@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, type Resolver, type SubmitHandler } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { registrarGastoSchema, type RegistrarGastoFormData } from '@/lib/schemas/tesoreria.schema'
 import { Button } from '@/components/ui/button'
@@ -26,7 +26,7 @@ export function GastoForm({ categorias, cajas }: GastoFormProps) {
   const [uploadingFile, setUploadingFile] = useState(false)
 
   const form = useForm<RegistrarGastoFormData>({
-    resolver: zodResolver(registrarGastoSchema),
+    resolver: zodResolver(registrarGastoSchema) as Resolver<RegistrarGastoFormData>,
     defaultValues: {
       afecta_caja: false,
     },
@@ -55,7 +55,7 @@ export function GastoForm({ categorias, cajas }: GastoFormProps) {
     form.setValue('comprobante_url', undefined)
   }
 
-  const onSubmit = (values: RegistrarGastoFormData) => {
+  const onSubmit: SubmitHandler<RegistrarGastoFormData> = (values) => {
     setError(null)
     startTransition(async () => {
       try {

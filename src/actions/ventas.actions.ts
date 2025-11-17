@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import type {
   CrearPedidoParams,
   CrearPedidoBotParams,
+  CrearPedidoBotResponse,
   CrearCotizacionParams,
   CrearReclamoParams,
   CrearReclamoBotParams,
@@ -223,7 +224,7 @@ export async function crearPedido(
 // Crear pedido desde bot (usa función RPC)
 export async function crearPedidoBot(
   params: CrearPedidoBotParams
-): Promise<ApiResponse<{ pedidoId: string; numeroPedido: string; total: number }>> {
+): Promise<ApiResponse<CrearPedidoBotResponse>> {
   try {
     const supabase = await createClient()
 

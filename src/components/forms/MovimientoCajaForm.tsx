@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, type Resolver, type SubmitHandler } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { movimientoCajaSchema, type MovimientoCajaFormData } from '@/lib/schemas/tesoreria.schema'
 import { Button } from '@/components/ui/button'
@@ -21,14 +21,14 @@ export function MovimientoCajaForm({ cajas }: MovimientoCajaFormProps) {
   const [error, setError] = useState<string | null>(null)
 
   const form = useForm<MovimientoCajaFormData>({
-    resolver: zodResolver(movimientoCajaSchema),
+    resolver: zodResolver(movimientoCajaSchema) as Resolver<MovimientoCajaFormData>,
     defaultValues: {
       tipo: 'ingreso',
       metodo_pago: 'efectivo',
     },
   })
 
-  const onSubmit = (values: MovimientoCajaFormData) => {
+  const onSubmit: SubmitHandler<MovimientoCajaFormData> = (values) => {
     setError(null)
     startTransition(async () => {
       try {

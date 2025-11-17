@@ -1,7 +1,7 @@
 'use client'
 
 import { useTransition, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, type Resolver, type SubmitHandler } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
   registrarPagoPedidoSchema,
@@ -25,7 +25,7 @@ export function RegistrarPagoPedidoForm({ pedidoId, cajas, saldoPendiente }: Reg
   const [error, setError] = useState<string | null>(null)
 
   const form = useForm<RegistrarPagoPedidoFormData>({
-    resolver: zodResolver(registrarPagoPedidoSchema),
+    resolver: zodResolver(registrarPagoPedidoSchema) as Resolver<RegistrarPagoPedidoFormData>,
     defaultValues: {
       pedido_id: pedidoId,
       tipo_pago: 'efectivo',
@@ -33,7 +33,7 @@ export function RegistrarPagoPedidoForm({ pedidoId, cajas, saldoPendiente }: Reg
     },
   })
 
-  const onSubmit = (values: RegistrarPagoPedidoFormData) => {
+  const onSubmit: SubmitHandler<RegistrarPagoPedidoFormData> = (values) => {
     setError(null)
     startTransition(async () => {
       try {

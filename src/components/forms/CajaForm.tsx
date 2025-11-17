@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, type Resolver, type SubmitHandler } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { crearCajaSchema, type CrearCajaFormData } from '@/lib/schemas/tesoreria.schema'
 import { Button } from '@/components/ui/button'
@@ -16,7 +16,7 @@ export function CajaForm() {
   const [error, setError] = useState<string | null>(null)
 
   const form = useForm<CrearCajaFormData>({
-    resolver: zodResolver(crearCajaSchema),
+    resolver: zodResolver(crearCajaSchema) as Resolver<CrearCajaFormData>,
     defaultValues: {
       nombre: '',
       saldo_inicial: 0,
@@ -25,7 +25,7 @@ export function CajaForm() {
     },
   })
 
-  const onSubmit = (values: CrearCajaFormData) => {
+  const onSubmit: SubmitHandler<CrearCajaFormData> = (values) => {
     setError(null)
     startTransition(async () => {
       try {

@@ -243,7 +243,9 @@ export async function POST(request: Request) {
 
     if (parsed.data.formato === 'pdf') {
       const pdfBuffer = await toPdf(tipoTitulos[parsed.data.tipo] || 'Reporte', headers, rows)
-      return new NextResponse(pdfBuffer, {
+      const pdfArrayBuffer = pdfBuffer.buffer.slice(pdfBuffer.byteOffset, pdfBuffer.byteOffset + pdfBuffer.byteLength)
+      const pdfUint8Array = new Uint8Array(pdfArrayBuffer)
+      return new NextResponse(pdfUint8Array as any, {
         status: 200,
         headers: {
           'Content-Type': 'application/pdf',

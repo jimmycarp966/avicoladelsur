@@ -100,6 +100,14 @@ export interface CrearPedidoBotParams extends CrearPedidoParams {
   }
 }
 
+export interface CrearPedidoBotResponse {
+  pedidoId: string
+  numeroPedido: string
+  total: number
+  referenciaPago: string | null
+  instruccionRepartidor: string | null
+}
+
 export interface CrearCotizacionParams {
   cliente_id: string
   items: Array<{
