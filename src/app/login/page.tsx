@@ -1,0 +1,55 @@
+import { redirect } from 'next/navigation'
+import { getCurrentUser } from '@/actions/auth.actions'
+import { LoginForm } from '@/components/auth/LoginForm'
+
+export const dynamic = 'force-dynamic'
+
+export default async function LoginPage() {
+  // Verificar si hay configuración de Supabase
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-white to-accent/5 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-8">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">Configuración Requerida</h1>
+            <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-md">
+              <h4 className="text-sm font-medium text-destructive mb-2">❌ Supabase no configurado</h4>
+              <p className="text-xs text-destructive/90 mb-4">
+                Para usar el sistema de autenticación, necesitas configurar Supabase primero.
+              </p>
+              <p className="text-xs text-destructive/80">
+                Consulta el archivo <code className="bg-destructive/20 px-1 rounded">SUPABASE_SETUP.md</code> para las instrucciones detalladas.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Si ya hay un usuario autenticado, redirigir según su rol
+  const user = await getCurrentUser()
+
+  if (user) {
+    switch (user.rol) {
+      case 'admin':
+        redirect('/dashboard')
+      case 'vendedor':
+        redirect('/ventas/pedidos')
+      case 'repartidor':
+        redirect('/home')
+      case 'almacenista':
+        redirect('/almacen/productos')
+      default:
+        redirect('/')
+    }
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-white to-accent/5 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        <LoginForm />
+      </div>
+    </div>
+  )
+}

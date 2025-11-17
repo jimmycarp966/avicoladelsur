@@ -1,0 +1,211 @@
+'use client'
+
+import { ColumnDef } from '@tanstack/react-table'
+import { DataTable, SortableHeader, StatusBadge } from '@/components/ui/data-table'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Edit, Trash2, Eye, Truck, MapPin, Navigation, CheckCircle, Clock } from 'lucide-react'
+import { formatDate } from '@/lib/utils'
+import type { RutaReparto as Ruta } from '@/types/domain.types'
+
+interface RutasTableProps {
+  data: Ruta[]
+  onView?: (ruta: Ruta) => void
+  onEdit?: (ruta: Ruta) => void
+  onDelete?: (ruta: Ruta) => void
+  onStart?: (ruta: Ruta) => void
+  onComplete?: (ruta: Ruta) => void
+}
+
+const getEstadoConfig = (estado: string) => {
+  const configs = {
+    planificada: { label: 'Planificada', variant: 'secondary' as const, color: 'bg-blue-100 text-blue-800' },
+    en_curso: { label: 'En Curso', variant: 'default' as const, color: 'bg-green-100 text-green-800' },
+    completada: { label: 'Completada', variant: 'default' as const, color: 'bg-purple-100 text-purple-800' },
+    cancelada: { label: 'Cancelada', variant: 'destructive' as const, color: 'bg-red-100 text-red-800' },
+  }
+  return configs[estado as keyof typeof configs] || { label: estado, variant: 'outline' as const, color: 'bg-gray-100 text-gray-800' }
+}
+
+export function RutasTable({ data, onView, onEdit, onDelete, onStart, onComplete }: RutasTableProps) {
+  const columns: ColumnDef<Ruta>[] = [
+    {
+      accessorKey: 'numero_ruta',
+      header: ({ column }) => (
+        <SortableHeader column={column}>Ruta</SortableHeader>
+      ),
+      cell: ({ row }) => {
+        const numero = row.getValue('numero_ruta') as string
+        return (
+          <div className="font-medium text-blue-600">
+            #{numero}
+          </div>
+        )
+      },
+    },
+    {
+      accessorKey: 'fecha_planificada',
+      header: ({ column }) => (
+        <SortableHeader column={column}>Fecha</SortableHeader>
+      ),
+      cell: ({ row }) => {
+        const fecha = row.getValue('fecha_planificada') as string
+        return (
+          <div className="text-sm text-muted-foreground">
+            {formatDate(fecha)}
+          </div>
+        )
+      },
+    },
+    {
+      accessorKey: 'repartidor_id',
+      header: 'Repartidor',
+      cell: ({ row }) => {
+        const repartidorId = row.getValue('repartidor_id') as string
+        // En producción, aquí haríamos una consulta para obtener el nombre del repartidor
+        return (
+          <div className="flex items-center gap-2">
+            <Avatar className="h-6 w-6">
+              <AvatarFallback className="text-xs">R</AvatarFallback>
+            </Avatar>
+            <span className="text-sm">Repartidor {repartidorId}</span>
+          </div>
+        )
+      },
+    },
+    {
+      accessorKey: 'vehiculo_id',
+      header: 'Vehículo',
+      cell: ({ row }) => {
+        const vehiculoId = row.getValue('vehiculo_id') as string
+        // En producción, aquí haríamos una consulta para obtener la patente del vehículo
+        return (
+          <div className="flex items-center gap-2">
+            <div className="p-1 bg-blue-100 rounded">
+              <Truck className="h-3 w-3 text-blue-600" />
+            </div>
+            <span className="text-sm">Vehículo {vehiculoId}</span>
+          </div>
+        )
+      },
+    },
+    {
+      accessorKey: 'peso_total_kg',
+      header: 'Peso Total',
+      cell: ({ row }) => {
+        const peso = row.getValue('peso_total_kg') as number
+        return (
+          <div className="text-center">
+            <div className="font-medium">{peso || 0} kg</div>
+          </div>
+        )
+      },
+    },
+    {
+      accessorKey: 'estado',
+      header: 'Estado',
+      cell: ({ row }) => {
+        const estado = row.getValue('estado') as string
+        const config = getEstadoConfig(estado)
+        return (
+          <Badge variant={config.variant} className={config.color}>
+            {config.label}
+          </Badge>
+        )
+      },
+    },
+    {
+      accessorKey: 'tiempo_estimado_min',
+      header: 'Tiempo Est.',
+      cell: ({ row }) => {
+        const tiempoMin = row.getValue('tiempo_estimado_min') as number
+
+        if (!tiempoMin) return <span className="text-muted-foreground">Sin estimar</span>
+
+        const horas = Math.floor(tiempoMin / 60)
+        const minutos = tiempoMin % 60
+
+        return (
+          <div className="text-sm text-muted-foreground">
+            {horas > 0 ? `${horas}h ` : ''}{minutos}min
+          </div>
+        )
+      },
+    },
+  ]
+
+  const actions = (ruta: Ruta) => (
+    <>
+      {onView && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onView(ruta)}
+          className="w-full justify-start"
+        >
+          <Eye className="mr-2 h-4 w-4" />
+          Ver detalles
+        </Button>
+      )}
+      {onStart && ruta.estado === 'planificada' && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onStart(ruta)}
+          className="w-full justify-start"
+        >
+          <Navigation className="mr-2 h-4 w-4" />
+          Iniciar ruta
+        </Button>
+      )}
+      {onComplete && ruta.estado === 'en_curso' && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onComplete(ruta)}
+          className="w-full justify-start"
+        >
+          <CheckCircle className="mr-2 h-4 w-4" />
+          Completar ruta
+        </Button>
+      )}
+      {onEdit && ruta.estado === 'planificada' && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onEdit(ruta)}
+          className="w-full justify-start"
+        >
+          <Edit className="mr-2 h-4 w-4" />
+          Editar
+        </Button>
+      )}
+      {onDelete && ruta.estado === 'planificada' && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onDelete(ruta)}
+          className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
+        >
+          <Trash2 className="mr-2 h-4 w-4" />
+          Cancelar
+        </Button>
+      )}
+    </>
+  )
+
+  return (
+    <DataTable
+      columns={columns}
+      data={data}
+      searchKey="numero_ruta"
+      searchPlaceholder="Buscar por número de ruta, repartidor..."
+      actions={actions}
+      enableRowSelection={true}
+      enableColumnVisibility={true}
+      enablePagination={true}
+      pageSize={15}
+    />
+  )
+}

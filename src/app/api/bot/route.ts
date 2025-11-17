@@ -1,0 +1,1095 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { crearPedidoBot } from '@/actions/ventas.actions'
+import { crearReclamoBot } from '@/actions/ventas.actions'
+
+// Tipos para las llamadas de Botpress
+interface BotpressWebhookPayload {
+  intent: string
+  parameters: Record<string, any>
+  session: {
+    userId: string
+    channel: string
+  }
+  message?: string
+}
+
+interface BotpressResponse {
+  success: boolean
+  message?: string
+  data?: any
+  error?: string
+}
+
+// Función auxiliar para encontrar cliente por teléfono
+async function findClienteByPhone(phone: string) {
+  const supabase = await createClient()
+
+  // Normalizar el número de teléfono (remover espacios, guiones, etc.)
+  const normalizedPhone = phone.replace(/[\s\-\(\)]/g, '')
+
+  const { data: cliente, error } = await supabase
+    .from('clientes')
+    .select('id, nombre, telefono, whatsapp')
+    .or(`telefono.ilike.%${normalizedPhone}%,whatsapp.ilike.%${normalizedPhone}%`)
+    .eq('activo', true)
+    .single()
+
+  if (error && error.code !== 'PGRST116') {
+    console.error('Error finding cliente:', error)
+    return null
+  }
+
+  return cliente
+}
+
+// Función auxiliar para encontrar producto por código
+async function findProductoByCode(code: string) {
+  const supabase = await createClient()
+
+  const { data: producto, error } = await supabase
+    .from('productos')
+    .select('id, codigo, nombre, precio_venta, unidad_medida')
+    .eq('codigo', code.toUpperCase())
+    .eq('activo', true)
+    .single()
+
+  if (error && error.code !== 'PGRST116') {
+    console.error('Error finding producto:', error)
+    return null
+  }
+
+  return producto
+}
+
+// Función auxiliar para obtener estado de pedido
+async function getPedidoStatus(pedidoNumero: string) {
+  const supabase = await createClient()
+
+  const { data: pedido, error } = await supabase
+    .from('pedidos')
+    .select(`
+      id,
+      numero_pedido,
+      estado,
+      fecha_pedido,
+      fecha_entrega_estimada,
+      fecha_entrega_real,
+      total,
+      clientes (
+        nombre
+      )
+    `)
+    .eq('numero_pedido', pedidoNumero)
+    .single()
+
+  if (error && error.code !== 'PGRST116') {
+    console.error('Error getting pedido status:', error)
+    return null
+  }
+
+  return pedido
+}
+
+async function getCuentaCorriente(clienteId: string) {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('cuentas_corrientes')
+    .select('saldo, limite_credito')
+    .eq('cliente_id', clienteId)
+    .single()
+
+  if (error && error.code !== 'PGRST116') {
+    console.error('Error getting cuenta corriente:', error)
+    return null
+  }
+
+  return data
+}
+
+// Manejador principal del webhook
+async function handleBotpressWebhook(payload: BotpressWebhookPayload): Promise<BotpressResponse> {
+  const { intent, parameters } = payload
+
+  try {
+    switch (intent) {
+      case 'tomar_pedido':
+      case 'crear_pedido': {
+        const { cliente_telefono, productos } = parameters
+
+        if (!cliente_telefono || !productos || !Array.isArray(productos)) {
+          return {
+            success: false,
+            error: 'Faltan parámetros: cliente_telefono y productos son requeridos'
+          }
+        }
+
+        // Buscar cliente por teléfono
+        const cliente = await findClienteByPhone(cliente_telefono)
+        if (!cliente) {
+          return {
+            success: false,
+            error: 'Cliente no encontrado. Por favor registre sus datos primero.'
+          }
+        }
+
+        // Procesar productos
+        const items = []
+        for (const prod of productos) {
+          if (!prod.codigo || !prod.cantidad) continue
+
+          const producto = await findProductoByCode(prod.codigo)
+          if (!producto) {
+            return {
+              success: false,
+              error: `Producto con código ${prod.codigo} no encontrado`
+            }
+          }
+
+          items.push({
+            producto_id: producto.id,
+            cantidad: prod.cantidad,
+            precio_unitario: producto.precio_venta
+          })
+        }
+
+        if (items.length === 0) {
+          return {
+            success: false,
+            error: 'No se encontraron productos válidos en el pedido'
+          }
+        }
+
+        // Crear pedido
+        const result = await crearPedidoBot({
+          cliente_id: cliente.id,
+          items,
+          observaciones: parameters.observaciones || 'Pedido creado desde WhatsApp',
+          origen: 'whatsapp'
+        })
+
+        if (result.success && result.data) {
+          return {
+            success: true,
+            message: `¡Pedido creado exitosamente! Número de pedido: ${result.data.numeroPedido}`,
+            data: {
+              pedido_id: result.data.pedidoId,
+              numero_pedido: result.data.numeroPedido,
+              total: result.data.total,
+              cliente: cliente.nombre
+            }
+          }
+        } else {
+          return {
+            success: false,
+            error: result.error || 'Error al crear el pedido'
+          }
+        }
+      }
+
+      case 'consultar_pedido':
+      case 'estado_pedido': {
+        const { pedido_numero } = parameters
+
+        if (!pedido_numero) {
+          return {
+            success: false,
+            error: 'Número de pedido es requerido'
+          }
+        }
+
+        const pedido = await getPedidoStatus(pedido_numero)
+        if (!pedido) {
+          return {
+            success: false,
+            error: 'Pedido no encontrado'
+          }
+        }
+
+        // Traducir estados a español
+        const estadosTraducidos = {
+          pendiente: 'Pendiente',
+          confirmado: 'Confirmado',
+          preparando: 'En preparación',
+          enviado: 'Enviado',
+          entregado: 'Entregado',
+          cancelado: 'Cancelado'
+        }
+
+        return {
+          success: true,
+          message: `Estado del pedido ${pedido.numero_pedido}: ${estadosTraducidos[pedido.estado as keyof typeof estadosTraducidos] || pedido.estado}`,
+          data: {
+            numero_pedido: pedido.numero_pedido,
+            estado: pedido.estado,
+            fecha_pedido: pedido.fecha_pedido,
+            fecha_entrega_estimada: pedido.fecha_entrega_estimada,
+            fecha_entrega_real: pedido.fecha_entrega_real,
+            total: pedido.total,
+            cliente: (pedido as any).clientes?.nombre
+          }
+        }
+      }
+
+      case 'consultar_deuda': {
+        const { cliente_telefono } = parameters
+        if (!cliente_telefono) {
+          return {
+            success: false,
+            error: 'Debes enviar el número de teléfono del cliente',
+          }
+        }
+
+        const cliente = await findClienteByPhone(cliente_telefono)
+        if (!cliente) {
+          return { success: false, error: 'Cliente no encontrado' }
+        }
+
+        const cuenta = await getCuentaCorriente(cliente.id)
+        const saldo = cuenta?.saldo ?? 0
+        return {
+          success: true,
+          message: saldo > 0
+            ? `Tu saldo pendiente es de $${saldo.toFixed(2)}. Puedes abonar en efectivo al repartidor o solicitar un link de pago.`
+            : 'No registramos deudas pendientes. ¡Gracias por mantener tus pagos al día!',
+          data: {
+            saldo,
+            limite_credito: cuenta?.limite_credito ?? 0,
+          },
+        }
+      }
+
+      case 'registrar_reclamo':
+      case 'crear_reclamo': {
+        const { cliente_telefono, tipo_reclamo, descripcion } = parameters
+
+        if (!cliente_telefono || !tipo_reclamo || !descripcion) {
+          return {
+            success: false,
+            error: 'Faltan parámetros: cliente_telefono, tipo_reclamo y descripcion son requeridos'
+          }
+        }
+
+        // Buscar cliente por teléfono
+        const cliente = await findClienteByPhone(cliente_telefono)
+        if (!cliente) {
+          return {
+            success: false,
+            error: 'Cliente no encontrado. Por favor registre sus datos primero.'
+          }
+        }
+
+        // Crear reclamo
+        const result = await crearReclamoBot({
+          cliente_id: cliente.id,
+          tipo_reclamo,
+          descripcion,
+          pedido_id: parameters.pedido_id,
+          prioridad: parameters.prioridad || 'media',
+          origen: 'whatsapp'
+        })
+
+        if (result.success && result.data) {
+          return {
+            success: true,
+            message: 'Reclamo registrado exitosamente. Nos pondremos en contacto pronto.',
+            data: {
+              reclamo_id: result.data.reclamoId,
+              numero_reclamo: `REC-${Date.now()}`,
+              tipo_reclamo,
+              cliente: cliente.nombre
+            }
+          }
+        } else {
+          return {
+            success: false,
+            error: result.error || 'Error al registrar el reclamo'
+          }
+        }
+      }
+
+      case 'consultar_productos':
+      case 'lista_productos': {
+        const supabase = await createClient()
+
+        const { data: productos, error } = await supabase
+          .from('productos')
+          .select('codigo, nombre, precio_venta, unidad_medida')
+          .eq('activo', true)
+          .order('nombre')
+          .limit(20)
+
+        if (error) {
+          return {
+            success: false,
+            error: 'Error al consultar productos'
+          }
+        }
+
+        return {
+          success: true,
+          message: `Encontré ${productos.length} productos disponibles`,
+          data: {
+            productos: productos.map(p => ({
+              codigo: p.codigo,
+              nombre: p.nombre,
+              precio: p.precio_venta,
+              unidad: p.unidad_medida
+            }))
+          }
+        }
+      }
+
+      case 'consultar_stock': {
+        const { producto_codigo } = parameters
+
+        if (!producto_codigo) {
+          return {
+            success: false,
+            error: 'Código de producto es requerido'
+          }
+        }
+
+        const producto = await findProductoByCode(producto_codigo)
+        if (!producto) {
+          return {
+            success: false,
+            error: 'Producto no encontrado'
+          }
+        }
+
+        // Obtener stock disponible
+        const supabase = await createClient()
+        const { data: stock, error } = await supabase
+          .rpc('get_stock_disponible', { producto_id: producto.id })
+
+        if (error) {
+          return {
+            success: false,
+            error: 'Error al consultar stock'
+          }
+        }
+
+        return {
+          success: true,
+          message: `Stock disponible de ${producto.nombre}: ${stock || 0} ${producto.unidad_medida || 'unidades'}`,
+          data: {
+            producto: producto.nombre,
+            stock_disponible: stock || 0,
+            unidad: producto.unidad_medida || 'unidades'
+          }
+        }
+      }
+
+      default:
+        return {
+          success: false,
+          error: `Intención "${intent}" no reconocida`
+        }
+    }
+  } catch (error: any) {
+    console.error('Error en webhook de Botpress:', error)
+    return {
+      success: false,
+      error: 'Error interno del servidor'
+    }
+  }
+}
+
+// Store temporal para confirmaciones de pedido (en producción usar Redis o DB)
+const pendingConfirmations = new Map<string, {
+  productos: Array<{ codigo: string; cantidad: number }>;
+  timestamp: number;
+}>()
+
+// Función auxiliar para verificar horario de atención
+function isHorarioAtencion(): { abierto: boolean; mensaje?: string } {
+  const now = new Date()
+  const hora = now.getHours()
+  const dia = now.getDay() // 0 = Domingo, 6 = Sábado
+  
+  // Lunes a Viernes: 8am - 6pm
+  if (dia >= 1 && dia <= 5) {
+    if (hora >= 8 && hora < 18) {
+      return { abierto: true }
+    }
+  }
+  
+  // Sábado: 8am - 1pm
+  if (dia === 6) {
+    if (hora >= 8 && hora < 13) {
+      return { abierto: true }
+    }
+  }
+  
+  // Fuera de horario
+  return {
+    abierto: false,
+    mensaje: `🌙 *Estamos cerrados*
+
+Horario de atención:
+📅 Lun-Vie: 8:00am - 6:00pm
+📅 Sábado: 8:00am - 1:00pm
+📅 Domingo: Cerrado
+
+Tu mensaje será atendido en el próximo horario hábil. ¡Gracias!`
+  }
+}
+
+// Función para manejar mensajes directos de Twilio
+async function handleTwilioWebhook(formData: FormData) {
+  const body = formData.get('Body')?.toString().trim() || ''
+  const from = formData.get('From')?.toString() || ''
+  
+  // Extraer el número de teléfono (Twilio envía: whatsapp:+1234567890)
+  const phoneNumber = from.replace('whatsapp:', '')
+  
+  console.log('Mensaje de Twilio recibido:', { from: phoneNumber, body })
+
+  let responseMessage = ''
+
+  try {
+    const bodyLower = body.toLowerCase()
+    
+    // Verificar horario de atención (excepto para consultas)
+    const horario = isHorarioAtencion()
+    if (!horario.abierto && !bodyLower.includes('estado') && !bodyLower.includes('consulta')) {
+      responseMessage = horario.mensaje || ''
+      // Continuar procesando de todos modos
+    }
+
+    // Comando: Hola / Ayuda
+    if (bodyLower.includes('hola') || bodyLower.includes('ayuda') || bodyLower.includes('menu') || bodyLower.includes('inicio')) {
+      responseMessage = `¡Hola! 👋 Bienvenido a *Avícola del Sur*
+
+🛒 *Menú Principal*
+
+1️⃣ Ver productos disponibles
+2️⃣ Hacer un pedido
+3️⃣ Consultar mi pedido
+4️⃣ Registrar un reclamo
+
+📝 *Responde con el número* de la opción que deseas.
+
+💡 También puedes escribir comandos:
+• *productos* - Ver catálogo
+• *pedido POLLO001 5* - Ordenar
+• *ayuda* - Ver este menú`
+    }
+    // Comando: Opciones del menú numérico
+    else if (body === '1' || bodyLower === 'opcion 1') {
+      // Redirigir a productos
+      const supabase = await createClient()
+      
+      const { data: productos, error } = await supabase
+        .from('productos')
+        .select(`
+          id,
+          codigo, 
+          nombre, 
+          precio_venta, 
+          unidad_medida,
+          categoria
+        `)
+        .eq('activo', true)
+        .order('categoria')
+        .order('nombre')
+        .limit(10)
+
+      if (error || !productos || productos.length === 0) {
+        responseMessage = 'No hay productos disponibles. Intenta más tarde.'
+      } else {
+        const productosConStock = await Promise.all(
+          productos.map(async (p) => {
+            const { data: lotes } = await supabase
+              .from('lotes')
+              .select('cantidad_disponible')
+              .eq('producto_id', p.id)
+              .eq('estado', 'disponible')
+              .gte('fecha_vencimiento', new Date().toISOString().split('T')[0])
+            
+            const stockTotal = lotes?.reduce((sum, l) => sum + Number(l.cantidad_disponible), 0) || 0
+            return { ...p, stock: stockTotal }
+          })
+        )
+
+        const productosDisponibles = productosConStock.filter(p => p.stock > 0)
+
+        if (productosDisponibles.length > 0) {
+          const categorias = [...new Set(productosDisponibles.map(p => p.categoria || 'Otros'))]
+          
+          responseMessage = `📦 *Catálogo de Productos*\n\n`
+          
+          categorias.forEach(categoria => {
+            responseMessage += `*${categoria}:*\n`
+            productosDisponibles
+              .filter(p => (p.categoria || 'Otros') === categoria)
+              .forEach((p) => {
+                const stockEmoji = p.stock > 50 ? '🟢' : p.stock > 20 ? '🟡' : '🔴'
+                responseMessage += `${stockEmoji} *[${p.codigo}]* ${p.nombre}\n`
+                responseMessage += `   💰 $${p.precio_venta}/${p.unidad_medida} | Stock: ${Math.floor(p.stock)}\n\n`
+              })
+          })
+          
+          responseMessage += `\n💬 Para ordenar responde:\n*[CODIGO] [CANTIDAD]*\nEj: POLLO001 5`
+        } else {
+          responseMessage = 'No hay productos con stock disponible.'
+        }
+      }
+    }
+    else if (body === '2' || bodyLower === 'opcion 2') {
+      responseMessage = `🛒 *Hacer un Pedido*
+
+Para hacer un pedido escribe:
+*[CODIGO] [CANTIDAD]*
+
+Ejemplo:
+*POLLO001 5*
+
+Para ver los productos disponibles, escribe *1* o *productos*`
+    }
+    else if (body === '3' || bodyLower === 'opcion 3') {
+      responseMessage = '🚧 Consulta de pedidos en desarrollo.\n\nPronto podrás consultar el estado de tus pedidos.'
+    }
+    else if (body === '4' || bodyLower === 'opcion 4') {
+      responseMessage = '🚧 Registro de reclamos en desarrollo.\n\nPronto podrás registrar reclamos desde aquí.'
+    }
+    // Confirmación de pedido
+    else if (bodyLower === 'si' || bodyLower === 'sí' || bodyLower === 'confirmar' || bodyLower === 'confirmo') {
+      const pending = pendingConfirmations.get(phoneNumber)
+      
+      if (!pending) {
+        responseMessage = 'No tienes ningún pedido pendiente de confirmación.\n\nEscribe el código y cantidad para hacer un pedido.'
+      } else {
+        // Verificar que no haya expirado (5 minutos)
+        if (Date.now() - pending.timestamp > 5 * 60 * 1000) {
+          pendingConfirmations.delete(phoneNumber)
+          responseMessage = '⏰ La confirmación ha expirado.\n\nVuelve a hacer tu pedido.'
+        } else {
+          const cliente = await findClienteByPhone(phoneNumber)
+          if (!cliente) {
+            responseMessage = '❌ Error: Cliente no encontrado.'
+          } else {
+            // Procesar todos los productos
+            const items = []
+            let totalGeneral = 0
+            
+            for (const prod of pending.productos) {
+              const producto = await findProductoByCode(prod.codigo)
+              if (producto) {
+                items.push({
+                  producto_id: producto.id,
+                  cantidad: prod.cantidad,
+                  precio_unitario: producto.precio_venta
+                })
+                totalGeneral += prod.cantidad * producto.precio_venta
+              }
+            }
+
+            const result = await crearPedidoBot({
+              cliente_id: cliente.id,
+              items: items,
+              observaciones: 'Pedido desde WhatsApp',
+              origen: 'whatsapp'
+            })
+
+            if (result.success && result.data) {
+              // Crear notificación
+              const supabase = await createClient()
+              await supabase.rpc('crear_notificacion', {
+                p_tipo: 'pedido_whatsapp',
+                p_titulo: 'Nuevo pedido desde WhatsApp',
+                p_mensaje: `${cliente.nombre} realizó un pedido por $${result.data.total.toFixed(2)}`,
+                p_datos: { pedido_id: result.data.pedidoId, cliente: cliente.nombre, total: result.data.total }
+              })
+
+              const referenciaPago = result.data.referenciaPago || ''
+              const mensajePago = referenciaPago 
+                ? `\n💳 Referencia de pago: *${referenciaPago}*\n\nEl repartidor te cobrará al momento de la entrega.`
+                : `\n\nEl pago quedará pendiente y podrás abonarlo en efectivo al repartidor.`
+
+              responseMessage = `✅ *¡Pedido Confirmado!*
+
+📋 Número: *${result.data.numeroPedido}*
+📦 ${items.length} producto${items.length > 1 ? 's' : ''}
+💰 Total: *$${result.data.total.toFixed(2)}*${mensajePago}
+¡Gracias por tu compra! 🙏
+
+Escribe *menu* para volver al inicio.`
+              
+              pendingConfirmations.delete(phoneNumber)
+            } else {
+              responseMessage = `❌ Error al crear pedido: ${result.error}`
+            }
+          }
+        }
+      }
+    }
+    // Cancelar pedido
+    else if (bodyLower === 'no' || bodyLower === 'cancelar') {
+      if (pendingConfirmations.has(phoneNumber)) {
+        pendingConfirmations.delete(phoneNumber)
+        responseMessage = '❌ Pedido cancelado.\n\nEscribe *menu* para volver a empezar.'
+      } else {
+        responseMessage = 'No tienes ningún pedido pendiente.'
+      }
+    }
+    // Comando: Pedido múltiple (POLLO001 5, HUEVO001 2, POLLO003 3)
+    else if (body.includes(',')) {
+      const items = body.split(',').map(item => item.trim())
+      const productos = []
+      let totalPreview = 0
+      let hayError = false
+      let errorMsg = ''
+
+      for (const item of items) {
+        const match = item.match(/^([A-Z]{3,10}\d{3,4})\s+(\d+(?:\.\d+)?)$/i)
+        if (match) {
+          const codigo = match[1].toUpperCase()
+          const cantidad = parseFloat(match[2])
+          
+          const producto = await findProductoByCode(codigo)
+          if (!producto) {
+            hayError = true
+            errorMsg = `Producto ${codigo} no encontrado`
+            break
+          }
+          
+          // Verificar stock
+          const supabase = await createClient()
+          const { data: lotes } = await supabase
+            .from('lotes')
+            .select('cantidad_disponible')
+            .eq('producto_id', producto.id)
+            .eq('estado', 'disponible')
+            .gte('fecha_vencimiento', new Date().toISOString().split('T')[0])
+          
+          const stockDisponible = lotes?.reduce((sum, l) => sum + Number(l.cantidad_disponible), 0) || 0
+          
+          if (stockDisponible < cantidad) {
+            hayError = true
+            errorMsg = `Stock insuficiente de ${producto.nombre} (disponible: ${Math.floor(stockDisponible)})`
+            break
+          }
+          
+          productos.push({
+            codigo,
+            cantidad,
+            nombre: producto.nombre,
+            precio: producto.precio_venta,
+            unidad: producto.unidad_medida
+          })
+          totalPreview += cantidad * producto.precio_venta
+        }
+      }
+
+      if (hayError) {
+        responseMessage = `❌ ${errorMsg}\n\nRevisa tu pedido e intenta de nuevo.`
+      } else if (productos.length === 0) {
+        responseMessage = `❌ Formato incorrecto para pedido múltiple.
+
+Ejemplo:
+*POLLO001 5, HUEVO001 2, POLLO003 3*`
+      } else {
+        // Guardar para confirmación
+        pendingConfirmations.set(phoneNumber, {
+          productos: productos.map(p => ({ codigo: p.codigo, cantidad: p.cantidad })),
+          timestamp: Date.now()
+        })
+
+        responseMessage = `📦 *Resumen de tu pedido:*\n\n`
+        productos.forEach(p => {
+          responseMessage += `• ${p.nombre}: ${p.cantidad} ${p.unidad}\n  $${p.precio} x ${p.cantidad} = $${(p.precio * p.cantidad).toFixed(2)}\n\n`
+        })
+        responseMessage += `💰 *Total: $${totalPreview.toFixed(2)}*\n\n`
+        responseMessage += `¿Confirmas este pedido?\n\nResponde *SÍ* para confirmar o *NO* para cancelar.`
+      }
+    }
+    // Comando: Pedido simple con confirmación
+    else if (/^[A-Z]{3,10}\d{3,4}\s+\d+$/i.test(body.trim())) {
+      const parts = body.trim().split(/\s+/)
+      const codigo = parts[0].toUpperCase()
+      const cantidad = parseFloat(parts[1])
+
+      const cliente = await findClienteByPhone(phoneNumber)
+      if (!cliente) {
+        responseMessage = '❌ Tu número no está registrado. Contacta con ventas.'
+      } else {
+        const producto = await findProductoByCode(codigo)
+        if (!producto) {
+          responseMessage = `❌ Producto *${codigo}* no encontrado.\n\nEscribe *1* para ver productos disponibles.`
+        } else {
+          const supabase = await createClient()
+          const { data: lotes } = await supabase
+            .from('lotes')
+            .select('cantidad_disponible')
+            .eq('producto_id', producto.id)
+            .eq('estado', 'disponible')
+            .gte('fecha_vencimiento', new Date().toISOString().split('T')[0])
+          
+          const stockDisponible = lotes?.reduce((sum, l) => sum + Number(l.cantidad_disponible), 0) || 0
+
+          if (stockDisponible < cantidad) {
+            responseMessage = `❌ *Stock insuficiente*
+
+${producto.nombre}
+Solicitado: ${cantidad} ${producto.unidad_medida}
+Disponible: ${Math.floor(stockDisponible)} ${producto.unidad_medida}`
+          } else {
+            // Guardar para confirmación
+            pendingConfirmations.set(phoneNumber, {
+              productos: [{ codigo, cantidad }],
+              timestamp: Date.now()
+            })
+
+            const total = cantidad * producto.precio_venta
+            responseMessage = `📦 *Resumen de tu pedido:*
+
+• ${producto.nombre}
+  ${cantidad} ${producto.unidad_medida} x $${producto.precio_venta}
+  
+💰 *Total: $${total.toFixed(2)}*
+
+¿Confirmas este pedido?
+
+Responde *SÍ* para confirmar o *NO* para cancelar.`
+          }
+        }
+      }
+    }
+    // Comando: Productos
+    else if (bodyLower.includes('productos') || bodyLower.includes('catalogo') || bodyLower.includes('lista')) {
+      const supabase = await createClient()
+      
+      // Obtener productos con su stock disponible
+      const { data: productos, error } = await supabase
+        .from('productos')
+        .select(`
+          id,
+          codigo, 
+          nombre, 
+          precio_venta, 
+          unidad_medida,
+          categoria
+        `)
+        .eq('activo', true)
+        .order('categoria')
+        .order('nombre')
+        .limit(10)
+
+      if (error) {
+        console.error('Error obteniendo productos:', error)
+        responseMessage = 'Error al obtener productos. Intenta de nuevo.'
+      } else if (productos && productos.length > 0) {
+        // Obtener stock de cada producto
+        const productosConStock = await Promise.all(
+          productos.map(async (p) => {
+            const { data: lotes } = await supabase
+              .from('lotes')
+              .select('cantidad_disponible')
+              .eq('producto_id', p.id)
+              .eq('estado', 'disponible')
+              .gte('fecha_vencimiento', new Date().toISOString().split('T')[0])
+            
+            const stockTotal = lotes?.reduce((sum, l) => sum + Number(l.cantidad_disponible), 0) || 0
+            return { ...p, stock: stockTotal }
+          })
+        )
+
+        // Filtrar productos con stock
+        const productosDisponibles = productosConStock.filter(p => p.stock > 0)
+
+        if (productosDisponibles.length > 0) {
+          // Agrupar por categoría
+          const categorias = [...new Set(productosDisponibles.map(p => p.categoria || 'Otros'))]
+          
+          responseMessage = `📦 *Catálogo de Productos*\n\n`
+          
+          categorias.forEach(categoria => {
+            responseMessage += `*${categoria}:*\n`
+            productosDisponibles
+              .filter(p => (p.categoria || 'Otros') === categoria)
+              .forEach((p) => {
+                const stockEmoji = p.stock > 50 ? '🟢' : p.stock > 20 ? '🟡' : '🔴'
+                responseMessage += `${stockEmoji} *[${p.codigo}]* ${p.nombre}\n`
+                responseMessage += `   💰 $${p.precio_venta}/${p.unidad_medida} | Stock: ${Math.floor(p.stock)}\n\n`
+              })
+          })
+          
+          responseMessage += `\n💬 Para ordenar escribe:\n*pedido [CODIGO] [CANTIDAD]*\nEj: pedido POLLO001 5`
+        } else {
+          responseMessage = 'No hay productos con stock disponible en este momento.'
+        }
+      } else {
+        responseMessage = 'No hay productos disponibles en este momento.'
+      }
+    }
+    // Consulta de deuda
+    else if (bodyLower.includes('deuda') || bodyLower.includes('saldo pendiente')) {
+      const cliente = await findClienteByPhone(phoneNumber)
+      if (!cliente) {
+        responseMessage = '❌ No encontramos tu cuenta. Comunícate con un asesor.'
+      } else {
+        const cuenta = await getCuentaCorriente(cliente.id)
+        const saldo = Number(cuenta?.saldo || 0)
+        if (saldo > 0) {
+          responseMessage = `📄 *Estado de cuenta*\n\nCliente: ${cliente.nombre}\nSaldo pendiente: *$${saldo.toFixed(
+            2
+          )}*\n\nPuedes abonar al repartidor o solicitar un link de pago respondiendo *pagar*.`
+        } else {
+          responseMessage = '✅ No registras deudas pendientes. ¡Gracias por estar al día!'
+        }
+      }
+    }
+    // Comando: Pedido
+    else if (bodyLower.includes('pedido')) {
+      // Parsear el mensaje: "pedido POLLO001 5"
+      const parts = body.split(/\s+/)
+      if (parts.length >= 3) {
+        const codigo = parts[1].toUpperCase()
+        const cantidad = parseFloat(parts[2])
+
+        if (!isNaN(cantidad) && cantidad > 0) {
+          // Buscar cliente
+          const cliente = await findClienteByPhone(phoneNumber)
+          if (!cliente) {
+            responseMessage = '❌ Tu número no está registrado. Por favor contacta con ventas.'
+          } else {
+            // Buscar producto
+            const producto = await findProductoByCode(codigo)
+            if (!producto) {
+              responseMessage = `❌ Producto *${codigo}* no encontrado. Envía "productos" para ver el catálogo.`
+            } else {
+              // Verificar stock disponible
+              const supabase = await createClient()
+              const { data: lotes } = await supabase
+                .from('lotes')
+                .select('cantidad_disponible')
+                .eq('producto_id', producto.id)
+                .eq('estado', 'disponible')
+                .gte('fecha_vencimiento', new Date().toISOString().split('T')[0])
+              
+              const stockDisponible = lotes?.reduce((sum, l) => sum + Number(l.cantidad_disponible), 0) || 0
+
+              if (stockDisponible < cantidad) {
+                responseMessage = `❌ *Stock insuficiente*
+
+Producto: ${producto.nombre}
+Solicitado: ${cantidad} ${producto.unidad_medida}
+Disponible: ${Math.floor(stockDisponible)} ${producto.unidad_medida}
+
+Por favor reduce la cantidad o elige otro producto.`
+              } else {
+                // Crear pedido
+                const result = await crearPedidoBot({
+                  cliente_id: cliente.id,
+                  items: [{
+                    producto_id: producto.id,
+                    cantidad: cantidad,
+                    precio_unitario: producto.precio_venta
+                  }],
+                  observaciones: 'Pedido creado desde WhatsApp',
+                  origen: 'whatsapp'
+                })
+
+                if (result.success && result.data) {
+                  const referenciaPago = result.data.referenciaPago || ''
+                  const mensajePago = referenciaPago 
+                    ? `\n💳 Referencia de pago: *${referenciaPago}*\n\nEl repartidor te cobrará al momento de la entrega.`
+                    : `\n\nTu pedido será procesado pronto.`
+
+                  responseMessage = `✅ *Pedido creado exitosamente*
+
+📋 Número: *${result.data.numeroPedido}*
+📦 Producto: ${producto.nombre}
+📊 Cantidad: ${cantidad} ${producto.unidad_medida}
+💰 Total: *$${result.data.total.toFixed(2)}*${mensajePago}
+¡Gracias! 🙏`
+                } else {
+                  responseMessage = `❌ Error al crear pedido: ${result.error}`
+                }
+              }
+            }
+          }
+        } else {
+          responseMessage = '❌ Cantidad inválida. Ejemplo: pedido POLLO001 5'
+        }
+      } else {
+        responseMessage = '❌ Formato incorrecto.\n\nUsa: pedido [CODIGO] [CANTIDAD]\nEjemplo: pedido POLLO001 5'
+      }
+    }
+    // Comando: Estado de pedido
+    else if (bodyLower.includes('estado') || body === '3' || bodyLower === 'opcion 3') {
+      // Buscar si escribió el número de pedido
+      const match = body.match(/PED-[\w-]+/i)
+      
+      if (match) {
+        const numeroPedido = match[0].toUpperCase()
+        const pedido = await getPedidoStatus(numeroPedido)
+        
+        if (!pedido) {
+          responseMessage = `❌ Pedido *${numeroPedido}* no encontrado.\n\nVerifica el número e intenta de nuevo.`
+        } else {
+          const estadosEmoji: Record<string, string> = {
+            pendiente: '⏳',
+            confirmado: '✅',
+            preparando: '📦',
+            enviado: '🚚',
+            entregado: '🎉',
+            cancelado: '❌'
+          }
+          
+          const estadosTexto: Record<string, string> = {
+            pendiente: 'Pendiente de confirmación',
+            confirmado: 'Confirmado',
+            preparando: 'En preparación',
+            enviado: 'En camino',
+            entregado: 'Entregado',
+            cancelado: 'Cancelado'
+          }
+          
+          const emoji = estadosEmoji[pedido.estado] || '📋'
+          const estadoTexto = estadosTexto[pedido.estado] || pedido.estado
+          
+          responseMessage = `${emoji} *Estado de Pedido*
+
+📋 Número: *${pedido.numero_pedido}*
+🔄 Estado: *${estadoTexto}*
+📅 Fecha: ${new Date(pedido.fecha_pedido).toLocaleDateString('es-AR')}
+💰 Total: $${pedido.total}`
+
+          if (pedido.fecha_entrega_estimada) {
+            responseMessage += `\n🚚 Entrega estimada: ${new Date(pedido.fecha_entrega_estimada).toLocaleDateString('es-AR')}`
+          }
+          
+          if (pedido.fecha_entrega_real) {
+            responseMessage += `\n✅ Entregado: ${new Date(pedido.fecha_entrega_real).toLocaleDateString('es-AR')}`
+          }
+        }
+      } else {
+        // Mostrar últimos pedidos del cliente
+        const cliente = await findClienteByPhone(phoneNumber)
+        if (!cliente) {
+          responseMessage = '❌ No se encontró tu perfil.'
+        } else {
+          const supabase = await createClient()
+          const { data: pedidos } = await supabase
+            .from('pedidos')
+            .select('numero_pedido, estado, total, fecha_pedido')
+            .eq('cliente_id', cliente.id)
+            .order('fecha_pedido', { ascending: false })
+            .limit(5)
+
+          if (!pedidos || pedidos.length === 0) {
+            responseMessage = 'No tienes pedidos registrados.'
+          } else {
+            responseMessage = `📋 *Tus últimos pedidos:*\n\n`
+            pedidos.forEach(p => {
+              const estadosEmoji: Record<string, string> = {
+                pendiente: '⏳',
+                confirmado: '✅',
+                preparando: '📦',
+                enviado: '🚚',
+                entregado: '🎉',
+                cancelado: '❌'
+              }
+              const emoji = estadosEmoji[p.estado] || '📋'
+              responseMessage += `${emoji} ${p.numero_pedido}\n`
+              responseMessage += `   Estado: ${p.estado} | Total: $${p.total}\n\n`
+            })
+            responseMessage += `Para ver detalles de un pedido:\n*estado PED-XXXXX*`
+          }
+        }
+      }
+    }
+    // Comando: Reclamo
+    else if (bodyLower.includes('reclamo')) {
+      responseMessage = '🚧 Registro de reclamos en desarrollo. Pronto disponible.'
+    }
+    // Mensaje no reconocido
+    else {
+      responseMessage = `No entendí tu mensaje 🤔
+
+Envía *"ayuda"* para ver los comandos disponibles.`
+    }
+
+  } catch (error: any) {
+    console.error('Error procesando mensaje:', error)
+    responseMessage = 'Error al procesar tu mensaje. Intenta de nuevo.'
+  }
+
+  // Responder con TwiML
+  return new Response(
+    `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Message>${responseMessage.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</Message>
+</Response>`,
+    {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/xml',
+      },
+    }
+  )
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const contentType = request.headers.get('content-type') || ''
+    
+    // Detectar si es una petición de Twilio (form-urlencoded)
+    if (contentType.includes('application/x-www-form-urlencoded')) {
+      const formData = await request.formData()
+      return handleTwilioWebhook(formData)
+    }
+    
+    // Si es JSON, asumimos que es de Botpress
+    const authHeader = request.headers.get('authorization')
+    const expectedToken = process.env.BOTPRESS_WEBHOOK_TOKEN
+
+    if (expectedToken && authHeader !== `Bearer ${expectedToken}`) {
+      return NextResponse.json(
+        { success: false, error: 'Token de autenticación inválido' },
+        { status: 401 }
+      )
+    }
+
+    // Parsear el payload
+    const payload: BotpressWebhookPayload = await request.json()
+
+    // Validar payload básico
+    if (!payload.intent) {
+      return NextResponse.json(
+        { success: false, error: 'Intención es requerida' },
+        { status: 400 }
+      )
+    }
+
+    // Procesar la solicitud
+    const response = await handleBotpressWebhook(payload)
+
+    // Retornar respuesta
+    return NextResponse.json(response, {
+      status: response.success ? 200 : 400
+    })
+
+  } catch (error: any) {
+    console.error('Error en webhook POST:', error)
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Error interno del servidor'
+      },
+      { status: 500 }
+    )
+  }
+}
+
+// Método GET para health check
+export async function GET() {
+  return NextResponse.json({
+    success: true,
+    message: 'Bot webhook is running',
+    timestamp: new Date().toISOString()
+  })
+}
