@@ -182,10 +182,10 @@ export async function crearPedido(
           tipo_pago: params.pago.tipo_pago ?? 'efectivo',
         }
       : {
-          modalidad: 'contado',
-          monto: params.pago?.monto ?? null,
-          caja_id: params.pago?.caja_id ?? null,
-          tipo_pago: params.pago?.tipo_pago ?? 'efectivo',
+          modalidad: 'contado' as const,
+          monto: null,
+          caja_id: null,
+          tipo_pago: 'efectivo' as const,
         }
 
     const { data, error } = await supabase.rpc('fn_procesar_pedido', {
