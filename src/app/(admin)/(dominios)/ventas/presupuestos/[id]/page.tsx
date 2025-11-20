@@ -1,6 +1,6 @@
 import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, Package, User, MapPin, Calendar, DollarSign, Scale } from 'lucide-react'
+import { ArrowLeft, Package, User, MapPin, Calendar, DollarSign, Scale, Clock, History } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -206,6 +206,144 @@ async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) 
               </div>
             )) || (
               <p className="text-muted-foreground">No hay items en este presupuesto</p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Historial de Versiones */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <History className="h-5 w-5" />
+            Historial de Versiones
+          </CardTitle>
+          <CardDescription>
+            Registro de cambios y eventos del presupuesto
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {/* Evento: Creación */}
+            <div className="flex items-start gap-4 pb-4 border-b">
+              <div className="flex-shrink-0">
+                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                  <Package className="h-5 w-5 text-blue-600" />
+                </div>
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium">Presupuesto Creado</h4>
+                  <span className="text-sm text-muted-foreground">
+                    {new Date(presupuesto.created_at).toLocaleString('es-AR', {
+                      dateStyle: 'short',
+                      timeStyle: 'short'
+                    })}
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Presupuesto {presupuesto.numero_presupuesto} creado en estado "{presupuesto.estado}"
+                </p>
+                {presupuesto.usuario_vendedor && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Vendedor: {(presupuesto.usuario_vendedor as any)?.nombre || 'N/A'}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Evento: Cambio de estado a "en_almacen" */}
+            {presupuesto.estado === 'en_almacen' || presupuesto.estado === 'facturado' ? (
+              <div className="flex items-start gap-4 pb-4 border-b">
+                <div className="flex-shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
+                    <Package className="h-5 w-5 text-orange-600" />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium">Enviado a Almacén</h4>
+                    <span className="text-sm text-muted-foreground">
+                      {presupuesto.updated_at && presupuesto.updated_at !== presupuesto.created_at
+                        ? new Date(presupuesto.updated_at).toLocaleString('es-AR', {
+                            dateStyle: 'short',
+                            timeStyle: 'short'
+                          })
+                        : 'N/A'}
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Presupuesto enviado para procesamiento en almacén
+                  </p>
+                  {presupuesto.usuario_almacen && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Almacenista: {(presupuesto.usuario_almacen as any)?.nombre || 'N/A'}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : null}
+
+            {/* Evento: Conversión a pedido */}
+            {presupuesto.estado === 'facturado' && presupuesto.pedido_convertido_id ? (
+              <div className="flex items-start gap-4 pb-4 border-b">
+                <div className="flex-shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                    <Package className="h-5 w-5 text-green-600" />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium">Convertido a Pedido</h4>
+                    <span className="text-sm text-muted-foreground">
+                      {presupuesto.updated_at
+                        ? new Date(presupuesto.updated_at).toLocaleString('es-AR', {
+                            dateStyle: 'short',
+                            timeStyle: 'short'
+                          })
+                        : 'N/A'}
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Presupuesto convertido exitosamente a pedido
+                  </p>
+                  {presupuesto.pedido_convertido && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Pedido: {(presupuesto.pedido_convertido as any)?.numero_pedido || 'N/A'}
+                    </p>
+                  )}
+                  {presupuesto.total_final && presupuesto.total_final !== presupuesto.total_estimado && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Total ajustado: ${presupuesto.total_estimado.toFixed(2)} → ${presupuesto.total_final.toFixed(2)}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : null}
+
+            {/* Evento: Última actualización */}
+            {presupuesto.updated_at && presupuesto.updated_at !== presupuesto.created_at && (
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
+                    <Clock className="h-5 w-5 text-gray-600" />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium">Última Actualización</h4>
+                    <span className="text-sm text-muted-foreground">
+                      {new Date(presupuesto.updated_at).toLocaleString('es-AR', {
+                        dateStyle: 'short',
+                        timeStyle: 'short'
+                      })}
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Modificaciones realizadas en observaciones, fecha de entrega u otros campos
+                  </p>
+                </div>
+              </div>
             )}
           </div>
         </CardContent>

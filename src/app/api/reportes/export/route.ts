@@ -219,6 +219,141 @@ export async function POST(request: Request) {
         }))
         break
       }
+      case 'kg_por_ruta': {
+        // Reporte de kg por ruta y ventas del día
+        const fecha = parsed.data.filtros?.fecha 
+          ? new Date(parsed.data.filtros.fecha as string).toISOString().split('T')[0]
+          : new Date().toISOString().split('T')[0]
+
+        headers = [
+          'numero_ruta',
+          'fecha_ruta',
+          'vehiculo',
+          'zona',
+          'total_kg',
+          'total_ventas',
+          'cantidad_entregas',
+          'estado_ruta'
+        ]
+
+        const { data: rutas, error: rutasError } = await supabase
+          .from('rutas_reparto')
+          .select(`
+            id,
+            numero_ruta,
+            fecha_ruta,
+            estado,
+            vehiculo:vehiculos(
+              patente,
+              modelo
+            ),
+            zona:zonas(
+              nombre
+            ),
+            detalles:detalles_ruta(
+              pedido:pedidos(
+                total,
+                detalles:detalles_pedido(
+                  cantidad,
+                  peso_final,
+                  producto:productos(
+                    peso_unitario
+                  )
+                )
+              )
+            )
+          `)
+          .eq('fecha_ruta', fecha)
+          .order('numero_ruta', { ascending: true })
+
+        if (rutasError) throw rutasError
+
+        rows = (rutas || []).map(ruta => {
+          const detalles = ruta.detalles || []
+          let totalKg = 0
+          let totalVentas = 0
+
+          detalles.forEach((detalle: any) => {
+            const pedido = detalle.pedido
+            if (pedido) {
+              totalVentas += Number(pedido.total || 0)
+              
+              const detallesPedido = pedido.detalles || []
+              detallesPedido.forEach((dp: any) => {
+                // Usar peso_final si existe, sino calcular con peso_unitario
+                if (dp.peso_final) {
+                  totalKg += Number(dp.peso_final)
+                } else if (dp.producto?.peso_unitario) {
+                  totalKg += Number(dp.cantidad || 0) * Number(dp.producto.peso_unitario)
+                } else {
+                  totalKg += Number(dp.cantidad || 0) // Asumir kg si no hay peso_unitario
+                }
+              })
+            }
+          })
+
+          return {
+            numero_ruta: ruta.numero_ruta || '',
+            fecha_ruta: ruta.fecha_ruta || fecha,
+            vehiculo: (ruta.vehiculo as any)?.patente || (ruta.vehiculo as any)?.modelo || 'N/A',
+            zona: (ruta.zona as any)?.nombre || 'N/A',
+            total_kg: totalKg.toFixed(2),
+            total_ventas: totalVentas.toFixed(2),
+            cantidad_entregas: detalles.length,
+            estado_ruta: ruta.estado || 'pendiente',
+          }
+        })
+
+        // Si no hay rutas, agregar resumen del día
+        if (rows.length === 0) {
+          // Obtener pedidos del día directamente
+          const { data: pedidos, error: pedidosError } = await supabase
+            .from('pedidos')
+            .select(`
+              total,
+              fecha_pedido,
+              detalles:detalles_pedido(
+                cantidad,
+                peso_final,
+                producto:productos(
+                  peso_unitario
+                )
+              )
+            `)
+            .gte('fecha_pedido', `${fecha}T00:00:00`)
+            .lt('fecha_pedido', `${fecha}T23:59:59`)
+
+          if (!pedidosError && pedidos) {
+            let totalKgDia = 0
+            let totalVentasDia = 0
+
+            pedidos.forEach((pedido: any) => {
+              totalVentasDia += Number(pedido.total || 0)
+              const detalles = pedido.detalles || []
+              detalles.forEach((dp: any) => {
+                if (dp.peso_final) {
+                  totalKgDia += Number(dp.peso_final)
+                } else if (dp.producto?.peso_unitario) {
+                  totalKgDia += Number(dp.cantidad || 0) * Number(dp.producto.peso_unitario)
+                }
+              })
+            })
+
+            rows.push({
+              numero_ruta: 'RESUMEN_DIA',
+              fecha_ruta: fecha,
+              vehiculo: 'TODOS',
+              zona: 'TODAS',
+              total_kg: totalKgDia.toFixed(2),
+              total_ventas: totalVentasDia.toFixed(2),
+              cantidad_entregas: pedidos.length,
+              estado_ruta: 'completado',
+            })
+          }
+        }
+
+        break
+      }
       default:
         headers = []
         rows = []
@@ -239,6 +374,7 @@ export async function POST(request: Request) {
       gastos: 'Reporte de Gastos',
       movimientos_caja: 'Reporte de Movimientos de Caja',
       cuentas_corrientes: 'Reporte de Cuentas Corrientes',
+      kg_por_ruta: 'Reporte de KG por Ruta y Ventas del Día',
     }
 
     if (parsed.data.formato === 'pdf') {

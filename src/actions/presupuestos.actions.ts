@@ -380,6 +380,8 @@ export async function obtenerPresupuestoAction(presupuestoId: string) {
         zona:zonas(nombre),
         usuario_vendedor:usuarios(nombre),
         usuario_almacen:usuarios(nombre),
+        usuario_repartidor:usuarios(nombre),
+        pedido_convertido:pedidos(numero_pedido),
         items:presupuesto_items(
           *,
           producto:productos(*),
@@ -403,6 +405,162 @@ export async function obtenerPresupuestoAction(presupuestoId: string) {
 
   } catch (error) {
     console.error('Error en obtenerPresupuestoAction:', error)
+    return { success: false, message: 'Error interno del servidor' }
+  }
+}
+
+// Acción para recalcular presupuesto (actualizar precios y totales)
+export async function recalcularPresupuestoAction(presupuestoId: string) {
+  try {
+    const supabase = await createClient()
+
+    // Obtener usuario actual
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, message: 'Usuario no autenticado' }
+    }
+
+    // Obtener presupuesto con items
+    const { data: presupuesto, error: presupuestoError } = await supabase
+      .from('presupuestos')
+      .select(`
+        *,
+        items:presupuesto_items(
+          id,
+          producto_id,
+          cantidad_solicitada,
+          producto:productos(precio_venta)
+        )
+      `)
+      .eq('id', presupuestoId)
+      .single()
+
+    if (presupuestoError || !presupuesto) {
+      return { success: false, message: 'Presupuesto no encontrado' }
+    }
+
+    // Solo se puede recalcular si está pendiente
+    if (presupuesto.estado !== 'pendiente') {
+      return { success: false, message: 'Solo se pueden recalcular presupuestos pendientes' }
+    }
+
+    let totalEstimado = 0
+
+    // Recalcular cada item con precios actuales
+    for (const item of presupuesto.items || []) {
+      const precioActual = item.producto?.precio_venta || 0
+      const subtotalEst = item.cantidad_solicitada * precioActual
+
+      // Actualizar item
+      await supabase
+        .from('presupuesto_items')
+        .update({
+          precio_unit_est: precioActual,
+          subtotal_est: subtotalEst,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', item.id)
+
+      totalEstimado += subtotalEst
+    }
+
+    // Actualizar total del presupuesto
+    const { error: updateError } = await supabase
+      .from('presupuestos')
+      .update({
+        total_estimado: totalEstimado,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', presupuestoId)
+
+    if (updateError) {
+      console.error('Error actualizando presupuesto:', updateError)
+      return { success: false, message: 'Error al actualizar presupuesto' }
+    }
+
+    revalidatePath('/ventas/presupuestos')
+    revalidatePath(`/ventas/presupuestos/${presupuestoId}`)
+
+    return {
+      success: true,
+      message: 'Presupuesto recalculado exitosamente',
+      data: { total_estimado: totalEstimado }
+    }
+
+  } catch (error) {
+    console.error('Error en recalcularPresupuestoAction:', error)
+    return { success: false, message: 'Error interno del servidor' }
+  }
+}
+
+// Acción para actualizar presupuesto
+export async function actualizarPresupuestoAction(formData: FormData) {
+  try {
+    const supabase = await createClient()
+
+    // Obtener usuario actual
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, message: 'Usuario no autenticado' }
+    }
+
+    const presupuestoId = formData.get('presupuesto_id') as string
+    const observaciones = formData.get('observaciones') as string
+    const fecha_entrega_estimada = formData.get('fecha_entrega_estimada') as string
+
+    if (!presupuestoId) {
+      return { success: false, message: 'ID de presupuesto requerido' }
+    }
+
+    // Verificar que el presupuesto existe y está en estado pendiente
+    const { data: presupuesto, error: presupuestoError } = await supabase
+      .from('presupuestos')
+      .select('estado')
+      .eq('id', presupuestoId)
+      .single()
+
+    if (presupuestoError || !presupuesto) {
+      return { success: false, message: 'Presupuesto no encontrado' }
+    }
+
+    if (presupuesto.estado !== 'pendiente') {
+      return { success: false, message: 'Solo se pueden editar presupuestos pendientes' }
+    }
+
+    // Actualizar presupuesto
+    const updateData: any = {
+      updated_at: new Date().toISOString(),
+    }
+
+    if (observaciones !== null) {
+      updateData.observaciones = observaciones
+    }
+
+    if (fecha_entrega_estimada) {
+      updateData.fecha_entrega_estimada = fecha_entrega_estimada
+    }
+
+    const { error: updateError } = await supabase
+      .from('presupuestos')
+      .update(updateData)
+      .eq('id', presupuestoId)
+
+    if (updateError) {
+      console.error('Error actualizando presupuesto:', updateError)
+      return { success: false, message: 'Error al actualizar presupuesto' }
+    }
+
+    revalidatePath('/ventas/presupuestos')
+    revalidatePath(`/ventas/presupuestos/${presupuestoId}`)
+
+    return {
+      success: true,
+      message: 'Presupuesto actualizado exitosamente',
+      data: { presupuesto_id: presupuestoId }
+    }
+
+  } catch (error) {
+    console.error('Error en actualizarPresupuestoAction:', error)
     return { success: false, message: 'Error interno del servidor' }
   }
 }

@@ -12,7 +12,8 @@ import {
   Truck,
   ShoppingCart,
   AlertTriangle,
-  Scale
+  Scale,
+  RefreshCw
 } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import type { Database } from '@/types/database.types'
@@ -43,6 +44,7 @@ interface PresupuestosTableProps {
   onSendToWarehouse?: (presupuesto: Presupuesto) => void
   onReserveStock?: (presupuesto: Presupuesto) => void
   onConvertToOrder?: (presupuesto: Presupuesto) => void
+  onRecalculate?: (presupuesto: Presupuesto) => void
 }
 
 const getEstadoConfig = (estado: string) => {
@@ -61,7 +63,8 @@ export function PresupuestosTable({
   onEdit,
   onSendToWarehouse,
   onReserveStock,
-  onConvertToOrder
+  onConvertToOrder,
+  onRecalculate
 }: PresupuestosTableProps) {
   const columns: ColumnDef<Presupuesto>[] = [
     {
@@ -196,6 +199,18 @@ export function PresupuestosTable({
                 className="h-8 w-8 p-0"
               >
                 <Edit className="h-4 w-4" />
+              </Button>
+            )}
+
+            {estado === 'pendiente' && onRecalculate && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onRecalculate(presupuesto)}
+                className="h-8 w-8 p-0 text-purple-600 hover:text-purple-700"
+                title="Recalcular presupuesto"
+              >
+                <RefreshCw className="h-4 w-4" />
               </Button>
             )}
 

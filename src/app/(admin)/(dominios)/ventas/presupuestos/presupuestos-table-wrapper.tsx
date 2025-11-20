@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { PresupuestosTable } from '@/components/tables/PresupuestosTable'
 import { useNotificationStore } from '@/store/notificationStore'
-import { obtenerPresupuestosAction, enviarPresupuestoAlmacenAction } from '@/actions/presupuestos.actions'
+import { obtenerPresupuestosAction, enviarPresupuestoAlmacenAction, recalcularPresupuestoAction } from '@/actions/presupuestos.actions'
 import type { Database } from '@/types/database.types'
 
 type Presupuesto = {
@@ -110,6 +110,23 @@ export function PresupuestosTableWrapper() {
     }
   }
 
+  const handleRecalculate = async (presupuesto: Presupuesto) => {
+    try {
+      const result = await recalcularPresupuestoAction(presupuesto.id)
+
+      if (result.success) {
+        showToast('success', result.message || 'Presupuesto recalculado exitosamente')
+        // Recargar la lista
+        await loadPresupuestos()
+      } else {
+        showToast('error', result.message || 'Error al recalcular presupuesto')
+      }
+    } catch (error) {
+      console.error('Error recalculando presupuesto:', error)
+      showToast('error', 'Error al recalcular presupuesto')
+    }
+  }
+
   if (loading) {
     return <div>Cargando presupuestos...</div>
   }
@@ -122,6 +139,7 @@ export function PresupuestosTableWrapper() {
       onSendToWarehouse={handleSendToWarehouse}
       onReserveStock={handleReserveStock}
       onConvertToOrder={handleConvertToOrder}
+      onRecalculate={handleRecalculate}
     />
   )
 }
