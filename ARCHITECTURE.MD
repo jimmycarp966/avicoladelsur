@@ -1328,7 +1328,7 @@ CREATE POLICY "repartidor_rutas_propias" ON pedidos FOR SELECT USING (
 3. **Fase 3**: Módulo de Almacén (productos, stock, lotes con FIFO)
 4. **Fase 4**: Módulo de Ventas (clientes, pedidos, cotizaciones)
 5. **Fase 6**: Bot de WhatsApp con Twilio (sin Botpress)
-6. **Hito Intermedio**: 
+6. **Hito Intermedio**:
    - ✅ Tesorería (cajas y movimientos)
    - ✅ Gastos con adjuntos en Storage
    - ✅ Cuentas corrientes con bloqueo automático
@@ -1337,17 +1337,182 @@ CREATE POLICY "repartidor_rutas_propias" ON pedidos FOR SELECT USING (
    - ✅ Referencias de pago automáticas
    - ✅ Instrucciones para repartidores
    - ✅ RPC fn_consultar_stock_por_lote
+7. **Hito Presupuestos** (Flujo Completo Bot → Almacén → Reparto → Tesorería):
+   - ✅ Migraciones SQL (presupuestos, stock_reservations, funciones RPC)
+   - ✅ Server Actions para gestión de presupuestos
+   - ✅ UI de presupuestos con tabla TanStack Table
+   - ✅ Bot actualizado para crear presupuestos
+   - ✅ Endpoints API (simular-peso, entrega, movimientos-tiempo-real)
+   - ✅ Script de demo y verificación
 
 ### 🚧 En Desarrollo:
-6. **Fase 5**: Módulo de Reparto (vehículos básico, rutas pendientes)
-7. **Fase 7**: Sistema de notificaciones en dashboard
-8. **Fase 8**: Testing y optimización
+8. **Fase 7**: Módulo de Reparto (PWA completa, GPS, firma digital)
+9. **Fase 8**: Integración balanza física
+10. **Fase 9**: Optimización de rutas y asignación automática
 
 ### 📋 Pendiente:
-9. **Fase 9**: PWA para repartidores con GPS
-10. **Fase 10**: Despliegue en producción
-11. **Fase 11**: WhatsApp Business API (número dedicado)
-12. **Fase 12**: Capacitación de usuarios
+11. **Fase 11**: PWA para repartidores con GPS
+12. **Fase 12**: Integración balanza física completa
+13. **Fase 13**: Optimización algoritmos de asignación por peso
+14. **Fase 14**: Notificaciones push y alertas
+15. **Fase 15**: Despliegue en producción
+16. **Fase 16**: WhatsApp Business API (número dedicado)
+17. **Fase 17**: Capacitación de usuarios
+
+---
+
+## 🎯 Flujo de Presupuestos - Implementación Completa
+
+### 📋 Descripción General
+
+Nuevo flujo operativo implementado que transforma el proceso de ventas desde pedidos directos a un sistema de presupuestos con control de stock preventivo, pesaje en almacén y trazabilidad completa.
+
+### 🔄 Pasos del Flujo
+
+```
+Cliente (WhatsApp) → Bot crea presupuesto → Reserva stock preventiva → Vendedor revisa →
+Almacén pesa → Convierte a pedido → Reparto entrega → Tesorería registra cobro
+```
+
+### 🗄️ Nuevas Tablas y Funciones
+
+#### Tablas Implementadas
+- **`presupuestos`**: Cabecera de presupuestos con estados y seguimiento
+- **`presupuesto_items`**: Items con cantidades, precios y pesos
+- **`stock_reservations`**: Reservas preventivas de stock por lotes
+
+#### Funciones RPC Atómicas
+- **`fn_reservar_stock_por_presupuesto()`**: Reserva stock FIFO por items
+- **`fn_convertir_presupuesto_a_pedido()`**: Conversión atómica con descuento de stock
+- **`fn_actualizar_peso_item_presupuesto()`**: Recálculo de precios por peso
+- **`fn_asignar_vehiculos_por_peso()`**: Heurística de asignación por capacidad
+- **`fn_crear_presupuesto_desde_bot()`**: Creación desde WhatsApp
+
+### 🎨 Interfaz de Usuario
+
+#### Dashboard Ventas
+- **`/ventas/presupuestos`**: Lista completa con filtros y acciones
+- **Estados**: Pendiente → En Almacén → Facturado → Anulado
+- **Acciones**: Enviar a almacén, Reservar stock, Convertir a pedido
+
+#### Dashboard Almacén
+- **`/almacen/presupuestos-dia`**: Vista por fecha/zona con totales
+- **`/[id]/pesaje`**: Interfaz de balanza con simulación
+- **Badge "BALANZA"**: Identifica items pesables automáticamente
+
+#### PWA Repartidor (Base Implementada)
+- **Registro de entregas**: Firma digital, QR, comprobantes
+- **Cobros**: Múltiples métodos de pago
+- **Movimientos de caja**: Automáticos por entrega
+
+### 🤖 Bot WhatsApp Actualizado
+
+#### Comandos Principales
+```
+POLLO001 5          → Crear presupuesto
+POLLO001 5, HUEVO001 2 → Presupuesto múltiple
+menu                 → Ver opciones
+estado PRES-XXXXX    → Consultar presupuesto
+```
+
+#### Respuestas Mejoradas
+- ✅ Números de presupuesto únicos (PRES-YYYYMMDD-XXXX)
+- 🔗 Links de seguimiento
+- 📊 Resúmenes con totales estimados
+- 📞 Instrucciones para contactar vendedor
+
+### 📊 Endpoints API
+
+#### Simulación y Testing
+```
+POST /api/almacen/simular-peso
+- Simula pesos de balanza (±10% variación)
+- Útil para desarrollo y demos
+
+POST /api/reparto/entrega
+- Registra entregas con cobros
+- Actualiza movimientos de tesorería
+
+GET /api/tesoreria/movimientos-tiempo-real
+- Movimientos en tiempo real
+- Saldos de cajas actualizados
+```
+
+### 🧪 Script de Demo
+
+```bash
+# Ejecutar verificación completa
+./scripts/demo-presupuestos.sh
+
+# Verifica:
+# ✅ Servidor corriendo
+# ✅ BD conectada
+# ✅ Endpoints responding
+# ✅ Funciones RPC funcionales
+```
+
+### 🔧 Checklist de Implementación
+
+#### Base de Datos ✅
+- [x] Migraciones SQL con rollback
+- [x] Funciones RPC atómicas
+- [x] Políticas RLS por rol
+- [x] Índices optimizados
+
+#### Backend ✅
+- [x] Server Actions con validación Zod
+- [x] Endpoints API funcionales
+- [x] Integración con Supabase
+- [x] Manejo de errores robusto
+
+#### Frontend ✅
+- [x] UI responsive con shadcn/ui
+- [x] Tablas con TanStack Table
+- [x] Formularios con React Hook Form
+- [x] Estados de carga y notificaciones
+
+#### Bot WhatsApp ✅
+- [x] Creación de presupuestos
+- [x] Mensajes con números únicos
+- [x] Links de seguimiento
+- [x] Compatibilidad con flujo existente
+
+#### Testing ✅
+- [x] Script de demo automatizado
+- [x] Endpoints de verificación
+- [x] Checklist de aceptación
+- [x] Casos de uso documentados
+
+### 🚀 Próximos Pasos para Producción
+
+1. **Integración Balanza Física**
+   - Conexión serial/HTTP con balanzas
+   - Adapter pattern para diferentes modelos
+   - Fallback a simulación
+
+2. **PWA Repartidor Completa**
+   - GPS tracking en tiempo real
+   - Modo offline avanzado
+   - Sincronización automática
+
+3. **Optimización de Algoritmos**
+   - Asignación por peso y distancia
+   - Rutas óptimas con GeoPostGIS
+   - Machine learning para predicciones
+
+4. **Notificaciones Avanzadas**
+   - Push notifications
+   - WhatsApp business para alerts
+   - Dashboard con realtime updates
+
+### 📈 Beneficios Implementados
+
+- **Control de Stock**: Reserva preventiva evita sobreventa
+- **Trazabilidad**: Desde presupuesto hasta cobro final
+- **Eficiencia**: Proceso estructurado reduce errores
+- **Transaccional**: Operaciones atómicas garantizan consistencia
+- **Escalabilidad**: Arquitectura preparada para crecimiento
+- **UX Mejorada**: Interfaces intuitivas para cada rol
 
 ---
 

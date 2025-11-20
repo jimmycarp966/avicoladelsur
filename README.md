@@ -116,21 +116,50 @@ npm run lint
 node scripts/verificar-bot.js
 ```
 
+## 🎯 Flujo de Presupuestos - NUEVO
+
+### Estado: ✅ IMPLEMENTADO (Hito Presupuestos)
+
+Sistema completo de presupuestos que transforma el proceso operativo:
+
+**Flujo**: `Bot → Presupuesto → Reserva Stock → Almacén → Pesaje → Pedido → Reparto → Tesorería`
+
+### Características Principales
+- 🤖 **Bot Actualizado**: Crea presupuestos en lugar de pedidos directos
+- 📋 **Números Únicos**: PRES-YYYYMMDD-XXXX con links de seguimiento
+- 🏭 **Control de Almacén**: Reserva preventiva + pesaje obligatorio
+- 🚛 **Reparto Integrado**: PWA básica con registro de entregas/cobros
+- 💰 **Tesorería Tiempo Real**: Movimientos automáticos por operaciones
+
+### Cómo Probar la Demo
+```bash
+# Verificar implementación completa
+./scripts/demo-presupuestos.sh
+
+# Endpoints de testing
+POST /api/almacen/simular-peso     # Simular balanza
+POST /api/reparto/entrega         # Registrar entrega
+GET /api/tesoreria/movimientos-tiempo-real  # Ver caja
+```
+
+---
+
 ## 🤖 Bot de WhatsApp
 
-### Estado: ✅ FUNCIONANDO
+### Estado: ✅ FUNCIONANDO + ACTUALIZADO
 
-El bot está completamente funcional y permite a los clientes:
+El bot está completamente funcional y ahora incluye el nuevo flujo de presupuestos:
 
 **Comandos disponibles:**
 - `hola` / `menu` - Ver menú principal
 - `1` - Ver catálogo de productos con stock en tiempo real
-- `2` - Instrucciones para hacer pedidos
-- `3` - Consultar estado de pedidos
-- `POLLO001 5` - Hacer pedido (código + cantidad)
-- `POLLO001 5, HUEVO001 2` - Pedido múltiple
-- `SÍ` / `NO` - Confirmar o cancelar pedido
-- `estado PED-XXXXX` - Ver estado de un pedido específico
+- `2` - Crear presupuesto (instrucciones)
+- `3` - Consultar pedidos y presupuestos
+- `POLLO001 5` - Crear presupuesto (código + cantidad)
+- `POLLO001 5, HUEVO001 2` - Presupuesto múltiple
+- `SÍ` / `NO` - Confirmar o cancelar presupuesto
+- `estado PED-XXXXX` - Ver estado de pedido
+- `estado PRES-XXXXX` - Ver estado de presupuesto
 
 **Características implementadas:**
 - ✅ Validación de stock en tiempo real desde lotes
@@ -161,10 +190,93 @@ El bot está completamente funcional y permite a los clientes:
 
 **Flujo técnico:**
 ```
-Cliente (WhatsApp) → Twilio → /api/bot/route.ts → 
-Server Actions → fn_crear_pedido_bot() → 
-Descuento de lotes con FIFO → Respuesta al cliente
+Cliente (WhatsApp) → Twilio → /api/bot/route.ts →
+Server Actions → fn_crear_presupuesto_desde_bot() →
+Reserva preventiva de stock → Respuesta con número PRES-XXXXX
 ```
+
+---
+
+## 🎯 Cómo Probar el Flujo de Presupuestos
+
+### Demo Completa (5 minutos)
+
+1. **Cliente crea presupuesto vía WhatsApp:**
+   ```
+   Enviar: POLLO001 5
+   Recibir: Número PRES-YYYYMMDD-XXXX + link de seguimiento
+   ```
+
+2. **Vendedor revisa en dashboard:**
+   ```
+   URL: /ventas/presupuestos
+   Acción: "Enviar a Almacén"
+   ```
+
+3. **Almacén procesa pesaje:**
+   ```
+   URL: /almacen/presupuestos-dia
+   Acción: Seleccionar presupuesto → Ingresar peso → "Finalizar"
+   ```
+
+4. **Sistema convierte a pedido:**
+   ```
+   Automático: Crea pedido + descuenta stock + actualiza caja
+   ```
+
+5. **Repartidor registra entrega:**
+   ```
+   URL: /repartidor/home
+   Acción: Marcar entrega + registrar cobro
+   ```
+
+6. **Tesorería ve movimientos:**
+   ```
+   URL: /tesoreria
+   Resultado: Movimientos en tiempo real
+   ```
+
+### Endpoints para Testing
+
+```bash
+# Simular peso de balanza
+curl -X POST http://localhost:3000/api/almacen/simular-peso \
+  -H "Content-Type: application/json" \
+  -d '{"presupuesto_item_id": "uuid-del-item"}'
+
+# Registrar entrega
+curl -X POST http://localhost:3000/api/reparto/entrega \
+  -H "Content-Type: application/json" \
+  -d '{"pedido_id": "uuid-del-pedido", "monto_cobrado": 1250.50}'
+
+# Ver movimientos de tesorería
+curl http://localhost:3000/api/tesoreria/movimientos-tiempo-real
+```
+
+### Verificación de Funciones RPC
+
+En Supabase SQL Editor:
+```sql
+-- Probar reserva de stock
+SELECT * FROM fn_reservar_stock_por_presupuesto('uuid-presupuesto');
+
+-- Probar conversión a pedido
+SELECT * FROM fn_convertir_presupuesto_a_pedido('uuid-presupuesto', 'uuid-user', 'uuid-caja');
+
+-- Probar actualización de peso
+SELECT * FROM fn_actualizar_peso_item_presupuesto('uuid-item', 5.25);
+```
+
+### Checklist de Aceptación
+
+- [ ] Bot crea presupuesto con número único
+- [ ] Reserva preventiva funciona (sin descontar stock físico)
+- [ ] Vendedor puede enviar a almacén
+- [ ] Almacén puede simular/fijar pesos
+- [ ] Conversión atómica presupuesto → pedido
+- [ ] Reparto registra entregas y cobros
+- [ ] Tesorería muestra movimientos en tiempo real
+- [ ] Todo el flujo funciona end-to-end
 
 ## 💰 Tesorería y Gastos (Hito Intermedio)
 
