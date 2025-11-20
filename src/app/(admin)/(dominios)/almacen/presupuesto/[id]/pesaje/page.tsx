@@ -178,96 +178,96 @@ async function PesajeContent({ presupuestoId }: { presupuestoId: string }) {
                   )}
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor={`peso-${item.id}`}>Peso Final (kg)</Label>
-                      <Input
-                        id={`peso-${item.id}`}
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00"
-                        defaultValue={item.peso_final || ""}
-                        className="text-lg"
-                      />
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor={`peso-${item.id}`}>Peso Final (kg)</Label>
+                        <Input
+                          id={`peso-${item.id}`}
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          defaultValue={item.peso_final || ""}
+                          className="text-lg"
+                        />
+                      </div>
+                      <div>
+                        <Label>Precio por KG</Label>
+                        <div className="p-3 bg-gray-50 rounded-md text-lg font-mono">
+                          ${item.producto?.precio_venta?.toFixed(2) || "0.00"}
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <Label>Precio por KG</Label>
-                      <div className="p-3 bg-gray-50 rounded-md text-lg font-mono">
-                        ${item.producto?.precio_venta?.toFixed(2) || "0.00"}
+
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-muted-foreground">
+                        Subtotal estimado: ${(item.subtotal_est || 0).toFixed(2)}
+                        {item.subtotal_final && (
+                          <span className="ml-2 text-green-600">
+                            → Final: ${item.subtotal_final.toFixed(2)}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            // Simular llamada a API de balanza
+                            try {
+                              const response = await fetch(`/api/almacen/simular-peso`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ presupuesto_item_id: item.id })
+                              })
+                              const data = await response.json()
+                              if (data.success) {
+                                // Actualizar el campo de peso
+                                const input = document.getElementById(`peso-${item.id}`) as HTMLInputElement
+                                if (input) input.value = data.peso_simulado.toString()
+                              }
+                            } catch (error) {
+                              console.error('Error simulando peso:', error)
+                            }
+                          }}
+                        >
+                          <Scale className="mr-2 h-4 w-4" />
+                          Simular Peso
+                        </Button>
+
+                        <Button
+                          type="button"
+                          disabled={estaPesado}
+                          onClick={async () => {
+                            const input = document.getElementById(`peso-${item.id}`) as HTMLInputElement
+                            const pesoValue = input?.value
+                            if (pesoValue) {
+                              const peso = parseFloat(pesoValue)
+                              if (!isNaN(peso) && peso > 0) {
+                                await handleActualizarPeso(item.id, peso)
+                              }
+                            }
+                          }}
+                        >
+                          {estaPesado ? (
+                            <>
+                              <CheckCircle className="mr-2 h-4 w-4" />
+                              Actualizado
+                            </>
+                          ) : (
+                            <>
+                              <Scale className="mr-2 h-4 w-4" />
+                              Aplicar Peso
+                            </>
+                          )}
+                        </Button>
                       </div>
                     </div>
                   </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm text-muted-foreground">
-                      Subtotal estimado: ${(item.subtotal_est || 0).toFixed(2)}
-                      {item.subtotal_final && (
-                        <span className="ml-2 text-green-600">
-                          → Final: ${item.subtotal_final.toFixed(2)}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={async () => {
-                          // Simular llamada a API de balanza
-                          try {
-                            const response = await fetch(`/api/almacen/simular-peso`, {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ presupuesto_item_id: item.id })
-                            })
-                            const data = await response.json()
-                            if (data.success) {
-                              // Actualizar el campo de peso
-                              const input = document.getElementById(`peso-${item.id}`) as HTMLInputElement
-                              if (input) input.value = data.peso_simulado.toString()
-                            }
-                          } catch (error) {
-                            console.error('Error simulando peso:', error)
-                          }
-                        }}
-                      >
-                        <Scale className="mr-2 h-4 w-4" />
-                        Simular Peso
-                      </Button>
-
-                      <Button
-                        type="button"
-                        disabled={estaPesado}
-                        onClick={async () => {
-                          const input = document.getElementById(`peso-${item.id}`) as HTMLInputElement
-                          const pesoValue = input?.value
-                          if (pesoValue) {
-                            const peso = parseFloat(pesoValue)
-                            if (!isNaN(peso) && peso > 0) {
-                              await handleActualizarPeso(item.id, peso)
-                            }
-                          }
-                        }}
-                      >
-                        {estaPesado ? (
-                          <>
-                            <CheckCircle className="mr-2 h-4 w-4" />
-                            Actualizado
-                          </>
-                        ) : (
-                          <>
-                            <Scale className="mr-2 h-4 w-4" />
-                            Aplicar Peso
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
+                </CardContent>
             </Card>
           )
         })}
