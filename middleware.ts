@@ -71,7 +71,7 @@ export async function middleware(request: NextRequest) {
   ]
 
   const isPublicRoute = publicRoutes.some(route =>
-    pathname === route || pathname.startsWith('/api/')
+    pathname === route || pathname.startsWith(route + '/') || pathname.startsWith('/api/')
   )
 
   // Si es una ruta pública, continuar

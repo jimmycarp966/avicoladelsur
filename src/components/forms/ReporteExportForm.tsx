@@ -72,6 +72,7 @@ export function ReporteExportForm() {
                 <SelectItem value="gastos">Gastos por categoría</SelectItem>
                 <SelectItem value="movimientos_caja">Movimientos de caja</SelectItem>
                 <SelectItem value="cuentas_corrientes">Cuentas corrientes</SelectItem>
+                <SelectItem value="kg_por_ruta">KG por Ruta y Ventas del Día</SelectItem>
               </SelectContent>
             </Select>
           </div>

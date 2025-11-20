@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { crearPedidoBot } from '@/actions/ventas.actions'
+import { crearPresupuestoAction } from '@/actions/presupuestos.actions'
 import { crearReclamoBot } from '@/actions/ventas.actions'
 
 // Tipos para las llamadas de Botpress
@@ -113,8 +113,8 @@ async function handleBotpressWebhook(payload: BotpressWebhookPayload): Promise<B
 
   try {
     switch (intent) {
-      case 'tomar_pedido':
-      case 'crear_pedido': {
+      case 'crear_presupuesto':
+      case 'tomar_pedido': {
         const { cliente_telefono, productos } = parameters
 
         if (!cliente_telefono || !productos || !Array.isArray(productos)) {
@@ -160,29 +160,38 @@ async function handleBotpressWebhook(payload: BotpressWebhookPayload): Promise<B
           }
         }
 
-        // Crear pedido
-        const result = await crearPedidoBot({
-          cliente_id: cliente.id,
-          items,
-          observaciones: parameters.observaciones || 'Pedido creado desde WhatsApp',
-          origen: 'whatsapp'
-        })
+        // Crear presupuesto
+        const formData = new FormData()
+        formData.append('cliente_id', cliente.id)
+        formData.append('observaciones', parameters.observaciones || 'Presupuesto creado desde WhatsApp')
+        formData.append('items', JSON.stringify(items.map(item => ({
+          producto_id: item.producto_id,
+          cantidad_solicitada: item.cantidad,
+          precio_unit_est: item.precio_unitario
+        }))))
+
+        const result = await crearPresupuestoAction(formData)
 
         if (result.success && result.data) {
+          const numeroPresupuesto = result.data.numero_presupuesto || result.data.numeroPresupuesto
           return {
             success: true,
-            message: `¡Pedido creado exitosamente! Número de pedido: ${result.data.numeroPedido}`,
+            message: `¡Presupuesto creado exitosamente! Número de presupuesto: ${numeroPresupuesto}
+
+Para seguimiento: https://tu-dominio/seguimiento/presupuesto/${numeroPresupuesto}
+
+El vendedor revisará tu presupuesto y te contactará pronto.`,
             data: {
-              pedido_id: result.data.pedidoId,
-              numero_pedido: result.data.numeroPedido,
-              total: result.data.total,
+              presupuesto_id: result.data.presupuesto_id || result.data.presupuestoId,
+              numero_presupuesto: numeroPresupuesto,
+              total_estimado: result.data.total_estimado || result.data.totalEstimado,
               cliente: cliente.nombre
             }
           }
         } else {
           return {
             success: false,
-            error: result.error || 'Error al crear el pedido'
+            error: result.message || 'Error al crear el presupuesto'
           }
         }
       }
@@ -303,7 +312,7 @@ async function handleBotpressWebhook(payload: BotpressWebhookPayload): Promise<B
         } else {
           return {
             success: false,
-            error: result.error || 'Error al registrar el reclamo'
+            error: result.message || 'Error al registrar el reclamo'
           }
         }
       }
@@ -465,15 +474,15 @@ async function handleTwilioWebhook(formData: FormData) {
 🛒 *Menú Principal*
 
 1️⃣ Ver productos disponibles
-2️⃣ Hacer un pedido
-3️⃣ Consultar mi pedido
+2️⃣ Crear presupuesto
+3️⃣ Consultar pedidos
 4️⃣ Registrar un reclamo
 
 📝 *Responde con el número* de la opción que deseas.
 
 💡 También puedes escribir comandos:
 • *productos* - Ver catálogo
-• *pedido POLLO001 5* - Ordenar
+• *POLLO001 5* - Crear presupuesto
 • *ayuda* - Ver este menú`
     }
     // Comando: Opciones del menú numérico
@@ -538,9 +547,9 @@ async function handleTwilioWebhook(formData: FormData) {
       }
     }
     else if (body === '2' || bodyLower === 'opcion 2') {
-      responseMessage = `🛒 *Hacer un Pedido*
+      responseMessage = `🛒 *Crear Presupuesto*
 
-Para hacer un pedido escribe:
+Para crear un presupuesto escribe:
 *[CODIGO] [CANTIDAD]*
 
 Ejemplo:
@@ -559,7 +568,7 @@ Para ver los productos disponibles, escribe *1* o *productos*`
       const pending = pendingConfirmations.get(phoneNumber)
       
       if (!pending) {
-        responseMessage = 'No tienes ningún pedido pendiente de confirmación.\n\nEscribe el código y cantidad para hacer un pedido.'
+        responseMessage = 'No tienes ningún presupuesto pendiente de confirmación.\n\nEscribe el código y cantidad para crear un presupuesto.'
       } else {
         // Verificar que no haya expirado (5 minutos)
         if (Date.now() - pending.timestamp > 5 * 60 * 1000) {
@@ -586,40 +595,46 @@ Para ver los productos disponibles, escribe *1* o *productos*`
               }
             }
 
-            const result = await crearPedidoBot({
-              cliente_id: cliente.id,
-              items: items,
-              observaciones: 'Pedido desde WhatsApp',
-              origen: 'whatsapp'
-            })
+            // Crear presupuesto
+            const formData = new FormData()
+            formData.append('cliente_id', cliente.id)
+            formData.append('observaciones', 'Presupuesto desde WhatsApp')
+            formData.append('items', JSON.stringify(items.map(item => ({
+              producto_id: item.producto_id,
+              cantidad_solicitada: item.cantidad,
+              precio_unit_est: item.precio_unitario
+            }))))
+
+            const result = await crearPresupuestoAction(formData)
 
             if (result.success && result.data) {
+              const numeroPresupuesto = result.data.numero_presupuesto || result.data.numeroPresupuesto
+              const totalEstimado = result.data.total_estimado || result.data.totalEstimado || 0
+
               // Crear notificación
               const supabase = await createClient()
               await supabase.rpc('crear_notificacion', {
-                p_tipo: 'pedido_whatsapp',
-                p_titulo: 'Nuevo pedido desde WhatsApp',
-                p_mensaje: `${cliente.nombre} realizó un pedido por $${result.data.total.toFixed(2)}`,
-                p_datos: { pedido_id: result.data.pedidoId, cliente: cliente.nombre, total: result.data.total }
+                p_tipo: 'presupuesto_whatsapp',
+                p_titulo: 'Nuevo presupuesto desde WhatsApp',
+                p_mensaje: `${cliente.nombre} creó un presupuesto por $${totalEstimado.toFixed(2)}`,
+                p_datos: { presupuesto_id: result.data.presupuesto_id, cliente: cliente.nombre, total: totalEstimado }
               })
 
-              const referenciaPago = result.data.referenciaPago || ''
-              const mensajePago = referenciaPago 
-                ? `\n💳 Referencia de pago: *${referenciaPago}*\n\nEl repartidor te cobrará al momento de la entrega.`
-                : `\n\nEl pago quedará pendiente y podrás abonarlo en efectivo al repartidor.`
+              responseMessage = `✅ *¡Presupuesto Creado!*
 
-              responseMessage = `✅ *¡Pedido Confirmado!*
-
-📋 Número: *${result.data.numeroPedido}*
+📋 Número: *${numeroPresupuesto}*
 📦 ${items.length} producto${items.length > 1 ? 's' : ''}
-💰 Total: *$${result.data.total.toFixed(2)}*${mensajePago}
-¡Gracias por tu compra! 🙏
+💰 Total Estimado: *$${totalEstimado.toFixed(2)}*
+
+🔗 Seguimiento: https://tu-dominio/seguimiento/presupuesto/${numeroPresupuesto}
+
+El vendedor revisará tu presupuesto y te contactará pronto para coordinar la entrega.
 
 Escribe *menu* para volver al inicio.`
               
               pendingConfirmations.delete(phoneNumber)
             } else {
-              responseMessage = `❌ Error al crear pedido: ${result.error}`
+              responseMessage = `❌ Error al crear presupuesto: ${result.message}`
             }
           }
         }
@@ -880,33 +895,34 @@ Disponible: ${Math.floor(stockDisponible)} ${producto.unidad_medida}
 
 Por favor reduce la cantidad o elige otro producto.`
               } else {
-                // Crear pedido
-                const result = await crearPedidoBot({
-                  cliente_id: cliente.id,
-                  items: [{
-                    producto_id: producto.id,
-                    cantidad: cantidad,
-                    precio_unitario: producto.precio_venta
-                  }],
-                  observaciones: 'Pedido creado desde WhatsApp',
-                  origen: 'whatsapp'
-                })
+                // Crear presupuesto
+                const formData = new FormData()
+                formData.append('cliente_id', cliente.id)
+                formData.append('observaciones', 'Presupuesto creado desde WhatsApp')
+                formData.append('items', JSON.stringify([{
+                  producto_id: producto.id,
+                  cantidad_solicitada: cantidad,
+                  precio_unit_est: producto.precio_venta
+                }]))
+
+                const result = await crearPresupuestoAction(formData)
 
                 if (result.success && result.data) {
-                  const referenciaPago = result.data.referenciaPago || ''
-                  const mensajePago = referenciaPago 
-                    ? `\n💳 Referencia de pago: *${referenciaPago}*\n\nEl repartidor te cobrará al momento de la entrega.`
-                    : `\n\nTu pedido será procesado pronto.`
+                  const numeroPresupuesto = result.data.numero_presupuesto || result.data.numeroPresupuesto
+                  const totalEstimado = result.data.total_estimado || result.data.totalEstimado || 0
 
-                  responseMessage = `✅ *Pedido creado exitosamente*
+                  responseMessage = `✅ *Presupuesto creado exitosamente*
 
-📋 Número: *${result.data.numeroPedido}*
+📋 Número: *${numeroPresupuesto}*
 📦 Producto: ${producto.nombre}
 📊 Cantidad: ${cantidad} ${producto.unidad_medida}
-💰 Total: *$${result.data.total.toFixed(2)}*${mensajePago}
-¡Gracias! 🙏`
+💰 Total Estimado: *$${totalEstimado.toFixed(2)}*
+
+🔗 Seguimiento: https://tu-dominio/seguimiento/presupuesto/${numeroPresupuesto}
+
+El vendedor revisará tu presupuesto y te contactará pronto.`
                 } else {
-                  responseMessage = `❌ Error al crear pedido: ${result.error}`
+                  responseMessage = `❌ Error al crear presupuesto: ${result.message}`
                 }
               }
             }

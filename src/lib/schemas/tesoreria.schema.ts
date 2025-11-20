@@ -39,7 +39,7 @@ export const registrarPagoPedidoSchema = z.object({
 })
 
 export const exportReportSchema = z.object({
-  tipo: z.enum(['ventas', 'gastos', 'movimientos_caja', 'cuentas_corrientes']),
+  tipo: z.enum(['ventas', 'gastos', 'movimientos_caja', 'cuentas_corrientes', 'kg_por_ruta']),
   formato: z.enum(['csv', 'pdf']).default('csv'),
   filtros: z.record(z.string(), z.any()).optional(),
 })

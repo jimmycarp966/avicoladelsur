@@ -208,7 +208,7 @@ export interface RegistrarPagoPedidoParams {
 }
 
 export interface ExportReportParams {
-  tipo: 'ventas' | 'gastos' | 'movimientos_caja' | 'cuentas_corrientes'
+  tipo: 'ventas' | 'gastos' | 'movimientos_caja' | 'cuentas_corrientes' | 'kg_por_ruta'
   formato?: 'csv' | 'pdf'
   filtros?: Record<string, any>
 }
