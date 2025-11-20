@@ -50,14 +50,21 @@ export async function crearVehiculo(
 // Registrar checklist de vehículo
 export async function registrarChecklistVehiculo(
   params: ChecklistVehiculoParams
-): Promise<ApiResponse> {
+): Promise<ApiResponse<{ checklistId: string }>> {
   try {
     const supabase = await createClient()
+
+    // Obtener usuario actual
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      throw new Error('Usuario no autenticado')
+    }
 
     const { data, error } = await supabase
       .from('checklists_vehiculos')
       .insert({
         ...params,
+        usuario_id: user.id,
         fecha_check: new Date().toISOString().split('T')[0], // Fecha actual
         aprobado: true, // Por defecto aprobado, se puede cambiar según lógica
       })
@@ -70,6 +77,7 @@ export async function registrarChecklistVehiculo(
 
     return {
       success: true,
+      data: { checklistId: data.id },
       message: 'Checklist de vehículo registrado exitosamente',
     }
   } catch (error: any) {
@@ -101,6 +109,15 @@ export async function crearRuta(
 
     if (repartidorError) throw new Error('Repartidor no encontrado o no válido')
 
+    // Validar que se proporcionen turno y zona_id
+    if (!params.turno || !params.zona_id) {
+      throw new Error('Turno y zona_id son obligatorios para crear una ruta')
+    }
+
+    if (!['mañana', 'tarde'].includes(params.turno)) {
+      throw new Error('Turno inválido. Debe ser "mañana" o "tarde"')
+    }
+
     // Crear ruta
     const { data: ruta, error: rutaError } = await supabase
       .from('rutas_reparto')
@@ -109,6 +126,8 @@ export async function crearRuta(
         vehiculo_id: params.vehiculo_id,
         repartidor_id: params.repartidor_id,
         fecha_ruta: params.fecha_ruta,
+        turno: params.turno,
+        zona_id: params.zona_id,
         estado: 'planificada',
         observaciones: params.observaciones,
       })
@@ -144,11 +163,26 @@ export async function asignarPedidosARuta(
   try {
     const supabase = await createClient()
 
-    // Obtener pedidos y calcular orden de entrega
+    // Obtener información de la ruta para validar
+    const { data: ruta, error: rutaError } = await supabase
+      .from('rutas_reparto')
+      .select('fecha_ruta, turno, zona_id')
+      .eq('id', rutaId)
+      .single()
+
+    if (rutaError || !ruta) {
+      throw new Error('Ruta no encontrada')
+    }
+
+    // Obtener pedidos y validar que cumplan condiciones
     const { data: pedidos, error: pedidosError } = await supabase
       .from('pedidos')
       .select(`
         id,
+        fecha_entrega_estimada,
+        turno,
+        zona_id,
+        estado,
         clientes (
           zona_entrega,
           coordenadas
@@ -158,6 +192,21 @@ export async function asignarPedidosARuta(
       .eq('estado', 'preparando')
 
     if (pedidosError) throw pedidosError
+
+    if (!pedidos || pedidos.length === 0) {
+      throw new Error('No se encontraron pedidos válidos')
+    }
+
+    // Validar que todos los pedidos cumplan las condiciones
+    const pedidosInvalidos = pedidos.filter(p => {
+      return p.fecha_entrega_estimada !== ruta.fecha_ruta ||
+             p.turno !== ruta.turno ||
+             p.zona_id !== ruta.zona_id
+    })
+
+    if (pedidosInvalidos.length > 0) {
+      throw new Error(`Algunos pedidos no cumplen las condiciones de la ruta (fecha, turno, zona)`)
+    }
 
     // Crear detalles de ruta (ordenados por zona y coordenadas)
     const detallesRuta = (pedidos as any[])
@@ -236,12 +285,29 @@ export async function iniciarRuta(
   }
 }
 
-// Finalizar ruta
+// Finalizar ruta (con checklist fin)
 export async function finalizarRuta(
-  rutaId: string
+  rutaId: string,
+  checklistFinId?: string
 ): Promise<ApiResponse> {
   try {
     const supabase = await createClient()
+
+    // Verificar que todas las entregas estén completas
+    const { data: detalles, error: detallesError } = await supabase
+      .from('detalles_ruta')
+      .select('estado_entrega')
+      .eq('ruta_id', rutaId)
+
+    if (detallesError) throw detallesError
+
+    const entregasPendientes = detalles?.filter(d => 
+      d.estado_entrega !== 'entregado' && d.estado_entrega !== 'fallido'
+    )
+
+    if (entregasPendientes && entregasPendientes.length > 0) {
+      throw new Error('No se puede finalizar la ruta. Todas las entregas deben estar completas.')
+    }
 
     // Calcular tiempo real y distancia
     const { data: ruta, error: rutaError } = await supabase
@@ -256,13 +322,19 @@ export async function finalizarRuta(
     const tiempoFin = new Date()
     const tiempoRealMin = Math.round((tiempoFin.getTime() - tiempoInicio.getTime()) / (1000 * 60))
 
+    const updateData: any = {
+      estado: 'completada',
+      tiempo_real_min: tiempoRealMin,
+      updated_at: new Date().toISOString(),
+    }
+
+    if (checklistFinId) {
+      updateData.checklist_fin_id = checklistFinId
+    }
+
     const { error: updateError } = await supabase
       .from('rutas_reparto')
-      .update({
-        estado: 'completada',
-        tiempo_real_min: tiempoRealMin,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', rutaId)
 
     if (updateError) throw updateError
@@ -278,6 +350,120 @@ export async function finalizarRuta(
     return {
       success: false,
       error: error.message || 'Error al finalizar ruta',
+    }
+  }
+}
+
+// Registrar devolución
+export async function registrarDevolucionAction(formData: FormData): Promise<ApiResponse> {
+  try {
+    const supabase = await createClient()
+
+    // Obtener usuario actual
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, error: 'Usuario no autenticado' }
+    }
+
+    // Verificar que es repartidor
+    const { data: usuario } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (!usuario || usuario.rol !== 'repartidor') {
+      return { success: false, error: 'Solo repartidores pueden registrar devoluciones' }
+    }
+
+    // Parsear datos
+    const pedido_id = formData.get('pedido_id') as string
+    const detalle_ruta_id = formData.get('detalle_ruta_id') as string
+    const producto_id = formData.get('producto_id') as string
+    const cantidad = parseFloat(formData.get('cantidad') as string)
+    const motivo = formData.get('motivo') as string
+    const observaciones = formData.get('observaciones') as string
+
+    if (!pedido_id || !producto_id || !cantidad || !motivo) {
+      return { success: false, error: 'Faltan datos requeridos' }
+    }
+
+    // Insertar devolución
+    const { error: insertError } = await supabase
+      .from('devoluciones')
+      .insert({
+        pedido_id,
+        detalle_ruta_id: detalle_ruta_id || null,
+        producto_id,
+        cantidad,
+        motivo,
+        observaciones: observaciones || null,
+        usuario_id: user.id,
+      })
+
+    if (insertError) throw insertError
+
+    revalidatePath('/(repartidor)/ruta/*')
+    revalidatePath('/(admin)/(dominios)/reparto/rutas')
+
+    return {
+      success: true,
+      message: 'Devolución registrada exitosamente',
+    }
+  } catch (error: any) {
+    console.error('Error al registrar devolución:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al registrar devolución',
+    }
+  }
+}
+
+// Obtener rutas por vehículo
+export async function obtenerRutasPorVehiculoAction(
+  vehiculoId: string,
+  fecha?: string
+): Promise<ApiResponse> {
+  try {
+    const supabase = await createClient()
+
+    let query = supabase
+      .from('rutas_reparto')
+      .select(`
+        *,
+        repartidor:usuarios(nombre, apellido),
+        vehiculo:vehiculos(patente, marca, modelo),
+        detalles_ruta (
+          id,
+          orden_entrega,
+          estado_entrega,
+          pedido:pedidos(
+            numero_pedido,
+            cliente:clientes(nombre, direccion)
+          )
+        )
+      `)
+      .eq('vehiculo_id', vehiculoId)
+      .order('fecha_ruta', { ascending: false })
+
+    if (fecha) {
+      query = query.eq('fecha_ruta', fecha)
+    }
+
+    const { data, error } = await query
+
+    if (error) throw error
+
+    return {
+      success: true,
+      data,
+      message: 'Rutas obtenidas exitosamente',
+    }
+  } catch (error: any) {
+    console.error('Error al obtener rutas por vehículo:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al obtener rutas',
     }
   }
 }

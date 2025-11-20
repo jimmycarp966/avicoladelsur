@@ -47,7 +47,7 @@ export async function POST(request: Request) {
         pedido_id: payload.pedido_id,
         caja_id: payload.caja_id,
         monto: payload.monto,
-        tipo_pago: payload.tipo_pago,
+        metodo_pago: payload.metodo_pago || payload.tipo_pago,
       })
       return NextResponse.json(result, { status: result.success ? 200 : 400 })
     }

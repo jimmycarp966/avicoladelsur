@@ -22,7 +22,7 @@ export default async function MovimientosPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <MovimientoCajaForm cajas={cajas.data ?? []} />
+        <MovimientoCajaForm cajas={cajas ?? []} />
 
         <Card>
           <CardHeader>
@@ -31,7 +31,7 @@ export default async function MovimientosPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {(movimientos.data ?? []).map((movimiento) => (
+              {((movimientos as any)?.movimientos ?? (movimientos as any)?.data ?? []).map((movimiento: any) => (
                 <div
                   key={movimiento.id}
                   className="rounded-lg border border-muted/50 p-4 flex items-center justify-between"
@@ -61,7 +61,7 @@ export default async function MovimientosPage() {
                   </div>
                 </div>
               ))}
-              {movimientos.data?.length === 0 && (
+              {((movimientos as any)?.movimientos ?? (movimientos as any)?.data ?? []).length === 0 && (
                 <p className="text-sm text-muted-foreground text-center">Aún no hay movimientos registrados.</p>
               )}
             </div>

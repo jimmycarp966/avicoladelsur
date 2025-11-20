@@ -27,7 +27,7 @@ export default async function GastosPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <GastoForm categorias={categorias.data ?? []} cajas={cajas.data ?? []} />
+        <GastoForm categorias={categorias?.data ?? []} cajas={cajas ?? []} />
 
         <Card>
           <CardHeader>
@@ -36,7 +36,7 @@ export default async function GastosPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {(gastos.data ?? []).map((gasto) => (
+              {(gastos?.data ?? []).map((gasto) => (
                 <div key={gasto.id} className="rounded-lg border border-muted/50 p-4">
                   <div className="flex items-center justify-between">
                     <div>

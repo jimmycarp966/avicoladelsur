@@ -34,7 +34,7 @@ export default async function ReportesPage() {
             <div className="rounded-lg border border-primary/10 p-4 bg-primary/5">
               <p className="text-sm text-muted-foreground">Saldo consolidado</p>
               <p className="text-2xl font-bold">
-                ${Number(resumen.data?.saldo_total ?? 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                ${Number(resumen.data?.saldoTotal ?? 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
               </p>
             </div>
             <div className="space-y-2">

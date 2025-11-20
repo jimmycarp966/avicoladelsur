@@ -38,6 +38,8 @@ const navigation = [
     children: [
       { name: 'Productos', href: '/almacen/productos' },
       { name: 'Lotes', href: '/almacen/lotes' },
+      { name: 'Presupuestos del Día', href: '/almacen/presupuestos-dia' },
+      { name: 'Recepción', href: '/almacen/recepcion' },
     ],
   },
   {
@@ -46,6 +48,7 @@ const navigation = [
     icon: ShoppingCart,
     roles: ['admin', 'vendedor'],
     children: [
+      { name: 'Presupuestos', href: '/ventas/presupuestos' },
       { name: 'Pedidos', href: '/ventas/pedidos' },
       { name: 'Clientes', href: '/ventas/clientes' },
     ],
@@ -68,6 +71,8 @@ const navigation = [
     children: [
       { name: 'Cajas', href: '/tesoreria/cajas' },
       { name: 'Movimientos', href: '/tesoreria/movimientos' },
+      { name: 'Cierres de Caja', href: '/tesoreria/cierre-caja' },
+      { name: 'Tesoro', href: '/tesoreria/tesoro' },
       { name: 'Gastos', href: '/tesoreria/gastos' },
     ],
   },

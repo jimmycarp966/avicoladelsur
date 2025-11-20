@@ -31,7 +31,7 @@ export default async function CajasPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {(cajas.data ?? []).map((caja) => (
+              {(cajas ?? []).map((caja) => (
                 <div
                   key={caja.id}
                   className="rounded-lg border border-primary/10 bg-white/80 p-4 shadow-sm"
@@ -54,7 +54,7 @@ export default async function CajasPage() {
                   </div>
                 </div>
               ))}
-              {cajas.data?.length === 0 && (
+              {(cajas ?? []).length === 0 && (
                 <p className="text-sm text-muted-foreground text-center">Aún no hay cajas registradas.</p>
               )}
             </div>

@@ -83,39 +83,110 @@ export async function POST(request: NextRequest) {
 
     // Si hay cobro, registrar movimiento de tesorería
     if (data.monto_cobrado && data.monto_cobrado > 0) {
-      // Buscar caja asociada al repartidor (simplificado - en producción buscar caja de ruta)
-      const { data: cajas } = await supabase
+      // Validar número de transacción BNA si es transferencia
+      if (data.metodo_pago === 'transferencia' && data.numero_transaccion) {
+        // Validar que no empiece con 0
+        if (data.numero_transaccion.startsWith('0')) {
+          return NextResponse.json(
+            { success: false, message: 'El número de transacción BNA no debe empezar con 0' },
+            { status: 400 }
+          )
+        }
+
+        // Validar que sea numérico
+        if (!/^\d+$/.test(data.numero_transaccion)) {
+          return NextResponse.json(
+            { success: false, message: 'El número de transacción debe contener solo dígitos' },
+            { status: 400 }
+          )
+        }
+      }
+
+      // Buscar caja central
+      const { data: cajaCentral } = await supabase
         .from('tesoreria_cajas')
-        .select('id')
-        .limit(1)
+        .select('id, saldo_actual')
+        .eq('nombre', 'Caja Central')
         .single()
 
-      if (cajas) {
-        // Crear movimiento de ingreso
-        await supabase.rpc('fn_crear_movimiento_caja', {
-          p_caja_id: cajas.id,
-          p_tipo: 'ingreso',
-          p_monto: data.monto_cobrado,
-          p_descripcion: `Cobro por entrega de pedido ${data.pedido_id}`,
-          p_origen_tipo: 'pedido',
-          p_origen_id: data.pedido_id,
-          p_user_id: user.id,
-        })
+      if (!cajaCentral) {
+        // Si no existe Caja Central, usar la primera disponible
+        const { data: cajas } = await supabase
+          .from('tesoreria_cajas')
+          .select('id')
+          .limit(1)
+          .single()
 
-        // Actualizar pedido con información de pago
-        await supabase
-          .from('pedidos')
-          .update({
-            pago_estado: 'pagado',
-            caja_movimiento_id: (
-              await supabase
-                .from('tesoreria_movimientos')
-                .select('id')
-                .eq('origen_id', data.pedido_id)
-                .single()
-            ).data?.id
+        if (cajas) {
+          // Crear movimiento de ingreso
+          const { data: movimiento, error: movimientoError } = await supabase
+            .from('tesoreria_movimientos')
+            .insert({
+              caja_id: cajas.id,
+              tipo: 'ingreso',
+              monto: data.monto_cobrado,
+              descripcion: `Cobro por entrega de pedido ${data.pedido_id}${data.numero_transaccion ? ` - Transacción: ${data.numero_transaccion}` : ''}`,
+              origen_tipo: 'pedido',
+              origen_id: data.pedido_id,
+              metodo_pago: data.metodo_pago || 'efectivo',
+              user_id: user.id,
+            })
+            .select()
+            .single()
+
+          if (!movimientoError && movimiento) {
+            // Actualizar saldo de caja
+            await supabase.rpc('fn_actualizar_saldo_caja', {
+              p_caja_id: cajas.id,
+              p_monto: data.monto_cobrado,
+            })
+
+            // Actualizar pedido con información de pago
+            await supabase
+              .from('pedidos')
+              .update({
+                pago_estado: 'pagado',
+                caja_movimiento_id: movimiento.id,
+              })
+              .eq('id', data.pedido_id)
+          }
+        }
+      } else {
+        // Crear movimiento de ingreso en caja central
+        const { data: movimiento, error: movimientoError } = await supabase
+          .from('tesoreria_movimientos')
+          .insert({
+            caja_id: cajaCentral.id,
+            tipo: 'ingreso',
+            monto: data.monto_cobrado,
+            descripcion: `Cobro por entrega de pedido ${data.pedido_id}${data.numero_transaccion ? ` - Transacción: ${data.numero_transaccion}` : ''}`,
+            origen_tipo: 'pedido',
+            origen_id: data.pedido_id,
+            metodo_pago: data.metodo_pago || 'efectivo',
+            user_id: user.id,
           })
-          .eq('id', data.pedido_id)
+          .select()
+          .single()
+
+        if (!movimientoError && movimiento) {
+          // Actualizar saldo de caja
+          await supabase
+            .from('tesoreria_cajas')
+            .update({
+              saldo_actual: (cajaCentral.saldo_actual || 0) + data.monto_cobrado,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', cajaCentral.id)
+
+          // Actualizar pedido con información de pago
+          await supabase
+            .from('pedidos')
+            .update({
+              pago_estado: 'pagado',
+              caja_movimiento_id: movimiento.id,
+            })
+            .eq('id', data.pedido_id)
+        }
       }
     }
 

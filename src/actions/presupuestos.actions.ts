@@ -576,6 +576,25 @@ export async function enviarPresupuestoAlmacenAction(presupuestoId: string) {
       return { success: false, message: 'Usuario no autenticado' }
     }
 
+    // Verificar que el presupuesto tenga turno y zona antes de enviar
+    const { data: presupuesto, error: presupuestoError } = await supabase
+      .from('presupuestos')
+      .select('turno, zona_id, estado')
+      .eq('id', presupuestoId)
+      .single()
+
+    if (presupuestoError || !presupuesto) {
+      return { success: false, message: 'Presupuesto no encontrado' }
+    }
+
+    if (presupuesto.estado !== 'pendiente') {
+      return { success: false, message: 'Solo se pueden enviar presupuestos pendientes a almacén' }
+    }
+
+    if (!presupuesto.turno || !presupuesto.zona_id) {
+      return { success: false, message: 'El presupuesto debe tener turno y zona asignados antes de enviar a almacén' }
+    }
+
     // Actualizar estado y usuario almacén
     const { error } = await supabase
       .from('presupuestos')
@@ -609,6 +628,190 @@ export async function enviarPresupuestoAlmacenAction(presupuestoId: string) {
 
   } catch (error) {
     console.error('Error en enviarPresupuestoAlmacenAction:', error)
+    return { success: false, message: 'Error interno del servidor' }
+  }
+}
+
+// Acción para asignar turno y zona a presupuesto
+export async function asignarTurnoZonaPresupuestoAction(formData: FormData) {
+  try {
+    const supabase = await createClient()
+
+    // Obtener usuario actual
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, message: 'Usuario no autenticado' }
+    }
+
+    // Verificar permisos (vendedor o admin)
+    const { data: usuario } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (!usuario || !['admin', 'vendedor'].includes(usuario.rol)) {
+      return { success: false, message: 'No tienes permisos para asignar turno y zona' }
+    }
+
+    // Parsear datos
+    const presupuesto_id = formData.get('presupuesto_id') as string
+    const turno = formData.get('turno') as string
+    const zona_id = formData.get('zona_id') as string
+    const metodos_pago = formData.get('metodos_pago') ? JSON.parse(formData.get('metodos_pago') as string) : null
+    const recargo_total = formData.get('recargo_total') ? parseFloat(formData.get('recargo_total') as string) : 0
+
+    if (!presupuesto_id || !turno || !zona_id) {
+      return { success: false, message: 'Faltan datos requeridos: presupuesto_id, turno, zona_id' }
+    }
+
+    if (!['mañana', 'tarde'].includes(turno)) {
+      return { success: false, message: 'Turno inválido. Debe ser "mañana" o "tarde"' }
+    }
+
+    // Llamar RPC para asignar turno y zona
+    const { data: result, error } = await supabase.rpc('fn_asignar_turno_zona_presupuesto', {
+      p_presupuesto_id: presupuesto_id,
+      p_turno: turno,
+      p_zona_id: zona_id,
+      p_metodos_pago: metodos_pago,
+      p_recargo_total: recargo_total,
+    })
+
+    if (error) {
+      console.error('Error asignando turno y zona:', error)
+      return { success: false, message: 'Error al asignar turno y zona' }
+    }
+
+    if (!result.success) {
+      return { success: false, message: result.error || 'Error en la asignación' }
+    }
+
+    revalidatePath('/ventas/presupuestos')
+    revalidatePath(`/ventas/presupuestos/${presupuesto_id}`)
+
+    return {
+      success: true,
+      message: 'Turno y zona asignados exitosamente',
+      data: result
+    }
+
+  } catch (error) {
+    console.error('Error en asignarTurnoZonaPresupuestoAction:', error)
+    return { success: false, message: 'Error interno del servidor' }
+  }
+}
+
+// Acción para convertir presupuesto a cotización
+export async function convertirPresupuestoACotizacionAction(presupuestoId: string) {
+  try {
+    const supabase = await createClient()
+
+    // Obtener usuario actual
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, message: 'Usuario no autenticado' }
+    }
+
+    // Verificar permisos (vendedor o admin)
+    const { data: usuario } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (!usuario || !['admin', 'vendedor'].includes(usuario.rol)) {
+      return { success: false, message: 'No tienes permisos para convertir presupuestos' }
+    }
+
+    // Llamar RPC para convertir a cotización
+    const { data: result, error } = await supabase.rpc('fn_convertir_presupuesto_a_cotizacion', {
+      p_presupuesto_id: presupuestoId,
+    })
+
+    if (error) {
+      console.error('Error convirtiendo presupuesto a cotización:', error)
+      return { success: false, message: 'Error al convertir presupuesto a cotización' }
+    }
+
+    if (!result.success) {
+      return { success: false, message: result.error || 'Error en la conversión' }
+    }
+
+    revalidatePath('/ventas/presupuestos')
+    revalidatePath(`/ventas/presupuestos/${presupuestoId}`)
+
+    return {
+      success: true,
+      message: `Presupuesto convertido a cotización ${result.numero_cotizacion} exitosamente`,
+      data: result
+    }
+
+  } catch (error) {
+    console.error('Error en convertirPresupuestoACotizacionAction:', error)
+    return { success: false, message: 'Error interno del servidor' }
+  }
+}
+
+// Acción para recalcular recargos por métodos de pago
+export async function recalcularRecargosAction(presupuestoId: string) {
+  try {
+    const supabase = await createClient()
+
+    // Obtener usuario actual
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, message: 'Usuario no autenticado' }
+    }
+
+    // Obtener presupuesto con métodos de pago
+    const { data: presupuesto, error: presupuestoError } = await supabase
+      .from('presupuestos')
+      .select('metodos_pago, total_estimado, recargo_total')
+      .eq('id', presupuestoId)
+      .single()
+
+    if (presupuestoError || !presupuesto) {
+      return { success: false, message: 'Presupuesto no encontrado' }
+    }
+
+    // Calcular recargos según métodos de pago
+    let recargoTotal = 0
+    const metodosPago = presupuesto.metodos_pago as any
+
+    if (metodosPago && Array.isArray(metodosPago)) {
+      for (const metodo of metodosPago) {
+        if (metodo.recargo) {
+          recargoTotal += metodo.recargo
+        }
+      }
+    }
+
+    // Actualizar recargo total
+    const { error: updateError } = await supabase
+      .from('presupuestos')
+      .update({
+        recargo_total: recargoTotal,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', presupuestoId)
+
+    if (updateError) {
+      console.error('Error actualizando recargos:', updateError)
+      return { success: false, message: 'Error al recalcular recargos' }
+    }
+
+    revalidatePath('/ventas/presupuestos')
+    revalidatePath(`/ventas/presupuestos/${presupuestoId}`)
+
+    return {
+      success: true,
+      message: 'Recargos recalculados exitosamente',
+      data: { recargo_total: recargoTotal }
+    }
+
+  } catch (error) {
+    console.error('Error en recalcularRecargosAction:', error)
     return { success: false, message: 'Error interno del servidor' }
   }
 }

@@ -1,33 +1,463 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import type {
-  ApiResponse,
-  CrearCajaParams,
-  MovimientoCajaParams,
-  RegistrarPagoPedidoParams,
-} from '@/types/api.types'
+import { revalidatePath } from 'next/cache'
+import { z } from 'zod'
 
-interface MovimientoFilters {
-  cajaId?: string
-  fechaDesde?: string
-  fechaHasta?: string
-  tipo?: 'ingreso' | 'egreso'
-}
+// Schemas de validación
+const crearCierreCajaSchema = z.object({
+  caja_id: z.string().uuid(),
+  fecha: z.string(),
+})
 
-export async function crearCaja(data: CrearCajaParams): Promise<ApiResponse<{ cajaId: string }>> {
+const cerrarCierreCajaSchema = z.object({
+  cierre_id: z.string().uuid(),
+  saldo_final: z.number(),
+  total_ingresos: z.number(),
+  total_egresos: z.number(),
+  cobranzas_cuenta_corriente: z.number(),
+  gastos: z.number(),
+  retiro_tesoro: z.number(),
+})
+
+const registrarRetiroTesoroSchema = z.object({
+  tipo: z.enum(['efectivo', 'transferencia', 'qr', 'tarjeta']),
+  monto: z.number().positive(),
+  descripcion: z.string().optional(),
+})
+
+const validarTransferenciaBNASchema = z.object({
+  numero_transaccion: z.string().min(1),
+})
+
+// Obtener movimientos en tiempo real
+export async function obtenerMovimientosTiempoRealAction(
+  cajaId?: string,
+  fecha?: string
+) {
   try {
     const supabase = await createClient()
 
-    const { data: nuevaCaja, error } = await supabase
+    // Obtener usuario actual
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, message: 'Usuario no autenticado' }
+    }
+
+    // Verificar permisos (admin o tesorero)
+    const { data: usuario } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (!usuario || !['admin', 'vendedor'].includes(usuario.rol)) {
+      return { success: false, message: 'No tienes permisos para ver movimientos' }
+    }
+
+    let query = supabase
+      .from('tesoreria_movimientos')
+      .select(`
+        *,
+        caja:tesoreria_cajas(nombre),
+        usuario:usuarios(nombre, apellido),
+        pedido:pedidos(numero_pedido, cliente:clientes(nombre))
+      `)
+      .order('created_at', { ascending: false })
+      .limit(100)
+
+    if (cajaId) {
+      query = query.eq('caja_id', cajaId)
+    }
+
+    if (fecha) {
+      const fechaInicio = `${fecha}T00:00:00Z`
+      const fechaFin = `${fecha}T23:59:59Z`
+      query = query.gte('created_at', fechaInicio).lte('created_at', fechaFin)
+    }
+
+    const { data, error } = await query
+
+    if (error) throw error
+
+    // Obtener saldo actual de cajas
+    const { data: cajas } = await supabase
+      .from('tesoreria_cajas')
+      .select('id, nombre, saldo_actual, moneda')
+      .order('created_at', { ascending: false })
+
+    return {
+      success: true,
+      data: {
+        movimientos: data || [],
+        cajas: cajas || [],
+        total_movimientos: data?.length || 0,
+      },
+    }
+  } catch (error: any) {
+    console.error('Error en obtenerMovimientosTiempoRealAction:', error)
+    return { success: false, message: error.message || 'Error al obtener movimientos' }
+  }
+}
+
+// Crear cierre de caja
+export async function crearCierreCajaAction(formData: FormData) {
+  try {
+    const supabase = await createClient()
+
+    // Obtener usuario actual
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, message: 'Usuario no autenticado' }
+    }
+
+    // Verificar permisos (admin o tesorero)
+    const { data: usuario } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (!usuario || !['admin', 'vendedor'].includes(usuario.rol)) {
+      return { success: false, message: 'No tienes permisos para crear cierres de caja' }
+    }
+
+    // Parsear y validar datos
+    const rawData = Object.fromEntries(formData)
+    const data = crearCierreCajaSchema.parse({
+      caja_id: rawData.caja_id,
+      fecha: rawData.fecha,
+    })
+
+    // Verificar que no exista un cierre abierto para esta caja y fecha
+    const { data: cierreExistente } = await supabase
+      .from('cierres_caja')
+      .select('id, estado')
+      .eq('caja_id', data.caja_id)
+      .eq('fecha', data.fecha)
+      .single()
+
+    if (cierreExistente) {
+      if (cierreExistente.estado === 'abierto') {
+        return { success: false, message: 'Ya existe un cierre abierto para esta caja y fecha' }
+      }
+      return { success: false, message: 'Ya existe un cierre cerrado para esta caja y fecha' }
+    }
+
+    // Obtener saldo inicial de la caja
+    const { data: caja } = await supabase
+      .from('tesoreria_cajas')
+      .select('saldo_actual')
+      .eq('id', data.caja_id)
+      .single()
+
+    if (!caja) {
+      return { success: false, message: 'Caja no encontrada' }
+    }
+
+    // Crear cierre
+    const { data: cierre, error } = await supabase
+      .from('cierres_caja')
+      .insert({
+        caja_id: data.caja_id,
+        fecha: data.fecha,
+        saldo_inicial: caja.saldo_actual,
+        estado: 'abierto',
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+
+    revalidatePath('/(admin)/(dominios)/tesoreria/cierre-caja')
+
+    return {
+      success: true,
+      message: 'Cierre de caja creado exitosamente',
+      data: cierre,
+    }
+  } catch (error: any) {
+    console.error('Error en crearCierreCajaAction:', error)
+    if (error instanceof z.ZodError) {
+      return { success: false, message: 'Datos inválidos: ' + error.issues[0].message }
+    }
+    return { success: false, message: error.message || 'Error al crear cierre de caja' }
+  }
+}
+
+// Cerrar cierre de caja
+export async function cerrarCierreCajaAction(formData: FormData) {
+  try {
+    const supabase = await createClient()
+
+    // Obtener usuario actual
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, message: 'Usuario no autenticado' }
+    }
+
+    // Verificar permisos (admin o tesorero)
+    const { data: usuario } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (!usuario || !['admin', 'vendedor'].includes(usuario.rol)) {
+      return { success: false, message: 'No tienes permisos para cerrar cierres de caja' }
+    }
+
+    // Parsear y validar datos
+    const rawData = Object.fromEntries(formData)
+    const data = cerrarCierreCajaSchema.parse({
+      cierre_id: rawData.cierre_id,
+      saldo_final: parseFloat(rawData.saldo_final as string),
+      total_ingresos: parseFloat(rawData.total_ingresos as string),
+      total_egresos: parseFloat(rawData.total_egresos as string),
+      cobranzas_cuenta_corriente: parseFloat(rawData.cobranzas_cuenta_corriente as string),
+      gastos: parseFloat(rawData.gastos as string),
+      retiro_tesoro: parseFloat(rawData.retiro_tesoro as string),
+    })
+
+    // Obtener cierre
+    const { data: cierre, error: cierreError } = await supabase
+      .from('cierres_caja')
+      .select('*')
+      .eq('id', data.cierre_id)
+      .single()
+
+    if (cierreError || !cierre) {
+      return { success: false, message: 'Cierre no encontrado' }
+    }
+
+    if (cierre.estado === 'cerrado') {
+      return { success: false, message: 'El cierre ya está cerrado' }
+    }
+
+    // Actualizar cierre
+    const { error: updateError } = await supabase
+      .from('cierres_caja')
+      .update({
+        saldo_final: data.saldo_final,
+        total_ingresos: data.total_ingresos,
+        total_egresos: data.total_egresos,
+        cobranzas_cuenta_corriente: data.cobranzas_cuenta_corriente,
+        gastos: data.gastos,
+        retiro_tesoro: data.retiro_tesoro,
+        estado: 'cerrado',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', data.cierre_id)
+
+    if (updateError) throw updateError
+
+    // Si hay retiro al tesoro, registrar en tesoro
+    if (data.retiro_tesoro > 0) {
+      await supabase
+        .from('tesoro')
+        .insert({
+          tipo: 'efectivo', // Por defecto, se puede ajustar
+          monto: data.retiro_tesoro,
+          descripcion: `Retiro desde cierre de caja ${cierre.fecha}`,
+          origen_tipo: 'cierre_caja',
+          origen_id: data.cierre_id,
+        })
+    }
+
+    revalidatePath('/(admin)/(dominios)/tesoreria/cierre-caja')
+    revalidatePath('/(admin)/(dominios)/tesoreria/tesoro')
+
+    return {
+      success: true,
+      message: 'Cierre de caja cerrado exitosamente',
+    }
+  } catch (error: any) {
+    console.error('Error en cerrarCierreCajaAction:', error)
+    if (error instanceof z.ZodError) {
+      return { success: false, message: 'Datos inválidos: ' + error.issues[0].message }
+    }
+    return { success: false, message: error.message || 'Error al cerrar cierre de caja' }
+  }
+}
+
+// Registrar retiro al tesoro
+export async function registrarRetiroTesoroAction(formData: FormData) {
+  try {
+    const supabase = await createClient()
+
+    // Obtener usuario actual
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, message: 'Usuario no autenticado' }
+    }
+
+    // Verificar permisos (admin o tesorero)
+    const { data: usuario } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (!usuario || !['admin', 'vendedor'].includes(usuario.rol)) {
+      return { success: false, message: 'No tienes permisos para registrar retiros' }
+    }
+
+    // Parsear y validar datos
+    const rawData = Object.fromEntries(formData)
+    const data = registrarRetiroTesoroSchema.parse({
+      tipo: rawData.tipo,
+      monto: parseFloat(rawData.monto as string),
+      descripcion: rawData.descripcion || undefined,
+    })
+
+    // Insertar retiro en tesoro
+    const { error } = await supabase
+      .from('tesoro')
+      .insert({
+        tipo: data.tipo,
+        monto: data.monto,
+        descripcion: data.descripcion || `Retiro de ${data.tipo}`,
+        origen_tipo: 'retiro',
+        origen_id: null,
+      })
+
+    if (error) throw error
+
+    revalidatePath('/(admin)/(dominios)/tesoreria/tesoro')
+
+    return {
+      success: true,
+      message: 'Retiro al tesoro registrado exitosamente',
+    }
+  } catch (error: any) {
+    console.error('Error en registrarRetiroTesoroAction:', error)
+    if (error instanceof z.ZodError) {
+      return { success: false, message: 'Datos inválidos: ' + error.issues[0].message }
+    }
+    return { success: false, message: error.message || 'Error al registrar retiro' }
+  }
+}
+
+// Registrar depósito bancario
+export async function registrarDepositoBancarioAction(formData: FormData) {
+  try {
+    const supabase = await createClient()
+
+    // Obtener usuario actual
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, message: 'Usuario no autenticado' }
+    }
+
+    // Verificar permisos (admin o tesorero)
+    const { data: usuario } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (!usuario || !['admin', 'vendedor'].includes(usuario.rol)) {
+      return { success: false, message: 'No tienes permisos para registrar depósitos' }
+    }
+
+    // Parsear datos
+    const monto = parseFloat(formData.get('monto') as string)
+    const numero_transaccion = formData.get('numero_transaccion') as string
+
+    if (!monto || !numero_transaccion) {
+      return { success: false, message: 'Faltan datos requeridos' }
+    }
+
+    // Validar número de transacción BNA (sin 0 inicial)
+    const validacion = await validarTransferenciaBNAAction(numero_transaccion)
+    if (!validacion.success) {
+      return validacion
+    }
+
+    // Registrar depósito (egreso del tesoro)
+    const { error } = await supabase
+      .from('tesoro')
+      .insert({
+        tipo: 'transferencia',
+        monto: -monto, // Negativo porque es salida del tesoro
+        descripcion: `Depósito bancario - Transacción: ${numero_transaccion}`,
+        origen_tipo: 'deposito',
+        origen_id: null,
+      })
+
+    if (error) throw error
+
+    revalidatePath('/(admin)/(dominios)/tesoreria/tesoro')
+
+    return {
+      success: true,
+      message: 'Depósito bancario registrado exitosamente',
+    }
+  } catch (error: any) {
+    console.error('Error en registrarDepositoBancarioAction:', error)
+    return { success: false, message: error.message || 'Error al registrar depósito' }
+  }
+}
+
+// Validar transferencia BNA (número sin 0 inicial)
+export async function validarTransferenciaBNAAction(numeroTransaccion: string) {
+  try {
+    // Validar formato básico
+    if (!numeroTransaccion || numeroTransaccion.length === 0) {
+      return { success: false, message: 'Número de transacción requerido' }
+    }
+
+    // Validar que no empiece con 0
+    if (numeroTransaccion.startsWith('0')) {
+      return { success: false, message: 'El número de transacción BNA no debe empezar con 0' }
+    }
+
+    // Validar que sea numérico (sin 0 inicial)
+    if (!/^\d+$/.test(numeroTransaccion)) {
+      return { success: false, message: 'El número de transacción debe contener solo dígitos' }
+    }
+
+    // Aquí se podría agregar validación adicional con API del BNA si está disponible
+    // Por ahora solo validamos formato
+
+    return {
+      success: true,
+      message: 'Número de transacción válido',
+    }
+  } catch (error: any) {
+    console.error('Error en validarTransferenciaBNAAction:', error)
+    return { success: false, message: error.message || 'Error al validar transferencia' }
+  }
+}
+
+// Listar cajas
+export async function listarCajas() {
+  try {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from('tesoreria_cajas')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+
+    return data || []
+  } catch (error: any) {
+    console.error('Error en listarCajas:', error)
+    return []
+  }
+}
+
+// Crear caja
+export async function crearCaja(data: { nombre: string; saldo_inicial?: number; moneda?: string }) {
+  try {
+    const supabase = await createClient()
+    const { data: caja, error } = await supabase
       .from('tesoreria_cajas')
       .insert({
         nombre: data.nombre,
-        saldo_inicial: data.saldo_inicial ?? 0,
-        saldo_actual: data.saldo_inicial ?? 0,
-        moneda: data.moneda ?? 'ARS',
-        sucursal_id: data.sucursal_id ?? null,
+        saldo_actual: data.saldo_inicial || 0,
+        moneda: data.moneda || 'ARS',
       })
       .select()
       .single()
@@ -35,220 +465,160 @@ export async function crearCaja(data: CrearCajaParams): Promise<ApiResponse<{ ca
     if (error) throw error
 
     revalidatePath('/(admin)/(dominios)/tesoreria/cajas')
-
-    return {
-      success: true,
-      data: { cajaId: nuevaCaja.id },
-      message: 'Caja creada correctamente',
-    }
+    return { success: true, data: caja }
   } catch (error: any) {
-    console.error('crearCaja', error)
-    return {
-      success: false,
-      error: error.message || 'No se pudo crear la caja',
-    }
+    console.error('Error en crearCaja:', error)
+    return { success: false, error: error.message || 'Error al crear caja' }
   }
 }
 
-export async function listarCajas(): Promise<ApiResponse<any[]>> {
-  try {
-    const supabase = await createClient()
-    const { data, error } = await supabase
-      .from('tesoreria_cajas')
-      .select('*')
-      .order('nombre')
-
-    if (error) throw error
-
-    return {
-      success: true,
-      data: data ?? [],
-    }
-  } catch (error: any) {
-    console.error('listarCajas', error)
-    return {
-      success: false,
-      error: error.message || 'No se pudieron obtener las cajas',
-    }
-  }
+// Obtener movimientos de caja (alias para compatibilidad)
+export async function obtenerMovimientosCaja(cajaId?: string, fecha?: string) {
+  return obtenerMovimientosTiempoRealAction(cajaId, fecha)
 }
 
-export async function registrarMovimientoCaja(
-  movimiento: MovimientoCajaParams
-): Promise<ApiResponse<{ movimientoId: string }>> {
+// Registrar movimiento de caja
+export async function registrarMovimientoCaja(data: {
+  caja_id: string
+  tipo: 'ingreso' | 'egreso'
+  monto: number
+  descripcion?: string
+  metodo_pago?: string
+}) {
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
 
-    const { data, error } = await supabase.rpc('fn_crear_movimiento_caja', {
-      p_caja_id: movimiento.caja_id,
-      p_tipo: movimiento.tipo,
-      p_monto: movimiento.monto,
-      p_descripcion: movimiento.descripcion,
-      p_origen_tipo: movimiento.origen_tipo,
-      p_origen_id: movimiento.origen_id,
-      p_user_id: user?.id ?? null,
-      p_metodo_pago: movimiento.metodo_pago ?? 'efectivo',
+    // Obtener usuario actual
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return { success: false, message: 'Usuario no autenticado' }
+    }
+
+    // Usar RPC para crear movimiento atómicamente
+    const { data: result, error } = await supabase.rpc('fn_crear_movimiento_caja', {
+      p_caja_id: data.caja_id,
+      p_tipo: data.tipo,
+      p_monto: data.monto,
+      p_descripcion: data.descripcion || null,
+      p_user_id: user.id,
+      p_metodo_pago: data.metodo_pago || 'efectivo',
     })
 
     if (error) throw error
-    if (!data?.success) {
-      throw new Error(data?.error || 'Error al registrar movimiento')
-    }
 
     revalidatePath('/(admin)/(dominios)/tesoreria/movimientos')
-    revalidatePath('/(admin)/(dominios)/tesoreria/cajas')
+    revalidatePath('/(admin)/(dominios)/tesoreria')
 
     return {
       success: true,
-      data: { movimientoId: data.movimiento_id },
-      message: 'Movimiento registrado correctamente',
+      message: 'Movimiento registrado exitosamente',
+      data: result,
     }
   } catch (error: any) {
-    console.error('registrarMovimientoCaja', error)
-    return {
-      success: false,
-      error: error.message || 'No se pudo registrar el movimiento',
-    }
+    console.error('Error en registrarMovimientoCaja:', error)
+    return { success: false, message: error.message || 'Error al registrar movimiento' }
   }
 }
 
-export async function obtenerMovimientosCaja(
-  filtros: MovimientoFilters = {}
-): Promise<ApiResponse<any[]>> {
+// Obtener resumen de tesorería
+export async function obtenerResumenTesoreria() {
   try {
     const supabase = await createClient()
-    let query = supabase
+
+    // Obtener cajas con saldos
+    const { data: cajas } = await supabase
+      .from('tesoreria_cajas')
+      .select('id, nombre, saldo_actual, moneda')
+
+    // Obtener movimientos del día
+    const hoy = new Date().toISOString().split('T')[0]
+    const { data: movimientosHoy } = await supabase
       .from('tesoreria_movimientos')
-      .select(
-        `
-        id,
-        caja_id,
-        tipo,
-        monto,
-        descripcion,
-        metodo_pago,
-        origen_tipo,
-        origen_id,
-        created_at,
-        tesoreria_cajas (nombre)
-      `
-      )
-      .order('created_at', { ascending: false })
+      .select('tipo, monto')
+      .gte('created_at', `${hoy}T00:00:00Z`)
+      .lte('created_at', `${hoy}T23:59:59Z`)
 
-    if (filtros.cajaId) {
-      query = query.eq('caja_id', filtros.cajaId)
-    }
+    const totalIngresos = movimientosHoy
+      ?.filter((m) => m.tipo === 'ingreso')
+      .reduce((sum, m) => sum + Number(m.monto), 0) || 0
 
-    if (filtros.tipo) {
-      query = query.eq('tipo', filtros.tipo)
-    }
-
-    if (filtros.fechaDesde) {
-      query = query.gte('created_at', filtros.fechaDesde)
-    }
-
-    if (filtros.fechaHasta) {
-      query = query.lte('created_at', filtros.fechaHasta)
-    }
-
-    const { data, error } = await query
-    if (error) throw error
-
-    return {
-      success: true,
-      data: data ?? [],
-    }
-  } catch (error: any) {
-    console.error('obtenerMovimientosCaja', error)
-    return {
-      success: false,
-      error: error.message || 'No se pudieron obtener los movimientos',
-    }
-  }
-}
-
-export async function registrarPagoPedido(
-  params: RegistrarPagoPedidoParams
-): Promise<ApiResponse<{ pagoEstado: string }>> {
-  try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    const { data, error } = await supabase.rpc('fn_crear_pago_pedido', {
-      p_pedido_id: params.pedido_id,
-      p_caja_id: params.caja_id,
-      p_monto: params.monto,
-      p_tipo_pago: params.tipo_pago ?? 'efectivo',
-      p_user_id: user?.id ?? null,
-    })
-
-    if (error) throw error
-    if (!data?.success) {
-      throw new Error(data?.error || 'Error al registrar pago')
-    }
-
-    revalidatePath('/(admin)/(dominios)/ventas/pedidos')
-    revalidatePath(`/(admin)/(dominios)/ventas/pedidos/${params.pedido_id}`)
-
-    return {
-      success: true,
-      data: { pagoEstado: data.pago_estado },
-      message: 'Pago registrado correctamente',
-    }
-  } catch (error: any) {
-    console.error('registrarPagoPedido', error)
-    return {
-      success: false,
-      error: error.message || 'No se pudo registrar el pago del pedido',
-    }
-  }
-}
-
-export async function obtenerResumenTesoreria(): Promise<
-  ApiResponse<{
-    cajas: number
-    saldo_total: number
-    ingresos_hoy: number
-    egresos_hoy: number
-  }>
-> {
-  try {
-    const supabase = await createClient()
-
-    const [{ data: cajas }, { data: movimientos }] = await Promise.all([
-      supabase.from('tesoreria_cajas').select('id, saldo_actual'),
-      supabase
-        .from('tesoreria_movimientos')
-        .select('tipo, monto, created_at')
-        .gte('created_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString()),
-    ])
-
-    const saldoTotal = cajas?.reduce((acc, caja) => acc + Number(caja.saldo_actual || 0), 0) ?? 0
-    const ingresosHoy =
-      movimientos?.filter((m) => m.tipo === 'ingreso').reduce((sum, m) => sum + Number(m.monto), 0) ?? 0
-    const egresosHoy =
-      movimientos?.filter((m) => m.tipo === 'egreso').reduce((sum, m) => sum + Number(m.monto), 0) ?? 0
+    const totalEgresos = movimientosHoy
+      ?.filter((m) => m.tipo === 'egreso')
+      .reduce((sum, m) => sum + Number(m.monto), 0) || 0
 
     return {
       success: true,
       data: {
-        cajas: cajas?.length ?? 0,
-        saldo_total: saldoTotal,
-        ingresos_hoy: ingresosHoy,
-        egresos_hoy: egresosHoy,
+        cajas: cajas || [],
+        totalIngresos,
+        totalEgresos,
+        saldoTotal: cajas?.reduce((sum, c) => sum + Number(c.saldo_actual), 0) || 0,
       },
     }
   } catch (error: any) {
-    console.error('obtenerResumenTesoreria', error)
-    return {
-      success: false,
-      error: error.message || 'No se pudo obtener el resumen de tesorería',
-    }
+    console.error('Error en obtenerResumenTesoreria:', error)
+    return { success: false, message: error.message || 'Error al obtener resumen' }
   }
 }
 
+// Registrar pago de pedido
+export async function registrarPagoPedido(data: {
+  pedido_id: string
+  caja_id: string
+  monto: number
+  metodo_pago: string
+  numero_transaccion?: string
+}) {
+  try {
+    const supabase = await createClient()
+
+    // Obtener usuario actual
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return { success: false, message: 'Usuario no autenticado' }
+    }
+
+    // Validar número de transacción BNA si es transferencia
+    if (data.metodo_pago === 'transferencia' && data.numero_transaccion) {
+      const validacion = await validarTransferenciaBNAAction(data.numero_transaccion)
+      if (!validacion.success) {
+        return validacion
+      }
+    }
+
+    // Registrar movimiento de caja
+    const movimiento = await registrarMovimientoCaja({
+      caja_id: data.caja_id,
+      tipo: 'ingreso',
+      monto: data.monto,
+      descripcion: `Pago de pedido ${data.pedido_id}`,
+      metodo_pago: data.metodo_pago,
+    })
+
+    if (!movimiento.success) {
+      return movimiento
+    }
+
+    // Actualizar estado de pago del pedido
+    const { error: updateError } = await supabase
+      .from('pedidos')
+      .update({
+        pago_estado: 'pagado',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', data.pedido_id)
+
+    if (updateError) throw updateError
+
+    revalidatePath('/(admin)/(dominios)/ventas/pedidos')
+    revalidatePath('/(admin)/(dominios)/tesoreria')
+
+    return {
+      success: true,
+      message: 'Pago registrado exitosamente',
+    }
+  } catch (error: any) {
+    console.error('Error en registrarPagoPedido:', error)
+    return { success: false, message: error.message || 'Error al registrar pago' }
+  }
+}

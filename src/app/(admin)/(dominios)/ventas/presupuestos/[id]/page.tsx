@@ -1,12 +1,14 @@
 import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, Package, User, MapPin, Calendar, DollarSign, Scale, Clock, History } from 'lucide-react'
+import { ArrowLeft, Package, User, MapPin, Calendar, DollarSign, Scale, Clock, History, FileText } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { obtenerPresupuestoAction, enviarPresupuestoAlmacenAction } from '@/actions/presupuestos.actions'
+import { obtenerPresupuestoAction, enviarPresupuestoAlmacenAction, convertirPresupuestoACotizacionAction } from '@/actions/presupuestos.actions'
 import { PresupuestoDetalleSkeleton } from './presupuesto-detalle-skeleton'
+import { AsignarTurnoZonaForm } from './asignar-turno-zona-form'
+import { createClient } from '@/lib/supabase/server'
 
 interface PresupuestoDetallePageProps {
   params: {
@@ -15,6 +17,7 @@ interface PresupuestoDetallePageProps {
 }
 
 async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) {
+  const supabase = await createClient()
   const result = await obtenerPresupuestoAction(presupuestoId)
 
   if (!result.success || !result.data) {
@@ -23,7 +26,24 @@ async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) 
 
   const presupuesto = result.data
 
+  // Obtener zonas y zonas_dias para el formulario
+  const { data: zonas } = await supabase
+    .from('zonas')
+    .select('id, nombre')
+    .eq('activo', true)
+    .order('nombre')
+
+  const { data: zonasDias } = await supabase
+    .from('zonas_dias')
+    .select('*')
+    .eq('activo', true)
+
   async function handleEnviarAlmacen() {
+    // Validar que tenga turno y zona antes de enviar
+    if (!presupuesto.turno || !presupuesto.zona_id) {
+      return { success: false, message: 'El presupuesto debe tener turno y zona asignados antes de enviar a almacén' }
+    }
+
     try {
       const response = await fetch('/api/ventas/presupuestos/enviar-almacen', {
         method: 'POST',
@@ -35,6 +55,15 @@ async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) 
       return result
     } catch (error) {
       return { success: false, message: 'Error de conexión' }
+    }
+  }
+
+  async function handleConvertirACotizacion() {
+    try {
+      const result = await convertirPresupuestoACotizacionAction(presupuestoId)
+      return result
+    } catch (error) {
+      return { success: false, message: 'Error al convertir a cotización' }
     }
   }
 
@@ -65,18 +94,37 @@ async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) 
           <p className="text-muted-foreground">Detalle completo del presupuesto</p>
         </div>
         {presupuesto.estado === 'pendiente' && (
-          <Button
-            onClick={async () => {
-              const result = await handleEnviarAlmacen()
-              if (result.success) {
-                window.location.reload()
-              }
-            }}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            <Package className="mr-2 h-4 w-4" />
-            Enviar a Almacén
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={async () => {
+                const result = await handleConvertirACotizacion()
+                if (result.success) {
+                  window.location.reload()
+                } else {
+                  alert(result.message || 'Error al convertir a cotización')
+                }
+              }}
+            >
+              <FileText className="mr-2 h-4 w-4" />
+              Convertir a Cotización
+            </Button>
+            <Button
+              onClick={async () => {
+                const result = await handleEnviarAlmacen()
+                if (result.success) {
+                  window.location.reload()
+                } else {
+                  alert(result.message || 'Error al enviar a almacén')
+                }
+              }}
+              className="bg-blue-600 hover:bg-blue-700"
+              disabled={!presupuesto.turno || !presupuesto.zona_id}
+            >
+              <Package className="mr-2 h-4 w-4" />
+              Enviar a Almacén
+            </Button>
+          </div>
         )}
       </div>
 
@@ -125,6 +173,17 @@ async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) 
         </Card>
       </div>
 
+      {/* Asignar Turno y Zona (si está pendiente y no tiene turno/zona) */}
+      {presupuesto.estado === 'pendiente' && (!presupuesto.turno || !presupuesto.zona_id) && zonas && (
+        <AsignarTurnoZonaForm
+          presupuestoId={presupuestoId}
+          presupuesto={presupuesto}
+          zonas={zonas}
+          zonasDias={zonasDias || []}
+          fechaEntrega={presupuesto.fecha_entrega_estimada}
+        />
+      )}
+
       {/* Información del cliente */}
       <Card>
         <CardHeader>
@@ -143,12 +202,27 @@ async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) 
             <p className="text-lg">{presupuesto.cliente?.telefono || 'No disponible'}</p>
           </div>
           {presupuesto.zona && (
-            <div className="md:col-span-2">
+            <div>
               <label className="text-sm font-medium flex items-center gap-2">
                 <MapPin className="h-4 w-4" />
                 Zona de Entrega
               </label>
               <p className="text-lg">{presupuesto.zona.nombre}</p>
+            </div>
+          )}
+          {presupuesto.turno && (
+            <div>
+              <label className="text-sm font-medium flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Turno
+              </label>
+              <p className="text-lg capitalize">{presupuesto.turno}</p>
+            </div>
+          )}
+          {presupuesto.recargo_total && presupuesto.recargo_total > 0 && (
+            <div className="md:col-span-2">
+              <label className="text-sm font-medium">Recargo por Métodos de Pago</label>
+              <p className="text-lg text-blue-600">${presupuesto.recargo_total.toFixed(2)}</p>
             </div>
           )}
         </CardContent>

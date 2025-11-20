@@ -160,6 +160,8 @@ export interface CrearRutaParams {
   vehiculo_id: string
   repartidor_id: string
   fecha_ruta: string
+  turno: 'mañana' | 'tarde'
+  zona_id: string
   pedidos_ids: string[]
   observaciones?: string
 }

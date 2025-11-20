@@ -36,9 +36,9 @@ export default async function TesoreriaPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ${Number(resumen.data?.saldo_total ?? 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+              ${Number(resumen.data?.saldoTotal ?? 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
             </div>
-            <p className="text-xs text-muted-foreground">{(resumen.data?.cajas ?? 0)} cajas activas</p>
+            <p className="text-xs text-muted-foreground">{(Array.isArray(resumen.data?.cajas) ? resumen.data.cajas.length : resumen.data?.cajas ?? 0)} cajas activas</p>
           </CardContent>
         </Card>
 
@@ -51,7 +51,7 @@ export default async function TesoreriaPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ${Number(resumen.data?.ingresos_hoy ?? 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+              ${Number(resumen.data?.totalIngresos ?? 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
             </div>
             <p className="text-xs text-muted-foreground">Cobros registrados en el día</p>
           </CardContent>
@@ -66,7 +66,7 @@ export default async function TesoreriaPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ${Number(resumen.data?.egresos_hoy ?? 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+              ${Number(resumen.data?.totalEgresos ?? 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
             </div>
             <p className="text-xs text-muted-foreground">Gastos que afectan caja</p>
           </CardContent>
@@ -80,7 +80,7 @@ export default async function TesoreriaPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{cajas.data?.length ?? 0}</div>
+            <div className="text-2xl font-bold">{cajas?.length ?? 0}</div>
             <p className="text-xs text-muted-foreground">Incluye cajas físicas y virtuales</p>
           </CardContent>
         </Card>
@@ -102,7 +102,7 @@ export default async function TesoreriaPage() {
                 </tr>
               </thead>
               <tbody>
-                {(cajas.data ?? []).map((caja) => (
+                {(cajas ?? []).map((caja) => (
                   <tr key={caja.id} className="border-t border-muted/50">
                     <td className="py-2 font-medium">{caja.nombre}</td>
                     <td className="py-2">
@@ -111,7 +111,7 @@ export default async function TesoreriaPage() {
                     <td className="py-2">{caja.moneda}</td>
                   </tr>
                 ))}
-                {cajas.data?.length === 0 && (
+                {cajas?.length === 0 && (
                   <tr>
                     <td colSpan={3} className="py-6 text-center text-muted-foreground">
                       No hay cajas registradas aún.

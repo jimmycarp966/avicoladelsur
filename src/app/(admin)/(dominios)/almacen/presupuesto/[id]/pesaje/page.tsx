@@ -162,7 +162,15 @@ async function PesajeContent({ presupuestoId }: { presupuestoId: string }) {
                       <Scale className={`h-5 w-5 ${estaPesado ? 'text-green-600' : 'text-orange-600'}`} />
                     </div>
                     <div>
-                      <CardTitle className="text-lg">{item.producto?.nombre}</CardTitle>
+                      <div className="flex items-center gap-2">
+                        <CardTitle className="text-lg">{item.producto?.nombre}</CardTitle>
+                        {item.producto?.categoria === 'BALANZA' && (
+                          <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-300">
+                            <Scale className="mr-1 h-3 w-3" />
+                            BALANZA
+                          </Badge>
+                        )}
+                      </div>
                       <CardDescription>
                         Código: {item.producto?.codigo} |
                         Solicitado: {item.cantidad_solicitada}kg |

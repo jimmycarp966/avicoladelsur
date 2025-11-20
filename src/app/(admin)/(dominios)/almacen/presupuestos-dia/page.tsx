@@ -1,11 +1,13 @@
 import { Suspense } from 'react'
-import { Package, Scale, Calendar, MapPin, Truck } from 'lucide-react'
+import { Package, Scale, Calendar, MapPin, Truck, Clock, Filter } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { createClient } from '@/lib/supabase/server'
 import { PresupuestosDiaSkeleton } from './presupuestos-dia-skeleton'
+import { PresupuestosDiaFiltros } from './presupuestos-dia-filtros'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,13 +16,27 @@ export const metadata = {
   description: 'Gestión de presupuestos para pesaje en almacén',
 }
 
-async function PresupuestosDiaContent() {
+async function PresupuestosDiaContent({
+  searchParams,
+}: {
+  searchParams?: { fecha?: string; zona_id?: string; turno?: string }
+}) {
   const supabase = await createClient()
 
-  // Obtener presupuestos en almacén para hoy
-  const today = new Date().toISOString().split('T')[0]
+  // Obtener parámetros de filtro
+  const fecha = searchParams?.fecha || new Date().toISOString().split('T')[0]
+  const zonaId = searchParams?.zona_id
+  const turno = searchParams?.turno
 
-  const { data: presupuestos, error } = await supabase
+  // Obtener zonas para el filtro
+  const { data: zonas } = await supabase
+    .from('zonas')
+    .select('id, nombre')
+    .eq('activo', true)
+    .order('nombre')
+
+  // Construir query con filtros
+  let query = supabase
     .from('presupuestos')
     .select(`
       *,
@@ -32,16 +48,42 @@ async function PresupuestosDiaContent() {
         cantidad_reservada,
         pesable,
         peso_final,
-        producto:productos(nombre, codigo)
+        producto:productos(nombre, codigo, categoria)
       )
     `)
     .eq('estado', 'en_almacen')
-    .gte('fecha_entrega_estimada', today)
-    .order('fecha_entrega_estimada', { ascending: true })
+    .eq('fecha_entrega_estimada', fecha)
+
+  if (zonaId) {
+    query = query.eq('zona_id', zonaId)
+  }
+
+  if (turno) {
+    query = query.eq('turno', turno)
+  }
+
+  const { data: presupuestos, error } = await query.order('fecha_entrega_estimada', { ascending: true })
 
   if (error) {
     console.error('Error obteniendo presupuestos:', error)
   }
+
+  // Agrupar por zona y turno
+  const presupuestosPorZonaTurno = presupuestos?.reduce((acc: any, p: any) => {
+    const key = `${p.zona_id || 'sin-zona'}-${p.turno || 'sin-turno'}`
+    if (!acc[key]) {
+      acc[key] = {
+        zona: p.zona,
+        turno: p.turno,
+        presupuestos: [],
+        totalKg: 0,
+      }
+    }
+    acc[key].presupuestos.push(p)
+    acc[key].totalKg += p.items?.reduce((sum: number, item: any) =>
+      sum + (item.cantidad_solicitada || 0), 0) || 0
+    return acc
+  }, {}) || {}
 
   // Calcular estadísticas
   const totalPresupuestos = presupuestos?.length || 0
@@ -131,14 +173,129 @@ async function PresupuestosDiaContent() {
         </Card>
       </div>
 
-      {/* Lista de presupuestos */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Presupuestos Pendientes de Pesaje</CardTitle>
-          <CardDescription>
-            Selecciona un presupuesto para comenzar el pesaje
-          </CardDescription>
-        </CardHeader>
+      {/* Filtros */}
+      <PresupuestosDiaFiltros zonas={zonas || []} fecha={fecha} zonaId={zonaId} turno={turno} />
+
+      {/* Agrupación por zona y turno */}
+      {Object.keys(presupuestosPorZonaTurno).length > 0 && (
+        <div className="space-y-6">
+          {Object.entries(presupuestosPorZonaTurno).map(([key, grupo]: [string, any]) => (
+            <Card key={key}>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <MapPin className="h-5 w-5" />
+                      {grupo.zona?.nombre || 'Sin zona'}
+                      {grupo.turno && (
+                        <>
+                          <span className="text-muted-foreground">•</span>
+                          <Clock className="h-4 w-4" />
+                          <span className="capitalize">{grupo.turno}</span>
+                        </>
+                      )}
+                    </CardTitle>
+                    <CardDescription>
+                      {grupo.presupuestos.length} presupuesto(s) • {grupo.totalKg.toFixed(1)} kg aproximados
+                    </CardDescription>
+                  </div>
+                  <Badge variant="outline" className="text-lg">
+                    {grupo.totalKg.toFixed(1)} kg
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {grupo.presupuestos.map((presupuesto: any) => {
+                    const itemsPesables = presupuesto.items?.filter((item: any) => item.pesable) || []
+                    const itemsPesados = itemsPesables.filter((item: any) => item.peso_final)
+                    const totalKg = presupuesto.items?.reduce((sum: number, item: any) =>
+                      sum + (item.cantidad_solicitada || 0), 0) || 0
+
+                    // Calcular porcentaje fuera de la expresión inline
+                    const porcentajePesaje = itemsPesables.length > 0 
+                      ? Math.round(itemsPesados.length * 100 / itemsPesables.length) 
+                      : 0
+
+                    return (
+                      <Card key={presupuesto.id} className="hover:shadow-md transition-shadow">
+                        <CardContent className="p-6">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-2">
+                                <h3 className="text-lg font-semibold">
+                                  #{presupuesto.numero_presupuesto}
+                                </h3>
+                                <Badge variant="outline">
+                                  {presupuesto.cliente?.nombre || 'Cliente'}
+                                </Badge>
+                              </div>
+
+                              <div className="flex items-center gap-6 text-sm text-muted-foreground">
+                                <span>
+                                  📦 {presupuesto.items?.length || 0} items
+                                </span>
+                                <span>
+                                  ⚖️ {itemsPesables.length} pesables ({itemsPesados.length} de {itemsPesables.length} completados)
+                                </span>
+                                <span>
+                                  🏋️ {totalKg.toFixed(1)}kg estimados
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <Button variant="outline" size="sm" asChild>
+                                <Link href={`/ventas/presupuestos/${presupuesto.id}`}>
+                                  Ver Detalle
+                                </Link>
+                              </Button>
+                              <Button asChild className="bg-blue-600 hover:bg-blue-700">
+                                <Link href={`/almacen/presupuesto/${presupuesto.id}/pesaje`}>
+                                  <Scale className="mr-2 h-4 w-4" />
+                                  Comenzar Pesaje
+                                </Link>
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* Barra de progreso de pesaje */}
+                          {itemsPesables.length > 0 && (
+                            <div className="mt-4">
+                              <div className="flex items-center justify-between text-sm mb-2">
+                                <span>Progreso de pesaje</span>
+                                <span>{itemsPesados.length} de {itemsPesables.length} items</span>
+                              </div>
+                              <div className="w-full bg-gray-200 rounded-full h-2">
+                                <div
+                                  className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                                  style={{
+                                    width: `${porcentajePesaje}%`
+                                  }}
+                                ></div>
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Lista de presupuestos fallback si no hay agrupacion */}
+      {Object.keys(presupuestosPorZonaTurno).length === 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Presupuestos Pendientes de Pesaje</CardTitle>
+            <CardDescription>
+              Selecciona un presupuesto para comenzar el pesaje
+            </CardDescription>
+          </CardHeader>
         <CardContent>
           {!presupuestos || presupuestos.length === 0 ? (
             <div className="text-center py-8">
@@ -155,6 +312,11 @@ async function PresupuestosDiaContent() {
                 const itemsPesados = itemsPesables.filter((item: any) => item.peso_final)
                 const totalKg = presupuesto.items?.reduce((sum: number, item: any) =>
                   sum + (item.cantidad_solicitada || 0), 0) || 0
+
+                // Calcular porcentaje fuera de la expresión inline
+                const porcentajePesaje = itemsPesables.length > 0 
+                  ? Math.round(itemsPesados.length * 100 / itemsPesables.length) 
+                  : 0
 
                 return (
                   <Card key={presupuesto.id} className="hover:shadow-md transition-shadow">
@@ -178,15 +340,15 @@ async function PresupuestosDiaContent() {
 
                           <div className="flex items-center gap-6 text-sm text-muted-foreground">
                             <span>
-                              📅 {presupuesto.fecha_entrega_estimada
-                                ? new Date(presupuesto.fecha_entrega_estimada).toLocaleDateString('es-AR')
-                                : 'Sin fecha'}
+                              {presupuesto.fecha_entrega_estimada
+                                ? `📅 ${new Date(presupuesto.fecha_entrega_estimada).toLocaleDateString('es-AR')}`
+                                : '📅 Sin fecha'}
                             </span>
                             <span>
                               📦 {presupuesto.items?.length || 0} items
                             </span>
                             <span>
-                              ⚖️ {itemsPesables.length} pesables ({itemsPesados.length}/{itemsPesables.length} completados)
+                              ⚖️ {itemsPesables.length} pesables ({itemsPesados.length} de {itemsPesables.length} completados)
                             </span>
                             <span>
                               🏋️ {totalKg.toFixed(1)}kg estimados
@@ -214,13 +376,13 @@ async function PresupuestosDiaContent() {
                         <div className="mt-4">
                           <div className="flex items-center justify-between text-sm mb-2">
                             <span>Progreso de pesaje</span>
-                            <span>{itemsPesados.length}/{itemsPesables.length} items</span>
+                            <span>{itemsPesados.length} de {itemsPesables.length} items</span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-2">
                             <div
                               className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                               style={{
-                                width: `${itemsPesables.length > 0 ? (itemsPesados.length / itemsPesables.length) * 100 : 0}%`
+                                width: `${porcentajePesaje}%`
                               }}
                             ></div>
                           </div>
@@ -234,14 +396,20 @@ async function PresupuestosDiaContent() {
           )}
         </CardContent>
       </Card>
+      )}
     </div>
   )
 }
 
-export default function PresupuestosDiaPage() {
+export default async function PresupuestosDiaPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ fecha?: string; zona_id?: string; turno?: string }>
+}) {
+  const params = await searchParams
   return (
     <Suspense fallback={<PresupuestosDiaSkeleton />}>
-      <PresupuestosDiaContent />
+      <PresupuestosDiaContent searchParams={params} />
     </Suspense>
   )
 }

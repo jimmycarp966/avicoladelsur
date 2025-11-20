@@ -4,12 +4,9 @@ import { obtenerMovimientosCaja, registrarMovimientoCaja } from '@/actions/tesor
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
-  const result = await obtenerMovimientosCaja({
-    cajaId: searchParams.get('cajaId') || undefined,
-    tipo: (searchParams.get('tipo') as 'ingreso' | 'egreso') || undefined,
-    fechaDesde: searchParams.get('desde') || undefined,
-    fechaHasta: searchParams.get('hasta') || undefined,
-  })
+  const cajaId = searchParams.get('cajaId') || undefined
+  const fecha = searchParams.get('fecha') || undefined
+  const result = await obtenerMovimientosCaja(cajaId, fecha)
 
   return NextResponse.json(result, { status: result.success ? 200 : 400 })
 }

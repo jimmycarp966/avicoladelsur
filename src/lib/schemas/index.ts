@@ -8,6 +8,7 @@ export * from './reclamos.schema'
 export * from './almacen.schema'
 export * from './reparto.schema'
 export * from './tesoreria.schema'
+export * from './presupuestos.schema'
 
 // Re-export de tipos
 export type {
@@ -64,6 +65,7 @@ export type {
   CrearRutaFormData,
   ActualizarEstadoEntregaFormData,
   ValidarEntregaFormData,
+  RegistrarDevolucionFormData,
   VehiculosFilterData,
   RutasFilterData,
   EntregasFilterData,
@@ -75,4 +77,9 @@ export type {
   RegistrarGastoFormData,
   RegistrarPagoPedidoFormData,
   ExportReportFormData,
+  CrearCierreCajaFormData,
+  CerrarCierreCajaFormData,
+  RegistrarRetiroTesoroFormData,
+  RegistrarDepositoBancarioFormData,
+  ValidarTransferenciaBNAFormData,
 } from './tesoreria.schema'

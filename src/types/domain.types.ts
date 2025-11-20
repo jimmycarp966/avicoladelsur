@@ -89,6 +89,11 @@ export interface Pedido extends BaseEntity {
   descuento: number
   total: number
   observaciones?: string
+  turno?: 'mañana' | 'tarde'
+  zona_id?: string
+  metodos_pago?: any
+  recargo_total?: number
+  presupuesto_id?: string
 }
 
 // Detalle de Pedido
@@ -155,6 +160,8 @@ export interface RutaReparto extends BaseEntity {
   vehiculo_id: string
   repartidor_id: string
   fecha_ruta: string
+  turno?: 'mañana' | 'tarde'
+  zona_id?: string
   estado: string
   distancia_estimada_km?: number
   distancia_real_km?: number
@@ -163,6 +170,8 @@ export interface RutaReparto extends BaseEntity {
   peso_total_kg?: number
   costo_combustible?: number
   observaciones?: string
+  checklist_inicio_id?: string
+  checklist_fin_id?: string
 }
 
 // Detalle de Ruta
@@ -181,6 +190,102 @@ export interface DetalleRuta extends BaseEntity {
   notas_entrega?: string
   firma_url?: string
   qr_verificacion?: string
+}
+
+// Presupuesto
+export interface Presupuesto extends BaseEntity {
+  numero_presupuesto: string
+  cliente_id: string
+  zona_id?: string
+  estado: 'pendiente' | 'cotizacion' | 'en_almacen' | 'facturado' | 'anulado'
+  fecha_entrega_estimada?: string
+  fecha_entrega_real?: string
+  total_estimado: number
+  total_final?: number
+  observaciones?: string
+  usuario_vendedor?: string
+  usuario_almacen?: string
+  usuario_repartidor?: string
+  pedido_convertido_id?: string
+  turno?: 'mañana' | 'tarde'
+  metodos_pago?: any
+  recargo_total?: number
+}
+
+// Presupuesto Item
+export interface PresupuestoItem extends BaseEntity {
+  presupuesto_id: string
+  producto_id: string
+  lote_reservado_id?: string
+  cantidad_solicitada: number
+  cantidad_reservada: number
+  precio_unit_est: number
+  precio_unit_final?: number
+  pesable: boolean
+  peso_final?: number
+  subtotal_est: number
+  subtotal_final?: number
+}
+
+// Zona
+export interface Zona extends BaseEntity {
+  nombre: string
+  descripcion?: string
+  activo: boolean
+}
+
+// Zona Día
+export interface ZonaDia extends BaseEntity {
+  zona_id: string
+  dia_semana: number // 0=domingo, 6=sábado
+  turno: 'mañana' | 'tarde'
+  activo: boolean
+}
+
+// Devolución
+export interface Devolucion extends BaseEntity {
+  pedido_id: string
+  detalle_ruta_id?: string
+  producto_id: string
+  cantidad: number
+  motivo: string
+  observaciones?: string
+  usuario_id: string
+}
+
+// Recepción Almacén
+export interface RecepcionAlmacen extends BaseEntity {
+  tipo: 'ingreso' | 'egreso'
+  producto_id: string
+  lote_id?: string
+  cantidad: number
+  unidad_medida: string
+  motivo: string
+  destino_produccion: boolean
+  usuario_id: string
+}
+
+// Cierre de Caja
+export interface CierreCaja extends BaseEntity {
+  caja_id: string
+  fecha: string
+  saldo_inicial: number
+  saldo_final?: number
+  total_ingresos: number
+  total_egresos: number
+  cobranzas_cuenta_corriente: number
+  gastos: number
+  retiro_tesoro: number
+  estado: 'abierto' | 'cerrado'
+}
+
+// Tesoro
+export interface Tesoro extends BaseEntity {
+  tipo: 'efectivo' | 'transferencia' | 'qr' | 'tarjeta'
+  monto: number
+  descripcion?: string
+  origen_tipo?: string
+  origen_id?: string
 }
 
 // Tipos para formularios

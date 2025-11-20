@@ -1,51 +1,102 @@
 import { Suspense } from 'react'
-import { Truck, MapPin, Clock, CheckCircle, DollarSign, Camera, FileText } from 'lucide-react'
+import { Truck, MapPin, Clock, CheckCircle, DollarSign, Camera, FileText, Calendar, Filter } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { createClient } from '@/lib/supabase/server'
 import { RepartoSkeleton } from './reparto-skeleton'
+import { obtenerRutasPorVehiculoAction } from '@/actions/reparto.actions'
 
 export const dynamic = 'force-dynamic'
 
-async function RepartoContent() {
+async function RepartoContent({ searchParams }: { searchParams: { fecha?: string; turno?: string } }) {
   const supabase = await createClient()
 
   // Obtener usuario actual (repartidor)
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return <div>No autorizado</div>
 
-  // Obtener pedidos asignados al repartidor (aquellos en rutas activas)
-  const { data: pedidosRuta } = await supabase
+  // Obtener vehículo asignado al repartidor
+  const { data: usuario } = await supabase
+    .from('usuarios')
+    .select('vehiculo_asignado')
+    .eq('id', user.id)
+    .single()
+
+  if (!usuario?.vehiculo_asignado) {
+    return (
+      <div className="p-4">
+        <Card>
+          <CardContent className="p-8 text-center">
+            <Truck className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium">No hay vehículo asignado</h3>
+            <p className="text-muted-foreground">
+              Contacta al administrador para asignar un vehículo
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // Filtros
+  const fechaFiltro = searchParams.fecha || new Date().toISOString().split('T')[0]
+  const turnoFiltro = searchParams.turno || undefined
+
+  // Obtener rutas del vehículo del repartidor
+  const rutasResponse = await obtenerRutasPorVehiculoAction(usuario.vehiculo_asignado, fechaFiltro)
+  const rutas = rutasResponse.success && rutasResponse.data ? (rutasResponse.data as any[]) : []
+
+  // Filtrar por turno si se especifica
+  const rutasFiltradas = turnoFiltro 
+    ? rutas.filter((r: any) => r.turno === turnoFiltro)
+    : rutas
+
+  // Obtener todas las entregas de las rutas activas
+  const rutasActivas = rutasFiltradas.filter((r: any) => 
+    ['planificada', 'en_curso'].includes(r.estado)
+  )
+
+  // Obtener detalles de ruta con información completa
+  const rutaIds = rutasActivas.map((r: any) => r.id)
+  
+  const { data: detallesRuta } = await supabase
     .from('detalles_ruta')
     .select(`
       id,
       orden_entrega,
       estado_entrega,
+      ruta_id,
       pedido:pedidos(
         id,
         numero_pedido,
         total,
+        turno,
+        zona_id,
         cliente:clientes(
           nombre,
           telefono,
-          direccion
+          direccion,
+          zona_entrega
         ),
         pago_estado,
         instrucciones_repartidor
       ),
       ruta: rutas_reparto(
+        id,
         numero_ruta,
         fecha_ruta,
-        vehiculo:vehiculos(patente)
+        turno,
+        zona_id,
+        estado,
+        vehiculo:vehiculos(patente, marca, modelo)
       )
     `)
-    .eq('estado_entrega', 'pendiente')
+    .in('ruta_id', rutaIds)
     .order('orden_entrega')
 
-  // Para demo, si no hay rutas reales, mostrar datos de ejemplo
-  const entregas = pedidosRuta?.map((detalle: any) => ({
+  const entregas = detallesRuta?.map((detalle: any) => ({
     id: detalle.id,
     pedido_id: detalle.pedido?.id,
     numero_pedido: detalle.pedido?.numero_pedido,
@@ -54,9 +105,11 @@ async function RepartoContent() {
     pago_estado: detalle.pedido?.pago_estado,
     instrucciones: detalle.pedido?.instrucciones_repartidor,
     orden_entrega: detalle.orden_entrega,
-    ruta: detalle.ruta?.numero_ruta,
-    vehiculo: detalle.ruta?.vehiculo?.patente,
-    estado: detalle.estado_entrega
+    ruta_id: detalle.ruta_id,
+    ruta: detalle.ruta,
+    estado: detalle.estado_entrega,
+    turno: detalle.ruta?.turno,
+    zona: detalle.pedido?.cliente?.zona_entrega
   })) || []
 
   // Estadísticas
@@ -66,6 +119,19 @@ async function RepartoContent() {
     .filter(e => e.pago_estado !== 'pagado')
     .reduce((sum, e) => sum + (e.total || 0), 0)
 
+  // Agrupar entregas por ruta
+  const entregasPorRuta = entregas.reduce((acc: any, entrega: any) => {
+    const rutaId = entrega.ruta_id
+    if (!acc[rutaId]) {
+      acc[rutaId] = {
+        ruta: entrega.ruta,
+        entregas: []
+      }
+    }
+    acc[rutaId].entregas.push(entrega)
+    return acc
+  }, {})
+
   return (
     <div className="space-y-6 pb-20">
       {/* Header */}
@@ -74,7 +140,7 @@ async function RepartoContent() {
           <div>
             <h1 className="text-2xl font-bold">Reparto del Día</h1>
             <p className="text-muted-foreground">
-              {new Date().toLocaleDateString('es-AR', {
+              {new Date(fechaFiltro).toLocaleDateString('es-AR', {
                 weekday: 'long',
                 year: 'numeric',
                 month: 'long',
@@ -82,11 +148,56 @@ async function RepartoContent() {
               })}
             </p>
           </div>
-          <Badge variant="outline" className="bg-blue-50">
-            <Truck className="mr-1 h-3 w-3" />
-            Ruta Activa
-          </Badge>
+          {rutasActivas.length > 0 && (
+            <Badge variant="outline" className="bg-blue-50">
+              <Truck className="mr-1 h-3 w-3" />
+              {rutasActivas.length} {rutasActivas.length === 1 ? 'Ruta Activa' : 'Rutas Activas'}
+            </Badge>
+          )}
         </div>
+      </div>
+
+      {/* Filtros */}
+      <div className="px-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <label className="text-sm font-medium mb-1 block">Fecha</label>
+                <input
+                  type="date"
+                  defaultValue={fechaFiltro}
+                  className="w-full px-3 py-2 border rounded-md"
+                  onChange={(e) => {
+                    const params = new URLSearchParams(searchParams as any)
+                    params.set('fecha', e.target.value)
+                    window.location.search = params.toString()
+                  }}
+                />
+              </div>
+              <div className="flex-1">
+                <label className="text-sm font-medium mb-1 block">Turno</label>
+                <select
+                  defaultValue={turnoFiltro || ''}
+                  className="w-full px-3 py-2 border rounded-md"
+                  onChange={(e) => {
+                    const params = new URLSearchParams(searchParams as any)
+                    if (e.target.value) {
+                      params.set('turno', e.target.value)
+                    } else {
+                      params.delete('turno')
+                    }
+                    window.location.search = params.toString()
+                  }}
+                >
+                  <option value="">Todos</option>
+                  <option value="mañana">Mañana</option>
+                  <option value="tarde">Tarde</option>
+                </select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Estadísticas rápidas */}
@@ -111,20 +222,62 @@ async function RepartoContent() {
         </Card>
       </div>
 
-      {/* Lista de entregas */}
-      <div className="px-4 space-y-4">
-        {entregas.length === 0 ? (
+      {/* Lista de rutas y entregas */}
+      <div className="px-4 space-y-6">
+        {Object.keys(entregasPorRuta).length === 0 ? (
           <Card>
             <CardContent className="p-8 text-center">
               <Truck className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium">No hay entregas asignadas</h3>
+              <h3 className="text-lg font-medium">No hay rutas asignadas</h3>
               <p className="text-muted-foreground">
                 Esperando asignación de ruta por el administrador
               </p>
             </CardContent>
           </Card>
         ) : (
-          entregas.map((entrega: any) => (
+          Object.entries(entregasPorRuta).map(([rutaId, grupo]: [string, any]) => {
+            const ruta = grupo.ruta
+            const entregasRuta = grupo.entregas
+            const entregasCompletadasRuta = entregasRuta.filter((e: any) => e.estado === 'entregado').length
+            
+            return (
+              <div key={rutaId} className="space-y-3">
+                {/* Header de Ruta */}
+                <Card className="bg-blue-50 border-blue-200">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-lg">{ruta?.numero_ruta}</CardTitle>
+                        <CardDescription>
+                          {ruta?.vehiculo?.patente} • {ruta?.turno === 'mañana' ? '🌅 Mañana' : '🌆 Tarde'}
+                        </CardDescription>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        asChild
+                      >
+                        <Link href={`/repartidor/ruta/${rutaId}`}>
+                          <MapPin className="mr-2 h-4 w-4" />
+                          Ver Hoja de Ruta
+                        </Link>
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-4 text-sm">
+                      <span>
+                        {entregasCompletadasRuta} / {entregasRuta.length} entregas
+                      </span>
+                      <Badge variant={ruta?.estado === 'en_curso' ? 'default' : 'secondary'}>
+                        {ruta?.estado === 'en_curso' ? 'En Curso' : 'Planificada'}
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Entregas de esta ruta */}
+                {entregasRuta.map((entrega: any) => (
             <Card key={entrega.id} className="hover:shadow-md transition-shadow">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
@@ -193,26 +346,37 @@ async function RepartoContent() {
                       className="flex-1"
                       asChild
                     >
-                      <Link href={`/repartidor/entrega/${entrega.pedido_id}`}>
+                      <Link href={`/repartidor/ruta/${rutaId}/entrega/${entrega.id}`}>
                         <MapPin className="mr-2 h-4 w-4" />
                         Ver Detalles
                       </Link>
                     </Button>
-                    <Button
-                      size="sm"
-                      className="flex-1 bg-green-600 hover:bg-green-700"
-                      asChild
-                    >
-                      <Link href={`/repartidor/entrega/${entrega.pedido_id}/completar`}>
+                    {entrega.estado !== 'entregado' && (
+                      <Button
+                        size="sm"
+                        className="flex-1 bg-green-600 hover:bg-green-700"
+                        asChild
+                      >
+                        <Link href={`/repartidor/ruta/${rutaId}/entrega/${entrega.id}/completar`}>
+                          <CheckCircle className="mr-2 h-4 w-4" />
+                          Marcar Entrega
+                        </Link>
+                      </Button>
+                    )}
+                    {entrega.estado === 'entregado' && (
+                      <Badge variant="default" className="flex-1 justify-center">
                         <CheckCircle className="mr-2 h-4 w-4" />
-                        Marcar Entrega
-                      </Link>
-                    </Button>
+                        Entregado
+                      </Badge>
+                    )}
                   </div>
                 </div>
               </CardContent>
             </Card>
-          ))
+                ))}
+              </div>
+            )
+          })
         )}
       </div>
 
@@ -239,10 +403,14 @@ async function RepartoContent() {
   )
 }
 
-export default function RepartoPage() {
+export default function RepartoPage({
+  searchParams,
+}: {
+  searchParams: { fecha?: string; turno?: string }
+}) {
   return (
     <Suspense fallback={<RepartoSkeleton />}>
-      <RepartoContent />
+      <RepartoContent searchParams={searchParams} />
     </Suspense>
   )
 }

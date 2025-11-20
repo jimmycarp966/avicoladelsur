@@ -314,3 +314,209 @@ export async function reservarStockPicking(
     }
   }
 }
+
+// Registrar recepción de ingreso
+export async function registrarRecepcionIngresoAction(formData: FormData): Promise<ApiResponse> {
+  try {
+    const supabase = await createClient()
+
+    // Obtener usuario actual
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, error: 'Usuario no autenticado' }
+    }
+
+    // Verificar permisos (almacenista o admin)
+    const { data: usuario } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (!usuario || !['admin', 'almacenista'].includes(usuario.rol)) {
+      return { success: false, error: 'No tienes permisos para registrar recepciones' }
+    }
+
+    // Parsear datos
+    const producto_id = formData.get('producto_id') as string
+    const lote_id = formData.get('lote_id') as string
+    const cantidad = parseFloat(formData.get('cantidad') as string)
+    const unidad_medida = formData.get('unidad_medida') as string || 'kg'
+    const motivo = formData.get('motivo') as string || 'compra'
+
+    if (!producto_id || !cantidad || !motivo) {
+      return { success: false, error: 'Faltan datos requeridos' }
+    }
+
+    // Insertar recepción
+    const { error: insertError } = await supabase
+      .from('recepcion_almacen')
+      .insert({
+        tipo: 'ingreso',
+        producto_id,
+        lote_id: lote_id || null,
+        cantidad,
+        unidad_medida,
+        motivo,
+        destino_produccion: false,
+        usuario_id: user.id,
+      })
+
+    if (insertError) throw insertError
+
+    // Si hay lote_id, actualizar cantidad disponible
+    if (lote_id) {
+      await supabase.rpc('reservar_stock_lote', {
+        p_lote_id: lote_id,
+        p_cantidad: -cantidad, // Negativo para incrementar
+        p_pedido_id: null,
+      })
+    }
+
+    revalidatePath('/(admin)/(dominios)/almacen/recepcion')
+
+    return {
+      success: true,
+      message: 'Recepción de ingreso registrada exitosamente',
+    }
+  } catch (error: any) {
+    console.error('Error al registrar recepción ingreso:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al registrar recepción',
+    }
+  }
+}
+
+// Registrar recepción de egreso
+export async function registrarRecepcionEgresoAction(formData: FormData): Promise<ApiResponse> {
+  try {
+    const supabase = await createClient()
+
+    // Obtener usuario actual
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, error: 'Usuario no autenticado' }
+    }
+
+    // Verificar permisos (almacenista o admin)
+    const { data: usuario } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (!usuario || !['admin', 'almacenista'].includes(usuario.rol)) {
+      return { success: false, error: 'No tienes permisos para registrar recepciones' }
+    }
+
+    // Parsear datos
+    const producto_id = formData.get('producto_id') as string
+    const cantidad = parseFloat(formData.get('cantidad') as string)
+    const unidad_medida = formData.get('unidad_medida') as string || 'kg'
+    const motivo = formData.get('motivo') as string || 'ajuste'
+    const destino_produccion = formData.get('destino_produccion') === 'true'
+
+    if (!producto_id || !cantidad || !motivo) {
+      return { success: false, error: 'Faltan datos requeridos' }
+    }
+
+    // Insertar recepción
+    const { error: insertError } = await supabase
+      .from('recepcion_almacen')
+      .insert({
+        tipo: 'egreso',
+        producto_id,
+        lote_id: null,
+        cantidad,
+        unidad_medida,
+        motivo,
+        destino_produccion,
+        usuario_id: user.id,
+      })
+
+    if (insertError) throw insertError
+
+    // Si es para producción y el producto tiene categoria BALANZA, crear cortes
+    if (destino_produccion) {
+      // Lógica para crear cortes (productos con categoria BALANZA)
+      // Esto se puede implementar más adelante
+    }
+
+    revalidatePath('/(admin)/(dominios)/almacen/recepcion')
+
+    return {
+      success: true,
+      message: 'Recepción de egreso registrada exitosamente',
+    }
+  } catch (error: any) {
+    console.error('Error al registrar recepción egreso:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al registrar recepción',
+    }
+  }
+}
+
+// Obtener presupuestos por zona, fecha y turno
+export async function obtenerPresupuestosPorZonaFechaAction(
+  zonaId: string,
+  fecha: string,
+  turno?: 'mañana' | 'tarde'
+): Promise<ApiResponse> {
+  try {
+    const supabase = await createClient()
+
+    let query = supabase
+      .from('presupuestos')
+      .select(`
+        *,
+        cliente:clientes(nombre, telefono),
+        zona:zonas(nombre),
+        items:presupuesto_items(
+          id,
+          cantidad_solicitada,
+          cantidad_reservada,
+          pesable,
+          peso_final,
+          producto:productos(nombre, codigo, categoria)
+        )
+      `)
+      .eq('zona_id', zonaId)
+      .eq('fecha_entrega_estimada', fecha)
+      .eq('estado', 'en_almacen')
+
+    if (turno) {
+      query = query.eq('turno', turno)
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: true })
+
+    if (error) throw error
+
+    // Calcular total de KG aproximado
+    const totalKgAproximado = data?.reduce((acc, presupuesto) => {
+      return acc + (presupuesto.items?.reduce((sum: number, item: any) => {
+        if (item.pesable) {
+          return sum + (item.peso_final || item.cantidad_solicitada || 0)
+        }
+        return sum
+      }, 0) || 0)
+    }, 0) || 0
+
+    return {
+      success: true,
+      data: {
+        presupuestos: data,
+        total_kg_aproximado: totalKgAproximado,
+        total_presupuestos: data?.length || 0,
+      },
+    }
+  } catch (error: any) {
+    console.error('Error al obtener presupuestos por zona/fecha:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al obtener presupuestos',
+    }
+  }
+}

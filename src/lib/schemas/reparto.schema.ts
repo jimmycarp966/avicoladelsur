@@ -91,6 +91,12 @@ export const crearRutaSchema = z.object({
       message: 'La fecha de ruta tiene un formato inválido',
     }),
 
+  turno: z.enum(['mañana', 'tarde'], {
+    message: 'El turno es requerido y debe ser "mañana" o "tarde"',
+  }),
+
+  zona_id: z.string().uuid('ID de zona inválido'),
+
   pedidos_ids: z
     .array(z.string().uuid('ID de pedido inválido'))
     .min(1, 'La ruta debe tener al menos un pedido')
@@ -100,6 +106,16 @@ export const crearRutaSchema = z.object({
     .string()
     .max(500, 'Las observaciones deben tener máximo 500 caracteres')
     .optional(),
+})
+
+// Esquema para registrar devolución
+export const registrarDevolucionSchema = z.object({
+  pedido_id: z.string().uuid('ID de pedido inválido'),
+  detalle_ruta_id: z.string().uuid('ID de detalle de ruta inválido').optional(),
+  producto_id: z.string().uuid('ID de producto inválido'),
+  cantidad: z.number().positive('La cantidad debe ser mayor a 0'),
+  motivo: z.string().min(1, 'El motivo es requerido'),
+  observaciones: z.string().optional(),
 })
 
 // Esquema para actualizar estado de entrega
@@ -152,6 +168,8 @@ export const rutasFilterSchema = z.object({
   vehiculo_id: z.string().uuid().optional(),
   repartidor_id: z.string().uuid().optional(),
   estado: z.enum(['planificada', 'en_curso', 'completada', 'cancelada']).optional(),
+  turno: z.enum(['mañana', 'tarde']).optional(),
+  zona_id: z.string().uuid().optional(),
   fecha_desde: z.string().optional(),
   fecha_hasta: z.string().optional(),
   page: z.number().int().min(1).default(1),
@@ -176,6 +194,7 @@ export type ChecklistVehiculoFormData = z.infer<typeof checklistVehiculoSchema>
 export type CrearRutaFormData = z.infer<typeof crearRutaSchema>
 export type ActualizarEstadoEntregaFormData = z.infer<typeof actualizarEstadoEntregaSchema>
 export type ValidarEntregaFormData = z.infer<typeof validarEntregaSchema>
+export type RegistrarDevolucionFormData = z.infer<typeof registrarDevolucionSchema>
 export type VehiculosFilterData = z.infer<typeof vehiculosFilterSchema>
 export type RutasFilterData = z.infer<typeof rutasFilterSchema>
 export type EntregasFilterData = z.infer<typeof entregasFilterSchema>

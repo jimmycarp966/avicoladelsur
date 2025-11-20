@@ -260,7 +260,7 @@ export default async function PedidoDetallePage({ params }: PedidoDetallePagePro
               <p className="text-sm font-semibold mb-2">Registrar pago manual</p>
               <RegistrarPagoPedidoForm
                 pedidoId={pedido.id}
-                cajas={cajas.data ?? []}
+                cajas={cajas ?? []}
                 saldoPendiente={saldoPendiente}
               />
             </div>

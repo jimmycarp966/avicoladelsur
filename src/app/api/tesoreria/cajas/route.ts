@@ -5,7 +5,7 @@ import { crearCajaSchema } from '@/lib/schemas/tesoreria.schema'
 
 export async function GET() {
   const result = await listarCajas()
-  return NextResponse.json(result, { status: result.success ? 200 : 400 })
+  return NextResponse.json(result, { status: 200 })
 }
 
 export async function POST(request: Request) {
