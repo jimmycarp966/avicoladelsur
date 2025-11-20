@@ -45,33 +45,51 @@ async function PesajeContent({ presupuestoId }: { presupuestoId: string }) {
     )
   }
 
-  async function handleActualizarPeso(formData: FormData) {
-    'use server'
+  async function handleActualizarPeso(itemId: string, peso: number) {
+    try {
+      const response = await fetch('/api/almacen/presupuesto/pesaje', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          presupuesto_item_id: itemId,
+          peso_final: peso
+        })
+      })
 
-    const itemId = formData.get('item_id') as string
-    const peso = parseFloat(formData.get('peso') as string)
+      const result = await response.json()
 
-    if (!itemId || !peso || peso <= 0) {
-      return { success: false, message: 'Datos inválidos' }
+      if (result.success) {
+        // Recargar la página para mostrar cambios
+        window.location.reload()
+      }
+
+      return result
+    } catch (error) {
+      return { success: false, message: 'Error de conexión' }
     }
-
-    const result = await actualizarPesoItemAction({
-      presupuesto_item_id: itemId,
-      peso_final: peso,
-    })
-
-    return result
   }
 
   async function handleFinalizarPesaje() {
-    'use server'
+    try {
+      const response = await fetch('/api/almacen/presupuesto/finalizar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          presupuesto_id: presupuestoId
+        })
+      })
 
-    const result = await confirmarPresupuestoAction({
-      presupuesto_id: presupuestoId,
-      // caja_id opcional
-    })
+      const result = await response.json()
 
-    return result
+      if (result.success) {
+        // Redirigir a presupuestos del día
+        window.location.href = '/almacen/presupuestos-dia'
+      }
+
+      return result
+    } catch (error) {
+      return { success: false, message: 'Error de conexión' }
+    }
   }
 
   const itemsCompletados = itemsPesables.filter((item: any) => item.peso_final)
@@ -161,20 +179,16 @@ async function PesajeContent({ presupuestoId }: { presupuestoId: string }) {
                 </div>
               </CardHeader>
               <CardContent>
-                <form action={handleActualizarPeso} className="space-y-4">
-                  <input type="hidden" name="item_id" value={item.id} />
-
+                <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor={`peso-${item.id}`}>Peso Final (kg)</Label>
                       <Input
                         id={`peso-${item.id}`}
-                        name="peso"
                         type="number"
                         step="0.01"
                         placeholder="0.00"
                         defaultValue={item.peso_final || ""}
-                        required
                         className="text-lg"
                       />
                     </div>
@@ -204,7 +218,7 @@ async function PesajeContent({ presupuestoId }: { presupuestoId: string }) {
                         onClick={async () => {
                           // Simular llamada a API de balanza
                           try {
-                            const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/almacen/simular-peso`, {
+                            const response = await fetch(`/api/almacen/simular-peso`, {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({ presupuesto_item_id: item.id })
@@ -224,7 +238,20 @@ async function PesajeContent({ presupuestoId }: { presupuestoId: string }) {
                         Simular Peso
                       </Button>
 
-                      <Button type="submit" disabled={estaPesado}>
+                      <Button
+                        type="button"
+                        disabled={estaPesado}
+                        onClick={async () => {
+                          const input = document.getElementById(`peso-${item.id}`) as HTMLInputElement
+                          const pesoValue = input?.value
+                          if (pesoValue) {
+                            const peso = parseFloat(pesoValue)
+                            if (!isNaN(peso) && peso > 0) {
+                              await handleActualizarPeso(item.id, peso)
+                            }
+                          }
+                        }}
+                      >
                         {estaPesado ? (
                           <>
                             <CheckCircle className="mr-2 h-4 w-4" />
@@ -239,7 +266,7 @@ async function PesajeContent({ presupuestoId }: { presupuestoId: string }) {
                       </Button>
                     </div>
                   </div>
-                </form>
+                </div>
               </CardContent>
             </Card>
           )
@@ -277,12 +304,16 @@ async function PesajeContent({ presupuestoId }: { presupuestoId: string }) {
               Al finalizar, se creará el pedido real y se descontarán las existencias del almacén.
             </div>
 
-            <form action={handleFinalizarPesaje} className="flex justify-end">
-              <Button type="submit" size="lg" className="bg-green-600 hover:bg-green-700">
+            <div className="flex justify-end">
+              <Button
+                size="lg"
+                className="bg-green-600 hover:bg-green-700"
+                onClick={handleFinalizarPesaje}
+              >
                 <Package className="mr-2 h-4 w-4" />
                 Convertir a Pedido y Finalizar
               </Button>
-            </form>
+            </div>
           </CardContent>
         </Card>
       )}

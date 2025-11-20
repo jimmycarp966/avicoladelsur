@@ -17,10 +17,22 @@ import {
 import { formatDate, formatCurrency } from '@/lib/utils'
 import type { Database } from '@/types/database.types'
 
-type Presupuesto = Database['public']['Tables']['presupuestos']['Row'] & {
+type Presupuesto = {
+  id: string
+  numero_presupuesto: string
+  cliente_id: string
+  zona_id?: string
+  estado: string
+  fecha_entrega_estimada?: string
+  total_estimado: number
+  total_final?: number
+  observaciones?: string
+  usuario_vendedor?: string
+  created_at: string
+  updated_at: string
   cliente?: { nombre: string; telefono?: string }
   zona?: { nombre: string }
-  usuario_vendedor?: { nombre: string }
+  usuario_vendedor_obj?: { nombre: string }
   items?: any[]
 }
 
@@ -240,8 +252,7 @@ export function PresupuestosTable({
     <DataTable
       columns={columns}
       data={data}
-      searchPlaceholder="Buscar presupuestos..."
-      searchColumn="numero_presupuesto"
+      searchKey="numero_presupuesto"
     />
   )
 }

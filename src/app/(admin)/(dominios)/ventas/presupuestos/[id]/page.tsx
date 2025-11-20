@@ -24,9 +24,18 @@ async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) 
   const presupuesto = result.data
 
   async function handleEnviarAlmacen() {
-    'use server'
-    const result = await enviarPresupuestoAlmacenAction(presupuestoId)
-    return result
+    try {
+      const response = await fetch('/api/ventas/presupuestos/enviar-almacen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ presupuesto_id: presupuestoId })
+      })
+
+      const result = await response.json()
+      return result
+    } catch (error) {
+      return { success: false, message: 'Error de conexión' }
+    }
   }
 
   const getEstadoConfig = (estado: string) => {
@@ -56,12 +65,18 @@ async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) 
           <p className="text-muted-foreground">Detalle completo del presupuesto</p>
         </div>
         {presupuesto.estado === 'pendiente' && (
-          <form action={handleEnviarAlmacen}>
-            <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-              <Package className="mr-2 h-4 w-4" />
-              Enviar a Almacén
-            </Button>
-          </form>
+          <Button
+            onClick={async () => {
+              const result = await handleEnviarAlmacen()
+              if (result.success) {
+                window.location.reload()
+              }
+            }}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            <Package className="mr-2 h-4 w-4" />
+            Enviar a Almacén
+          </Button>
         )}
       </div>
 

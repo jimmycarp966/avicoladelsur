@@ -114,7 +114,7 @@ export async function crearPresupuestoAction(formData: FormData) {
   } catch (error) {
     console.error('Error en crearPresupuestoAction:', error)
     if (error instanceof z.ZodError) {
-      return { success: false, message: 'Datos inválidos: ' + error.errors[0].message }
+      return { success: false, message: 'Datos inválidos: ' + error.issues[0].message }
     }
     return { success: false, message: 'Error interno del servidor' }
   }
@@ -174,7 +174,7 @@ export async function reservarStockAction(formData: FormData) {
   } catch (error) {
     console.error('Error en reservarStockAction:', error)
     if (error instanceof z.ZodError) {
-      return { success: false, message: 'Datos inválidos: ' + error.errors[0].message }
+      return { success: false, message: 'Datos inválidos: ' + error.issues[0].message }
     }
     return { success: false, message: 'Error interno del servidor' }
   }
@@ -239,7 +239,7 @@ export async function confirmarPresupuestoAction(formData: FormData) {
   } catch (error) {
     console.error('Error en confirmarPresupuestoAction:', error)
     if (error instanceof z.ZodError) {
-      return { success: false, message: 'Datos inválidos: ' + error.errors[0].message }
+      return { success: false, message: 'Datos inválidos: ' + error.issues[0].message }
     }
     return { success: false, message: 'Error interno del servidor' }
   }
@@ -300,7 +300,7 @@ export async function actualizarPesoItemAction(formData: FormData) {
   } catch (error) {
     console.error('Error en actualizarPesoItemAction:', error)
     if (error instanceof z.ZodError) {
-      return { success: false, message: 'Datos inválidos: ' + error.errors[0].message }
+      return { success: false, message: 'Datos inválidos: ' + error.issues[0].message }
     }
     return { success: false, message: 'Error interno del servidor' }
   }

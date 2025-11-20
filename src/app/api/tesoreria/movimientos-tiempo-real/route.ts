@@ -107,7 +107,7 @@ export async function GET(request: NextRequest) {
         {
           success: false,
           error: 'Parámetros inválidos',
-          details: error.errors
+          details: error.issues
         },
         { status: 400 }
       )

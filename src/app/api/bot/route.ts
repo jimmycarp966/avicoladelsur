@@ -191,7 +191,7 @@ El vendedor revisará tu presupuesto y te contactará pronto.`,
         } else {
           return {
             success: false,
-            error: result.error || 'Error al crear el pedido'
+            error: result.message || 'Error al crear el presupuesto'
           }
         }
       }
@@ -312,7 +312,7 @@ El vendedor revisará tu presupuesto y te contactará pronto.`,
         } else {
           return {
             success: false,
-            error: result.error || 'Error al registrar el reclamo'
+            error: result.message || 'Error al registrar el reclamo'
           }
         }
       }
@@ -634,7 +634,7 @@ Escribe *menu* para volver al inicio.`
               
               pendingConfirmations.delete(phoneNumber)
             } else {
-              responseMessage = `❌ Error al crear pedido: ${result.error}`
+              responseMessage = `❌ Error al crear presupuesto: ${result.message}`
             }
           }
         }
@@ -922,7 +922,7 @@ Por favor reduce la cantidad o elige otro producto.`
 
 El vendedor revisará tu presupuesto y te contactará pronto.`
                 } else {
-                  responseMessage = `❌ Error al crear pedido: ${result.error}`
+                  responseMessage = `❌ Error al crear presupuesto: ${result.message}`
                 }
               }
             }
