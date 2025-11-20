@@ -191,6 +191,17 @@ export async function confirmarPresupuestoAction(formData: FormData) {
       return { success: false, message: 'Usuario no autenticado' }
     }
 
+    // Verificar permisos (admin, vendedor o almacenista)
+    const { data: usuario } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (!usuario || !['admin', 'vendedor', 'almacenista'].includes(usuario.rol)) {
+      return { success: false, message: 'No tienes permisos para confirmar presupuestos' }
+    }
+
     // Parsear y validar datos
     const rawData = Object.fromEntries(formData)
     const data = confirmarPresupuestoSchema.parse({
@@ -229,6 +240,7 @@ export async function confirmarPresupuestoAction(formData: FormData) {
     revalidatePath('/ventas/presupuestos')
     revalidatePath('/ventas/pedidos')
     revalidatePath('/tesoreria/cajas')
+    revalidatePath('/almacen/presupuestos-dia')
 
     return {
       success: true,

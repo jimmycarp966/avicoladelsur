@@ -85,6 +85,49 @@ export async function obtenerMovimientosTiempoRealAction(
       .from('tesoreria_cajas')
       .select('id, nombre, saldo_actual, moneda')
       .order('created_at', { ascending: false })
+    
+    const totalesPorMetodo: Record<string, { ingresos: number; egresos: number }> = {}
+    const totalesPorCaja: Record<string, { ingresos: number; egresos: number }> = {}
+    let totalIngresos = 0
+    let totalEgresos = 0
+
+    const cajaCentral = cajas?.find((c) => c.nombre?.toLowerCase().includes('caja central'))
+    let cajaCentralIngresos = 0
+    let cajaCentralEgresos = 0
+    const cajaCentralMetodos: Record<string, number> = {}
+
+    data?.forEach((movimiento) => {
+      const monto = Number(movimiento.monto) || 0
+      const metodo = (movimiento.metodo_pago || 'efectivo').toLowerCase()
+      const cajaId = movimiento.caja_id
+
+      if (movimiento.tipo === 'ingreso') {
+        totalIngresos += monto
+      } else {
+        totalEgresos += monto
+      }
+
+      if (!totalesPorMetodo[metodo]) {
+        totalesPorMetodo[metodo] = { ingresos: 0, egresos: 0 }
+      }
+      totalesPorMetodo[metodo][movimiento.tipo === 'ingreso' ? 'ingresos' : 'egresos'] += monto
+
+      if (cajaId) {
+        if (!totalesPorCaja[cajaId]) {
+          totalesPorCaja[cajaId] = { ingresos: 0, egresos: 0 }
+        }
+        totalesPorCaja[cajaId][movimiento.tipo === 'ingreso' ? 'ingresos' : 'egresos'] += monto
+      }
+
+      if (cajaCentral?.id && cajaId === cajaCentral.id) {
+        if (movimiento.tipo === 'ingreso') {
+          cajaCentralIngresos += monto
+          cajaCentralMetodos[metodo] = (cajaCentralMetodos[metodo] || 0) + monto
+        } else {
+          cajaCentralEgresos += monto
+        }
+      }
+    })
 
     return {
       success: true,
@@ -92,6 +135,21 @@ export async function obtenerMovimientosTiempoRealAction(
         movimientos: data || [],
         cajas: cajas || [],
         total_movimientos: data?.length || 0,
+        totales_por_metodo: totalesPorMetodo,
+        totales_por_tipo: {
+          ingresos: totalIngresos,
+          egresos: totalEgresos,
+        },
+        totales_por_caja: totalesPorCaja,
+        caja_central: cajaCentral
+          ? {
+              id: cajaCentral.id,
+              nombre: cajaCentral.nombre,
+              ingresos: cajaCentralIngresos,
+              egresos: cajaCentralEgresos,
+              totales_por_metodo: cajaCentralMetodos,
+            }
+          : null,
       },
     }
   } catch (error: any) {

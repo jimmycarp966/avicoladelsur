@@ -68,6 +68,89 @@ async function PresupuestosDiaContent({
     console.error('Error obteniendo presupuestos:', error)
   }
 
+  const calcularKgItem = (item: any) => {
+    if (!item) return 0
+    if (item.pesable && item.peso_final) {
+      return item.peso_final
+    }
+    return item.cantidad_solicitada || 0
+  }
+
+  const { data: sugerenciasVehiculos } = await supabase.rpc('fn_asignar_vehiculos_por_peso', {
+    p_fecha: fecha,
+    p_zona_id: zonaId || null,
+    p_turno: turno || null
+  })
+
+  const vehiculoIds = sugerenciasVehiculos?.map((s: any) => s.vehiculo_id).filter(Boolean) ?? []
+  let vehiculosAsignados: Record<string, any> = {}
+
+  if (vehiculoIds.length > 0) {
+    const { data: vehiculosData } = await supabase
+      .from('vehiculos')
+      .select('id, patente, marca, modelo, capacidad_kg')
+      .in('id', vehiculoIds)
+
+    vehiculosAsignados = Object.fromEntries((vehiculosData || []).map((v: any) => [v.id, v]))
+  }
+
+  const presupuestoInfoMap = new Map(
+    (presupuestos || []).map((p: any) => [p.id, { numero: p.numero_presupuesto }])
+  )
+
+  const asignacionesVehiculoMap: Record<string, {
+    vehiculo: any | null
+    peso_total: number
+    capacidad_restante: number
+    presupuestos: Array<{ id: string; numero: string; peso_estimado: number }>
+  }> = {}
+
+  const asignacionPorPresupuesto = new Map<string, {
+    vehiculo: any | null
+    peso_estimado: number
+    capacidad_restante: number
+  }>()
+
+  ;(sugerenciasVehiculos || []).forEach((sugerencia: any) => {
+    if (!sugerencia?.vehiculo_id || !sugerencia?.presupuesto_id) {
+      return
+    }
+
+    const vehiculo = vehiculosAsignados[sugerencia.vehiculo_id] || null
+    const presupuestoInfo = presupuestoInfoMap.get(sugerencia.presupuesto_id)
+    const pesoEstimado = Number(sugerencia.peso_estimado) || 0
+    const capacidadRestante = Number(sugerencia.capacidad_restante ?? (vehiculo?.capacidad_kg || 0))
+    const vehiculoKey = sugerencia.vehiculo_id
+
+    if (!asignacionesVehiculoMap[vehiculoKey]) {
+      asignacionesVehiculoMap[vehiculoKey] = {
+        vehiculo,
+        peso_total: 0,
+        capacidad_restante: capacidadRestante,
+        presupuestos: [],
+      }
+    }
+
+    asignacionesVehiculoMap[vehiculoKey].peso_total += pesoEstimado
+    asignacionesVehiculoMap[vehiculoKey].capacidad_restante = capacidadRestante
+
+    if (presupuestoInfo) {
+      asignacionesVehiculoMap[vehiculoKey].presupuestos.push({
+        id: sugerencia.presupuesto_id,
+        numero: presupuestoInfo.numero,
+        peso_estimado: pesoEstimado,
+      })
+    }
+
+    asignacionPorPresupuesto.set(sugerencia.presupuesto_id, {
+      vehiculo,
+      peso_estimado: pesoEstimado,
+      capacidad_restante: capacidadRestante,
+    })
+  })
+
+  const asignacionesResumen = Object.values(asignacionesVehiculoMap)
+
   // Agrupar por zona y turno
   const presupuestosPorZonaTurno = presupuestos?.reduce((acc: any, p: any) => {
     const key = `${p.zona_id || 'sin-zona'}-${p.turno || 'sin-turno'}`
@@ -81,7 +164,7 @@ async function PresupuestosDiaContent({
     }
     acc[key].presupuestos.push(p)
     acc[key].totalKg += p.items?.reduce((sum: number, item: any) =>
-      sum + (item.cantidad_solicitada || 0), 0) || 0
+      sum + calcularKgItem(item), 0) || 0
     return acc
   }, {}) || {}
 
@@ -92,7 +175,7 @@ async function PresupuestosDiaContent({
   ) || 0
   const totalKgEstimados = presupuestos?.reduce((acc, p) =>
     acc + (p.items?.reduce((sum: number, item: any) =>
-      sum + (item.cantidad_solicitada || 0), 0) || 0), 0
+      sum + calcularKgItem(item), 0) || 0), 0
   ) || 0
 
   return (
@@ -173,6 +256,61 @@ async function PresupuestosDiaContent({
         </Card>
       </div>
 
+      {/* Sugerencias de asignación automática */}
+      {asignacionesResumen.length > 0 && (
+        <Card className="border-l-4 border-l-primary/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Truck className="h-5 w-5 text-primary" />
+              Asignación automática sugerida
+            </CardTitle>
+            <CardDescription>
+              Vehículos recomendados según la carga total de los presupuestos seleccionados
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {asignacionesResumen.map((asignacion, index) => {
+              const capacidadVehiculo = Number(asignacion.vehiculo?.capacidad_kg || 0)
+              const restante = Math.max(capacidadVehiculo - asignacion.peso_total, 0)
+
+              return (
+                <div key={asignacion.vehiculo?.id || `vehiculo-${index}`} className="rounded-lg border border-primary/10 p-4">
+                  <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Vehículo sugerido</p>
+                      <p className="text-lg font-semibold">
+                        {asignacion.vehiculo
+                          ? `${asignacion.vehiculo.patente} • ${asignacion.vehiculo.marca || ''} ${asignacion.vehiculo.modelo || ''}`
+                          : 'Sin vehículo disponible'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Capacidad: {capacidadVehiculo.toFixed(1)} kg • Restante: {restante.toFixed(1)} kg
+                      </p>
+                    </div>
+                    <Badge variant="outline" className="w-fit">
+                      {asignacion.presupuestos.length} presupuesto(s)
+                    </Badge>
+                  </div>
+                  {asignacion.presupuestos.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {asignacion.presupuestos.map((presupuesto) => (
+                        <Link
+                          key={presupuesto.id}
+                          href={`/ventas/presupuestos/${presupuesto.id}`}
+                          className="text-sm text-primary underline underline-offset-2"
+                        >
+                          #{presupuesto.numero} ({presupuesto.peso_estimado.toFixed(1)} kg)
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Filtros */}
       <PresupuestosDiaFiltros zonas={zonas || []} fecha={fecha} zonaId={zonaId} turno={turno} />
 
@@ -210,7 +348,8 @@ async function PresupuestosDiaContent({
                     const itemsPesables = presupuesto.items?.filter((item: any) => item.pesable) || []
                     const itemsPesados = itemsPesables.filter((item: any) => item.peso_final)
                     const totalKg = presupuesto.items?.reduce((sum: number, item: any) =>
-                      sum + (item.cantidad_solicitada || 0), 0) || 0
+                      sum + calcularKgItem(item), 0) || 0
+                    const asignacionVehiculo = asignacionPorPresupuesto.get(presupuesto.id)
 
                     // Calcular porcentaje fuera de la expresión inline
                     const porcentajePesaje = itemsPesables.length > 0 
@@ -242,6 +381,12 @@ async function PresupuestosDiaContent({
                                   🏋️ {totalKg.toFixed(1)}kg estimados
                                 </span>
                               </div>
+                              {asignacionVehiculo && (
+                                <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-primary/5 px-3 py-1 text-sm text-primary">
+                                  <Truck className="h-4 w-4" />
+                                  Vehículo sugerido: {asignacionVehiculo.vehiculo?.patente || 'Por asignar'} ({asignacionVehiculo.peso_estimado.toFixed(1)} kg)
+                                </div>
+                              )}
                             </div>
 
                             <div className="flex items-center gap-2">
@@ -311,7 +456,8 @@ async function PresupuestosDiaContent({
                 const itemsPesables = presupuesto.items?.filter((item: any) => item.pesable) || []
                 const itemsPesados = itemsPesables.filter((item: any) => item.peso_final)
                 const totalKg = presupuesto.items?.reduce((sum: number, item: any) =>
-                  sum + (item.cantidad_solicitada || 0), 0) || 0
+                  sum + calcularKgItem(item), 0) || 0
+                const asignacionVehiculo = asignacionPorPresupuesto.get(presupuesto.id)
 
                 // Calcular porcentaje fuera de la expresión inline
                 const porcentajePesaje = itemsPesables.length > 0 
@@ -354,6 +500,13 @@ async function PresupuestosDiaContent({
                               🏋️ {totalKg.toFixed(1)}kg estimados
                             </span>
                           </div>
+
+                          {asignacionVehiculo && (
+                            <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-primary/5 px-3 py-1 text-sm text-primary">
+                              <Truck className="h-4 w-4" />
+                              Vehículo sugerido: {asignacionVehiculo.vehiculo?.patente || 'Por asignar'} ({asignacionVehiculo.peso_estimado.toFixed(1)} kg)
+                            </div>
+                          )}
                         </div>
 
                         <div className="flex items-center gap-2">

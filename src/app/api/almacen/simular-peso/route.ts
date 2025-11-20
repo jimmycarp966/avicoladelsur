@@ -1,35 +1,100 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { createClient } from '@/lib/supabase/server'
+import { BalanzaAdapterFactory } from '@/lib/balanza-adapter'
 
-// Schema para validar la solicitud
 const simularPesoSchema = z.object({
   presupuesto_item_id: z.string().uuid(),
-  peso_simulado: z.number().positive().optional(), // Si no se proporciona, genera uno aleatorio
+  peso_simulado: z.number().positive().optional(),
 })
 
-// Función para generar peso simulado basado en la cantidad solicitada
+const useBalanzaFisica = (process.env.BALANZA_MODE || '').toLowerCase() === 'live'
+
 function generarPesoSimulado(cantidadSolicitada: number): number {
-  // Simula variaciones realistas del peso (±10%)
-  const variacion = (Math.random() - 0.5) * 0.2 // -10% a +10%
-  const pesoBase = cantidadSolicitada * 1000 // Convertir a gramos (asumiendo kg)
-  return Math.round((pesoBase * (1 + variacion)) * 100) / 100 // Redondear a 2 decimales
+  const base = cantidadSolicitada > 0 ? cantidadSolicitada : 1
+  const variacion = (Math.random() - 0.5) * 0.15 // ±7.5 %
+  const peso = base * (1 + variacion)
+  return Math.max(0.01, Math.round(peso * 1000) / 1000)
 }
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = await createClient()
     const body = await request.json()
     const { presupuesto_item_id, peso_simulado } = simularPesoSchema.parse(body)
 
-    // Generar peso simulado si no se proporcionó
-    const pesoFinal = peso_simulado || generarPesoSimulado(1) // Valor por defecto si no hay cantidad
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return NextResponse.json(
+        { success: false, message: 'Usuario no autenticado' },
+        { status: 401 }
+      )
+    }
 
-    // En un escenario real, aquí se conectaría con la balanza física
-    // Por ahora, solo devolvemos el peso simulado
+    const { data: usuario } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (!usuario || !['admin', 'almacenista'].includes(usuario.rol)) {
+      return NextResponse.json(
+        { success: false, message: 'No tienes permisos para leer la balanza' },
+        { status: 403 }
+      )
+    }
+
+    const { data: item, error: itemError } = await supabase
+      .from('presupuesto_items')
+      .select(`
+        cantidad_solicitada,
+        pesable,
+        producto:productos(nombre)
+      `)
+      .eq('id', presupuesto_item_id)
+      .single()
+
+    if (itemError || !item) {
+      return NextResponse.json(
+        { success: false, message: 'Item de presupuesto no encontrado' },
+        { status: 404 }
+      )
+    }
+
+    const cantidadBase = Number(item.cantidad_solicitada) || 1
+    let pesoFinal = peso_simulado ? Number(peso_simulado) : undefined
+    let origen: 'manual' | 'balanza' | 'simulado' = peso_simulado ? 'manual' : 'simulado'
+
+    if (!pesoFinal && useBalanzaFisica) {
+      try {
+        const balanza = BalanzaAdapterFactory.crearAdapter()
+        await balanza.conectar()
+        const lectura = await balanza.leerPeso()
+        pesoFinal = lectura.peso
+        origen = 'balanza'
+        await balanza.desconectar()
+      } catch (adapterError) {
+        console.error('Error leyendo balanza física:', adapterError)
+      }
+    }
+
+    if (!pesoFinal || pesoFinal <= 0) {
+      pesoFinal = generarPesoSimulado(cantidadBase)
+      origen = 'simulado'
+    }
+
+    const pesoRedondeado = Number(pesoFinal.toFixed(3))
+    const producto = Array.isArray(item.producto) ? item.producto[0] : item.producto
 
     return NextResponse.json({
       success: true,
-      peso_simulado: pesoFinal,
-      mensaje: `Peso simulado: ${pesoFinal} kg`,
+      peso_simulado: pesoRedondeado,
+      mensaje: `Peso ${origen === 'balanza' ? 'registrado' : 'simulado'}: ${pesoRedondeado} kg`,
+      metadata: {
+        origen,
+        producto: producto?.nombre,
+        pesable: item.pesable,
+      },
       timestamp: new Date().toISOString()
     })
 

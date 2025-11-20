@@ -1,6 +1,6 @@
 import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, Package, User, MapPin, Calendar, DollarSign, Scale, Clock, History, FileText } from 'lucide-react'
+import { ArrowLeft, Package, User, MapPin, Calendar, DollarSign, Scale, Clock, History, FileText, CreditCard } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -25,6 +25,8 @@ async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) 
   }
 
   const presupuesto = result.data
+  const itemsPesables = (presupuesto.items || []).filter((item: any) => item.pesable)
+  const puedeFacturarDirecto = presupuesto.estado === 'pendiente' && itemsPesables.length === 0
 
   // Obtener zonas y zonas_dias para el formulario
   const { data: zonas } = await supabase
@@ -64,6 +66,21 @@ async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) 
       return result
     } catch (error) {
       return { success: false, message: 'Error al convertir a cotización' }
+    }
+  }
+
+  async function handleFacturarDirecto() {
+    try {
+      const response = await fetch('/api/ventas/presupuestos/facturar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ presupuesto_id: presupuestoId })
+      })
+
+      const result = await response.json()
+      return result
+    } catch (error) {
+      return { success: false, message: 'Error de conexión' }
     }
   }
 
@@ -109,6 +126,22 @@ async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) 
               <FileText className="mr-2 h-4 w-4" />
               Convertir a Cotización
             </Button>
+            {puedeFacturarDirecto && (
+              <Button
+                className="bg-green-600 hover:bg-green-700 text-white"
+                onClick={async () => {
+                  const result = await handleFacturarDirecto()
+                  if (result.success) {
+                    window.location.reload()
+                  } else {
+                    alert(result.message || 'Error al facturar presupuesto')
+                  }
+                }}
+              >
+                <CreditCard className="mr-2 h-4 w-4" />
+                Facturar sin Almacén
+              </Button>
+            )}
             <Button
               onClick={async () => {
                 const result = await handleEnviarAlmacen()
@@ -225,6 +258,32 @@ async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) 
               <p className="text-lg text-blue-600">${presupuesto.recargo_total.toFixed(2)}</p>
             </div>
           )}
+        {Array.isArray(presupuesto.metodos_pago) && presupuesto.metodos_pago.length > 0 && (
+          <div className="md:col-span-2 space-y-2">
+            <label className="text-sm font-medium flex items-center gap-2">
+              <CreditCard className="h-4 w-4" />
+              Métodos de pago admitidos
+            </label>
+            <div className="space-y-2">
+              {presupuesto.metodos_pago.map((metodo: any, index: number) => {
+                const etiqueta = (metodo.metodo || metodo.tipo || 'sin definir').replace('_', ' ')
+                const recargoValue = Number(metodo.recargo || 0)
+                const mostrarRecargo = Number.isFinite(recargoValue) && recargoValue > 0
+
+                return (
+                  <div key={`${etiqueta}-${index}`} className="flex items-center justify-between rounded-md border p-3 text-sm">
+                    <span className="font-medium capitalize">{etiqueta}</span>
+                    {mostrarRecargo && (
+                      <span className="text-primary font-medium">
+                        +${recargoValue.toFixed(2)}
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
         </CardContent>
       </Card>
 

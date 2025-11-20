@@ -238,4 +238,5 @@ export interface RutaActivaResponse {
   }
   entregas_pendientes: number
   entregas_completadas: number
+  distancia_estimada_km?: number
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
 // Schema para registrar entrega
@@ -19,6 +20,7 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient()
     const body = await request.json()
     const data = registrarEntregaSchema.parse(body)
+    let shouldRevalidateTesoreria = false
 
     // Obtener usuario actual (repartidor)
     const { data: { user }, error: userError } = await supabase.auth.getUser()
@@ -109,7 +111,7 @@ export async function POST(request: NextRequest) {
         .eq('nombre', 'Caja Central')
         .single()
 
-      if (!cajaCentral) {
+        if (!cajaCentral) {
         // Si no existe Caja Central, usar la primera disponible
         const { data: cajas } = await supabase
           .from('tesoreria_cajas')
@@ -149,6 +151,8 @@ export async function POST(request: NextRequest) {
                 caja_movimiento_id: movimiento.id,
               })
               .eq('id', data.pedido_id)
+
+            shouldRevalidateTesoreria = true
           }
         }
       } else {
@@ -186,6 +190,8 @@ export async function POST(request: NextRequest) {
               caja_movimiento_id: movimiento.id,
             })
             .eq('id', data.pedido_id)
+
+          shouldRevalidateTesoreria = true
         }
       }
     }
@@ -198,6 +204,12 @@ export async function POST(request: NextRequest) {
         .from('detalles_ruta')
         .update({ comprobante_url: data.comprobante_url })
         .eq('id', detalleRuta.id)
+    }
+
+    if (shouldRevalidateTesoreria) {
+      revalidatePath('/(admin)/(dominios)/tesoreria/movimientos')
+      revalidatePath('/(admin)/(dominios)/tesoreria')
+      revalidatePath('/(admin)/(dominios)/tesoreria/tesoro')
     }
 
     return NextResponse.json({

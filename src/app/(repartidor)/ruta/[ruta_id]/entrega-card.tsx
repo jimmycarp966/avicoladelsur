@@ -100,13 +100,14 @@ export function EntregaCard({ entrega, rutaId, rutaEstado }: EntregaCardProps) {
               <span className="text-muted-foreground">Total:</span>
               <span className="font-semibold">${pedido?.total?.toFixed(2) || '0.00'}</span>
             </div>
-            {pedido?.metodos_pago && (
+            {Array.isArray(pedido?.metodos_pago) && pedido.metodos_pago.length > 0 && (
               <div className="text-sm">
                 <span className="text-muted-foreground">Métodos de pago:</span>
                 <div className="flex flex-wrap gap-1 mt-1">
-                  {Object.entries(pedido.metodos_pago).map(([metodo, recargo]: [string, any]) => (
-                    <Badge key={metodo} variant="outline" className="text-xs">
-                      {metodo}: {recargo ? `+${recargo}%` : 'Sin recargo'}
+                  {pedido.metodos_pago.map((metodo: any, index: number) => (
+                    <Badge key={`${metodo.metodo || metodo.tipo}-${index}`} variant="outline" className="text-xs">
+                      {(metodo.metodo || metodo.tipo || 'metodo').replace('_', ' ')}
+                      {metodo.recargo ? ` • +$${metodo.recargo}` : ''}
                     </Badge>
                   ))}
                 </div>
@@ -157,7 +158,7 @@ export function EntregaCard({ entrega, rutaId, rutaEstado }: EntregaCardProps) {
                 >
                   <Link href={`/repartidor/ruta/${rutaId}/entrega/${entrega.id}`}>
                     <FileText className="mr-2 h-4 w-4" />
-                    Detalles
+                    Gestionar
                   </Link>
                 </Button>
                 <Button

@@ -61,40 +61,42 @@ async function RepartoContent({ searchParams }: { searchParams: { fecha?: string
   // Obtener detalles de ruta con información completa
   const rutaIds = rutasActivas.map((r: any) => r.id)
   
-  const { data: detallesRuta } = await supabase
-    .from('detalles_ruta')
-    .select(`
-      id,
-      orden_entrega,
-      estado_entrega,
-      ruta_id,
-      pedido:pedidos(
-        id,
-        numero_pedido,
-        total,
-        turno,
-        zona_id,
-        cliente:clientes(
-          nombre,
-          telefono,
-          direccion,
-          zona_entrega
-        ),
-        pago_estado,
-        instrucciones_repartidor
-      ),
-      ruta: rutas_reparto(
-        id,
-        numero_ruta,
-        fecha_ruta,
-        turno,
-        zona_id,
-        estado,
-        vehiculo:vehiculos(patente, marca, modelo)
-      )
-    `)
-    .in('ruta_id', rutaIds)
-    .order('orden_entrega')
+  const { data: detallesRuta } = rutaIds.length > 0
+    ? await supabase
+        .from('detalles_ruta')
+        .select(`
+          id,
+          orden_entrega,
+          estado_entrega,
+          ruta_id,
+          pedido:pedidos(
+            id,
+            numero_pedido,
+            total,
+            turno,
+            zona_id,
+            cliente:clientes(
+              nombre,
+              telefono,
+              direccion,
+              zona_entrega
+            ),
+            pago_estado,
+            instrucciones_repartidor
+          ),
+          ruta: rutas_reparto(
+            id,
+            numero_ruta,
+            fecha_ruta,
+            turno,
+            zona_id,
+            estado,
+            vehiculo:vehiculos(patente, marca, modelo)
+          )
+        `)
+        .in('ruta_id', rutaIds)
+        .order('orden_entrega')
+    : { data: [] }
 
   const entregas = detallesRuta?.map((detalle: any) => ({
     id: detalle.id,
@@ -291,10 +293,10 @@ async function RepartoContent({ searchParams }: { searchParams: { fecha?: string
                       {entrega.pago_estado === 'pagado' ? 'Pagado' : 'Pendiente'}
                     </Badge>
                   </div>
-                  <Badge variant="outline" className="text-xs">
-                    <MapPin className="mr-1 h-3 w-3" />
-                    {entrega.ruta || 'Ruta 1'}
-                  </Badge>
+                    <Badge variant="outline" className="text-xs">
+                      <MapPin className="mr-1 h-3 w-3" />
+                      {entrega.ruta?.numero_ruta || 'Ruta'}
+                    </Badge>
                 </div>
               </CardHeader>
               <CardContent>
@@ -319,10 +321,10 @@ async function RepartoContent({ searchParams }: { searchParams: { fecha?: string
                         <DollarSign className="h-4 w-4" />
                         ${entrega.total?.toFixed(2) || '0.00'}
                       </span>
-                      {entrega.vehiculo && (
+                      {entrega.ruta?.vehiculo?.patente && (
                         <span className="flex items-center gap-1">
                           <Truck className="h-4 w-4" />
-                          {entrega.vehiculo}
+                          {entrega.ruta.vehiculo.patente}
                         </span>
                       )}
                     </div>
@@ -340,15 +342,10 @@ async function RepartoContent({ searchParams }: { searchParams: { fecha?: string
 
                   {/* Acciones */}
                   <div className="flex gap-2 pt-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      asChild
-                    >
+                    <Button variant="outline" size="sm" className="flex-1" asChild>
                       <Link href={`/repartidor/ruta/${rutaId}/entrega/${entrega.id}`}>
                         <MapPin className="mr-2 h-4 w-4" />
-                        Ver Detalles
+                        Gestionar
                       </Link>
                     </Button>
                     {entrega.estado !== 'entregado' && (
@@ -357,9 +354,9 @@ async function RepartoContent({ searchParams }: { searchParams: { fecha?: string
                         className="flex-1 bg-green-600 hover:bg-green-700"
                         asChild
                       >
-                        <Link href={`/repartidor/ruta/${rutaId}/entrega/${entrega.id}/completar`}>
+                        <Link href={`/repartidor/ruta/${rutaId}`}>
                           <CheckCircle className="mr-2 h-4 w-4" />
-                          Marcar Entrega
+                          Ir a ruta
                         </Link>
                       </Button>
                     )}

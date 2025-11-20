@@ -1,4 +1,6 @@
 import { getCurrentUser } from '@/actions/auth.actions'
+import { obtenerRutaActiva } from '@/actions/reparto.actions'
+import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -19,36 +21,70 @@ export const dynamic = 'force-dynamic'
 
 export default async function RepartidorDashboard() {
   const user = await getCurrentUser()
+  const supabase = await createClient()
 
-  // Datos de ejemplo (en producción vendrían de la base de datos)
-  const rutaActiva = {
-    numero: 'RUT-001',
-    estado: 'en_curso',
-    entregasTotal: 8,
-    entregasCompletadas: 3,
-    entregasPendientes: 5,
-    distanciaEstimada: 45.2,
-    tiempoEstimado: '2h 30min',
+  if (!user) {
+    return (
+      <div className="p-6">
+        <Card>
+          <CardContent className="p-8 text-center text-muted-foreground">
+            Debes iniciar sesión para ver tu panel de rutas.
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
-  const entregasHoy = [
-    {
-      id: 'PED-001',
-      cliente: 'Supermercado Central',
-      direccion: 'Av. Principal 123',
-      estado: 'pendiente',
-      productos: ['Pollo Entero', 'Huevos'],
-      prioridad: 'alta',
-    },
-    {
-      id: 'PED-002',
-      cliente: 'Tienda Familiar',
-      direccion: 'Calle Secundaria 456',
-      estado: 'completada',
-      productos: ['Pechuga de Pollo'],
-      prioridad: 'normal',
-    },
-  ]
+  const rutaActivaResponse = await obtenerRutaActiva(user.id)
+  const rutaActiva = rutaActivaResponse.success ? rutaActivaResponse.data : null
+
+  let entregasHoy: Array<{
+    id: string
+    cliente: string
+    direccion: string
+    estado: string
+    productos: string[]
+    prioridad: string
+  }> = []
+  let entregasPendientes = 0
+  let entregasCompletadas = 0
+  let totalEntregas = 0
+
+  if (rutaActiva?.ruta_id) {
+    const { data: detalles } = await supabase
+      .from('detalles_ruta')
+      .select(`
+        id,
+        orden_entrega,
+        estado_entrega,
+        pedido:pedidos(
+          numero_pedido,
+          total,
+          cliente:clientes(nombre, direccion)
+        )
+      `)
+      .eq('ruta_id', rutaActiva.ruta_id)
+      .order('orden_entrega', { ascending: true })
+
+    if (detalles) {
+      totalEntregas = detalles.length
+      entregasCompletadas = detalles.filter(det => det.estado_entrega === 'entregado').length
+      entregasPendientes = totalEntregas - entregasCompletadas
+
+      entregasHoy = detalles.map(det => {
+        const pedido = Array.isArray(det.pedido) ? det.pedido[0] : det.pedido
+        const cliente = Array.isArray(pedido?.cliente) ? pedido?.cliente[0] : pedido?.cliente
+        return {
+          id: det.id,
+          cliente: cliente?.nombre || pedido?.numero_pedido || 'Cliente',
+          direccion: cliente?.direccion || 'Sin dirección',
+          estado: det.estado_entrega,
+          productos: pedido?.numero_pedido ? [pedido.numero_pedido] : [],
+          prioridad: det.estado_entrega === 'pendiente' ? 'alta' : 'normal',
+        }
+      })
+    }
+  }
 
   return (
     <div className="space-y-6 p-4">
@@ -63,7 +99,7 @@ export default async function RepartidorDashboard() {
       </div>
 
       {/* Ruta activa */}
-      {rutaActiva && (
+      {rutaActiva ? (
         <Card className="border-l-4 border-l-green-500">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
@@ -73,39 +109,41 @@ export default async function RepartidorDashboard() {
               </Badge>
             </div>
             <CardDescription>
-              Ruta #{rutaActiva.numero}
+              Ruta #{rutaActiva.numero_ruta}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">
-                  {rutaActiva.entregasCompletadas}
-                </div>
+                <div className="text-2xl font-bold text-green-600">{entregasCompletadas}</div>
                 <div className="text-sm text-gray-500">Completadas</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-orange-600">
-                  {rutaActiva.entregasPendientes}
-                </div>
+                <div className="text-2xl font-bold text-orange-600">{entregasPendientes}</div>
                 <div className="text-sm text-gray-500">Pendientes</div>
               </div>
             </div>
 
             <div className="flex gap-2">
               <Button asChild className="flex-1">
-                <Link href="/repartidor/ruta-diaria">
+                <Link href={`/repartidor/ruta/${rutaActiva.ruta_id}`}>
                   <Navigation className="mr-2 h-4 w-4" />
                   Ver Ruta
                 </Link>
               </Button>
               <Button variant="outline" asChild className="flex-1">
-                <Link href="/repartidor/checkin">
+                <Link href={`/repartidor/ruta/${rutaActiva.ruta_id}`}>
                   <CheckSquare className="mr-2 h-4 w-4" />
                   Check-in
                 </Link>
               </Button>
             </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="border-l-4 border-l-orange-400 bg-orange-50">
+          <CardContent className="p-6 text-center text-orange-800">
+            No tienes rutas asignadas para hoy.
           </CardContent>
         </Card>
       )}
@@ -134,7 +172,7 @@ export default async function RepartidorDashboard() {
         <CardHeader>
           <CardTitle className="text-lg">Próximas Entregas</CardTitle>
           <CardDescription>
-            {rutaActiva?.entregasPendientes} entregas pendientes
+            {entregasPendientes} entregas pendientes
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -162,7 +200,7 @@ export default async function RepartidorDashboard() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm text-gray-500">15 min</span>
+                  <span className="text-sm text-gray-500">Próximo</span>
                 </div>
               </div>
             ))}
@@ -181,7 +219,7 @@ export default async function RepartidorDashboard() {
         <Card>
           <CardContent className="p-3 text-center">
             <div className="text-xl font-bold text-blue-600">
-              {rutaActiva?.distanciaEstimada}km
+              {rutaActiva ? `${rutaActiva?.distancia_estimada_km || '--'} km` : '--'}
             </div>
             <div className="text-xs text-gray-500">Distancia</div>
           </CardContent>
@@ -190,7 +228,7 @@ export default async function RepartidorDashboard() {
         <Card>
           <CardContent className="p-3 text-center">
             <div className="text-xl font-bold text-green-600">
-              {rutaActiva?.tiempoEstimado}
+              {rutaActiva?.estado === 'en_curso' ? 'En curso' : 'Planificada'}
             </div>
             <div className="text-xs text-gray-500">Tiempo</div>
           </CardContent>
