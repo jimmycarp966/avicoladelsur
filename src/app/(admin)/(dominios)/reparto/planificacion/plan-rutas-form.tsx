@@ -36,6 +36,7 @@ export default function PlanRutasForm({
   const [turno, setTurno] = useState<'mañana' | 'tarde' | ''>('')
   const [vehiculoId, setVehiculoId] = useState<string>('')
   const [repartidorId, setRepartidorId] = useState<string>('')
+  const SIN_ASIGNAR_VALUE = 'sin-asignar'
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -121,12 +122,15 @@ export default function PlanRutasForm({
 
       <div className="space-y-2">
         <Label>Repartidor (opcional)</Label>
-        <Select value={repartidorId} onValueChange={setRepartidorId}>
+        <Select
+          value={repartidorId || SIN_ASIGNAR_VALUE}
+          onValueChange={(value) => setRepartidorId(value === SIN_ASIGNAR_VALUE ? '' : value)}
+        >
           <SelectTrigger>
             <SelectValue placeholder="Selecciona un repartidor" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Sin asignar</SelectItem>
+            <SelectItem value={SIN_ASIGNAR_VALUE}>Sin asignar</SelectItem>
             {repartidores.map((rep) => (
               <SelectItem key={rep.id} value={rep.id}>
                 {rep.nombre} {rep.apellido}
