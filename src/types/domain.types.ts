@@ -38,6 +38,7 @@ export interface Cliente extends BaseEntity {
   whatsapp?: string
   email?: string
   direccion?: string
+  localidad_id?: string
   zona_entrega?: string
   coordenadas?: {
     lat: number
@@ -231,6 +232,14 @@ export interface PresupuestoItem extends BaseEntity {
 export interface Zona extends BaseEntity {
   nombre: string
   descripcion?: string
+  activo: boolean
+}
+
+// Localidad
+export interface Localidad extends BaseEntity {
+  nombre: string
+  zona_id: string
+  zona?: Zona
   activo: boolean
 }
 

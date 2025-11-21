@@ -77,13 +77,17 @@ export function ClienteForm({ cliente, onSuccess }: ClienteFormProps) {
     try {
       setIsLoading(true)
 
-      // En producción, esto sería una llamada real a la API
-      console.log('Cliente data:', data)
+      const { crearCliente, actualizarCliente } = await import('@/actions/ventas.actions')
+      
+      const result = isEditing
+        ? await actualizarCliente(cliente.id, data)
+        : await crearCliente(data)
 
-      // Simular delay de API
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      if (!result.success) {
+        throw new Error(result.error || 'Error al guardar cliente')
+      }
 
-      showToast('success', isEditing ? 'Cliente actualizado exitosamente' : 'Cliente creado exitosamente')
+      showToast('success', result.message || (isEditing ? 'Cliente actualizado exitosamente' : 'Cliente creado exitosamente'))
 
       if (onSuccess) {
         onSuccess()

@@ -10,6 +10,7 @@ import type {
   ApiResponse,
   StockDisponibleResponse
 } from '@/types/api.types'
+import type { ProductoFormData } from '@/lib/schemas/productos.schema'
 
 // Ingreso de mercadería
 export async function ingresarMercaderia(
@@ -517,6 +518,216 @@ export async function obtenerPresupuestosPorZonaFechaAction(
     return {
       success: false,
       error: error.message || 'Error al obtener presupuestos',
+    }
+  }
+}
+
+// Crear producto
+export async function crearProducto(
+  data: ProductoFormData
+): Promise<ApiResponse<{ productoId: string }>> {
+  try {
+    const supabase = await createClient()
+
+    // Verificar permisos (admin o almacenista)
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, error: 'Usuario no autenticado' }
+    }
+
+    const { data: usuario } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (!usuario || !['admin', 'almacenista'].includes(usuario.rol)) {
+      return { success: false, error: 'No tienes permisos para crear productos' }
+    }
+
+    // Verificar que el código no exista
+    const { data: productoExistente } = await supabase
+      .from('productos')
+      .select('id')
+      .eq('codigo', data.codigo)
+      .single()
+
+    if (productoExistente) {
+      return { success: false, error: 'Ya existe un producto con ese código' }
+    }
+
+    const { data: producto, error } = await supabase
+      .from('productos')
+      .insert({
+        codigo: data.codigo,
+        nombre: data.nombre,
+        descripcion: data.descripcion || null,
+        categoria: data.categoria || null,
+        precio_venta: data.precio_venta,
+        precio_costo: data.precio_costo || null,
+        unidad_medida: data.unidad_medida,
+        stock_minimo: data.stock_minimo,
+        activo: data.activo ?? true,
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+
+    revalidatePath('/(admin)/(dominios)/almacen/productos')
+
+    return {
+      success: true,
+      data: { productoId: producto.id },
+      message: 'Producto creado exitosamente',
+    }
+  } catch (error: any) {
+    console.error('Error al crear producto:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al crear producto',
+    }
+  }
+}
+
+// Actualizar producto
+export async function actualizarProducto(
+  productoId: string,
+  data: ProductoFormData
+): Promise<ApiResponse> {
+  try {
+    const supabase = await createClient()
+
+    // Verificar permisos (admin o almacenista)
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, error: 'Usuario no autenticado' }
+    }
+
+    const { data: usuario } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (!usuario || !['admin', 'almacenista'].includes(usuario.rol)) {
+      return { success: false, error: 'No tienes permisos para actualizar productos' }
+    }
+
+    // Verificar que el código no exista en otro producto
+    const { data: productoExistente } = await supabase
+      .from('productos')
+      .select('id')
+      .eq('codigo', data.codigo)
+      .neq('id', productoId)
+      .single()
+
+    if (productoExistente) {
+      return { success: false, error: 'Ya existe otro producto con ese código' }
+    }
+
+    const { error } = await supabase
+      .from('productos')
+      .update({
+        codigo: data.codigo,
+        nombre: data.nombre,
+        descripcion: data.descripcion || null,
+        categoria: data.categoria || null,
+        precio_venta: data.precio_venta,
+        precio_costo: data.precio_costo || null,
+        unidad_medida: data.unidad_medida,
+        stock_minimo: data.stock_minimo,
+        activo: data.activo ?? true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', productoId)
+
+    if (error) throw error
+
+    revalidatePath('/(admin)/(dominios)/almacen/productos')
+
+    return {
+      success: true,
+      message: 'Producto actualizado exitosamente',
+    }
+  } catch (error: any) {
+    console.error('Error al actualizar producto:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al actualizar producto',
+    }
+  }
+}
+
+// Eliminar producto (soft delete)
+export async function eliminarProducto(
+  productoId: string
+): Promise<ApiResponse> {
+  try {
+    const supabase = await createClient()
+
+    // Verificar permisos (admin o almacenista)
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, error: 'Usuario no autenticado' }
+    }
+
+    const { data: usuario } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (!usuario || !['admin', 'almacenista'].includes(usuario.rol)) {
+      return { success: false, error: 'No tienes permisos para eliminar productos' }
+    }
+
+    const { error } = await supabase
+      .from('productos')
+      .update({
+        activo: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', productoId)
+
+    if (error) throw error
+
+    revalidatePath('/(admin)/(dominios)/almacen/productos')
+
+    return {
+      success: true,
+      message: 'Producto desactivado exitosamente',
+    }
+  } catch (error: any) {
+    console.error('Error al eliminar producto:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al eliminar producto',
+    }
+  }
+}
+
+// Obtener productos
+export async function obtenerProductos(): Promise<ApiResponse<any[]>> {
+  try {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+      .from('productos')
+      .select('*')
+      .order('nombre', { ascending: true })
+
+    if (error) throw error
+
+    return {
+      success: true,
+      data: data || [],
+    }
+  } catch (error: any) {
+    console.error('Error al obtener productos:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al obtener productos',
     }
   }
 }

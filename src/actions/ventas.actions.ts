@@ -56,6 +56,130 @@ export async function crearCliente(
   }
 }
 
+// Crear cliente desde bot (WhatsApp)
+export async function crearClienteDesdeBot(
+  clienteData: {
+    nombre: string
+    apellido?: string
+    telefono?: string
+    whatsapp: string
+    direccion: string
+    localidad_id: string
+  }
+): Promise<ApiResponse<{ clienteId: string; cliente: any }>> {
+  try {
+    const supabase = await createClient()
+
+    // Validar que la localidad existe y está activa
+    const { data: localidad, error: localidadError } = await supabase
+      .from('localidades')
+      .select('id, nombre, zona_id')
+      .eq('id', clienteData.localidad_id)
+      .eq('activo', true)
+      .single()
+
+    if (localidadError || !localidad) {
+      return {
+        success: false,
+        error: 'Localidad no válida o no encontrada',
+      }
+    }
+
+    // Construir nombre completo
+    const nombreCompleto = clienteData.apellido
+      ? `${clienteData.nombre} ${clienteData.apellido}`
+      : clienteData.nombre
+
+    // Obtener zona_id de la localidad
+    const { data: cliente, error } = await supabase
+      .from('clientes')
+      .insert({
+        nombre: nombreCompleto,
+        telefono: clienteData.telefono || clienteData.whatsapp,
+        whatsapp: clienteData.whatsapp,
+        direccion: clienteData.direccion,
+        localidad_id: clienteData.localidad_id,
+        tipo_cliente: 'minorista',
+        limite_credito: 0,
+        activo: true,
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+
+    // Crear cuenta corriente para el nuevo cliente
+    await supabase.rpc('fn_asegurar_cuenta_corriente', {
+      p_cliente_id: cliente.id,
+    })
+
+    revalidatePath('/(admin)/(dominios)/ventas/clientes')
+
+    return {
+      success: true,
+      data: {
+        clienteId: cliente.id,
+        cliente: cliente,
+      },
+      message: 'Cliente creado exitosamente',
+    }
+  } catch (error: any) {
+    console.error('Error al crear cliente desde bot:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al crear cliente',
+    }
+  }
+}
+
+// Eliminar cliente (soft delete)
+export async function eliminarCliente(
+  clienteId: string
+): Promise<ApiResponse> {
+  try {
+    const supabase = await createClient()
+
+    // Verificar permisos (admin o vendedor)
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, error: 'Usuario no autenticado' }
+    }
+
+    const { data: usuario } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (!usuario || !['admin', 'vendedor'].includes(usuario.rol)) {
+      return { success: false, error: 'No tienes permisos para eliminar clientes' }
+    }
+
+    const { error } = await supabase
+      .from('clientes')
+      .update({
+        activo: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', clienteId)
+
+    if (error) throw error
+
+    revalidatePath('/(admin)/(dominios)/ventas/clientes')
+
+    return {
+      success: true,
+      message: 'Cliente desactivado exitosamente',
+    }
+  } catch (error: any) {
+    console.error('Error al eliminar cliente:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al eliminar cliente',
+    }
+  }
+}
+
 // Actualizar cliente
 export async function actualizarCliente(
   clienteId: string,
@@ -585,6 +709,72 @@ export async function actualizarEstadoReclamo(
     return {
       success: false,
       error: error.message || 'Error al actualizar estado del reclamo',
+    }
+  }
+}
+
+// Obtener lista de pedidos
+export async function obtenerPedidos(
+  filtros?: {
+    search?: string
+    estado?: string
+    cliente_id?: string
+    fecha_desde?: string
+    fecha_hasta?: string
+    page?: number
+    limit?: number
+  }
+): Promise<ApiResponse> {
+  try {
+    const supabase = await createClient()
+
+    let query = supabase
+      .from('pedidos')
+      .select(`
+        *,
+        cliente:clientes(id, nombre, telefono, zona_entrega),
+        usuario_vendedor:usuarios(id, nombre, apellido)
+      `)
+      .order('created_at', { ascending: false })
+
+    // Aplicar filtros
+    if (filtros?.estado) {
+      query = query.eq('estado', filtros.estado)
+    }
+    if (filtros?.cliente_id) {
+      query = query.eq('cliente_id', filtros.cliente_id)
+    }
+    if (filtros?.fecha_desde) {
+      query = query.gte('fecha_pedido', filtros.fecha_desde)
+    }
+    if (filtros?.fecha_hasta) {
+      query = query.lte('fecha_pedido', filtros.fecha_hasta)
+    }
+    if (filtros?.search) {
+      query = query.or(`numero_pedido.ilike.%${filtros.search}%,clientes.nombre.ilike.%${filtros.search}%`)
+    }
+
+    // Paginación
+    const page = filtros?.page || 1
+    const limit = filtros?.limit || 50
+    const from = (page - 1) * limit
+    const to = from + limit - 1
+
+    query = query.range(from, to)
+
+    const { data, error } = await query
+
+    if (error) throw error
+
+    return {
+      success: true,
+      data: data || [],
+    }
+  } catch (error: any) {
+    console.error('Error al obtener pedidos:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al obtener pedidos',
     }
   }
 }

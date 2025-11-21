@@ -75,18 +75,17 @@ export function ProductoForm({ producto, onSuccess }: ProductoFormProps) {
     try {
       setIsLoading(true)
 
-      // En producción, esto sería una llamada real a la API
-      // const result = isEditing
-      //   ? await actualizarProducto(producto.id, data)
-      //   : await crearProducto(data)
+      const { crearProducto, actualizarProducto } = await import('@/actions/almacen.actions')
+      
+      const result = isEditing
+        ? await actualizarProducto(producto.id, data)
+        : await crearProducto(data)
 
-      // Simulación para desarrollo
-      console.log('Producto data:', data)
+      if (!result.success) {
+        throw new Error(result.error || 'Error al guardar producto')
+      }
 
-      // Simular delay de API
-      await new Promise(resolve => setTimeout(resolve, 1000))
-
-      showToast('success', isEditing ? 'Producto actualizado exitosamente' : 'Producto creado exitosamente')
+      showToast('success', result.message || (isEditing ? 'Producto actualizado exitosamente' : 'Producto creado exitosamente'))
 
       if (onSuccess) {
         onSuccess()

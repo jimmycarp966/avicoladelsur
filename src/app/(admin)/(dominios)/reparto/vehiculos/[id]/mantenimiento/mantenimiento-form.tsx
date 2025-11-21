@@ -55,28 +55,21 @@ export function MantenimientoVehiculoForm({ vehiculoId }: MantenimientoVehiculoF
     try {
       setIsLoading(true)
 
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
+      const { crearMantenimientoVehiculo } = await import('@/actions/reparto.actions')
+      
+      const result = await crearMantenimientoVehiculo(vehiculoId, {
+        tipo: data.tipo_mantenimiento,
+        descripcion: data.descripcion,
+        costo: data.costo_estimado,
+        fecha: data.fecha_programada,
+        observaciones: data.observaciones,
+      })
 
-      if (!user) {
-        showToast('error', 'Usuario no autenticado')
-        return
+      if (!result.success) {
+        throw new Error(result.error || 'Error al programar mantenimiento')
       }
 
-      // Insertar registro de mantenimiento
-      // Nota: Si existe una tabla de mantenimientos, usar esa. Por ahora, guardamos en observaciones del vehículo
-      const { error } = await supabase
-        .from('vehiculos')
-        .update({
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', vehiculoId)
-
-      if (error) throw error
-
-      // Aquí se podría crear una tabla de mantenimientos_programados si no existe
-      // Por ahora, mostramos un mensaje de éxito
-      showToast('success', 'Mantenimiento programado exitosamente. Nota: Esta funcionalidad puede requerir una tabla de mantenimientos en la base de datos.')
+      showToast('success', result.message || 'Mantenimiento programado exitosamente')
       router.push('/reparto/vehiculos')
     } catch (error: any) {
       console.error('Error programando mantenimiento:', error)

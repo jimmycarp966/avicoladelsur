@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { crearPresupuestoAction } from '@/actions/presupuestos.actions'
-import { crearReclamoBot } from '@/actions/ventas.actions'
+import { crearReclamoBot, crearClienteDesdeBot } from '@/actions/ventas.actions'
 
 // Tipos para las llamadas de Botpress
 interface BotpressWebhookPayload {
@@ -105,6 +105,240 @@ async function getCuentaCorriente(clienteId: string) {
   }
 
   return data
+}
+
+// ===========================================
+// SISTEMA DE ESTADO DE REGISTRO DE CLIENTES
+// ===========================================
+
+interface RegistroClienteEstado {
+  estado: 'esperando_nombre' | 'esperando_direccion' | 'esperando_localidad'
+  nombre?: string
+  apellido?: string
+  direccion?: string
+  productos_pendientes: Array<{ codigo: string; cantidad: number }>
+  timestamp: number
+}
+
+const registroClientesPendientes = new Map<string, RegistroClienteEstado>()
+
+// Limpiar estados expirados (10 minutos)
+function limpiarEstadosExpirados() {
+  const ahora = Date.now()
+  const timeout = 10 * 60 * 1000 // 10 minutos
+
+  for (const [phone, estado] of registroClientesPendientes.entries()) {
+    if (ahora - estado.timestamp > timeout) {
+      registroClientesPendientes.delete(phone)
+    }
+  }
+}
+
+// Función auxiliar para obtener localidades activas
+async function obtenerLocalidadesActivas() {
+  const supabase = await createClient()
+  
+  const { data, error } = await supabase.rpc('fn_obtener_localidades_activas')
+
+  if (error) {
+    console.error('Error obteniendo localidades:', error)
+    return []
+  }
+
+  return data || []
+}
+
+// Función para iniciar flujo de registro de cliente
+function iniciarRegistroCliente(phoneNumber: string, productos: Array<{ codigo: string; cantidad: number }>) {
+  registroClientesPendientes.set(phoneNumber, {
+    estado: 'esperando_nombre',
+    productos_pendientes: productos,
+    timestamp: Date.now()
+  })
+  
+  return `👋 *¡Bienvenido a Avícola del Sur!*
+
+No encontramos tu número registrado. Para crear tu presupuesto necesitamos algunos datos.
+
+📝 *Paso 1 de 3*
+Por favor, envía tu *nombre y apellido*:
+
+Ejemplo: *Juan Pérez*`
+}
+
+// Función para procesar respuesta del flujo de registro
+async function procesarRegistroCliente(phoneNumber: string, mensaje: string): Promise<string | null> {
+  limpiarEstadosExpirados()
+  
+  const estado = registroClientesPendientes.get(phoneNumber)
+  if (!estado) return null
+
+  const bodyLower = mensaje.toLowerCase().trim()
+
+  // Permitir cancelar en cualquier momento
+  if (bodyLower === 'cancelar' || bodyLower === 'cancel') {
+    registroClientesPendientes.delete(phoneNumber)
+    return '❌ Registro cancelado.\n\nEscribe *menu* para volver al inicio.'
+  }
+
+  switch (estado.estado) {
+    case 'esperando_nombre': {
+      // Validar que tenga al menos 2 palabras (nombre y apellido)
+      const palabras = mensaje.trim().split(/\s+/)
+      if (palabras.length < 2) {
+        return '❌ Por favor, envía tu nombre completo (nombre y apellido).\n\nEjemplo: *Juan Pérez*'
+      }
+
+      estado.nombre = palabras[0]
+      estado.apellido = palabras.slice(1).join(' ')
+      estado.estado = 'esperando_direccion'
+      estado.timestamp = Date.now()
+
+      return `✅ Nombre registrado: *${estado.nombre} ${estado.apellido}*
+
+📝 *Paso 2 de 3*
+Ahora envía tu *dirección completa*:
+
+Ejemplo: *Av. Corrientes 1234*`
+    }
+
+    case 'esperando_direccion': {
+      if (mensaje.trim().length < 5) {
+        return '❌ Por favor, envía una dirección válida (mínimo 5 caracteres).'
+      }
+
+      estado.direccion = mensaje.trim()
+      estado.estado = 'esperando_localidad'
+      estado.timestamp = Date.now()
+
+      // Obtener localidades
+      const localidades = await obtenerLocalidadesActivas()
+      
+      if (localidades.length === 0) {
+        registroClientesPendientes.delete(phoneNumber)
+        return '❌ No hay localidades disponibles en este momento. Por favor contacta con ventas.'
+      }
+
+      // Guardar localidades en el estado para validación posterior
+      ;(estado as any).localidades = localidades
+
+      let mensajeLocalidades = `✅ Dirección registrada: *${estado.direccion}*
+
+📝 *Paso 3 de 3*
+Selecciona tu *localidad* (responde con el número):
+
+`
+      localidades.forEach((loc: any, index: number) => {
+        mensajeLocalidades += `${index + 1}. ${loc.nombre} - Zona ${loc.zona_nombre}\n`
+      })
+      mensajeLocalidades += `\nResponde con el número de tu localidad.`
+
+      return mensajeLocalidades
+    }
+
+    case 'esperando_localidad': {
+      const numero = parseInt(mensaje.trim())
+      const localidades = (estado as any).localidades || []
+
+      if (isNaN(numero) || numero < 1 || numero > localidades.length) {
+        return `❌ Número inválido. Por favor responde con un número entre 1 y ${localidades.length}.`
+      }
+
+      const localidadSeleccionada = localidades[numero - 1]
+
+      // Crear cliente
+      const resultado = await crearClienteDesdeBot({
+        nombre: estado.nombre!,
+        apellido: estado.apellido,
+        whatsapp: phoneNumber,
+        direccion: estado.direccion!,
+        localidad_id: localidadSeleccionada.id
+      })
+
+      if (!resultado.success || !resultado.data) {
+        registroClientesPendientes.delete(phoneNumber)
+        return `❌ Error al crear tu cuenta: ${resultado.error}\n\nPor favor contacta con ventas.`
+      }
+
+      const clienteId = resultado.data.clienteId
+      registroClientesPendientes.delete(phoneNumber)
+
+      // Crear presupuesto con los productos pendientes
+      const items = []
+      for (const prod of estado.productos_pendientes) {
+        const producto = await findProductoByCode(prod.codigo)
+        if (producto) {
+          items.push({
+            producto_id: producto.id,
+            cantidad_solicitada: prod.cantidad,
+            precio_unit_est: producto.precio_venta
+          })
+        }
+      }
+
+      if (items.length === 0) {
+        return `✅ *¡Cliente registrado exitosamente!*
+
+Sin embargo, no se pudieron procesar los productos de tu pedido. Por favor intenta crear un nuevo presupuesto escribiendo el código y cantidad.`
+      }
+
+      const formData = new FormData()
+      formData.append('cliente_id', clienteId)
+      formData.append('observaciones', 'Presupuesto desde WhatsApp - Cliente nuevo')
+      formData.append('items', JSON.stringify(items))
+
+      const presupuestoResult = await crearPresupuestoAction(formData)
+
+      if (presupuestoResult.success && presupuestoResult.data) {
+        const numeroPresupuesto = presupuestoResult.data.numero_presupuesto || presupuestoResult.data.numeroPresupuesto
+        const totalEstimado = presupuestoResult.data.total_estimado || presupuestoResult.data.totalEstimado || 0
+        const baseUrl = getBaseUrl()
+
+        // Obtener nombres de productos para el detalle
+        const productosDetalle = await Promise.all(
+          estado.productos_pendientes.map(async (prod) => {
+            const producto = await findProductoByCode(prod.codigo)
+            return producto 
+              ? `${prod.cantidad} ${producto.unidad_medida} - ${producto.nombre}`
+              : `${prod.cantidad} - ${prod.codigo}`
+          })
+        )
+        
+        const detalleProductos = productosDetalle.length <= 3
+          ? productosDetalle.map((detalle, idx) => `   ${idx + 1}. ${detalle}`).join('\n')
+          : `${productosDetalle.length} productos diferentes`
+
+        return `✅ *¡Cliente registrado y presupuesto creado exitosamente!*
+
+📋 *Número de presupuesto:*
+   ${numeroPresupuesto}
+
+📦 *Productos:*
+${detalleProductos}
+
+💰 *Total estimado:* $${totalEstimado.toFixed(2)}
+
+📱 *Seguimiento en línea:*
+   ${baseUrl}/seguimiento/presupuesto/${numeroPresupuesto}
+
+⏳ *Próximos pasos:*
+   1. Nuestro equipo revisará tu presupuesto
+   2. Te contactaremos para confirmar disponibilidad
+   3. Coordinaremos la entrega en tu zona
+
+💬 Escribe *menu* para volver al inicio o *estado ${numeroPresupuesto}* para consultar el estado.`
+      } else {
+        return `✅ *¡Cliente registrado exitosamente!*
+
+Sin embargo, hubo un error al crear el presupuesto: ${presupuestoResult.message}
+
+Por favor intenta crear un nuevo presupuesto escribiendo el código y cantidad.`
+      }
+    }
+
+    default:
+      return null
+  }
 }
 
 // Manejador principal del webhook
@@ -477,6 +711,34 @@ async function handleTwilioWebhook(formData: FormData) {
   try {
     const bodyLower = body.toLowerCase()
     
+    // Verificar si hay un registro en proceso (antes de cualquier otro comando)
+    const registroEnProceso = registroClientesPendientes.get(phoneNumber)
+    if (registroEnProceso) {
+      // Permitir cancelar o ver menú incluso durante registro
+      if (bodyLower === 'cancelar' || bodyLower === 'cancel' || bodyLower.includes('menu') || bodyLower.includes('ayuda')) {
+        // Continuar con el flujo normal
+      } else {
+        // Procesar respuesta del registro
+        const resultadoRegistro = await procesarRegistroCliente(phoneNumber, body)
+        if (resultadoRegistro) {
+          responseMessage = resultadoRegistro
+          // Retornar respuesta inmediatamente
+          return new Response(
+            `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Message>${responseMessage.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</Message>
+</Response>`,
+            {
+              status: 200,
+              headers: {
+                'Content-Type': 'text/xml',
+              },
+            }
+          )
+        }
+      }
+    }
+    
     // Verificar horario de atención (excepto para consultas)
     const horario = isHorarioAtencion()
     if (!horario.abierto && !bodyLower.includes('estado') && !bodyLower.includes('consulta')) {
@@ -692,74 +954,80 @@ ${detalleProductos}
     }
     // Comando: Pedido múltiple (POLLO001 5, HUEVO001 2, POLLO003 3)
     else if (body.includes(',')) {
-      const items = body.split(',').map(item => item.trim())
-      const productos = []
-      let totalPreview = 0
-      let hayError = false
-      let errorMsg = ''
+        const items = body.split(',').map(item => item.trim())
+        const productos = []
+        let totalPreview = 0
+        let hayError = false
+        let errorMsg = ''
 
-      for (const item of items) {
-        const match = item.match(/^([A-Z]{3,10}\d{3,4})\s+(\d+(?:\.\d+)?)$/i)
-        if (match) {
-          const codigo = match[1].toUpperCase()
-          const cantidad = parseFloat(match[2])
-          
-          const producto = await findProductoByCode(codigo)
-          if (!producto) {
-            hayError = true
-            errorMsg = `Producto ${codigo} no encontrado`
-            break
+        for (const item of items) {
+          const match = item.match(/^([A-Z]{3,10}\d{3,4})\s+(\d+(?:\.\d+)?)$/i)
+          if (match) {
+            const codigo = match[1].toUpperCase()
+            const cantidad = parseFloat(match[2])
+            
+            const producto = await findProductoByCode(codigo)
+            if (!producto) {
+              hayError = true
+              errorMsg = `Producto ${codigo} no encontrado`
+              break
+            }
+            
+            // Verificar stock
+            const supabase = await createClient()
+            const { data: lotes } = await supabase
+              .from('lotes')
+              .select('cantidad_disponible')
+              .eq('producto_id', producto.id)
+              .eq('estado', 'disponible')
+              .gte('fecha_vencimiento', new Date().toISOString().split('T')[0])
+            
+            const stockDisponible = lotes?.reduce((sum, l) => sum + Number(l.cantidad_disponible), 0) || 0
+            
+            if (stockDisponible < cantidad) {
+              hayError = true
+              errorMsg = `Stock insuficiente de ${producto.nombre} (disponible: ${Math.floor(stockDisponible)})`
+              break
+            }
+            
+            productos.push({
+              codigo,
+              cantidad,
+              nombre: producto.nombre,
+              precio: producto.precio_venta,
+              unidad: producto.unidad_medida
+            })
+            totalPreview += cantidad * producto.precio_venta
           }
-          
-          // Verificar stock
-          const supabase = await createClient()
-          const { data: lotes } = await supabase
-            .from('lotes')
-            .select('cantidad_disponible')
-            .eq('producto_id', producto.id)
-            .eq('estado', 'disponible')
-            .gte('fecha_vencimiento', new Date().toISOString().split('T')[0])
-          
-          const stockDisponible = lotes?.reduce((sum, l) => sum + Number(l.cantidad_disponible), 0) || 0
-          
-          if (stockDisponible < cantidad) {
-            hayError = true
-            errorMsg = `Stock insuficiente de ${producto.nombre} (disponible: ${Math.floor(stockDisponible)})`
-            break
-          }
-          
-          productos.push({
-            codigo,
-            cantidad,
-            nombre: producto.nombre,
-            precio: producto.precio_venta,
-            unidad: producto.unidad_medida
-          })
-          totalPreview += cantidad * producto.precio_venta
         }
-      }
 
-      if (hayError) {
-        responseMessage = `❌ ${errorMsg}\n\nRevisa tu pedido e intenta de nuevo.`
-      } else if (productos.length === 0) {
-        responseMessage = `❌ Formato incorrecto para pedido múltiple.
+        if (hayError) {
+          responseMessage = `❌ ${errorMsg}\n\nRevisa tu pedido e intenta de nuevo.`
+        } else if (productos.length === 0) {
+          responseMessage = `❌ Formato incorrecto para pedido múltiple.
 
 Ejemplo:
 *POLLO001 5, HUEVO001 2, POLLO003 3*`
-      } else {
-        // Guardar para confirmación
-        pendingConfirmations.set(phoneNumber, {
-          productos: productos.map(p => ({ codigo: p.codigo, cantidad: p.cantidad })),
-          timestamp: Date.now()
-        })
+        } else {
+          const cliente = await findClienteByPhone(phoneNumber)
+          if (!cliente) {
+            // Iniciar flujo de registro
+            responseMessage = iniciarRegistroCliente(phoneNumber, productos.map(p => ({ codigo: p.codigo, cantidad: p.cantidad })))
+          } else {
+            // Guardar para confirmación
+            pendingConfirmations.set(phoneNumber, {
+              productos: productos.map(p => ({ codigo: p.codigo, cantidad: p.cantidad })),
+              timestamp: Date.now()
+            })
 
-        responseMessage = `📦 *Resumen de tu pedido:*\n\n`
-        productos.forEach(p => {
-          responseMessage += `• ${p.nombre}: ${p.cantidad} ${p.unidad}\n  $${p.precio} x ${p.cantidad} = $${(p.precio * p.cantidad).toFixed(2)}\n\n`
-        })
-        responseMessage += `💰 *Total: $${totalPreview.toFixed(2)}*\n\n`
-        responseMessage += `¿Confirmas este pedido?\n\nResponde *SÍ* para confirmar o *NO* para cancelar.`
-      }
+            responseMessage = `📦 *Resumen de tu pedido:*\n\n`
+            productos.forEach(p => {
+              responseMessage += `• ${p.nombre}: ${p.cantidad} ${p.unidad}\n  $${p.precio} x ${p.cantidad} = $${(p.precio * p.cantidad).toFixed(2)}\n\n`
+            })
+            responseMessage += `💰 *Total: $${totalPreview.toFixed(2)}*\n\n`
+            responseMessage += `¿Confirmas este pedido?\n\nResponde *SÍ* para confirmar o *NO* para cancelar.`
+          }
+        }
     }
     // Comando: Pedido simple con confirmación
     else if (/^[A-Z]{3,10}\d{3,4}\s+\d+$/i.test(body.trim())) {
@@ -769,7 +1037,8 @@ Ejemplo:
 
       const cliente = await findClienteByPhone(phoneNumber)
       if (!cliente) {
-        responseMessage = '❌ Tu número no está registrado. Contacta con ventas.'
+        // Iniciar flujo de registro
+        responseMessage = iniciarRegistroCliente(phoneNumber, [{ codigo, cantidad }])
       } else {
         const producto = await findProductoByCode(codigo)
         if (!producto) {
@@ -914,7 +1183,8 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
           // Buscar cliente
           const cliente = await findClienteByPhone(phoneNumber)
           if (!cliente) {
-            responseMessage = '❌ Tu número no está registrado. Por favor contacta con ventas.'
+            // Iniciar flujo de registro
+            responseMessage = iniciarRegistroCliente(phoneNumber, [{ codigo, cantidad }])
           } else {
             // Buscar producto
             const producto = await findProductoByCode(codigo)

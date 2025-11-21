@@ -28,19 +28,6 @@ type CrearPedidoFormData = {
 import { useNotificationStore } from '@/store/notificationStore'
 import { formatCurrency } from '@/lib/utils'
 
-// Datos de ejemplo - en producción vendrían de la base de datos
-const clientesEjemplo = [
-  { id: '1', nombre: 'Supermercado Central', zona_entrega: 'Centro' },
-  { id: '2', nombre: 'Tienda Familiar', zona_entrega: 'Norte' },
-  { id: '3', nombre: 'Restaurante El Buen Sabor', zona_entrega: 'Centro' },
-]
-
-const productosEjemplo = [
-  { id: '1', codigo: 'POLLO001', nombre: 'Pollo Entero', precio_venta: 850.00, unidad_medida: 'kg' },
-  { id: '2', codigo: 'POLLO002', nombre: 'Pechuga de Pollo', precio_venta: 1200.00, unidad_medida: 'kg' },
-  { id: '3', codigo: 'HUEVO001', nombre: 'Huevos Blancos', precio_venta: 180.00, unidad_medida: 'docena' },
-  { id: '4', codigo: 'POLLO003', nombre: 'Alas de Pollo', precio_venta: 650.00, unidad_medida: 'kg' },
-]
 
 interface PedidoFormProps {
   pedido?: {
@@ -62,28 +49,42 @@ export function PedidoForm({ pedido, onSuccess }: PedidoFormProps) {
   const router = useRouter()
   const { showToast } = useNotificationStore()
   const [isLoading, setIsLoading] = useState(false)
-  const [clientes, setClientes] = useState(clientesEjemplo)
-  const [productos] = useState(productosEjemplo)
+  const [clientes, setClientes] = useState<any[]>([])
+  const [productos, setProductos] = useState<any[]>([])
   const [selectedCliente, setSelectedCliente] = useState<any>(null)
   const [clienteBloqueado, setClienteBloqueado] = useState(false)
   const [loadingCliente, setLoadingCliente] = useState(false)
 
   const isEditing = !!pedido
 
-  // Cargar clientes reales
+  // Cargar clientes y productos reales
   useEffect(() => {
     const fetchClientes = async () => {
       try {
-        const response = await fetch('/api/ventas/clientes')
-        const result = await response.json()
+        const { obtenerClientes } = await import('@/actions/ventas.actions')
+        const result = await obtenerClientes()
         if (result.success && result.data) {
-          setClientes(result.data)
+          setClientes(Array.isArray(result.data) ? result.data : [])
         }
       } catch (error) {
         console.error('Error al cargar clientes:', error)
       }
     }
+
+    const fetchProductos = async () => {
+      try {
+        const { obtenerProductos } = await import('@/actions/almacen.actions')
+        const result = await obtenerProductos()
+        if (result.success && result.data) {
+          setProductos(Array.isArray(result.data) ? result.data : [])
+        }
+      } catch (error) {
+        console.error('Error al cargar productos:', error)
+      }
+    }
+
     fetchClientes()
+    fetchProductos()
   }, [])
 
   const {
@@ -197,13 +198,31 @@ export function PedidoForm({ pedido, onSuccess }: PedidoFormProps) {
         return
       }
 
-      // Simulación para desarrollo
-      console.log('Pedido data:', data)
+      const { crearPedido } = await import('@/actions/ventas.actions')
+      
+      const result = await crearPedido({
+        cliente_id: data.cliente_id,
+        items: data.items.map(item => ({
+          producto_id: item.producto_id,
+          cantidad: item.cantidad,
+          precio_unitario: item.precio_unitario,
+        })),
+        fecha_entrega_estimada: data.fecha_entrega_estimada,
+        descuento: data.descuento,
+        observaciones: data.observaciones,
+        pago: (data as any).pago ? {
+          modalidad: (data as any).pago.modalidad,
+          monto: (data as any).pago.monto,
+          caja_id: (data as any).pago.caja_id,
+          tipo_pago: (data as any).pago.tipo_pago,
+        } : undefined,
+      })
 
-      // Simular delay de API
-      await new Promise(resolve => setTimeout(resolve, 1500))
+      if (!result.success) {
+        throw new Error(result.error || 'Error al guardar pedido')
+      }
 
-      showToast('success', isEditing ? 'Pedido actualizado exitosamente' : 'Pedido creado exitosamente')
+      showToast('success', result.message || 'Pedido creado exitosamente')
 
       if (onSuccess) {
         onSuccess()

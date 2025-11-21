@@ -609,3 +609,187 @@ export async function obtenerRutaActiva(
     }
   }
 }
+
+// Eliminar vehículo (soft delete)
+export async function eliminarVehiculo(
+  vehiculoId: string
+): Promise<ApiResponse> {
+  try {
+    const supabase = await createClient()
+
+    // Verificar permisos (admin)
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, error: 'Usuario no autenticado' }
+    }
+
+    const { data: usuario } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (!usuario || usuario.rol !== 'admin') {
+      return { success: false, error: 'No tienes permisos para eliminar vehículos' }
+    }
+
+    const { error } = await supabase
+      .from('vehiculos')
+      .update({
+        activo: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', vehiculoId)
+
+    if (error) throw error
+
+    revalidatePath('/(admin)/(dominios)/reparto/vehiculos')
+
+    return {
+      success: true,
+      message: 'Vehículo desactivado exitosamente',
+    }
+  } catch (error: any) {
+    console.error('Error al eliminar vehículo:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al eliminar vehículo',
+    }
+  }
+}
+
+// Crear mantenimiento de vehículo
+export async function crearMantenimientoVehiculo(
+  vehiculoId: string,
+  data: {
+    tipo: string
+    descripcion?: string
+    costo?: number
+    fecha?: string
+    kilometraje?: number
+    observaciones?: string
+  }
+): Promise<ApiResponse<{ mantenimientoId: string }>> {
+  try {
+    const supabase = await createClient()
+
+    // Verificar permisos (admin o repartidor)
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, error: 'Usuario no autenticado' }
+    }
+
+    const { data: usuario } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (!usuario || !['admin', 'repartidor'].includes(usuario.rol)) {
+      return { success: false, error: 'No tienes permisos para crear mantenimientos' }
+    }
+
+    // Insertar mantenimiento (usando tabla checklists_vehiculos como registro de mantenimiento)
+    const { data: mantenimiento, error } = await supabase
+      .from('checklists_vehiculos')
+      .insert({
+        vehiculo_id: vehiculoId,
+        usuario_id: user.id,
+        fecha_check: data.fecha || new Date().toISOString().split('T')[0],
+        kilometraje: data.kilometraje || null,
+        observaciones: data.observaciones || data.descripcion || null,
+        aprobado: true,
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+
+    // Actualizar updated_at del vehículo
+    await supabase
+      .from('vehiculos')
+      .update({
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', vehiculoId)
+
+    revalidatePath('/(admin)/(dominios)/reparto/vehiculos')
+
+    return {
+      success: true,
+      data: { mantenimientoId: mantenimiento.id },
+      message: 'Mantenimiento registrado exitosamente',
+    }
+  } catch (error: any) {
+    console.error('Error al crear mantenimiento:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al crear mantenimiento',
+    }
+  }
+}
+
+// Obtener vehículos
+export async function obtenerVehiculos(): Promise<ApiResponse<any[]>> {
+  try {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+      .from('vehiculos')
+      .select('*')
+      .order('patente', { ascending: true })
+
+    if (error) throw error
+
+    return {
+      success: true,
+      data: data || [],
+    }
+  } catch (error: any) {
+    console.error('Error al obtener vehículos:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al obtener vehículos',
+    }
+  }
+}
+
+// Obtener rutas
+export async function obtenerRutas(): Promise<ApiResponse<any[]>> {
+  try {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+      .from('rutas_reparto')
+      .select(`
+        *,
+        repartidor:usuarios(nombre, apellido),
+        vehiculo:vehiculos(patente, marca, modelo),
+        zona:zonas(nombre),
+        detalles_ruta (
+          id,
+          orden_entrega,
+          estado_entrega,
+          pedido:pedidos(
+            numero_pedido,
+            cliente:clientes(nombre)
+          )
+        )
+      `)
+      .order('fecha_ruta', { ascending: false })
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+
+    return {
+      success: true,
+      data: data || [],
+    }
+  } catch (error: any) {
+    console.error('Error al obtener rutas:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al obtener rutas',
+    }
+  }
+}
