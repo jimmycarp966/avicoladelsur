@@ -49,6 +49,7 @@ export default function PlanRutasTable({ plan, diasSemana }: PlanRutasTableProps
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Semana</TableHead>
                   <TableHead>Día</TableHead>
                   <TableHead>Turno</TableHead>
                   <TableHead>Zona</TableHead>
@@ -57,37 +58,47 @@ export default function PlanRutasTable({ plan, diasSemana }: PlanRutasTableProps
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {plan.map((entry) => (
-                  <TableRow key={entry.id}>
-                    <TableCell>{diasSemana[entry.dia_semana]}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="capitalize">
-                        {entry.turno}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{entry.zona?.nombre || 'Sin zona'}</TableCell>
-                    <TableCell>
-                      {entry.repartidor ? (
-                        <span>
-                          {entry.repartidor.nombre} {entry.repartidor.apellido}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">Sin asignar</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(entry.id)}
-                        disabled={isPending}
-                      >
-                        <Trash className="h-4 w-4" />
-                        <span className="sr-only">Eliminar plan</span>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {plan.map((entry) => {
+                  const semanaInicio = entry.semana_inicio
+                    ? new Date(entry.semana_inicio).toLocaleDateString('es-AR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                      })
+                    : 'N/A'
+                  return (
+                    <TableRow key={entry.id}>
+                      <TableCell className="text-sm text-muted-foreground">{semanaInicio}</TableCell>
+                      <TableCell>{diasSemana[entry.dia_semana]}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="capitalize">
+                          {entry.turno}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{entry.zona?.nombre || 'Sin zona'}</TableCell>
+                      <TableCell>
+                        {entry.repartidor ? (
+                          <span>
+                            {entry.repartidor.nombre} {entry.repartidor.apellido}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Sin asignar</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDelete(entry.id)}
+                          disabled={isPending}
+                        >
+                          <Trash className="h-4 w-4" />
+                          <span className="sr-only">Eliminar plan</span>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
           </div>

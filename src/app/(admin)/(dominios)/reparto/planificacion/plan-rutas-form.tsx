@@ -35,6 +35,16 @@ export default function PlanRutasForm({
   const [repartidorId, setRepartidorId] = useState<string>('')
   const SIN_ASIGNAR_VALUE = 'sin-asignar'
 
+  // Función helper para calcular inicio de semana (lunes)
+  const calcularInicioSemana = (fecha: Date): Date => {
+    const dia = fecha.getDay()
+    const diff = dia === 0 ? -6 : 1 - dia
+    const lunes = new Date(fecha)
+    lunes.setDate(fecha.getDate() + diff)
+    lunes.setHours(0, 0, 0, 0)
+    return lunes
+  }
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
@@ -44,10 +54,19 @@ export default function PlanRutasForm({
     }
 
     const formData = new FormData(event.currentTarget)
+    // Calcular semana_inicio automáticamente (lunes de la semana actual)
+    const semanaInicio = calcularInicioSemana(new Date())
+    formData.set('semanaInicio', semanaInicio.toISOString().split('T')[0])
+
     startTransition(async () => {
       const result = await crearPlanRutaAction(formData)
       if (result?.success) {
         toast.success('Plan de ruta creado')
+        // Reset form
+        setZonaId('')
+        setDiaSemana('')
+        setTurno('')
+        setRepartidorId('')
       } else {
         toast.error(result?.message || 'No se pudo crear el plan')
       }
