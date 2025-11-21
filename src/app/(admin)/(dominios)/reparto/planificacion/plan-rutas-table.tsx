@@ -52,7 +52,6 @@ export default function PlanRutasTable({ plan, diasSemana }: PlanRutasTableProps
                   <TableHead>Día</TableHead>
                   <TableHead>Turno</TableHead>
                   <TableHead>Zona</TableHead>
-                  <TableHead>Vehículo</TableHead>
                   <TableHead>Repartidor</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
@@ -67,12 +66,6 @@ export default function PlanRutasTable({ plan, diasSemana }: PlanRutasTableProps
                       </Badge>
                     </TableCell>
                     <TableCell>{entry.zona?.nombre || 'Sin zona'}</TableCell>
-                    <TableCell>
-                      <div className="text-sm font-medium">{entry.vehiculo?.patente}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {entry.vehiculo?.marca} {entry.vehiculo?.modelo}
-                      </div>
-                    </TableCell>
                     <TableCell>
                       {entry.repartidor ? (
                         <span>

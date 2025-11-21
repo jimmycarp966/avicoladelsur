@@ -16,7 +16,7 @@ const DIAS_SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Vier
 export default async function PlanificacionRutasPage() {
   const supabase = await createClient()
 
-  const [plan, zonas, vehiculos, repartidores] = await Promise.all([
+  const [plan, zonas, repartidores] = await Promise.all([
     supabase
       .from('plan_rutas_semanal')
       .select(
@@ -25,25 +25,14 @@ export default async function PlanificacionRutasPage() {
           zona_id,
           dia_semana,
           turno,
-          vehiculo_id,
           repartidor_id,
           zona:zonas(nombre),
-          vehiculo:vehiculos(patente, marca, modelo, capacidad_kg),
           repartidor:usuarios(nombre, apellido)
         `,
       )
       .order('dia_semana', { ascending: true })
       .order('turno', { ascending: true }),
     supabase.from('zonas').select('id, nombre').eq('activo', true).order('nombre', { ascending: true }),
-    supabase
-      .from('vehiculos')
-      .select('id, patente, marca, modelo, capacidad_kg')
-      .eq('activo', true)
-      .order('patente', { ascending: true })
-      .then(({ data, error }) => ({
-        data: data?.map(v => ({ ...v, nombre: v.patente })),
-        error
-      })),
     supabase
       .from('usuarios')
       .select('id, nombre, apellido')
@@ -66,7 +55,6 @@ export default async function PlanificacionRutasPage() {
         <CardContent>
           <PlanRutasForm
             zonas={zonas.data ?? []}
-            vehiculos={vehiculos.data ?? []}
             repartidores={repartidores.data ?? []}
             diasSemana={DIAS_SEMANA}
           />

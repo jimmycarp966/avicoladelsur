@@ -14,18 +14,17 @@ import {
 } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 
-type Option = { id: string; nombre: string; apellido?: string | null; patente?: string }
+type ZonaOption = { id: string; nombre: string }
+type RepartidorOption = { id: string; nombre: string; apellido?: string | null }
 
 interface PlanRutasFormProps {
-  zonas: Option[]
-  vehiculos: Array<Option & { marca?: string | null; modelo?: string | null; capacidad_kg?: number | null }>
-  repartidores: Option[]
+  zonas: ZonaOption[]
+  repartidores: RepartidorOption[]
   diasSemana: string[]
 }
 
 export default function PlanRutasForm({
   zonas,
-  vehiculos,
   repartidores,
   diasSemana,
 }: PlanRutasFormProps) {
@@ -33,15 +32,14 @@ export default function PlanRutasForm({
   const [zonaId, setZonaId] = useState<string>('')
   const [diaSemana, setDiaSemana] = useState<string>('')
   const [turno, setTurno] = useState<'mañana' | 'tarde' | ''>('')
-  const [vehiculoId, setVehiculoId] = useState<string>('')
   const [repartidorId, setRepartidorId] = useState<string>('')
   const SIN_ASIGNAR_VALUE = 'sin-asignar'
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
-    if (!zonaId || !diaSemana || !turno || !vehiculoId) {
-      toast.error('Completa zona, día, turno y vehículo')
+    if (!zonaId || !diaSemana || !turno) {
+      toast.error('Completa zona, día y turno')
       return
     }
 
@@ -104,22 +102,6 @@ export default function PlanRutasForm({
       </div>
 
       <div className="space-y-2">
-        <Label>Vehículo *</Label>
-        <Select value={vehiculoId} onValueChange={setVehiculoId}>
-          <SelectTrigger>
-            <SelectValue placeholder="Selecciona un vehículo" />
-          </SelectTrigger>
-          <SelectContent>
-            {vehiculos.map((vehiculo) => (
-              <SelectItem key={vehiculo.id} value={vehiculo.id}>
-                {vehiculo.patente} · {vehiculo.marca} {vehiculo.modelo} ({vehiculo.capacidad_kg ?? 0} kg)
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-2">
         <Label>Repartidor (opcional)</Label>
         <Select
           value={repartidorId || SIN_ASIGNAR_VALUE}
@@ -142,7 +124,6 @@ export default function PlanRutasForm({
       <input type="hidden" name="zonaId" value={zonaId} />
       <input type="hidden" name="diaSemana" value={diaSemana} />
       <input type="hidden" name="turno" value={turno} />
-      <input type="hidden" name="vehiculoId" value={vehiculoId} />
       <input type="hidden" name="repartidorId" value={repartidorId} />
 
       <div className="md:col-span-2 flex justify-end">

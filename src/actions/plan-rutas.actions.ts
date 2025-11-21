@@ -9,7 +9,6 @@ const planRutaSchema = z.object({
   zonaId: z.string().uuid('Zona inválida'),
   diaSemana: z.coerce.number().int().min(0).max(6),
   turno: z.enum(['mañana', 'tarde']),
-  vehiculoId: z.string().uuid('Vehículo inválido'),
   repartidorId: z.string().uuid().optional().nullable(),
 })
 
@@ -18,7 +17,6 @@ export async function crearPlanRutaAction(formData: FormData) {
     zonaId: formData.get('zonaId'),
     diaSemana: formData.get('diaSemana'),
     turno: formData.get('turno'),
-    vehiculoId: formData.get('vehiculoId'),
     repartidorId: formData.get('repartidorId') || null,
   })
 
@@ -34,7 +32,6 @@ export async function crearPlanRutaAction(formData: FormData) {
     zona_id: data.zonaId,
     dia_semana: data.diaSemana,
     turno: data.turno,
-    vehiculo_id: data.vehiculoId,
     repartidor_id: data.repartidorId || null,
   })
 
