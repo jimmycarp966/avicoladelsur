@@ -2,6 +2,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+import { config } from '@/lib/config'
 import { getGoogleDirections, isGoogleDirectionsAvailable } from '@/lib/rutas/google-directions'
 import {
   optimizeRouteLocal,
@@ -91,8 +92,21 @@ export async function generateRutaOptimizada({
     throw new Error('No hay coordenadas válidas para optimizar la ruta')
   }
 
-  const origin = waypoints[0]
-  const destination = waypoints[waypoints.length - 1]
+  const homeBase = config.rutas.homeBase
+  const origin: Point = {
+    lat: homeBase.lat,
+    lng: homeBase.lng,
+    id: 'home-base-origin',
+    nombreCliente: homeBase.nombre,
+  }
+  const destination = config.rutas.returnToBase
+    ? {
+        lat: homeBase.lat,
+        lng: homeBase.lng,
+        id: 'home-base-destination',
+        nombreCliente: homeBase.nombre,
+      }
+    : waypoints[waypoints.length - 1]
 
   let ordenVisita: any[] = []
   let polyline = ''

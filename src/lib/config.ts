@@ -19,6 +19,14 @@ export const config = {
     authToken: process.env.TWILIO_AUTH_TOKEN,
     whatsappNumber: process.env.TWILIO_WHATSAPP_NUMBER,
   },
+  rutas: {
+    homeBase: {
+      nombre: 'Casa Central Monteros',
+      lat: -27.176861754312416,
+      lng: -65.51203507261263,
+    },
+    returnToBase: true,
+  },
 }
 
 // Roles del sistema
