@@ -454,7 +454,7 @@ SELECT * FROM fn_registrar_cobro_reparto(
 
 ## 💰 Tesorería y Gastos (Hito Intermedio)
 
-El hito intermedio incorpora la capa financiera básica:
+El hito intermedio incorpora la capa financiera básica y el sistema de validación de cobros:
 
 - ✅ Tesorería con cajas por sucursal y movimientos ligados a pedidos.
 - ✅ Registro de gastos con categorías, **adjuntos en Supabase Storage** (imágenes y PDFs) y opción de afectar caja en la misma transacción.
@@ -464,6 +464,35 @@ El hito intermedio incorpora la capa financiera básica:
 - ✅ **Referencias de pago** generadas automáticamente para pedidos con pago diferido.
 - ✅ **Instrucciones para repartidores** con monto y referencia de pago.
 - ✅ **Sistema de validación de cobros**: Repartidores registran pagos durante la ruta (estado, método, monto), tesorero valida antes de acreditar en caja. Los movimientos de caja se crean solo tras validación del tesorero.
+
+### 🔐 Sistema de Validación de Cobros
+
+**Estado**: ✅ **IMPLEMENTADO** - Sistema completo de doble verificación para cobros de rutas
+
+**Flujo de validación**:
+1. **Repartidor en ruta**: Registra estado de pago para cada entrega (Ya pagó/Pendiente/Pagará después)
+   - Si "Ya pagó": Registra método de pago, monto, número de transacción (si aplica), comprobante
+   - Si "Pendiente": Registra método de pago previsto
+   - Si "Pagará después": Solo registra notas
+2. **Finalización de ruta**: Repartidor solo puede finalizar cuando todas las entregas tienen estado de pago definido
+3. **Validación tesorero**: Tesorero revisa rutas completadas en `/tesoreria/validar-rutas`
+   - Ve resumen de recaudación registrada con desglose por método de pago
+   - Ingresa monto físico recibido y compara con registrado
+   - Valida la ruta → sistema crea movimientos de caja agrupados por método
+   - Marca pedidos como pagados y registra trazabilidad completa
+
+**Características**:
+- ✅ Cobros registrados NO afectan caja hasta validación del tesorero
+- ✅ Validación requerida: Todas las entregas deben tener estado definido antes de finalizar ruta
+- ✅ Movimientos de caja se crean agrupados por método de pago tras validación
+- ✅ Trazabilidad completa: Tesorero validador, fecha de validación, observaciones
+- ✅ Comparación de montos: Sistema muestra diferencia entre registrado y recibido
+- ✅ Campos en BD: `detalles_ruta` tiene campos de tracking, `rutas_reparto` tiene campos de validación
+
+**Páginas relacionadas**:
+- `/repartidor/ruta/[ruta_id]/entrega/[entrega_id]` - Registro de pagos por repartidor
+- `/tesoreria/validar-rutas` - Validación de rutas por tesorero
+- `/reparto/rutas/[id]` - Vista detalle con estado de validación
 
 ### Endpoints nuevos
 
