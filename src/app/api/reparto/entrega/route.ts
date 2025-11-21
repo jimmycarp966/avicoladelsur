@@ -104,27 +104,31 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Buscar caja central
-      const { data: cajaCentral } = await supabase
+      // Buscar caja central con búsqueda flexible
+      const { data: todasLasCajas } = await supabase
         .from('tesoreria_cajas')
-        .select('id, saldo_actual')
-        .eq('nombre', 'Caja Central')
-        .single()
+        .select('id, nombre, saldo_actual')
+
+      const cajaCentral = todasLasCajas?.find((c) => {
+        const nombreNormalizado = c.nombre?.toLowerCase().trim().replace(/\s+/g, ' ') || ''
+        return (
+          nombreNormalizado.includes('caja central') ||
+          nombreNormalizado.includes('casa central') ||
+          nombreNormalizado === 'caja central' ||
+          nombreNormalizado === 'casa central'
+        )
+      })
 
         if (!cajaCentral) {
         // Si no existe Caja Central, usar la primera disponible
-        const { data: cajas } = await supabase
-          .from('tesoreria_cajas')
-          .select('id')
-          .limit(1)
-          .single()
+        const primeraCaja = todasLasCajas?.[0]
 
-        if (cajas) {
+        if (primeraCaja) {
           // Crear movimiento de ingreso
           const { data: movimiento, error: movimientoError } = await supabase
             .from('tesoreria_movimientos')
             .insert({
-              caja_id: cajas.id,
+              caja_id: primeraCaja.id,
               tipo: 'ingreso',
               monto: data.monto_cobrado,
               descripcion: `Cobro por entrega de pedido ${data.pedido_id}${data.numero_transaccion ? ` - Transacción: ${data.numero_transaccion}` : ''}`,
@@ -139,7 +143,7 @@ export async function POST(request: NextRequest) {
           if (!movimientoError && movimiento) {
             // Actualizar saldo de caja
             await supabase.rpc('fn_actualizar_saldo_caja', {
-              p_caja_id: cajas.id,
+              p_caja_id: primeraCaja.id,
               p_monto: data.monto_cobrado,
             })
 

@@ -91,7 +91,16 @@ export async function obtenerMovimientosTiempoRealAction(
     let totalIngresos = 0
     let totalEgresos = 0
 
-    const cajaCentral = cajas?.find((c) => c.nombre?.toLowerCase().includes('caja central'))
+    // Buscar caja central con búsqueda flexible
+    const cajaCentral = cajas?.find((c) => {
+      const nombreNormalizado = c.nombre?.toLowerCase().trim().replace(/\s+/g, ' ') || ''
+      return (
+        nombreNormalizado.includes('caja central') ||
+        nombreNormalizado.includes('casa central') ||
+        nombreNormalizado === 'caja central' ||
+        nombreNormalizado === 'casa central'
+      )
+    })
     let cajaCentralIngresos = 0
     let cajaCentralEgresos = 0
     const cajaCentralMetodos: Record<string, number> = {}
