@@ -1,11 +1,12 @@
-'use client'
+"use client"
 
+import Link from 'next/link'
 import { ColumnDef } from '@tanstack/react-table'
-import { DataTable, SortableHeader, StatusBadge } from '@/components/ui/data-table'
+import { DataTable, SortableHeader } from '@/components/ui/data-table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Edit, Trash2, Eye, Truck, MapPin, Navigation, CheckCircle, Clock } from 'lucide-react'
+import { Edit, Trash2, Eye, Truck, MapPin, Navigation, CheckCircle } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import type { RutaReparto as Ruta } from '@/types/domain.types'
 
@@ -137,6 +138,17 @@ export function RutasTable({ data, onView, onEdit, onDelete, onStart, onComplete
 
   const actions = (ruta: Ruta) => (
     <>
+      <Button
+        variant="ghost"
+        size="sm"
+        asChild
+        className="w-full justify-start"
+      >
+        <Link href={`/reparto/rutas/${ruta.id}?tab=mapa`}>
+          <MapPin className="mr-2 h-4 w-4" />
+          Ver mapa
+        </Link>
+      </Button>
       {onView && (
         <Button
           variant="ghost"

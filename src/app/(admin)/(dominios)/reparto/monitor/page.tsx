@@ -6,6 +6,8 @@
 
 import MonitorMap from '@/components/reparto/MonitorMap'
 
+export const dynamic = 'force-dynamic'
+
 export default function MonitorRepartoPage() {
   return (
     <div className="container mx-auto py-6 space-y-6">

@@ -20,7 +20,6 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient()
     const body = await request.json()
     const data = registrarEntregaSchema.parse(body)
-    let shouldRevalidateTesoreria = false
 
     // Obtener usuario actual (repartidor)
     const { data: { user }, error: userError } = await supabase.auth.getUser()
@@ -74,147 +73,69 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Actualizar detalle de ruta con información adicional
+    // Validar número de transacción BNA si es transferencia
+    if (data.metodo_pago === 'transferencia' && data.numero_transaccion) {
+      // Validar que no empiece con 0
+      if (data.numero_transaccion.startsWith('0')) {
+        return NextResponse.json(
+          { success: false, message: 'El número de transacción BNA no debe empezar con 0' },
+          { status: 400 }
+        )
+      }
+
+      // Validar que sea numérico
+      if (!/^\d+$/.test(data.numero_transaccion)) {
+        return NextResponse.json(
+          { success: false, message: 'El número de transacción debe contener solo dígitos' },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Actualizar detalle de ruta con información de pago (SIN crear movimientos de caja)
+    // Los movimientos de caja se crearán cuando el tesorero valide la ruta
+    const updateData: any = {
+      notas_entrega: data.notas_entrega,
+      updated_at: new Date().toISOString()
+    }
+
+    // Registrar información de pago según el caso:
+    // - Si monto_cobrado > 0: Ya pagó
+    // - Si monto_cobrado = 0 pero hay metodo_pago: Pendiente de pago
+    // - Si monto_cobrado = 0 y no hay metodo_pago: Pagará después (solo notas)
+    if (data.monto_cobrado && data.monto_cobrado > 0) {
+      // Ya pagó - registrar monto y método
+      updateData.pago_registrado = true
+      updateData.metodo_pago_registrado = data.metodo_pago || 'efectivo'
+      updateData.monto_cobrado_registrado = data.monto_cobrado
+      updateData.numero_transaccion_registrado = data.numero_transaccion || null
+      updateData.comprobante_url_registrado = data.comprobante_url || null
+      updateData.notas_pago = data.notas_entrega || null
+    } else if (data.metodo_pago && data.monto_cobrado === 0) {
+      // Pendiente de pago - registrar método futuro pero sin monto
+      updateData.pago_registrado = false
+      updateData.metodo_pago_registrado = data.metodo_pago
+      updateData.monto_cobrado_registrado = null
+      updateData.notas_pago = data.notas_entrega || 'Pendiente de pago'
+    } else if (data.monto_cobrado === 0) {
+      // Pagará después - solo registrar notas
+      updateData.pago_registrado = false
+      updateData.metodo_pago_registrado = null
+      updateData.monto_cobrado_registrado = null
+      updateData.notas_pago = data.notas_entrega || 'Pagará después'
+    }
+
     await supabase
       .from('detalles_ruta')
-      .update({
-        notas_entrega: data.notas_entrega,
-        updated_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('id', detalleRuta.id)
 
-    // Si hay cobro, registrar movimiento de tesorería
-    if (data.monto_cobrado && data.monto_cobrado > 0) {
-      // Validar número de transacción BNA si es transferencia
-      if (data.metodo_pago === 'transferencia' && data.numero_transaccion) {
-        // Validar que no empiece con 0
-        if (data.numero_transaccion.startsWith('0')) {
-          return NextResponse.json(
-            { success: false, message: 'El número de transacción BNA no debe empezar con 0' },
-            { status: 400 }
-          )
-        }
+    // La función trigger actualizará automáticamente recaudacion_total_registrada en rutas_reparto
+    // NO actualizamos pago_estado en pedidos hasta que el tesorero valide
 
-        // Validar que sea numérico
-        if (!/^\d+$/.test(data.numero_transaccion)) {
-          return NextResponse.json(
-            { success: false, message: 'El número de transacción debe contener solo dígitos' },
-            { status: 400 }
-          )
-        }
-      }
-
-      // Buscar caja central con búsqueda flexible
-      const { data: todasLasCajas } = await supabase
-        .from('tesoreria_cajas')
-        .select('id, nombre, saldo_actual')
-
-      const cajaCentral = todasLasCajas?.find((c) => {
-        const nombreNormalizado = c.nombre?.toLowerCase().trim().replace(/\s+/g, ' ') || ''
-        return (
-          nombreNormalizado.includes('caja central') ||
-          nombreNormalizado.includes('casa central') ||
-          nombreNormalizado === 'caja central' ||
-          nombreNormalizado === 'casa central'
-        )
-      })
-
-        if (!cajaCentral) {
-        // Si no existe Caja Central, usar la primera disponible
-        const primeraCaja = todasLasCajas?.[0]
-
-        if (primeraCaja) {
-          // Crear movimiento de ingreso
-          const { data: movimiento, error: movimientoError } = await supabase
-            .from('tesoreria_movimientos')
-            .insert({
-              caja_id: primeraCaja.id,
-              tipo: 'ingreso',
-              monto: data.monto_cobrado,
-              descripcion: `Cobro por entrega de pedido ${data.pedido_id}${data.numero_transaccion ? ` - Transacción: ${data.numero_transaccion}` : ''}`,
-              origen_tipo: 'pedido',
-              origen_id: data.pedido_id,
-              metodo_pago: data.metodo_pago || 'efectivo',
-              user_id: user.id,
-            })
-            .select()
-            .single()
-
-          if (!movimientoError && movimiento) {
-            // Actualizar saldo de caja
-            await supabase.rpc('fn_actualizar_saldo_caja', {
-              p_caja_id: primeraCaja.id,
-              p_monto: data.monto_cobrado,
-            })
-
-            // Actualizar pedido con información de pago
-            await supabase
-              .from('pedidos')
-              .update({
-                pago_estado: 'pagado',
-                caja_movimiento_id: movimiento.id,
-              })
-              .eq('id', data.pedido_id)
-
-            shouldRevalidateTesoreria = true
-          }
-        }
-      } else {
-        // Crear movimiento de ingreso en caja central
-        const { data: movimiento, error: movimientoError } = await supabase
-          .from('tesoreria_movimientos')
-          .insert({
-            caja_id: cajaCentral.id,
-            tipo: 'ingreso',
-            monto: data.monto_cobrado,
-            descripcion: `Cobro por entrega de pedido ${data.pedido_id}${data.numero_transaccion ? ` - Transacción: ${data.numero_transaccion}` : ''}`,
-            origen_tipo: 'pedido',
-            origen_id: data.pedido_id,
-            metodo_pago: data.metodo_pago || 'efectivo',
-            user_id: user.id,
-          })
-          .select()
-          .single()
-
-        if (!movimientoError && movimiento) {
-          // Actualizar saldo de caja
-          await supabase
-            .from('tesoreria_cajas')
-            .update({
-              saldo_actual: (cajaCentral.saldo_actual || 0) + data.monto_cobrado,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', cajaCentral.id)
-
-          // Actualizar pedido con información de pago
-          await supabase
-            .from('pedidos')
-            .update({
-              pago_estado: 'pagado',
-              caja_movimiento_id: movimiento.id,
-            })
-            .eq('id', data.pedido_id)
-
-          shouldRevalidateTesoreria = true
-        }
-      }
-    }
-
-    // Subir comprobante si se proporcionó
-    if (data.comprobante_url) {
-      // En una implementación real, aquí se subiría el archivo a Storage
-      // Por ahora, solo guardamos la URL
-      await supabase
-        .from('detalles_ruta')
-        .update({ comprobante_url: data.comprobante_url })
-        .eq('id', detalleRuta.id)
-    }
-
-    if (shouldRevalidateTesoreria) {
-      revalidatePath('/(admin)/(dominios)/tesoreria/movimientos')
-      revalidatePath('/(admin)/(dominios)/tesoreria')
-      revalidatePath('/(admin)/(dominios)/tesoreria/tesoro')
-    }
+    // Revalidar rutas para mostrar recaudación actualizada
+    revalidatePath('/(repartidor)/ruta')
+    revalidatePath('/(admin)/(dominios)/reparto/rutas')
 
     return NextResponse.json({
       success: true,
@@ -222,7 +143,8 @@ export async function POST(request: NextRequest) {
       data: {
         pedido_id: data.pedido_id,
         entrega_registrada: true,
-        cobro_registrado: !!data.monto_cobrado
+        cobro_registrado: !!data.monto_cobrado,
+        nota: data.monto_cobrado ? 'El cobro quedará pendiente de validación por tesorería' : null
       }
     })
 

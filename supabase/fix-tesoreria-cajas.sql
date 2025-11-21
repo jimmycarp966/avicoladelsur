@@ -54,3 +54,5 @@ WHERE tablename = 'tesoreria_cajas';
 
 -- Check if there are any records
 SELECT COUNT(*) as total_cajas FROM tesoreria_cajas;
+
+

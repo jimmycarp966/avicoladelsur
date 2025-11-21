@@ -12,6 +12,7 @@ import { AlertCircle, MapPin, Truck } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { parsePolyline } from '@/lib/utils/rutas'
 
 // Importar Leaflet dinámicamente (solo en cliente)
 const MapContainer = dynamic(() => import('react-leaflet').then(mod => mod.MapContainer), { ssr: false })

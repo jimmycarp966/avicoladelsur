@@ -9,6 +9,11 @@ export async function createClient() {
     throw new Error('@supabase/ssr: Your project\'s URL and API key are required to create a Supabase client!\n\nCheck your Supabase project\'s API settings to find these values\n\nhttps://supabase.com/dashboard/project/_/settings/api')
   }
 
+  // Validar que la URL sea válida
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    throw new Error('@supabase/ssr: Invalid Supabase URL. Must start with http:// or https://')
+  }
+
   const cookieStore = await cookies()
 
   return createServerClient(url, key, {

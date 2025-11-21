@@ -43,11 +43,17 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
   const cliente = pedido?.cliente
   const productos = pedido?.detalle_pedido || []
 
-  const [metodoPago, setMetodoPago] = useState('efectivo')
-  const [montoCobrado, setMontoCobrado] = useState(pedido?.total || 0)
-  const [numeroTransaccion, setNumeroTransaccion] = useState('')
-  const [comprobanteUrl, setComprobanteUrl] = useState('')
-  const [notasEntrega, setNotasEntrega] = useState('')
+  const [estadoPago, setEstadoPago] = useState<'pagado' | 'pendiente' | 'pagara_despues' | ''>(
+    entrega.pago_registrado ? 'pagado' : ''
+  )
+  const [metodoPago, setMetodoPago] = useState(entrega.metodo_pago_registrado || 'efectivo')
+  const [montoCobrado, setMontoCobrado] = useState(
+    entrega.monto_cobrado_registrado || pedido?.total || 0
+  )
+  const [numeroTransaccion, setNumeroTransaccion] = useState(entrega.numero_transaccion_registrado || '')
+  const [comprobanteUrl, setComprobanteUrl] = useState(entrega.comprobante_url_registrado || '')
+  const [notasEntrega, setNotasEntrega] = useState(entrega.notas_pago || entrega.notas_entrega || '')
+  const [metodoPagoFuturo, setMetodoPagoFuturo] = useState('efectivo')
   const [pagoLoading, setPagoLoading] = useState(false)
 
   const [productoId, setProductoId] = useState(productos[0]?.producto_id || '')
@@ -63,28 +69,49 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
 
     if (!pedido?.id) return
 
+    if (!estadoPago) {
+      toast.error('Selecciona el estado del pago')
+      return
+    }
+
     setPagoLoading(true)
+    
+    // Preparar datos según el estado de pago
+    const bodyData: any = {
+      pedido_id: pedido.id,
+      notas_entrega: notasEntrega || undefined,
+    }
+
+    if (estadoPago === 'pagado') {
+      // Si ya pagó, incluir método y monto
+      bodyData.metodo_pago = metodoPago
+      bodyData.monto_cobrado = Number(montoCobrado) || 0
+      bodyData.numero_transaccion = numeroTransaccion || undefined
+      bodyData.comprobante_url = comprobanteUrl || undefined
+    } else if (estadoPago === 'pendiente') {
+      // Si está pendiente, solo registrar método futuro
+      bodyData.metodo_pago = metodoPagoFuturo
+      bodyData.monto_cobrado = 0
+    } else if (estadoPago === 'pagara_despues') {
+      // Si pagará después, no registrar monto
+      bodyData.monto_cobrado = 0
+    }
+
     const response = await fetch('/api/reparto/entrega', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        pedido_id: pedido.id,
-        metodo_pago: metodoPago,
-        numero_transaccion: numeroTransaccion || undefined,
-        comprobante_url: comprobanteUrl || undefined,
-        monto_cobrado: Number(montoCobrado) || 0,
-        notas_entrega: notasEntrega || undefined,
-      }),
+      body: JSON.stringify(bodyData),
     })
     setPagoLoading(false)
 
     if (!response.ok) {
       const error = await response.json()
-      toast.error(error.message || 'Error al registrar el cobro')
+      toast.error(error.message || 'Error al registrar el pago')
       return
     }
 
-    toast.success('Cobro registrado correctamente')
+    const result = await response.json()
+    toast.success(result.data?.nota || 'Información de pago registrada correctamente')
     router.refresh()
   }
 
@@ -241,80 +268,130 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <DollarSign className="h-4 w-4" />
-              Registrar cobro
+              Estado de pago
             </CardTitle>
             <CardDescription>
-              Captura el pago recibido por el cliente
+              Registra el estado del pago del cliente
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form className="space-y-3" onSubmit={handleRegistrarPago}>
               <div className="space-y-1">
-                <Label>Método de pago</Label>
+                <Label>Estado del pago *</Label>
                 <select
                   className="w-full rounded-md border px-3 py-2 text-sm"
-                  value={metodoPago}
-                  onChange={(e) => setMetodoPago(e.target.value)}
+                  value={estadoPago}
+                  onChange={(e) => setEstadoPago(e.target.value as any)}
+                  required
                 >
-                  <option value="efectivo">Efectivo</option>
-                  <option value="transferencia">Transferencia</option>
-                  <option value="qr">QR</option>
-                  <option value="tarjeta">Tarjeta</option>
-                  <option value="cuenta_corriente">Cuenta corriente</option>
+                  <option value="">Selecciona un estado</option>
+                  <option value="pagado">Ya pagó</option>
+                  <option value="pendiente">Pendiente de pago</option>
+                  <option value="pagara_despues">Pagará después</option>
                 </select>
               </div>
 
-              <div className="space-y-1">
-                <Label>Monto cobrado</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={montoCobrado}
-                  onChange={(e) => setMontoCobrado(parseFloat(e.target.value))}
-                  required
-                />
-              </div>
+              {estadoPago === 'pagado' && (
+                <>
+                  <div className="space-y-1">
+                    <Label>Método de pago *</Label>
+                    <select
+                      className="w-full rounded-md border px-3 py-2 text-sm"
+                      value={metodoPago}
+                      onChange={(e) => setMetodoPago(e.target.value)}
+                      required
+                    >
+                      <option value="efectivo">Efectivo</option>
+                      <option value="transferencia">Transferencia</option>
+                      <option value="qr">QR</option>
+                      <option value="tarjeta">Tarjeta</option>
+                      <option value="cuenta_corriente">Cuenta corriente</option>
+                    </select>
+                  </div>
 
-              {metodoPago === 'transferencia' && (
-                <div className="space-y-1">
-                  <Label>N.º de transacción</Label>
-                  <Input
-                    value={numeroTransaccion}
-                    onChange={(e) => setNumeroTransaccion(e.target.value)}
-                    placeholder="Banco Nación, etc."
-                  />
-                </div>
+                  <div className="space-y-1">
+                    <Label>Monto cobrado *</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={montoCobrado}
+                      onChange={(e) => setMontoCobrado(parseFloat(e.target.value) || 0)}
+                      required
+                    />
+                  </div>
+
+                  {metodoPago === 'transferencia' && (
+                    <div className="space-y-1">
+                      <Label>N.º de transacción</Label>
+                      <Input
+                        value={numeroTransaccion}
+                        onChange={(e) => setNumeroTransaccion(e.target.value)}
+                        placeholder="Banco Nación, etc."
+                      />
+                    </div>
+                  )}
+
+                  <div className="space-y-1">
+                    <Label>Comprobante (URL)</Label>
+                    <Input
+                      value={comprobanteUrl}
+                      onChange={(e) => setComprobanteUrl(e.target.value)}
+                      placeholder="https://..."
+                    />
+                  </div>
+                </>
               )}
 
-              <div className="space-y-1">
-                <Label>Comprobante (URL)</Label>
-                <Input
-                  value={comprobanteUrl}
-                  onChange={(e) => setComprobanteUrl(e.target.value)}
-                  placeholder="https://..."
-                />
-              </div>
+              {estadoPago === 'pendiente' && (
+                <div className="space-y-1">
+                  <Label>Método de pago previsto</Label>
+                  <select
+                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    value={metodoPagoFuturo}
+                    onChange={(e) => setMetodoPagoFuturo(e.target.value)}
+                  >
+                    <option value="efectivo">Efectivo</option>
+                    <option value="transferencia">Transferencia</option>
+                    <option value="qr">QR</option>
+                    <option value="tarjeta">Tarjeta</option>
+                    <option value="cuenta_corriente">Cuenta corriente</option>
+                  </select>
+                </div>
+              )}
 
               <div className="space-y-1">
                 <Label>Notas</Label>
                 <Textarea
                   value={notasEntrega}
                   onChange={(e) => setNotasEntrega(e.target.value)}
-                  placeholder="Observaciones del cobro"
+                  placeholder="Observaciones sobre el pago o entrega"
                   rows={3}
                 />
               </div>
+
+              {entrega.pago_registrado && (
+                <div className="bg-blue-50 border border-blue-200 rounded-md p-2 text-sm text-blue-800">
+                  <p className="font-semibold">Pago ya registrado</p>
+                  <p className="text-xs">
+                    Método: {entrega.metodo_pago_registrado || 'N/A'} | 
+                    Monto: ${entrega.monto_cobrado_registrado || 0}
+                  </p>
+                  <p className="text-xs mt-1">
+                    {entrega.pago_validado ? '✓ Validado por tesorería' : '⏳ Pendiente de validación'}
+                  </p>
+                </div>
+              )}
 
               <Button type="submit" disabled={pagoLoading} className="w-full">
                 {pagoLoading ? (
                   <>
                     <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                    Registrando...
+                    Guardando...
                   </>
                 ) : (
                   <>
                     <DollarSign className="mr-2 h-4 w-4" />
-                    Registrar cobro
+                    {entrega.pago_registrado ? 'Actualizar información' : 'Registrar estado de pago'}
                   </>
                 )}
               </Button>

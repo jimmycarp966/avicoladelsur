@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import PlanRutasForm from './plan-rutas-form'
 import PlanRutasTable from './plan-rutas-table'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: 'Planificación de Rutas',
 }

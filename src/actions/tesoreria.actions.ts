@@ -689,3 +689,201 @@ export async function registrarPagoPedido(data: {
     return { success: false, message: error.message || 'Error al registrar pago' }
   }
 }
+
+// Validar ruta completada (crear movimientos de caja y marcar como validada)
+export async function validarRutaAction(formData: FormData) {
+  try {
+    const supabase = await createClient()
+
+    // Obtener usuario actual
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, message: 'Usuario no autenticado' }
+    }
+
+    // Verificar que sea tesorero o admin
+    const { data: usuario } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (!usuario || !['admin', 'vendedor'].includes(usuario.rol)) {
+      return { success: false, message: 'Solo tesoreros y administradores pueden validar rutas' }
+    }
+
+    // Parsear datos
+    const ruta_id = formData.get('ruta_id') as string
+    const monto_fisico_recibido = parseFloat(formData.get('monto_fisico_recibido') as string)
+    const observaciones = formData.get('observaciones') as string || null
+    const caja_id = formData.get('caja_id') as string
+
+    if (!ruta_id || !caja_id) {
+      return { success: false, message: 'Faltan datos requeridos' }
+    }
+
+    // Obtener ruta con detalles de pagos registrados
+    const { data: ruta, error: rutaError } = await supabase
+      .from('rutas_reparto')
+      .select(`
+        *,
+        detalles_ruta (
+          id,
+          pedido_id,
+          pago_registrado,
+          metodo_pago_registrado,
+          monto_cobrado_registrado,
+          numero_transaccion_registrado,
+          comprobante_url_registrado,
+          pago_validado,
+          pedido:pedidos(id, numero_pedido, total)
+        )
+      `)
+      .eq('id', ruta_id)
+      .single()
+
+    if (rutaError || !ruta) {
+      return { success: false, message: 'Ruta no encontrada' }
+    }
+
+    if (ruta.estado !== 'completada') {
+      return { success: false, message: 'La ruta debe estar completada para validar' }
+    }
+
+    if (ruta.validada_por_tesorero) {
+      return { success: false, message: 'Esta ruta ya fue validada' }
+    }
+
+    // Agrupar pagos por método de pago
+    const pagosPorMetodo: Record<string, { total: number; detalles: any[] }> = {}
+    
+    ruta.detalles_ruta?.forEach((detalle: any) => {
+      if (detalle.pago_registrado && detalle.monto_cobrado_registrado > 0) {
+        const metodo = detalle.metodo_pago_registrado || 'efectivo'
+        if (!pagosPorMetodo[metodo]) {
+          pagosPorMetodo[metodo] = { total: 0, detalles: [] }
+        }
+        pagosPorMetodo[metodo].total += Number(detalle.monto_cobrado_registrado)
+        pagosPorMetodo[metodo].detalles.push(detalle)
+      }
+    })
+
+    // Crear movimientos de caja agrupados por método de pago
+    const movimientosCreados: string[] = []
+    
+    for (const [metodo, datos] of Object.entries(pagosPorMetodo)) {
+      const { data: movimiento, error: movError } = await supabase
+        .from('tesoreria_movimientos')
+        .insert({
+          caja_id,
+          tipo: 'ingreso',
+          monto: datos.total,
+          descripcion: `Validación ruta ${ruta.numero_ruta} - ${metodo}`,
+          origen_tipo: 'ruta',
+          origen_id: ruta_id,
+          metodo_pago: metodo,
+          user_id: user.id,
+        })
+        .select()
+        .single()
+
+      if (movError) throw movError
+      movimientosCreados.push(movimiento.id)
+
+      // Actualizar saldo de caja
+      await supabase.rpc('fn_actualizar_saldo_caja', {
+        p_caja_id: caja_id,
+        p_monto: datos.total,
+      })
+    }
+
+    // Actualizar ruta como validada
+    const { error: updateRutaError } = await supabase
+      .from('rutas_reparto')
+      .update({
+        validada_por_tesorero: true,
+        tesorero_validador_id: user.id,
+        fecha_validacion: new Date().toISOString(),
+        recaudacion_total_validada: monto_fisico_recibido || ruta.recaudacion_total_registrada,
+        observaciones_validacion: observaciones,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', ruta_id)
+
+    if (updateRutaError) throw updateRutaError
+
+    // Marcar pagos como validados en detalles_ruta
+    const { error: updateDetallesError } = await supabase
+      .from('detalles_ruta')
+      .update({ pago_validado: true })
+      .eq('ruta_id', ruta_id)
+      .eq('pago_registrado', true)
+
+    if (updateDetallesError) throw updateDetallesError
+
+    // Actualizar estado de pago en pedidos
+    const pedidosIds = ruta.detalles_ruta
+      ?.filter((d: any) => d.pago_registrado && d.monto_cobrado_registrado > 0)
+      .map((d: any) => d.pedido_id) || []
+
+    if (pedidosIds.length > 0) {
+      const { error: updatePedidosError } = await supabase
+        .from('pedidos')
+        .update({ pago_estado: 'pagado' })
+        .in('id', pedidosIds)
+
+      if (updatePedidosError) throw updatePedidosError
+    }
+
+    revalidatePath('/(admin)/(dominios)/tesoreria/validar-rutas')
+    revalidatePath('/(admin)/(dominios)/reparto/rutas')
+    revalidatePath('/(admin)/(dominios)/tesoreria')
+
+    return {
+      success: true,
+      message: 'Ruta validada exitosamente. Los movimientos de caja han sido creados.',
+    }
+  } catch (error: any) {
+    console.error('Error en validarRutaAction:', error)
+    return { success: false, message: error.message || 'Error al validar ruta' }
+  }
+}
+
+// Obtener rutas completadas pendientes de validación
+export async function obtenerRutasPendientesValidacion() {
+  try {
+    const supabase = await createClient()
+
+    const { data: rutas, error } = await supabase
+      .from('rutas_reparto')
+      .select(`
+        *,
+        repartidor:usuarios(nombre, apellido),
+        vehiculo:vehiculos(patente, marca, modelo),
+        zona:zonas(nombre),
+        detalles_ruta (
+          id,
+          orden_entrega,
+          estado_entrega,
+          pago_registrado,
+          metodo_pago_registrado,
+          monto_cobrado_registrado,
+          pedido:pedidos(id, numero_pedido, total, cliente:clientes(nombre))
+        )
+      `)
+      .eq('estado', 'completada')
+      .eq('validada_por_tesorero', false)
+      .order('fecha_ruta', { ascending: false })
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+
+    return {
+      success: true,
+      data: rutas || [],
+    }
+  } catch (error: any) {
+    console.error('Error en obtenerRutasPendientesValidacion:', error)
+    return { success: false, message: error.message || 'Error al obtener rutas pendientes' }
+  }
+}

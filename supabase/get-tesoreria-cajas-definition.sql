@@ -28,3 +28,5 @@ LEFT JOIN information_schema.constraint_column_usage AS ccu
   AND ccu.table_schema = tc.table_schema
 WHERE tc.table_name = 'tesoreria_cajas'
 AND tc.table_schema = 'public';
+
+

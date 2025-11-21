@@ -1,13 +1,19 @@
-import { obtenerResumenTesoreria, listarCajas } from '@/actions/tesoreria.actions'
+import { obtenerResumenTesoreria, listarCajas, obtenerRutasPendientesValidacion } from '@/actions/tesoreria.actions'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import { PiggyBank, Wallet, TrendingUp, TrendingDown } from 'lucide-react'
+import { PiggyBank, Wallet, TrendingUp, TrendingDown, CheckCircle2 } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
 export default async function TesoreriaPage() {
-  const [resumen, cajas] = await Promise.all([obtenerResumenTesoreria(), listarCajas()])
+  const [resumen, cajas, rutasPendientes] = await Promise.all([
+    obtenerResumenTesoreria(),
+    listarCajas(),
+    obtenerRutasPendientesValidacion(),
+  ])
+  
+  const rutasPendientesCount = rutasPendientes.success ? rutasPendientes.data?.length || 0 : 0
 
   return (
     <div className="space-y-6">
@@ -20,9 +26,19 @@ export default async function TesoreriaPage() {
               Control en tiempo real de tus cajas, egresos y flujo de efectivo
             </p>
           </div>
-          <Button asChild className="bg-primary hover:bg-primary/90 shadow-sm">
-            <Link href="/tesoreria/cajas">Gestionar cajas</Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            {rutasPendientesCount > 0 && (
+              <Button asChild variant="default" className="bg-yellow-600 hover:bg-yellow-700 shadow-sm">
+                <Link href="/tesoreria/validar-rutas" className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Validar Rutas ({rutasPendientesCount})
+                </Link>
+              </Button>
+            )}
+            <Button asChild className="bg-primary hover:bg-primary/90 shadow-sm">
+              <Link href="/tesoreria/cajas">Gestionar cajas</Link>
+            </Button>
+          </div>
         </div>
       </div>
 

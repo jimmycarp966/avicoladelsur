@@ -66,3 +66,5 @@ COMMENT ON COLUMN clientes.localidad_id IS 'Localidad del cliente (opcional, pue
 COMMENT ON FUNCTION fn_obtener_localidades_activas() IS 'Retorna todas las localidades activas con su zona asociada, ordenadas por nombre';
 
 
+
+

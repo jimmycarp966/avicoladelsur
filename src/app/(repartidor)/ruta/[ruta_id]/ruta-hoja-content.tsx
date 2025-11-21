@@ -48,10 +48,37 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
   const totalCobrar = entregas
     .filter((e: any) => e.pedido?.pago_estado !== 'pagado')
     .reduce((sum: number, e: any) => sum + (e.pedido?.total || 0), 0)
+  
+  // Calcular recaudación registrada
+  const entregasConPago = entregas.filter((e: any) => e.pago_registrado && e.monto_cobrado_registrado > 0)
+  const recaudacionRegistrada = ruta.recaudacion_total_registrada || 0
+  const pagosPorMetodo: Record<string, number> = {}
+  entregasConPago.forEach((detalle: any) => {
+    const metodo = detalle.metodo_pago_registrado || 'efectivo'
+    pagosPorMetodo[metodo] = (pagosPorMetodo[metodo] || 0) + Number(detalle.monto_cobrado_registrado)
+  })
+
+  // Verificar que todas las entregas completadas tengan estado de pago definido
+  // Una entrega tiene estado definido si:
+  // - Tiene pago_registrado = true (ya pagó)
+  // - O tiene metodo_pago_registrado pero monto = 0 (pendiente)
+  // - O tiene notas_pago indicando que pagará después
+  const entregasSinEstadoPago = entregas.filter((e: any) => {
+    if (e.estado_entrega !== 'entregado') return false // Solo verificar entregas completadas
+    // Si tiene pago registrado con monto > 0, está definido
+    if (e.pago_registrado && e.monto_cobrado_registrado > 0) return false
+    // Si tiene método de pago registrado (aunque monto sea 0), está definido
+    if (e.metodo_pago_registrado) return false
+    // Si tiene notas de pago, está definido
+    if (e.notas_pago && e.notas_pago.trim() !== '') return false
+    // Si no tiene nada, no está definido
+    return true
+  })
 
   const puedeIniciar = ruta.estado === 'planificada' && ruta.checklist_inicio_id
   const puedeFinalizar = ruta.estado === 'en_curso' && 
     entregasPendientes === 0 && 
+    entregasSinEstadoPago.length === 0 &&
     ruta.checklist_fin_id
 
   const handleIniciarRuta = async () => {
@@ -76,6 +103,11 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
   const handleFinalizarRuta = async () => {
     if (entregasPendientes > 0) {
       toast.error('Todas las entregas deben estar completas antes de finalizar')
+      return
+    }
+
+    if (entregasSinEstadoPago.length > 0) {
+      toast.error(`Debes registrar el estado de pago para ${entregasSinEstadoPago.length} entrega(s) antes de finalizar la ruta`)
       return
     }
 
@@ -180,6 +212,81 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
         </Card>
       </div>
 
+      {/* Resumen de Recaudación - Solo si hay pagos registrados o ruta completada */}
+      {(recaudacionRegistrada > 0 || ruta.estado === 'completada') && (
+        <div className="px-4">
+          <Card className={ruta.validada_por_tesorero ? 'border-green-200 bg-green-50' : 'border-blue-200 bg-blue-50'}>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <DollarSign className="h-5 w-5" />
+                Recaudación Registrada
+                {ruta.validada_por_tesorero && (
+                  <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    Validada
+                  </Badge>
+                )}
+                {ruta.estado === 'completada' && !ruta.validada_por_tesorero && (
+                  <Badge variant="outline" className="bg-yellow-100 text-yellow-700 border-yellow-300">
+                    <Clock className="h-3 w-3 mr-1" />
+                    Pendiente de validación
+                  </Badge>
+                )}
+              </CardTitle>
+              <CardDescription>
+                {ruta.validada_por_tesorero 
+                  ? 'Esta ruta fue validada por tesorería y los fondos fueron acreditados en caja'
+                  : ruta.estado === 'completada'
+                  ? 'La ruta está completada. Esperando validación de tesorería.'
+                  : 'Pagos registrados durante la ruta'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Total registrado:</span>
+                <span className="text-2xl font-bold">
+                  ${recaudacionRegistrada.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              
+              {Object.keys(pagosPorMetodo).length > 0 && (
+                <div>
+                  <p className="text-sm font-medium mb-2">Desglose por método de pago:</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {Object.entries(pagosPorMetodo).map(([metodo, monto]) => (
+                      <div key={metodo} className="flex items-center justify-between text-sm bg-white/50 p-2 rounded">
+                        <span className="capitalize text-muted-foreground">
+                          {metodo.replace('_', ' ')}:
+                        </span>
+                        <span className="font-semibold">
+                          ${Number(monto).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {ruta.validada_por_tesorero && ruta.recaudacion_total_validada && (
+                <div className="pt-2 border-t">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Total validado:</span>
+                    <span className="font-semibold text-green-700">
+                      ${Number(ruta.recaudacion_total_validada).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  {ruta.fecha_validacion && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Validada el {new Date(ruta.fecha_validacion).toLocaleString('es-AR')}
+                    </p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Checklist Inicio */}
       {ruta.estado === 'planificada' && (
         <div className="px-4">
@@ -239,8 +346,41 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
         </div>
       )}
 
+      {/* Alerta de entregas sin estado de pago */}
+      {ruta.estado === 'en_curso' && entregasSinEstadoPago.length > 0 && (
+        <div className="px-4">
+          <Alert className="border-yellow-200 bg-yellow-50">
+            <AlertCircle className="h-4 w-4 text-yellow-600" />
+            <AlertDescription>
+              <div className="space-y-2">
+                <p className="font-medium text-yellow-900">
+                  Debes registrar el estado de pago para {entregasSinEstadoPago.length} entrega(s) antes de finalizar la ruta:
+                </p>
+                <ul className="list-disc list-inside text-sm text-yellow-800 space-y-1">
+                  {entregasSinEstadoPago.map((entrega: any) => (
+                    <li key={entrega.id}>
+                      Orden #{entrega.orden_entrega} - {entrega.pedido?.cliente?.nombre || 'Cliente'}
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0 ml-2 text-yellow-700 underline"
+                        asChild
+                      >
+                        <Link href={`/repartidor/ruta/${ruta.id}/entrega/${entrega.id}`}>
+                          Registrar pago
+                        </Link>
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
+
       {/* Checklist Fin */}
-      {ruta.estado === 'en_curso' && entregasPendientes === 0 && (
+      {ruta.estado === 'en_curso' && entregasPendientes === 0 && entregasSinEstadoPago.length === 0 && (
         <div className="px-4">
           {!ruta.checklist_fin_id ? (
             <Card className="border-blue-200 bg-blue-50">
@@ -299,12 +439,14 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
       {/* Lista de entregas */}
       <div className="px-4 space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Entregas ({entregasOrdenadas.length})</h2>
-          {ruta.estado === 'en_curso' && (
+          <h2 className="text-lg font-semibold">
+            Entregas ({entregasOrdenadas.length})
+          </h2>
+          {entregasOrdenadas.length > 0 && (
             <Button variant="outline" size="sm" asChild>
               <Link href={`/repartidor/ruta/${ruta.id}/mapa`}>
                 <Navigation className="mr-2 h-4 w-4" />
-                Ver Mapa
+                Ver mapa
               </Link>
             </Button>
           )}
