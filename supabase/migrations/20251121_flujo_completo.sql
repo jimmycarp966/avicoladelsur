@@ -32,18 +32,26 @@ ALTER TABLE rutas_reparto ADD COLUMN IF NOT EXISTS zona_id UUID REFERENCES zonas
 ALTER TABLE rutas_reparto ADD COLUMN IF NOT EXISTS checklist_inicio_id UUID REFERENCES checklists_vehiculos(id);
 ALTER TABLE rutas_reparto ADD COLUMN IF NOT EXISTS checklist_fin_id UUID REFERENCES checklists_vehiculos(id);
 
--- Agregar campos a presupuestos
-ALTER TABLE presupuestos ADD COLUMN IF NOT EXISTS turno VARCHAR(20) CHECK (turno IN ('mañana', 'tarde'));
-ALTER TABLE presupuestos ADD COLUMN IF NOT EXISTS metodos_pago JSONB;
-ALTER TABLE presupuestos ADD COLUMN IF NOT EXISTS recargo_total DECIMAL(10,2) DEFAULT 0;
+-- Agregar campos a presupuestos (solo si la tabla existe)
+DO $$ 
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'presupuestos') THEN
+        ALTER TABLE presupuestos ADD COLUMN IF NOT EXISTS turno VARCHAR(20) CHECK (turno IN ('mañana', 'tarde'));
+        ALTER TABLE presupuestos ADD COLUMN IF NOT EXISTS metodos_pago JSONB;
+        ALTER TABLE presupuestos ADD COLUMN IF NOT EXISTS recargo_total DECIMAL(10,2) DEFAULT 0;
 
--- Actualizar CHECK de estado en presupuestos para incluir 'cotizacion'
--- Primero eliminamos la constraint existente si existe
-ALTER TABLE presupuestos DROP CONSTRAINT IF EXISTS presupuestos_estado_check;
-ALTER TABLE presupuestos ADD CONSTRAINT presupuestos_estado_check 
-    CHECK (estado IN ('pendiente', 'cotizacion', 'en_almacen', 'facturado', 'anulado'));
+        -- Actualizar CHECK de estado en presupuestos para incluir 'cotizacion'
+        -- Primero eliminamos la constraint existente si existe
+        ALTER TABLE presupuestos DROP CONSTRAINT IF EXISTS presupuestos_estado_check;
+        ALTER TABLE presupuestos ADD CONSTRAINT presupuestos_estado_check 
+            CHECK (estado IN ('pendiente', 'cotizacion', 'en_almacen', 'facturado', 'anulado'));
+    END IF;
+END $$;
 
 -- Asegurar que productos con categoria='BALANZA' tengan pesable=true
+-- Primero crear la columna pesable si no existe
+ALTER TABLE productos ADD COLUMN IF NOT EXISTS pesable BOOLEAN DEFAULT false;
+
 -- Crear trigger para esto
 CREATE OR REPLACE FUNCTION fn_actualizar_pesable_por_categoria()
 RETURNS TRIGGER AS $$
@@ -91,23 +99,28 @@ CREATE TABLE IF NOT EXISTS tesoro (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Tabla cierres_caja
-CREATE TABLE IF NOT EXISTS cierres_caja (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    caja_id UUID NOT NULL REFERENCES tesoreria_cajas(id),
-    fecha DATE NOT NULL,
-    saldo_inicial NUMERIC(14,2) NOT NULL DEFAULT 0,
-    saldo_final NUMERIC(14,2),
-    total_ingresos NUMERIC(14,2) DEFAULT 0,
-    total_egresos NUMERIC(14,2) DEFAULT 0,
-    cobranzas_cuenta_corriente NUMERIC(14,2) DEFAULT 0,
-    gastos NUMERIC(14,2) DEFAULT 0,
-    retiro_tesoro NUMERIC(14,2) DEFAULT 0,
-    estado VARCHAR(20) NOT NULL DEFAULT 'abierto' CHECK (estado IN ('abierto', 'cerrado')),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(caja_id, fecha)
-);
+-- Tabla cierres_caja (solo si tesoreria_cajas existe)
+DO $$ 
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'tesoreria_cajas') THEN
+        CREATE TABLE IF NOT EXISTS cierres_caja (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            caja_id UUID NOT NULL REFERENCES tesoreria_cajas(id),
+            fecha DATE NOT NULL,
+            saldo_inicial NUMERIC(14,2) NOT NULL DEFAULT 0,
+            saldo_final NUMERIC(14,2),
+            total_ingresos NUMERIC(14,2) DEFAULT 0,
+            total_egresos NUMERIC(14,2) DEFAULT 0,
+            cobranzas_cuenta_corriente NUMERIC(14,2) DEFAULT 0,
+            gastos NUMERIC(14,2) DEFAULT 0,
+            retiro_tesoro NUMERIC(14,2) DEFAULT 0,
+            estado VARCHAR(20) NOT NULL DEFAULT 'abierto' CHECK (estado IN ('abierto', 'cerrado')),
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE(caja_id, fecha)
+        );
+    END IF;
+END $$;
 
 -- Tabla devoluciones
 CREATE TABLE IF NOT EXISTS devoluciones (
@@ -148,8 +161,14 @@ CREATE INDEX IF NOT EXISTS idx_rutas_reparto_turno ON rutas_reparto(turno);
 CREATE INDEX IF NOT EXISTS idx_rutas_reparto_zona_id ON rutas_reparto(zona_id);
 CREATE INDEX IF NOT EXISTS idx_rutas_reparto_fecha_turno_zona ON rutas_reparto(fecha_ruta, turno, zona_id);
 
-CREATE INDEX IF NOT EXISTS idx_presupuestos_turno ON presupuestos(turno);
-CREATE INDEX IF NOT EXISTS idx_presupuestos_zona_turno ON presupuestos(zona_id, turno);
+-- Índices en presupuestos (solo si la tabla existe)
+DO $$ 
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'presupuestos') THEN
+        CREATE INDEX IF NOT EXISTS idx_presupuestos_turno ON presupuestos(turno);
+        CREATE INDEX IF NOT EXISTS idx_presupuestos_zona_turno ON presupuestos(zona_id, turno);
+    END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_zonas_dias_zona ON zonas_dias(zona_id);
 CREATE INDEX IF NOT EXISTS idx_zonas_dias_dia_turno ON zonas_dias(dia_semana, turno);
@@ -161,8 +180,14 @@ CREATE INDEX IF NOT EXISTS idx_recepcion_almacen_producto ON recepcion_almacen(p
 CREATE INDEX IF NOT EXISTS idx_recepcion_almacen_tipo ON recepcion_almacen(tipo);
 CREATE INDEX IF NOT EXISTS idx_recepcion_almacen_fecha ON recepcion_almacen(created_at);
 
-CREATE INDEX IF NOT EXISTS idx_cierres_caja_caja_fecha ON cierres_caja(caja_id, fecha);
-CREATE INDEX IF NOT EXISTS idx_cierres_caja_estado ON cierres_caja(estado);
+-- Índices en cierres_caja (solo si la tabla existe)
+DO $$ 
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'cierres_caja') THEN
+        CREATE INDEX IF NOT EXISTS idx_cierres_caja_caja_fecha ON cierres_caja(caja_id, fecha);
+        CREATE INDEX IF NOT EXISTS idx_cierres_caja_estado ON cierres_caja(estado);
+    END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_tesoro_tipo ON tesoro(tipo);
 CREATE INDEX IF NOT EXISTS idx_tesoro_fecha ON tesoro(created_at);
@@ -615,7 +640,13 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 ALTER TABLE zonas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE zonas_dias ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tesoro ENABLE ROW LEVEL SECURITY;
-ALTER TABLE cierres_caja ENABLE ROW LEVEL SECURITY;
+-- RLS para cierres_caja (solo si la tabla existe)
+DO $$ 
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'cierres_caja') THEN
+        ALTER TABLE cierres_caja ENABLE ROW LEVEL SECURITY;
+    END IF;
+END $$;
 ALTER TABLE devoluciones ENABLE ROW LEVEL SECURITY;
 ALTER TABLE recepcion_almacen ENABLE ROW LEVEL SECURITY;
 
@@ -646,14 +677,23 @@ CREATE POLICY "tesorero_tesoro_read" ON tesoro FOR SELECT USING (
     EXISTS (SELECT 1 FROM usuarios WHERE id = auth.uid() AND rol IN ('admin', 'vendedor') AND activo = true)
 );
 
--- Políticas para cierres_caja
-CREATE POLICY "admin_cierres_caja_full" ON cierres_caja FOR ALL USING (
-    EXISTS (SELECT 1 FROM usuarios WHERE id = auth.uid() AND rol = 'admin' AND activo = true)
-);
-
-CREATE POLICY "tesorero_cierres_caja_read" ON cierres_caja FOR SELECT USING (
-    EXISTS (SELECT 1 FROM usuarios WHERE id = auth.uid() AND rol IN ('admin', 'vendedor') AND activo = true)
-);
+-- Políticas para cierres_caja (solo si la tabla existe)
+DO $$ 
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'cierres_caja') THEN
+        IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'cierres_caja' AND policyname = 'admin_cierres_caja_full') THEN
+            CREATE POLICY "admin_cierres_caja_full" ON cierres_caja FOR ALL USING (
+                EXISTS (SELECT 1 FROM usuarios WHERE id = auth.uid() AND rol = 'admin' AND activo = true)
+            );
+        END IF;
+        
+        IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'cierres_caja' AND policyname = 'tesorero_cierres_caja_read') THEN
+            CREATE POLICY "tesorero_cierres_caja_read" ON cierres_caja FOR SELECT USING (
+                EXISTS (SELECT 1 FROM usuarios WHERE id = auth.uid() AND rol IN ('admin', 'vendedor') AND activo = true)
+            );
+        END IF;
+    END IF;
+END $$;
 
 -- Políticas para devoluciones
 CREATE POLICY "admin_devoluciones_full" ON devoluciones FOR ALL USING (
@@ -684,7 +724,13 @@ CREATE POLICY "almacenista_recepcion_almacen_full" ON recepcion_almacen FOR ALL 
 COMMENT ON TABLE zonas IS 'Zonas de entrega del sistema';
 COMMENT ON TABLE zonas_dias IS 'Configuración de días estipulados por zona y turno';
 COMMENT ON TABLE tesoro IS 'Tesoro separado de cajas (dinero físico en casa central)';
-COMMENT ON TABLE cierres_caja IS 'Cierres de caja diarios con totales';
+-- Comentario en cierres_caja (solo si la tabla existe)
+DO $$ 
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'cierres_caja') THEN
+        COMMENT ON TABLE cierres_caja IS 'Cierres de caja diarios con totales';
+    END IF;
+END $$;
 COMMENT ON TABLE devoluciones IS 'Devoluciones de productos registradas por repartidores';
 COMMENT ON TABLE recepcion_almacen IS 'Ingresos y egresos de almacén (recepciones)';
 
@@ -693,8 +739,14 @@ COMMENT ON COLUMN pedidos.zona_id IS 'Zona estipulada para el pedido';
 COMMENT ON COLUMN pedidos.metodos_pago IS 'Múltiples formas de pago con recargos (JSONB)';
 COMMENT ON COLUMN rutas_reparto.turno IS 'Turno de la ruta: mañana o tarde';
 COMMENT ON COLUMN rutas_reparto.zona_id IS 'Zona estipulada para esta ruta';
-COMMENT ON COLUMN presupuestos.turno IS 'Turno asignado por vendedor: mañana o tarde';
-COMMENT ON COLUMN presupuestos.metodos_pago IS 'Múltiples formas de pago con recargos (JSONB)';
+-- Comentarios en presupuestos (solo si la tabla existe)
+DO $$ 
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'presupuestos') THEN
+        COMMENT ON COLUMN presupuestos.turno IS 'Turno asignado por vendedor: mañana o tarde';
+        COMMENT ON COLUMN presupuestos.metodos_pago IS 'Múltiples formas de pago con recargos (JSONB)';
+    END IF;
+END $$;
 
 -- ===========================================
 -- ROLLBACK (comentado para referencia)

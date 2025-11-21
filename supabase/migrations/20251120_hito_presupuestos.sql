@@ -546,11 +546,6 @@ CREATE POLICY "vendedor_presupuestos_zona" ON presupuestos FOR SELECT USING (
     EXISTS (
         SELECT 1 FROM usuarios
         WHERE id = auth.uid() AND rol IN ('admin', 'vendedor') AND activo = true
-    ) AND (
-        zona_id IS NULL OR
-        zona_id IN (
-            SELECT zona_id FROM usuarios WHERE id = auth.uid()
-        )
     )
 );
 
@@ -574,7 +569,6 @@ CREATE POLICY "vendedor_presupuesto_items" ON presupuesto_items FOR SELECT USING
         SELECT 1 FROM usuarios u
         JOIN presupuestos p ON p.id = presupuesto_id
         WHERE u.id = auth.uid() AND u.rol IN ('admin', 'vendedor') AND u.activo = true
-        AND (p.zona_id IS NULL OR p.zona_id = u.zona_id)
     )
 );
 

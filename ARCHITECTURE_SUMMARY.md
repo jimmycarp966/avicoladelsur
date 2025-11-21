@@ -4,7 +4,7 @@
 
 Sistema ERP modular para Avícola del Sur que unifica Almacén (WMS), Ventas (CRM), Reparto (TMS) y Tesorería en una única fuente de verdad con Supabase. Incluye bot de WhatsApp automatizado para pedidos, PWA móvil para repartidores con GPS, y arquitectura server-side con Next.js 15, React 19, TypeScript y Server Actions. Implementa FIFO automático, RLS completo, validaciones atómicas y trazabilidad total desde ingreso hasta entrega.
 
-**Estado actual**: Hito Intermedio completado (tesorería, cuentas corrientes, referencias de pago). Próximo: Flujo Presupuestos → Almacén → Reparto → Tesorería.
+**Estado actual**: ✅ Flujo completo implementado - Presupuestos → Almacén → Reparto → Tesorería funcionando end-to-end. Sistema listo para pruebas de integración.
 
 ## 🛠️ Tecnologías Principales
 
@@ -122,4 +122,24 @@ supabase/                         # Scripts SQL y migraciones
 
 ---
 
-*Resumen creado el 20/11/2025 basado en ARCHITECTURE.MD v7.0 - Próximo hito: Flujo Presupuestos → Almacén → Reparto → Tesorería*
+## 🎯 Flujo de Presupuestos Implementado
+
+**Estado**: ✅ Completo y verificado
+
+**Flujo**: `Bot WhatsApp → Presupuesto (Pendiente) → Almacén (Pesaje) → Pedido (Facturado) → Reparto (Entrega/Cobro) → Tesorería (Tiempo Real)`
+
+**Características clave:**
+- Clientes son deudores por defecto hasta confirmar reparto
+- Presupuestos con múltiples métodos de pago y recargos
+- Reserva preventiva de stock (no descuenta físicamente)
+- Pesaje obligatorio solo para productos categoría "balanza"
+- Facturación directa disponible para presupuestos sin pesables
+- Asignación automática de vehículos por peso y capacidad
+- Cobros del reparto se registran automáticamente en tesorería
+- Devoluciones con motivo y observaciones
+
+**Ver [`TESTING.md`](../TESTING.md) para guía completa de pruebas.**
+
+---
+
+*Resumen actualizado el 20/11/2025 - Flujo completo implementado y listo para pruebas*

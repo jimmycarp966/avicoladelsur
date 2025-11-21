@@ -176,11 +176,12 @@ async function handleBotpressWebhook(payload: BotpressWebhookPayload): Promise<B
           const numeroPresupuesto = result.data.numero_presupuesto || result.data.numeroPresupuesto
           return {
             success: true,
-            message: `¡Presupuesto creado exitosamente! Número de presupuesto: ${numeroPresupuesto}
+            message: `✅ ¡Presupuesto creado exitosamente!
 
-Para seguimiento: https://tu-dominio/seguimiento/presupuesto/${numeroPresupuesto}
+📋 Número: ${numeroPresupuesto}
+🔗 Seguimiento: ${getBaseUrl()}/seguimiento/presupuesto/${numeroPresupuesto}
 
-El vendedor revisará tu presupuesto y te contactará pronto.`,
+Nuestro equipo revisará tu presupuesto y te contactará pronto.`,
             data: {
               presupuesto_id: result.data.presupuesto_id || result.data.presupuestoId,
               numero_presupuesto: numeroPresupuesto,
@@ -445,6 +446,18 @@ Tu mensaje será atendido en el próximo horario hábil. ¡Gracias!`
   }
 }
 
+// Función auxiliar para obtener URL base del sistema
+function getBaseUrl(): string {
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`
+  }
+  // Fallback para desarrollo local
+  return 'https://avicoladelsur.vercel.app'
+}
+
 // Función para manejar mensajes directos de Twilio
 async function handleTwilioWebhook(formData: FormData) {
   const body = formData.get('Body')?.toString().trim() || ''
@@ -454,6 +467,10 @@ async function handleTwilioWebhook(formData: FormData) {
   const phoneNumber = from.replace('whatsapp:', '')
   
   console.log('Mensaje de Twilio recibido:', { from: phoneNumber, body })
+
+  // Buscar cliente para personalizar mensajes
+  const cliente = await findClienteByPhone(phoneNumber)
+  const nombreCliente = cliente?.nombre || ''
 
   let responseMessage = ''
 
@@ -469,21 +486,28 @@ async function handleTwilioWebhook(formData: FormData) {
 
     // Comando: Hola / Ayuda
     if (bodyLower.includes('hola') || bodyLower.includes('ayuda') || bodyLower.includes('menu') || bodyLower.includes('inicio')) {
-      responseMessage = `¡Hola! 👋 Bienvenido a *Avícola del Sur*
+      const saludo = nombreCliente ? `¡Hola ${nombreCliente}! 👋` : '¡Hola! 👋'
+      responseMessage = `${saludo} Bienvenido a *Avícola del Sur*
+
+🏡 Tu distribuidor de confianza
 
 🛒 *Menú Principal*
 
 1️⃣ Ver productos disponibles
 2️⃣ Crear presupuesto
-3️⃣ Consultar pedidos
-4️⃣ Registrar un reclamo
+3️⃣ Consultar estado de pedidos
+4️⃣ Consultar saldo pendiente
 
 📝 *Responde con el número* de la opción que deseas.
 
-💡 También puedes escribir comandos:
-• *productos* - Ver catálogo
-• *POLLO001 5* - Crear presupuesto
-• *ayuda* - Ver este menú`
+💡 *Comandos rápidos:*
+• Escribe *productos* para ver el catálogo completo
+• Escribe *[CODIGO] [CANTIDAD]* para crear un presupuesto
+   Ejemplo: *POLLO001 5*
+• Escribe *estado PRES-XXXXX* para consultar un presupuesto
+• Escribe *deuda* para ver tu saldo pendiente
+
+❓ Escribe *ayuda* en cualquier momento para ver este menú`
     }
     // Comando: Opciones del menú numérico
     else if (body === '1' || bodyLower === 'opcion 1') {
@@ -620,17 +644,33 @@ Para ver los productos disponibles, escribe *1* o *productos*`
                 p_datos: { presupuesto_id: result.data.presupuesto_id, cliente: cliente.nombre, total: totalEstimado }
               })
 
-              responseMessage = `✅ *¡Presupuesto Creado!*
+              const baseUrl = getBaseUrl()
+              const detalleProductos = items.length <= 3 
+                ? items.map((item, idx) => {
+                    const prod = pending.productos.find(p => p.codigo === item.codigo)
+                    return `   ${idx + 1}. ${prod?.nombre || 'Producto'} - ${item.cantidad} ${prod?.unidad || 'un'}`
+                  }).join('\n')
+                : `${items.length} productos diferentes`
 
-📋 Número: *${numeroPresupuesto}*
-📦 ${items.length} producto${items.length > 1 ? 's' : ''}
-💰 Total Estimado: *$${totalEstimado.toFixed(2)}*
+              responseMessage = `✅ *¡Presupuesto Creado Exitosamente!*
 
-🔗 Seguimiento: https://tu-dominio/seguimiento/presupuesto/${numeroPresupuesto}
+📋 *Número de presupuesto:*
+   ${numeroPresupuesto}
 
-El vendedor revisará tu presupuesto y te contactará pronto para coordinar la entrega.
+📦 *Productos:*
+${detalleProductos}
 
-Escribe *menu* para volver al inicio.`
+💰 *Total estimado:* $${totalEstimado.toFixed(2)}
+
+📱 *Seguimiento en línea:*
+   ${baseUrl}/seguimiento/presupuesto/${numeroPresupuesto}
+
+⏳ *Próximos pasos:*
+   1. Nuestro equipo revisará tu presupuesto
+   2. Te contactaremos para confirmar disponibilidad
+   3. Coordinaremos la entrega en tu zona
+
+💬 Escribe *menu* para volver al inicio o *estado ${numeroPresupuesto}* para consultar el estado.`
               
               pendingConfirmations.delete(phoneNumber)
             } else {
@@ -747,9 +787,14 @@ Ejemplo:
           if (stockDisponible < cantidad) {
             responseMessage = `❌ *Stock insuficiente*
 
-${producto.nombre}
-Solicitado: ${cantidad} ${producto.unidad_medida}
-Disponible: ${Math.floor(stockDisponible)} ${producto.unidad_medida}`
+📦 *Producto:* ${producto.nombre}
+📊 *Solicitado:* ${cantidad} ${producto.unidad_medida}
+📦 *Disponible:* ${Math.floor(stockDisponible)} ${producto.unidad_medida}
+
+💡 *Sugerencias:*
+   • Reduce la cantidad a ${Math.floor(stockDisponible)} ${producto.unidad_medida}
+   • Consulta productos similares escribiendo *productos*
+   • Contacta a tu vendedor para más opciones`
           } else {
             // Guardar para confirmación
             pendingConfirmations.set(phoneNumber, {
@@ -886,14 +931,17 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
               
               const stockDisponible = lotes?.reduce((sum, l) => sum + Number(l.cantidad_disponible), 0) || 0
 
-              if (stockDisponible < cantidad) {
-                responseMessage = `❌ *Stock insuficiente*
+          if (stockDisponible < cantidad) {
+            responseMessage = `❌ *Stock insuficiente*
 
-Producto: ${producto.nombre}
-Solicitado: ${cantidad} ${producto.unidad_medida}
-Disponible: ${Math.floor(stockDisponible)} ${producto.unidad_medida}
+📦 *Producto:* ${producto.nombre}
+📊 *Solicitado:* ${cantidad} ${producto.unidad_medida}
+📦 *Disponible:* ${Math.floor(stockDisponible)} ${producto.unidad_medida}
 
-Por favor reduce la cantidad o elige otro producto.`
+💡 *Opciones:*
+   • Reduce la cantidad a ${Math.floor(stockDisponible)} ${producto.unidad_medida}
+   • Consulta otros productos escribiendo *productos*
+   • Contacta a tu vendedor para alternativas`
               } else {
                 // Crear presupuesto
                 const formData = new FormData()
@@ -911,16 +959,20 @@ Por favor reduce la cantidad o elige otro producto.`
                   const numeroPresupuesto = result.data.numero_presupuesto || result.data.numeroPresupuesto
                   const totalEstimado = result.data.total_estimado || result.data.totalEstimado || 0
 
-                  responseMessage = `✅ *Presupuesto creado exitosamente*
+                  const baseUrl = getBaseUrl()
+                  responseMessage = `✅ *¡Presupuesto Creado!*
 
-📋 Número: *${numeroPresupuesto}*
-📦 Producto: ${producto.nombre}
-📊 Cantidad: ${cantidad} ${producto.unidad_medida}
-💰 Total Estimado: *$${totalEstimado.toFixed(2)}*
+📋 *Número:* ${numeroPresupuesto}
+📦 *Producto:* ${producto.nombre}
+📊 *Cantidad:* ${cantidad} ${producto.unidad_medida}
+💰 *Total estimado:* $${totalEstimado.toFixed(2)}
 
-🔗 Seguimiento: https://tu-dominio/seguimiento/presupuesto/${numeroPresupuesto}
+🔗 *Seguimiento:*
+   ${baseUrl}/seguimiento/presupuesto/${numeroPresupuesto}
 
-El vendedor revisará tu presupuesto y te contactará pronto.`
+⏳ Nuestro equipo revisará tu presupuesto y te contactará pronto para coordinar la entrega.
+
+💬 Escribe *menu* para más opciones.`
                 } else {
                   responseMessage = `❌ Error al crear presupuesto: ${result.message}`
                 }
@@ -1024,9 +1076,17 @@ El vendedor revisará tu presupuesto y te contactará pronto.`
     }
     // Mensaje no reconocido
     else {
-      responseMessage = `No entendí tu mensaje 🤔
+      responseMessage = `🤔 *No entendí tu mensaje*
 
-Envía *"ayuda"* para ver los comandos disponibles.`
+💡 *Comandos disponibles:*
+   • *menu* o *ayuda* - Ver menú principal
+   • *productos* - Ver catálogo completo
+   • *[CODIGO] [CANTIDAD]* - Crear presupuesto
+      Ejemplo: *POLLO001 5*
+   • *estado PRES-XXXXX* - Consultar presupuesto
+   • *deuda* - Ver saldo pendiente
+
+📞 Si necesitas ayuda personalizada, contacta a tu vendedor.`
     }
 
   } catch (error: any) {

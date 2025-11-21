@@ -116,9 +116,9 @@ npm run lint
 node scripts/verificar-bot.js
 ```
 
-## 🎯 Flujo de Presupuestos - NUEVO
+## 🎯 Flujo de Presupuestos - COMPLETO
 
-### Estado: ✅ IMPLEMENTADO (Hito Presupuestos)
+### Estado: ✅ IMPLEMENTADO Y VERIFICADO
 
 Sistema completo de presupuestos que transforma el proceso operativo:
 
@@ -127,9 +127,12 @@ Sistema completo de presupuestos que transforma el proceso operativo:
 ### Características Principales
 - 🤖 **Bot Actualizado**: Crea presupuestos en lugar de pedidos directos
 - 📋 **Números Únicos**: PRES-YYYYMMDD-XXXX con links de seguimiento
-- 🏭 **Control de Almacén**: Reserva preventiva + pesaje obligatorio
-- 🚛 **Reparto Integrado**: PWA básica con registro de entregas/cobros
-- 💰 **Tesorería Tiempo Real**: Movimientos automáticos por operaciones
+- 🏭 **Control de Almacén**: Reserva preventiva + pesaje obligatorio para productos de categoría "balanza"
+- 🚛 **Reparto Integrado**: PWA completa con registro de entregas, cobros (múltiples métodos) y devoluciones
+- 💰 **Tesorería Tiempo Real**: Movimientos automáticos por operaciones, totales por método de pago
+- 👥 **Clientes Deudores**: Todos los clientes son deudores hasta confirmar reparto
+- 💳 **Múltiples Métodos de Pago**: Soporte para efectivo, transferencia, QR, tarjeta, cuenta corriente con recargos
+- 🚚 **Asignación Automática**: Vehículos asignados automáticamente según peso y capacidad
 
 ### Cómo Probar la Demo
 ```bash
@@ -197,46 +200,58 @@ Reserva preventiva de stock → Respuesta con número PRES-XXXXX
 
 ---
 
-## 🎯 Cómo Probar el Flujo de Presupuestos
+## 🧪 Guía de Pruebas
 
-### Demo Completa (5 minutos)
+### 📋 Checklist Completo de Pruebas
 
-1. **Cliente crea presupuesto vía WhatsApp:**
-   ```
-   Enviar: POLLO001 5
-   Recibir: Número PRES-YYYYMMDD-XXXX + link de seguimiento
-   ```
+**Ver la guía completa de pruebas en [`TESTING.md`](./TESTING.md)** que incluye:
 
-2. **Vendedor revisa en dashboard:**
-   ```
-   URL: /ventas/presupuestos
-   Acción: "Enviar a Almacén"
-   ```
+- ✅ Flujo completo Bot → Ventas → Almacén → Reparto → Tesorería
+- ✅ Pruebas de cada módulo individual
+- ✅ Endpoints de API para testing
+- ✅ Funciones RPC de Supabase
+- ✅ Validaciones de datos y consistencia
+- ✅ Problemas comunes y soluciones
 
-3. **Almacén procesa pesaje:**
-   ```
-   URL: /almacen/presupuestos-dia
-   Acción: Seleccionar presupuesto → Ingresar peso → "Finalizar"
-   ```
+### 🚀 Inicio Rápido de Pruebas
 
-4. **Sistema convierte a pedido:**
-   ```
-   Automático: Crea pedido + descuenta stock + actualiza caja
-   ```
+**1. Flujo End-to-End Básico (10 minutos):**
 
-5. **Repartidor registra entrega:**
-   ```
-   URL: /repartidor/home
-   Acción: Marcar entrega + registrar cobro
-   ```
+```bash
+# 1. Cliente crea presupuesto vía WhatsApp
+Enviar: POLLO001 5
+Recibir: PRES-YYYYMMDD-XXXX + link
 
-6. **Tesorería ve movimientos:**
-   ```
-   URL: /tesoreria
-   Resultado: Movimientos en tiempo real
-   ```
+# 2. Vendedor gestiona presupuesto
+URL: /ventas/presupuestos/[id]
+- Asignar zona y turno
+- Enviar a almacén (o facturar directo si no hay pesables)
 
-### Endpoints para Testing
+# 3. Almacén procesa pesaje
+URL: /almacen/presupuestos-dia
+- Seleccionar presupuesto
+- Pesar productos de categoría "balanza"
+- Finalizar presupuesto
+
+# 4. Sistema convierte automáticamente
+- Presupuesto → Pedido
+- Stock descontado
+- Pedido disponible para ruta
+
+# 5. Repartidor registra entrega
+URL: /repartidor/ruta/[ruta_id]/entrega/[entrega_id]
+- Registrar cobro (múltiples métodos de pago)
+- Registrar devolución (si aplica)
+- Marcar como entregado
+
+# 6. Tesorería verifica
+URL: /tesoreria/movimientos
+- Ver movimientos en tiempo real
+- Verificar totales por método de pago
+- Verificar caja central actualizada
+```
+
+**2. Endpoints de Testing:**
 
 ```bash
 # Simular peso de balanza
@@ -244,39 +259,93 @@ curl -X POST http://localhost:3000/api/almacen/simular-peso \
   -H "Content-Type: application/json" \
   -d '{"presupuesto_item_id": "uuid-del-item"}'
 
-# Registrar entrega
+# Finalizar presupuesto en almacén
+curl -X POST http://localhost:3000/api/almacen/presupuesto/finalizar \
+  -H "Content-Type: application/json" \
+  -d '{"presupuesto_id": "uuid-presupuesto"}'
+
+# Registrar cobro desde reparto
 curl -X POST http://localhost:3000/api/reparto/entrega \
   -H "Content-Type: application/json" \
-  -d '{"pedido_id": "uuid-del-pedido", "monto_cobrado": 1250.50}'
+  -d '{
+    "pedido_id": "uuid-pedido",
+    "metodo_pago": "efectivo",
+    "monto_cobrado": 1250.50
+  }'
 
-# Ver movimientos de tesorería
+# Registrar devolución
+curl -X POST http://localhost:3000/api/reparto/devoluciones \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pedido_id": "uuid-pedido",
+    "producto_id": "uuid-producto",
+    "cantidad": 2,
+    "motivo": "producto_dañado"
+  }'
+
+# Ver movimientos de tesorería en tiempo real
 curl http://localhost:3000/api/tesoreria/movimientos-tiempo-real
+
+# Facturar presupuesto directo (sin almacén)
+curl -X POST http://localhost:3000/api/ventas/presupuestos/facturar \
+  -H "Content-Type: application/json" \
+  -d '{"presupuesto_id": "uuid-presupuesto"}'
 ```
 
-### Verificación de Funciones RPC
+**3. Funciones RPC de Supabase:**
 
 En Supabase SQL Editor:
 ```sql
--- Probar reserva de stock
+-- Verificar reserva preventiva de stock
 SELECT * FROM fn_reservar_stock_por_presupuesto('uuid-presupuesto');
 
--- Probar conversión a pedido
-SELECT * FROM fn_convertir_presupuesto_a_pedido('uuid-presupuesto', 'uuid-user', 'uuid-caja');
-
--- Probar actualización de peso
+-- Actualizar peso de item pesable
 SELECT * FROM fn_actualizar_peso_item_presupuesto('uuid-item', 5.25);
+
+-- Convertir presupuesto a pedido
+SELECT * FROM fn_convertir_presupuesto_a_pedido(
+  'uuid-presupuesto',
+  'uuid-usuario',
+  'uuid-caja'
+);
+
+-- Asignar vehículos por peso
+SELECT * FROM fn_asignar_vehiculos_por_peso('2025-11-20'::date, 'tarde'::text);
+
+-- Registrar cobro desde reparto
+SELECT * FROM fn_registrar_cobro_reparto(
+  'uuid-pedido',
+  'efectivo'::text,
+  1250.50,
+  'uuid-repartidor',
+  NULL,
+  NULL
+);
 ```
 
-### Checklist de Aceptación
+### ✅ Checklist de Validación Rápida
 
-- [ ] Bot crea presupuesto con número único
-- [ ] Reserva preventiva funciona (sin descontar stock físico)
+**Funcionalidades Core:**
+- [ ] Bot crea presupuestos con números únicos (PRES-YYYYMMDD-XXXX)
+- [ ] Clientes se crean como deudores por defecto
+- [ ] Presupuestos soportan múltiples métodos de pago con recargos
+- [ ] Reserva preventiva de stock (no descuenta físicamente)
+- [ ] Vendedor puede facturar directo (sin productos pesables)
 - [ ] Vendedor puede enviar a almacén
-- [ ] Almacén puede simular/fijar pesos
-- [ ] Conversión atómica presupuesto → pedido
-- [ ] Reparto registra entregas y cobros
+- [ ] Almacén ve totales por zona/turno y asigna vehículos automáticamente
+- [ ] Almacén puede pesar productos de categoría "balanza"
+- [ ] Almacén puede finalizar presupuesto → convierte a pedido
+- [ ] Repartidor ve rutas y puede registrar cobros/devoluciones
 - [ ] Tesorería muestra movimientos en tiempo real
-- [ ] Todo el flujo funciona end-to-end
+
+**Validaciones de Datos:**
+- [ ] Stock se descuenta correctamente después de finalizar
+- [ ] Precios se recalculan según peso real
+- [ ] Totales son correctos en cada paso
+- [ ] Estados se actualizan correctamente
+- [ ] Movimientos de caja se registran automáticamente
+
+**Ver la guía completa en [`TESTING.md`](./TESTING.md) para pruebas detalladas de cada módulo.**
 
 ## 💰 Tesorería y Gastos (Hito Intermedio)
 
