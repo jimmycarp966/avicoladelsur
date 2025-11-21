@@ -21,7 +21,7 @@ export function PresupuestosDiaFiltros({ zonas, fecha, zonaId, turno }: Presupue
 
   const handleFilterChange = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString())
-    if (value) {
+    if (value && value !== 'all') {
       params.set(key, value)
     } else {
       params.delete(key)
@@ -57,12 +57,12 @@ export function PresupuestosDiaFiltros({ zonas, fecha, zonaId, turno }: Presupue
               <MapPin className="h-4 w-4" />
               Zona
             </Label>
-            <Select value={zonaId || ''} onValueChange={(value) => handleFilterChange('zona_id', value)}>
+            <Select value={zonaId || 'all'} onValueChange={(value) => handleFilterChange('zona_id', value)}>
               <SelectTrigger id="zona">
                 <SelectValue placeholder="Todas las zonas" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todas las zonas</SelectItem>
+                <SelectItem value="all">Todas las zonas</SelectItem>
                 {zonas.map(zona => (
                   <SelectItem key={zona.id} value={zona.id}>
                     {zona.nombre}
@@ -77,12 +77,12 @@ export function PresupuestosDiaFiltros({ zonas, fecha, zonaId, turno }: Presupue
               <Clock className="h-4 w-4" />
               Turno
             </Label>
-            <Select value={turno || ''} onValueChange={(value) => handleFilterChange('turno', value)}>
+            <Select value={turno || 'all'} onValueChange={(value) => handleFilterChange('turno', value)}>
               <SelectTrigger id="turno">
                 <SelectValue placeholder="Todos los turnos" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos los turnos</SelectItem>
+                <SelectItem value="all">Todos los turnos</SelectItem>
                 <SelectItem value="mañana">Mañana</SelectItem>
                 <SelectItem value="tarde">Tarde</SelectItem>
               </SelectContent>

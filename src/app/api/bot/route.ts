@@ -500,13 +500,6 @@ async function handleTwilioWebhook(formData: FormData) {
 
 📝 *Responde con el número* de la opción que deseas.
 
-💡 *Comandos rápidos:*
-• Escribe *productos* para ver el catálogo completo
-• Escribe *[CODIGO] [CANTIDAD]* para crear un presupuesto
-   Ejemplo: *POLLO001 5*
-• Escribe *estado PRES-XXXXX* para consultar un presupuesto
-• Escribe *deuda* para ver tu saldo pendiente
-
 ❓ Escribe *ayuda* en cualquier momento para ver este menú`
     }
     // Comando: Opciones del menú numérico

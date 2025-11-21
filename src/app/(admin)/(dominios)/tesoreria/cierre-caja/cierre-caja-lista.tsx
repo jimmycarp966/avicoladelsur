@@ -38,7 +38,7 @@ export function CierreCajaLista({
 
   const handleFilterChange = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString())
-    if (value) {
+    if (value && value !== 'all') {
       params.set(key, value)
     } else {
       params.delete(key)
@@ -66,12 +66,12 @@ export function CierreCajaLista({
         <div className="mb-6 grid gap-4 md:grid-cols-4">
           <div className="space-y-2">
             <Label htmlFor="filtro-caja">Caja</Label>
-            <Select value={cajaId || ''} onValueChange={(value) => handleFilterChange('caja_id', value)}>
+            <Select value={cajaId || 'all'} onValueChange={(value) => handleFilterChange('caja_id', value)}>
               <SelectTrigger id="filtro-caja">
                 <SelectValue placeholder="Todas las cajas" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todas las cajas</SelectItem>
+                <SelectItem value="all">Todas las cajas</SelectItem>
                 {cajas.map(caja => (
                   <SelectItem key={caja.id} value={caja.id}>
                     {caja.nombre}
@@ -93,12 +93,12 @@ export function CierreCajaLista({
 
           <div className="space-y-2">
             <Label htmlFor="filtro-estado">Estado</Label>
-            <Select value={estado || ''} onValueChange={(value) => handleFilterChange('estado', value)}>
+            <Select value={estado || 'all'} onValueChange={(value) => handleFilterChange('estado', value)}>
               <SelectTrigger id="filtro-estado">
                 <SelectValue placeholder="Todos" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos</SelectItem>
+                <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="abierto">Abierto</SelectItem>
                 <SelectItem value="cerrado">Cerrado</SelectItem>
               </SelectContent>

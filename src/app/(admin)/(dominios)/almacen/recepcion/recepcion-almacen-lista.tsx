@@ -35,7 +35,7 @@ export function RecepcionAlmacenLista({
 
   const handleFilterChange = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString())
-    if (value) {
+    if (value && value !== 'all') {
       params.set(key, value)
     } else {
       params.delete(key)
@@ -63,12 +63,12 @@ export function RecepcionAlmacenLista({
         <div className="mb-6 grid gap-4 md:grid-cols-4">
           <div className="space-y-2">
             <Label htmlFor="filtro-tipo">Tipo</Label>
-            <Select value={tipo || ''} onValueChange={(value) => handleFilterChange('tipo', value)}>
+            <Select value={tipo || 'all'} onValueChange={(value) => handleFilterChange('tipo', value)}>
               <SelectTrigger id="filtro-tipo">
                 <SelectValue placeholder="Todos" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos</SelectItem>
+                <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="ingreso">Ingreso</SelectItem>
                 <SelectItem value="egreso">Egreso</SelectItem>
               </SelectContent>
