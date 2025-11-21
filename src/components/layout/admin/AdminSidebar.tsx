@@ -59,7 +59,9 @@ const navigation = [
     icon: Truck,
     roles: ['admin'],
     children: [
+      { name: 'Planificación semanal', href: '/reparto/planificacion' },
       { name: 'Rutas', href: '/reparto/rutas' },
+      { name: 'Monitor GPS', href: '/reparto/monitor' },
       { name: 'Vehículos', href: '/reparto/vehiculos' },
     ],
   },
@@ -71,6 +73,7 @@ const navigation = [
     children: [
       { name: 'Cajas', href: '/tesoreria/cajas' },
       { name: 'Movimientos', href: '/tesoreria/movimientos' },
+      { name: 'Validar rutas', href: '/tesoreria/validar-rutas' },
       { name: 'Cierres de Caja', href: '/tesoreria/cierre-caja' },
       { name: 'Tesoro', href: '/tesoreria/tesoro' },
       { name: 'Gastos', href: '/tesoreria/gastos' },
