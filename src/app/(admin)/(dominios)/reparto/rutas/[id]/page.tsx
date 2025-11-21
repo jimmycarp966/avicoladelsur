@@ -44,7 +44,7 @@ export default async function RutaDetallePage({
     .select(
       `
         *,
-        repartidor:usuarios(nombre, apellido, telefono),
+        repartidor:usuarios!rutas_reparto_repartidor_id_fkey(nombre, apellido, telefono),
         vehiculo:vehiculos(patente, marca, modelo, capacidad_kg),
         zona:zonas(nombre),
         tesorero_validador:usuarios!rutas_reparto_tesorero_validador_id_fkey(nombre, apellido),

@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
       .select(`
         *,
         vehiculo:vehiculos(patente),
-        repartidor:usuarios(nombre, apellido),
+        repartidor:usuarios!alertas_reparto_repartidor_id_fkey(nombre, apellido),
         cliente:clientes(nombre),
         pedido:pedidos(numero_pedido)
       `)

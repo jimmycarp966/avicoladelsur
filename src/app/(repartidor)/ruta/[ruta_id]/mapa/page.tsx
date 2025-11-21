@@ -30,7 +30,7 @@ async function RutaMapaContent({ rutaId }: { rutaId: string }) {
     .select(
       `
         *,
-        repartidor:usuarios(id, nombre, apellido),
+        repartidor:usuarios!rutas_reparto_repartidor_id_fkey(id, nombre, apellido),
         vehiculo:vehiculos(patente, marca, modelo, capacidad_kg),
         zona:zonas(nombre),
         detalles_ruta (

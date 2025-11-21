@@ -950,7 +950,7 @@ export async function obtenerRutasPendientesValidacion() {
       .from('rutas_reparto')
       .select(`
         *,
-        repartidor:usuarios(nombre, apellido),
+        repartidor:usuarios!rutas_reparto_repartidor_id_fkey(nombre, apellido),
         vehiculo:vehiculos(patente, marca, modelo),
         zona:zonas(nombre),
         detalles_ruta (
