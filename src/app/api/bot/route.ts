@@ -767,6 +767,7 @@ async function handleTwilioWebhook(formData: FormData) {
     // Comando: Opciones del menú numérico
     else if (body === '1' || bodyLower === 'opcion 1') {
       // Consultar productos directamente con stock disponible desde la vista
+      // Mostrar TODOS los productos activos, incluso sin stock
       const supabase = await createClient()
       
       const { data: productos, error } = await supabase
@@ -780,12 +781,11 @@ async function handleTwilioWebhook(formData: FormData) {
           categoria,
           stock_disponible
         `)
-        .gt('stock_disponible', 0)
         .order('categoria')
         .order('nombre')
 
       if (error || !productos || productos.length === 0) {
-        responseMessage = 'No hay productos con stock disponible en este momento.'
+        responseMessage = 'No hay productos disponibles en este momento.'
       } else {
         const categorias = [...new Set(productos.map(p => p.categoria || 'Otros'))]
         
@@ -797,9 +797,13 @@ async function handleTwilioWebhook(formData: FormData) {
             .filter(p => (p.categoria || 'Otros') === categoria)
             .forEach((p) => {
               const stock = Number(p.stock_disponible) || 0
-              const stockEmoji = stock > 50 ? '🟢' : stock > 20 ? '🟡' : '🔴'
+              const stockEmoji = stock > 50 ? '🟢' : stock > 20 ? '🟡' : stock > 0 ? '🔴' : '⚪'
               responseMessage += `${stockEmoji} *[${p.codigo}]* ${p.nombre}\n`
-              responseMessage += `   💰 $${p.precio_venta}/${p.unidad_medida} | Stock: ${Math.floor(stock)}\n\n`
+              if (stock > 0) {
+                responseMessage += `   💰 $${p.precio_venta}/${p.unidad_medida} | Stock: ${Math.floor(stock)}\n\n`
+              } else {
+                responseMessage += `   💰 $${p.precio_venta}/${p.unidad_medida} | Stock: Sin stock disponible\n\n`
+              }
             })
         })
         
@@ -964,7 +968,11 @@ ${detalleProductos}
             
             const stockDisponible = productoConStock ? Number(productoConStock.stock_disponible) || 0 : 0
             
-            if (stockDisponible < cantidad) {
+            if (stockDisponible <= 0) {
+              hayError = true
+              errorMsg = `Sin stock disponible de ${producto.nombre}`
+              break
+            } else if (stockDisponible < cantidad) {
               hayError = true
               errorMsg = `Stock insuficiente de ${producto.nombre} (disponible: ${Math.floor(stockDisponible)})`
               break
@@ -1034,7 +1042,18 @@ Ejemplo:
           
           const stockDisponible = productoConStock ? Number(productoConStock.stock_disponible) || 0 : 0
 
-          if (stockDisponible < cantidad) {
+          if (stockDisponible <= 0) {
+            responseMessage = `❌ *Sin stock disponible*
+
+📦 *Producto:* ${producto.nombre}
+📊 *Solicitado:* ${cantidad} ${producto.unidad_medida}
+📦 *Disponible:* Sin stock
+
+💡 *Opciones:*
+   • Este producto no tiene stock disponible en este momento
+   • Consulta otros productos escribiendo *productos*
+   • Contacta a tu vendedor para más información`
+          } else if (stockDisponible < cantidad) {
             responseMessage = `❌ *Stock insuficiente*
 
 📦 *Producto:* ${producto.nombre}
@@ -1070,6 +1089,7 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
     // Comando: Productos
     else if (bodyLower.includes('productos') || bodyLower.includes('catalogo') || bodyLower.includes('lista')) {
       // Consultar productos directamente con stock disponible desde la vista
+      // Mostrar TODOS los productos activos, incluso sin stock
       const supabase = await createClient()
       
       const { data: productos, error } = await supabase
@@ -1083,7 +1103,6 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
           categoria,
           stock_disponible
         `)
-        .gt('stock_disponible', 0)
         .order('categoria')
         .order('nombre')
 
@@ -1091,7 +1110,7 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
         console.error('Error obteniendo productos:', error)
         responseMessage = 'Error al obtener productos. Intenta de nuevo.'
       } else if (!productos || productos.length === 0) {
-        responseMessage = 'No hay productos con stock disponible en este momento.'
+        responseMessage = 'No hay productos disponibles en este momento.'
       } else {
         const categorias = [...new Set(productos.map(p => p.categoria || 'Otros'))]
         
@@ -1103,9 +1122,13 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
             .filter(p => (p.categoria || 'Otros') === categoria)
             .forEach((p) => {
               const stock = Number(p.stock_disponible) || 0
-              const stockEmoji = stock > 50 ? '🟢' : stock > 20 ? '🟡' : '🔴'
+              const stockEmoji = stock > 50 ? '🟢' : stock > 20 ? '🟡' : stock > 0 ? '🔴' : '⚪'
               responseMessage += `${stockEmoji} *[${p.codigo}]* ${p.nombre}\n`
-              responseMessage += `   💰 $${p.precio_venta}/${p.unidad_medida} | Stock: ${Math.floor(stock)}\n\n`
+              if (stock > 0) {
+                responseMessage += `   💰 $${p.precio_venta}/${p.unidad_medida} | Stock: ${Math.floor(stock)}\n\n`
+              } else {
+                responseMessage += `   💰 $${p.precio_venta}/${p.unidad_medida} | Stock: Sin stock disponible\n\n`
+              }
             })
         })
         
