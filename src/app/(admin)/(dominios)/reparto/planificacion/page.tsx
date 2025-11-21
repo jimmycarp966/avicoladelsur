@@ -25,7 +25,6 @@ export default async function PlanificacionRutasPage() {
           zona_id,
           dia_semana,
           turno,
-          max_peso_kg,
           vehiculo_id,
           repartidor_id,
           zona:zonas(nombre),

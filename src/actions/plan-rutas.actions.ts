@@ -11,7 +11,6 @@ const planRutaSchema = z.object({
   turno: z.enum(['mañana', 'tarde']),
   vehiculoId: z.string().uuid('Vehículo inválido'),
   repartidorId: z.string().uuid().optional().nullable(),
-  maxPesoKg: z.coerce.number().positive().optional().nullable(),
 })
 
 export async function crearPlanRutaAction(formData: FormData) {
@@ -21,7 +20,6 @@ export async function crearPlanRutaAction(formData: FormData) {
     turno: formData.get('turno'),
     vehiculoId: formData.get('vehiculoId'),
     repartidorId: formData.get('repartidorId') || null,
-    maxPesoKg: formData.get('maxPesoKg') || null,
   })
 
   if (!parseResult.success) {
@@ -38,7 +36,6 @@ export async function crearPlanRutaAction(formData: FormData) {
     turno: data.turno,
     vehiculo_id: data.vehiculoId,
     repartidor_id: data.repartidorId || null,
-    max_peso_kg: data.maxPesoKg || null,
   })
 
   if (error) {

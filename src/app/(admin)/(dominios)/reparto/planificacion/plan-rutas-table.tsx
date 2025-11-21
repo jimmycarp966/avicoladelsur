@@ -54,7 +54,6 @@ export default function PlanRutasTable({ plan, diasSemana }: PlanRutasTableProps
                   <TableHead>Zona</TableHead>
                   <TableHead>Vehículo</TableHead>
                   <TableHead>Repartidor</TableHead>
-                  <TableHead>Capacidad (kg)</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -82,11 +81,6 @@ export default function PlanRutasTable({ plan, diasSemana }: PlanRutasTableProps
                       ) : (
                         <span className="text-xs text-muted-foreground">Sin asignar</span>
                       )}
-                    </TableCell>
-                    <TableCell>
-                      {entry.max_peso_kg
-                        ? `${entry.max_peso_kg} kg`
-                        : `${entry.vehiculo?.capacidad_kg ?? 0} kg`}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button

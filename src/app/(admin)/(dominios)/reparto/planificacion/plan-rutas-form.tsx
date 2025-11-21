@@ -12,7 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
 type Option = { id: string; nombre: string; apellido?: string | null; patente?: string }
@@ -138,11 +137,6 @@ export default function PlanRutasForm({
             ))}
           </SelectContent>
         </Select>
-      </div>
-
-      <div className="space-y-2">
-        <Label>Capacidad personalizada (kg)</Label>
-        <Input name="maxPesoKg" type="number" step="0.01" placeholder="Usar capacidad del vehículo" />
       </div>
 
       <input type="hidden" name="zonaId" value={zonaId} />
