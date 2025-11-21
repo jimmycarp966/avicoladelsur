@@ -766,63 +766,44 @@ async function handleTwilioWebhook(formData: FormData) {
     }
     // Comando: Opciones del menú numérico
     else if (body === '1' || bodyLower === 'opcion 1') {
-      // Redirigir a productos
+      // Consultar productos directamente con stock disponible desde la vista
       const supabase = await createClient()
       
       const { data: productos, error } = await supabase
-        .from('productos')
+        .from('productos_con_stock')
         .select(`
           id,
           codigo, 
           nombre, 
           precio_venta, 
           unidad_medida,
-          categoria
+          categoria,
+          stock_disponible
         `)
-        .eq('activo', true)
+        .gt('stock_disponible', 0)
         .order('categoria')
         .order('nombre')
-        .limit(10)
 
       if (error || !productos || productos.length === 0) {
-        responseMessage = 'No hay productos disponibles. Intenta más tarde.'
+        responseMessage = 'No hay productos con stock disponible en este momento.'
       } else {
-        const productosConStock = await Promise.all(
-          productos.map(async (p) => {
-            const { data: lotes } = await supabase
-              .from('lotes')
-              .select('cantidad_disponible')
-              .eq('producto_id', p.id)
-              .eq('estado', 'disponible')
-              .gte('fecha_vencimiento', new Date().toISOString().split('T')[0])
-            
-            const stockTotal = lotes?.reduce((sum, l) => sum + Number(l.cantidad_disponible), 0) || 0
-            return { ...p, stock: stockTotal }
-          })
-        )
-
-        const productosDisponibles = productosConStock.filter(p => p.stock > 0)
-
-        if (productosDisponibles.length > 0) {
-          const categorias = [...new Set(productosDisponibles.map(p => p.categoria || 'Otros'))]
-          
-          responseMessage = `📦 *Catálogo de Productos*\n\n`
-          
-          categorias.forEach(categoria => {
-            responseMessage += `*${categoria}:*\n`
-            productosDisponibles
-              .filter(p => (p.categoria || 'Otros') === categoria)
-              .forEach((p) => {
-                const stockEmoji = p.stock > 50 ? '🟢' : p.stock > 20 ? '🟡' : '🔴'
-                responseMessage += `${stockEmoji} *[${p.codigo}]* ${p.nombre}\n`
-                responseMessage += `   💰 $${p.precio_venta}/${p.unidad_medida} | Stock: ${Math.floor(p.stock)}\n\n`
-              })
-          })
-          
-          responseMessage += `\n💬 Para ordenar responde:\n*[CODIGO] [CANTIDAD]*\nEj: POLLO001 5`
-        } else {
-          responseMessage = 'No hay productos con stock disponible.'
-        }
+        const categorias = [...new Set(productos.map(p => p.categoria || 'Otros'))]
+        
+        responseMessage = `📦 *Catálogo de Productos*\n\n`
+        
+        categorias.forEach(categoria => {
+          responseMessage += `*${categoria}:*\n`
+          productos
+            .filter(p => (p.categoria || 'Otros') === categoria)
+            .forEach((p) => {
+              const stock = Number(p.stock_disponible) || 0
+              const stockEmoji = stock > 50 ? '🟢' : stock > 20 ? '🟡' : '🔴'
+              responseMessage += `${stockEmoji} *[${p.codigo}]* ${p.nombre}\n`
+              responseMessage += `   💰 $${p.precio_venta}/${p.unidad_medida} | Stock: ${Math.floor(stock)}\n\n`
+            })
+        })
+        
+        responseMessage += `\n💬 Para ordenar responde:\n*[CODIGO] [CANTIDAD]*\nEj: POLLO001 5`
       }
     }
     else if (body === '2' || bodyLower === 'opcion 2') {
@@ -973,16 +954,15 @@ ${detalleProductos}
               break
             }
             
-            // Verificar stock
+            // Verificar stock disponible consultando productos con stock
             const supabase = await createClient()
-            const { data: lotes } = await supabase
-              .from('lotes')
-              .select('cantidad_disponible')
-              .eq('producto_id', producto.id)
-              .eq('estado', 'disponible')
-              .gte('fecha_vencimiento', new Date().toISOString().split('T')[0])
+            const { data: productoConStock } = await supabase
+              .from('productos_con_stock')
+              .select('stock_disponible')
+              .eq('id', producto.id)
+              .single()
             
-            const stockDisponible = lotes?.reduce((sum, l) => sum + Number(l.cantidad_disponible), 0) || 0
+            const stockDisponible = productoConStock ? Number(productoConStock.stock_disponible) || 0 : 0
             
             if (stockDisponible < cantidad) {
               hayError = true
@@ -1044,15 +1024,15 @@ Ejemplo:
         if (!producto) {
           responseMessage = `❌ Producto *${codigo}* no encontrado.\n\nEscribe *1* para ver productos disponibles.`
         } else {
+          // Verificar stock disponible consultando productos con stock
           const supabase = await createClient()
-          const { data: lotes } = await supabase
-            .from('lotes')
-            .select('cantidad_disponible')
-            .eq('producto_id', producto.id)
-            .eq('estado', 'disponible')
-            .gte('fecha_vencimiento', new Date().toISOString().split('T')[0])
+          const { data: productoConStock } = await supabase
+            .from('productos_con_stock')
+            .select('stock_disponible')
+            .eq('id', producto.id)
+            .single()
           
-          const stockDisponible = lotes?.reduce((sum, l) => sum + Number(l.cantidad_disponible), 0) || 0
+          const stockDisponible = productoConStock ? Number(productoConStock.stock_disponible) || 0 : 0
 
           if (stockDisponible < cantidad) {
             responseMessage = `❌ *Stock insuficiente*
@@ -1089,69 +1069,47 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
     }
     // Comando: Productos
     else if (bodyLower.includes('productos') || bodyLower.includes('catalogo') || bodyLower.includes('lista')) {
+      // Consultar productos directamente con stock disponible desde la vista
       const supabase = await createClient()
       
-      // Obtener productos con su stock disponible
       const { data: productos, error } = await supabase
-        .from('productos')
+        .from('productos_con_stock')
         .select(`
           id,
           codigo, 
           nombre, 
           precio_venta, 
           unidad_medida,
-          categoria
+          categoria,
+          stock_disponible
         `)
-        .eq('activo', true)
+        .gt('stock_disponible', 0)
         .order('categoria')
         .order('nombre')
-        .limit(10)
 
       if (error) {
         console.error('Error obteniendo productos:', error)
         responseMessage = 'Error al obtener productos. Intenta de nuevo.'
-      } else if (productos && productos.length > 0) {
-        // Obtener stock de cada producto
-        const productosConStock = await Promise.all(
-          productos.map(async (p) => {
-            const { data: lotes } = await supabase
-              .from('lotes')
-              .select('cantidad_disponible')
-              .eq('producto_id', p.id)
-              .eq('estado', 'disponible')
-              .gte('fecha_vencimiento', new Date().toISOString().split('T')[0])
-            
-            const stockTotal = lotes?.reduce((sum, l) => sum + Number(l.cantidad_disponible), 0) || 0
-            return { ...p, stock: stockTotal }
-          })
-        )
-
-        // Filtrar productos con stock
-        const productosDisponibles = productosConStock.filter(p => p.stock > 0)
-
-        if (productosDisponibles.length > 0) {
-          // Agrupar por categoría
-          const categorias = [...new Set(productosDisponibles.map(p => p.categoria || 'Otros'))]
-          
-          responseMessage = `📦 *Catálogo de Productos*\n\n`
-          
-          categorias.forEach(categoria => {
-            responseMessage += `*${categoria}:*\n`
-            productosDisponibles
-              .filter(p => (p.categoria || 'Otros') === categoria)
-              .forEach((p) => {
-                const stockEmoji = p.stock > 50 ? '🟢' : p.stock > 20 ? '🟡' : '🔴'
-                responseMessage += `${stockEmoji} *[${p.codigo}]* ${p.nombre}\n`
-                responseMessage += `   💰 $${p.precio_venta}/${p.unidad_medida} | Stock: ${Math.floor(p.stock)}\n\n`
-              })
-          })
-          
-          responseMessage += `\n💬 Para ordenar escribe:\n*[CODIGO] [CANTIDAD]*\nEj: POLLO001 5`
-        } else {
-          responseMessage = 'No hay productos con stock disponible en este momento.'
-        }
+      } else if (!productos || productos.length === 0) {
+        responseMessage = 'No hay productos con stock disponible en este momento.'
       } else {
-        responseMessage = 'No hay productos disponibles en este momento.'
+        const categorias = [...new Set(productos.map(p => p.categoria || 'Otros'))]
+        
+        responseMessage = `📦 *Catálogo de Productos*\n\n`
+        
+        categorias.forEach(categoria => {
+          responseMessage += `*${categoria}:*\n`
+          productos
+            .filter(p => (p.categoria || 'Otros') === categoria)
+            .forEach((p) => {
+              const stock = Number(p.stock_disponible) || 0
+              const stockEmoji = stock > 50 ? '🟢' : stock > 20 ? '🟡' : '🔴'
+              responseMessage += `${stockEmoji} *[${p.codigo}]* ${p.nombre}\n`
+              responseMessage += `   💰 $${p.precio_venta}/${p.unidad_medida} | Stock: ${Math.floor(stock)}\n\n`
+            })
+        })
+        
+        responseMessage += `\n💬 Para ordenar escribe:\n*[CODIGO] [CANTIDAD]*\nEj: POLLO001 5`
       }
     }
     // Consulta de deuda
@@ -1191,16 +1149,15 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
             if (!producto) {
               responseMessage = `❌ Producto *${codigo}* no encontrado. Envía "productos" para ver el catálogo.`
             } else {
-              // Verificar stock disponible
+              // Verificar stock disponible consultando productos con stock
               const supabase = await createClient()
-              const { data: lotes } = await supabase
-                .from('lotes')
-                .select('cantidad_disponible')
-                .eq('producto_id', producto.id)
-                .eq('estado', 'disponible')
-                .gte('fecha_vencimiento', new Date().toISOString().split('T')[0])
+              const { data: productoConStock } = await supabase
+                .from('productos_con_stock')
+                .select('stock_disponible')
+                .eq('id', producto.id)
+                .single()
               
-              const stockDisponible = lotes?.reduce((sum, l) => sum + Number(l.cantidad_disponible), 0) || 0
+              const stockDisponible = productoConStock ? Number(productoConStock.stock_disponible) || 0 : 0
 
           if (stockDisponible < cantidad) {
             responseMessage = `❌ *Stock insuficiente*
