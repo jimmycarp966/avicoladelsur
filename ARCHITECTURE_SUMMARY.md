@@ -70,7 +70,7 @@ supabase/                         # Scripts SQL y migraciones
 1. **Single Source of Truth**: Todo gira alrededor de Supabase como BD central
 2. **Server-Side First**: Server Actions manejan toda lógica crítica, validaciones y operaciones atómicas
 3. **Planificación Semanal**: Rutas se definen por semana (zona/día/turno/vehículo) y pedidos se asignan automáticamente
-4. **Turnos Automáticos**: Pedidos sin turno definido lo heredan según hora de confirmación (<06:00 mañana, ≥06:00 tarde)
+4. **Turnos Automáticos**: Pedidos sin turno definido lo heredan según hora de confirmación (<05:00 mañana mismo día, 05:00-15:00 tarde mismo día, ≥15:00 mañana día siguiente)
 5. **Asignación Automática**: fn_asignar_pedido_a_ruta() busca rutas planificadas y valida capacidad por peso final
 6. **FIFO Automático**: Sistema de lotes con descuento automático del más antiguo primero
 7. **RLS Estricto**: Cada tabla tiene Row Level Security por roles (admin, vendedor, repartidor, almacenista)
@@ -107,13 +107,17 @@ supabase/                         # Scripts SQL y migraciones
 - **Optimización de Rutas**: Google Directions API con fallback local (Nearest Neighbor + 2-opt)
 - **GPS Tracking**: PWA móvil envía ubicación cada 5s durante reparto activo
 - **Alertas Automáticas**: Desvío (>200m) y cliente saltado (<100m sin entrega)
-- **PWA Móvil**: Hoja ruta digital con GPS, entregas y cobros en tiempo real
+- **PWA Móvil**: Hoja ruta digital con GPS, entregas y registro de pagos
+- **Registro de Pagos**: Repartidores registran estado de pago (Ya pagó/Pendiente/Pagará después) durante la ruta
+- **Validación de Cobros**: Sistema de validación donde tesorero verifica y acredita cobros antes de afectar caja
 - **Firma Digital**: Verificación con QR y subida automática a Supabase Storage
 
 ### 💵 **Tesorería**: Control Financiero
 - **Cajas**: Por sucursal con saldos iniciales/actuales
 - **Movimientos**: Ingresos/egresos ligados a pedidos/gastos
 - **Cuentas Corrientes**: Control saldos y límites por cliente
+- **Validación de Cobros**: Repartidores registran pagos durante ruta, tesorero valida antes de acreditar en caja
+- **Página de Validación**: `/tesoreria/validar-rutas` para revisar y validar rutas completadas
 - **Reportes**: CSV/PDF export con pdfkit
 
 ### 🤖 **Bot WhatsApp**: Automatización de Ventas
@@ -158,7 +162,7 @@ supabase/                         # Scripts SQL y migraciones
 #### **2. Creación de Pedidos** (Automática)
 - **Bot WhatsApp**: Toma pedidos naturales, valida stock, reserva FIFO
 - **Vendedor Web**: Crea presupuestos con zona opcional
-- **Turno automático**: Si no definido → <06:00 mañana, ≥06:00 tarde
+- **Turno automático**: Si no definido → <05:00 mañana mismo día, 05:00-15:00 tarde mismo día, ≥15:00 mañana día siguiente
 - **Asignación automática**: Busca ruta planificada por zona/turno/día, valida capacidad
 
 #### **3. Procesamiento en Almacén** (Semi-automático)
@@ -173,8 +177,11 @@ supabase/                         # Scripts SQL y migraciones
 - **Monitor admin**: Mapa Leaflet en tiempo real con polylíneas y alertas
 - **Alertas**: Desvío (>200m) y cliente saltado (<100m sin entrega)
 
-#### **5. Cobro y Conciliación** (Automático)
-- Cobros en PWA → actualización inmediata en cuentas corrientes
+#### **5. Cobro y Conciliación** (Semi-automático con Validación)
+- **Registro de pagos**: Repartidores registran estado de pago durante la ruta (Ya pagó/Pendiente/Pagará después)
+- **Validación requerida**: Todas las entregas deben tener estado de pago definido antes de finalizar ruta
+- **Validación tesorero**: Tesorero revisa rutas completadas, verifica montos y valida antes de acreditar en caja
+- **Movimientos de caja**: Se crean solo tras validación del tesorero, agrupados por método de pago
 - Referencias PAY-XXXXXX para seguimiento
 - Reportes CSV/PDF de movimientos y rutas
 
@@ -182,9 +189,10 @@ supabase/                         # Scripts SQL y migraciones
 - **Vehículos fijos**: 3 modelos con capacidades específicas
 - **Planificación semanal**: Rutas predeterminadas por zona/día/turno
 - **Validación de capacidad**: Peso final ≤ capacidad vehículo planificada
-- **Turnos automáticos**: Basados en hora de confirmación Buenos Aires
+- **Turnos automáticos**: Basados en hora de confirmación Buenos Aires (5:00 AM y 15:00 como cortes)
 - **GPS tracking**: Polling cada 5s durante reparto activo
 - **Optimización híbrida**: Google Directions + fallback local robusto
+- **Validación de cobros**: Sistema de doble verificación (repartidor registra, tesorero valida)
 - **RLS completo**: Políticas por rol en todas las tablas
 - **Operaciones atómicas**: Todas las transacciones críticas en RPCs
 
@@ -192,4 +200,4 @@ supabase/                         # Scripts SQL y migraciones
 
 ---
 
-*Resumen actualizado el 20/11/2025 - Flujo completo implementado y listo para pruebas*
+*Resumen actualizado el 27/11/2025 - Sistema de validación de cobros y horarios de corte actualizados implementados*

@@ -162,7 +162,8 @@ scripts/                         # Scripts de automatización
 - **App nativa-like**: Dashboard, entregas, GPS tracking
 - **Hoja ruta digital**: `/repartidor/ruta/[ruta_id]` con optimización visual
 - **GPS tracking**: Envío automático cada 5s durante reparto activo
-- **Cobros integrados**: Registro de pagos con referencias PAY-XXXXXX
+- **Registro de pagos**: Estados "Ya pagó", "Pendiente de pago", "Pagará después" con método y monto
+- **Validación requerida**: Todas las entregas deben tener estado de pago definido antes de finalizar ruta
 - **Firma digital**: QR verificación + subida automática a Storage
 
 ### 🗺️ **Optimización de Rutas Híbrida**
@@ -191,6 +192,7 @@ scripts/                         # Scripts de automatización
 - **Cajas múltiples**: Por sucursal con cierres automáticos
 - **Movimientos atómicos**: RPC `fn_crear_movimiento_caja()`
 - **Referencias pago**: PAY-YYYYMMDD-XXXXXX para seguimiento
+- **Validación de cobros**: Repartidores registran pagos durante ruta, tesorero valida antes de acreditar en caja
 - **Reportes CSV/PDF**: Business intelligence completa
 
 ### 🔐 **Seguridad y Roles**
@@ -461,6 +463,7 @@ El hito intermedio incorpora la capa financiera básica:
 - ✅ Reportes de ventas, gastos, movimientos de caja y cuentas corrientes con **export CSV y PDF** server-side.
 - ✅ **Referencias de pago** generadas automáticamente para pedidos con pago diferido.
 - ✅ **Instrucciones para repartidores** con monto y referencia de pago.
+- ✅ **Sistema de validación de cobros**: Repartidores registran pagos durante la ruta (estado, método, monto), tesorero valida antes de acreditar en caja. Los movimientos de caja se crean solo tras validación del tesorero.
 
 ### Endpoints nuevos
 
@@ -471,6 +474,8 @@ El hito intermedio incorpora la capa financiera básica:
 | `GET/POST` | `/api/gastos` | Listado de gastos y registro con afectación opcional a caja. **Soporta adjuntos en Storage**. |
 | `GET/POST` | `/api/cuentas_corrientes` | Consultar cuentas y registrar pagos manuales de pedidos. |
 | `POST` | `/api/reportes/export` | Genera **CSV o PDF** para ventas, gastos, movimientos de caja y cuentas corrientes. |
+| `POST` | `/api/reparto/entrega` | Registrar entrega y estado de pago (sin crear movimientos de caja hasta validación). |
+| `GET` | `/api/reparto/ubicacion-actual` | Obtener última ubicación GPS del repartidor/vehículo. |
 
 ### RPC / Funciones Supabase
 
@@ -480,6 +485,9 @@ El hito intermedio incorpora la capa financiera básica:
 - `fn_procesar_pedido`: flujo atómico de pedidos (web/bot) con descuento FIFO, cuentas corrientes, caja y **generación de referencia de pago**.
 - `fn_crear_pedido_bot`: wrapper para pedidos creados desde WhatsApp.
 - `fn_consultar_stock_por_lote`: consulta lotes disponibles ordenados por FIFO (fecha de vencimiento y fecha de ingreso).
+- `fn_convertir_presupuesto_a_pedido`: convierte presupuesto a pedido con horarios de corte actualizados (5:00 AM y 15:00).
+- `fn_actualizar_recaudacion_ruta`: actualiza automáticamente la recaudación total registrada de una ruta.
+- `fn_obtener_ultima_ubicacion_por_vehiculo`: obtiene última ubicación GPS por vehículo.
 
 ### Cómo probar en ambiente de prueba
 
@@ -651,7 +659,7 @@ Sistema completo de optimización de rutas y tracking en tiempo real integrado a
 - 🚨 **Alertas Automáticas**: Desvío de ruta (>200m) y cliente saltado (<100m sin entregar)
 - 📊 **Monitor Admin**: Visualización en tiempo real de vehículos, rutas y alertas en mapa Leaflet
 - 🔄 **Polling Inteligente**: Actualización automática cada 5 segundos en monitor admin
-- 🕕 **Turnos Automáticos**: Pedidos confirmados antes de las 06:00 → turno mañana; desde las 06:00 → turno tarde
+- 🕕 **Turnos Automáticos**: Pedidos confirmados antes de las 05:00 → turno mañana del mismo día; entre 05:00-15:00 → turno tarde del mismo día; después de las 15:00 → turno mañana del día siguiente
 - 🚚 **Asignación a Rutas Planificadas**: Cada pedido facturado se ubica en la ruta diaria definida (fecha + zona + turno). Si no hay plan para esa combinación se bloquea la conversión.
 
 ### Configuración
@@ -723,8 +731,9 @@ Ver la guía completa en [`docs/GOOGLE_MAPS_SETUP.md`](./docs/GOOGLE_MAPS_SETUP.
 curl http://localhost:3000/api/reparto/alertas
 
 # 5. Turnos automáticos
-#   - Confirmar presupuesto antes de las 06:00 -> pedido turno mañana
-#   - Confirmar presupuesto después de las 06:00 -> pedido turno tarde
+#   - Confirmar presupuesto antes de las 05:00 -> pedido turno mañana del mismo día
+#   - Confirmar presupuesto entre 05:00-15:00 -> pedido turno tarde del mismo día
+#   - Confirmar presupuesto después de las 15:00 -> pedido turno mañana del día siguiente
 
 # 6. Asignación automática de rutas
 #   - Tras convertir un presupuesto, consultar la tabla rutas_reparto y detalles_ruta
