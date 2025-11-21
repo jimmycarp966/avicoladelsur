@@ -645,12 +645,20 @@ Para ver los productos disponibles, escribe *1* o *productos*`
               })
 
               const baseUrl = getBaseUrl()
-              const detalleProductos = items.length <= 3 
-                ? items.map((item, idx) => {
-                    const prod = pending.productos.find(p => p.codigo === item.codigo)
-                    return `   ${idx + 1}. ${prod?.nombre || 'Producto'} - ${item.cantidad} ${prod?.unidad || 'un'}`
-                  }).join('\n')
-                : `${items.length} productos diferentes`
+              
+              // Obtener nombres de productos para el detalle
+              const productosDetalle = await Promise.all(
+                pending.productos.map(async (prod) => {
+                  const producto = await findProductoByCode(prod.codigo)
+                  return producto 
+                    ? `${prod.cantidad} ${producto.unidad_medida} - ${producto.nombre}`
+                    : `${prod.cantidad} - ${prod.codigo}`
+                })
+              )
+              
+              const detalleProductos = productosDetalle.length <= 3
+                ? productosDetalle.map((detalle, idx) => `   ${idx + 1}. ${detalle}`).join('\n')
+                : `${productosDetalle.length} productos diferentes`
 
               responseMessage = `✅ *¡Presupuesto Creado Exitosamente!*
 
