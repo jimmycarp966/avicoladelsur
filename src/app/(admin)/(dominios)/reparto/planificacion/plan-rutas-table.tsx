@@ -66,10 +66,12 @@ export default function PlanRutasTable({ plan, diasSemana }: PlanRutasTableProps
                         year: 'numeric',
                       })
                     : 'N/A'
+                  // Convertir día de BD (0=domingo, 1=lunes, ..., 6=sábado) a índice del array (0=lunes, 6=domingo)
+                  const diaIdx = entry.dia_semana === 0 ? 6 : entry.dia_semana - 1
                   return (
                     <TableRow key={entry.id}>
                       <TableCell className="text-sm text-muted-foreground">{semanaInicio}</TableCell>
-                      <TableCell>{diasSemana[entry.dia_semana]}</TableCell>
+                      <TableCell>{diasSemana[diaIdx]}</TableCell>
                       <TableCell>
                         <Badge variant="secondary" className="capitalize">
                           {entry.turno}

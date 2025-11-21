@@ -17,7 +17,9 @@ import {
   TableRow,
 } from '@/components/ui/table'
 
-const DIAS_SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+// Días ordenados de lunes a domingo (índice 0 = lunes, índice 6 = domingo)
+// Pero en BD: 0=domingo, 1=lunes, ..., 6=sábado
+const DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 
 interface SemanaCardProps {
   semana: {
@@ -115,9 +117,12 @@ export default function SemanaCard({ semana }: SemanaCardProps) {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {semana.planes.map((plan) => (
-                        <TableRow key={plan.id}>
-                          <TableCell>{DIAS_SEMANA[plan.dia_semana]}</TableCell>
+                      {semana.planes.map((plan) => {
+                        // Convertir día de BD (0=domingo, 1=lunes, ..., 6=sábado) a índice del array (0=lunes, 6=domingo)
+                        const diaIdx = plan.dia_semana === 0 ? 6 : plan.dia_semana - 1
+                        return (
+                          <TableRow key={plan.id}>
+                            <TableCell>{DIAS_SEMANA[diaIdx]}</TableCell>
                           <TableCell>
                             <Badge variant="secondary" className="capitalize">
                               {plan.turno}
@@ -140,7 +145,8 @@ export default function SemanaCard({ semana }: SemanaCardProps) {
                             )}
                           </TableCell>
                         </TableRow>
-                      ))}
+                        )
+                      })}
                     </TableBody>
                   </Table>
                 </div>

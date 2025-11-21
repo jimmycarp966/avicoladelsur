@@ -7,8 +7,9 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import ModalPlan from './modal-plan'
 
-const DIAS_SEMANA = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
-const DIAS_SEMANA_COMPLETOS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+// Días ordenados de lunes a domingo (índice 0 = lunes, índice 6 = domingo)
+const DIAS_SEMANA = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+const DIAS_SEMANA_COMPLETOS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 const TURNOS = ['mañana', 'tarde'] as const
 
 type ZonaOption = { id: string; nombre: string }
@@ -42,12 +43,24 @@ export default function CalendarioSemanal({
   const [selectedDia, setSelectedDia] = useState<number | null>(null)
   const [selectedTurno, setSelectedTurno] = useState<'mañana' | 'tarde' | null>(null)
 
-  const getPlan = (diaSemana: number, turno: 'mañana' | 'tarde') => {
-    return planes.find((p) => p.dia_semana === diaSemana && p.turno === turno)
+  // Convertir índice del calendario (0=lunes, 6=domingo) a día de semana de BD (1=lunes, 0=domingo)
+  const calendarioIdxToDiaSemana = (idx: number): number => {
+    // idx 0 (lunes) -> BD 1 (lunes)
+    // idx 1 (martes) -> BD 2 (martes)
+    // ...
+    // idx 5 (sábado) -> BD 6 (sábado)
+    // idx 6 (domingo) -> BD 0 (domingo)
+    return idx === 6 ? 0 : idx + 1
   }
 
-  const handleCellClick = (diaSemana: number, turno: 'mañana' | 'tarde') => {
-    setSelectedDia(diaSemana)
+  const getPlan = (calendarioIdx: number, turno: 'mañana' | 'tarde') => {
+    const diaSemanaBD = calendarioIdxToDiaSemana(calendarioIdx)
+    return planes.find((p) => p.dia_semana === diaSemanaBD && p.turno === turno)
+  }
+
+  const handleCellClick = (calendarioIdx: number, turno: 'mañana' | 'tarde') => {
+    const diaSemanaBD = calendarioIdxToDiaSemana(calendarioIdx)
+    setSelectedDia(diaSemanaBD)
     setSelectedTurno(turno)
     setModalOpen(true)
   }
@@ -64,7 +77,10 @@ export default function CalendarioSemanal({
 
   const getPlanExistente = () => {
     if (selectedDia === null || selectedTurno === null) return null
-    const plan = getPlan(selectedDia, selectedTurno)
+    // selectedDia es el día de la BD (0=domingo, 1=lunes, etc.)
+    // Necesitamos convertirlo al índice del calendario (0=lunes, 6=domingo)
+    const calendarioIdx = selectedDia === 0 ? 6 : selectedDia - 1
+    const plan = getPlan(calendarioIdx, selectedTurno)
     return plan
       ? {
           id: plan.id,

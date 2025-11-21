@@ -15,7 +15,9 @@ export const metadata: Metadata = {
   title: 'Planificación de Rutas',
 }
 
-const DIAS_SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+// Días ordenados de lunes a domingo (índice 0 = lunes, índice 6 = domingo)
+// Pero en BD: 0=domingo, 1=lunes, ..., 6=sábado
+const DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 
 export default async function PlanificacionRutasPage() {
   const supabase = await createClient()
