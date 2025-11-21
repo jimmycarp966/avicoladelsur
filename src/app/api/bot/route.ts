@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { crearPresupuestoAction } from '@/actions/presupuestos.actions'
 import { crearReclamoBot, crearClienteDesdeBot } from '@/actions/ventas.actions'
 
 // Tipos para las llamadas de Botpress
@@ -282,12 +281,11 @@ Selecciona tu *localidad* (responde con el número):
 Sin embargo, no se pudieron procesar los productos de tu pedido. Por favor intenta crear un nuevo presupuesto escribiendo el código y cantidad.`
       }
 
-      const formData = new FormData()
-      formData.append('cliente_id', clienteId)
-      formData.append('observaciones', 'Presupuesto desde WhatsApp - Cliente nuevo')
-      formData.append('items', JSON.stringify(items))
-
-      const presupuestoResult = await crearPresupuestoAction(formData)
+      const presupuestoResult = await crearPresupuestoDirecto(
+        clienteId,
+        items,
+        'Presupuesto desde WhatsApp - Cliente nuevo'
+      )
 
       if (presupuestoResult.success && presupuestoResult.data) {
         const numeroPresupuesto = presupuestoResult.data.numero_presupuesto || presupuestoResult.data.numeroPresupuesto
@@ -338,6 +336,53 @@ Por favor intenta crear un nuevo presupuesto escribiendo el código y cantidad.`
 
     default:
       return null
+  }
+}
+
+// Función auxiliar para crear presupuesto directamente (bypass de auth de usuario)
+async function crearPresupuestoDirecto(
+  clienteId: string,
+  items: any[],
+  observaciones: string,
+  shouldNotify: boolean = true
+) {
+  const supabase = await createClient()
+
+  // Map items to format expected by RPC
+  const itemsJson = items.map(item => ({
+    producto_id: item.producto_id,
+    cantidad: item.cantidad || item.cantidad_solicitada,
+  }))
+
+  const { data: result, error } = await supabase.rpc('fn_crear_presupuesto_desde_bot', {
+    p_cliente_id: clienteId,
+    p_items: itemsJson,
+    p_observaciones: observaciones,
+    p_zona_id: null
+  })
+
+  if (error) {
+    console.error('Error in crearPresupuestoDirecto RPC:', error)
+    return { success: false, message: 'Error al crear presupuesto (RPC)' }
+  }
+
+  if (!result.success) {
+    return { success: false, message: result.error || 'Error creando presupuesto' }
+  }
+
+  // Crear notificación
+  if (shouldNotify) {
+    await supabase.rpc('crear_notificacion', {
+      p_tipo: 'presupuesto_whatsapp',
+      p_titulo: 'Nuevo presupuesto desde WhatsApp',
+      p_mensaje: `Presupuesto ${result.numero_presupuesto} creado automáticamente`,
+      p_datos: { presupuesto_id: result.presupuesto_id, total: result.total_estimado }
+    })
+  }
+
+  return {
+    success: true,
+    data: result
   }
 }
 
@@ -395,16 +440,11 @@ async function handleBotpressWebhook(payload: BotpressWebhookPayload): Promise<B
         }
 
         // Crear presupuesto
-        const formData = new FormData()
-        formData.append('cliente_id', cliente.id)
-        formData.append('observaciones', parameters.observaciones || 'Presupuesto creado desde WhatsApp')
-        formData.append('items', JSON.stringify(items.map(item => ({
-          producto_id: item.producto_id,
-          cantidad_solicitada: item.cantidad,
-          precio_unit_est: item.precio_unitario
-        }))))
-
-        const result = await crearPresupuestoAction(formData)
+        const result = await crearPresupuestoDirecto(
+          cliente.id,
+          items,
+          parameters.observaciones || 'Presupuesto creado desde WhatsApp'
+        )
 
         if (result.success && result.data) {
           const numeroPresupuesto = result.data.numero_presupuesto || result.data.numeroPresupuesto
@@ -860,16 +900,12 @@ Para ver los productos disponibles, escribe *1* o *productos*`
             }
 
             // Crear presupuesto
-            const formData = new FormData()
-            formData.append('cliente_id', cliente.id)
-            formData.append('observaciones', 'Presupuesto desde WhatsApp')
-            formData.append('items', JSON.stringify(items.map(item => ({
-              producto_id: item.producto_id,
-              cantidad_solicitada: item.cantidad,
-              precio_unit_est: item.precio_unitario
-            }))))
-
-            const result = await crearPresupuestoAction(formData)
+            const result = await crearPresupuestoDirecto(
+              cliente.id,
+              items,
+              'Presupuesto desde WhatsApp',
+              false // Custom notification below
+            )
 
             if (result.success && result.data) {
               const numeroPresupuesto = result.data.numero_presupuesto || result.data.numeroPresupuesto
@@ -1220,16 +1256,15 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
    • Contacta a tu vendedor para alternativas`
               } else {
                 // Crear presupuesto
-                const formData = new FormData()
-                formData.append('cliente_id', cliente!.id)
-                formData.append('observaciones', 'Presupuesto creado desde WhatsApp')
-                formData.append('items', JSON.stringify([{
-                  producto_id: producto!.id,
-                  cantidad_solicitada: cantidad,
-                  precio_unit_est: producto!.precio_venta
-                }]))
-
-                const result = await crearPresupuestoAction(formData)
+                const result = await crearPresupuestoDirecto(
+                  cliente!.id,
+                  [{
+                    producto_id: producto!.id,
+                    cantidad: cantidad,
+                    precio_unitario: producto!.precio_venta
+                  }],
+                  'Presupuesto creado desde WhatsApp'
+                )
 
                 if (result.success && result.data) {
                   const numeroPresupuesto = result.data.numero_presupuesto || result.data.numeroPresupuesto
