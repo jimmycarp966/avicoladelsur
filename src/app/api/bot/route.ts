@@ -473,28 +473,6 @@ async function handleTwilioWebhook(formData: FormData) {
   const nombreCliente = cliente?.nombre || ''
 
   let responseMessage = ''
-  let buttonsToShow: Array<{ label: string; action: string }> | undefined = undefined
-
-  // Función auxiliar para crear mensaje con "botones" visuales
-  function formatMessageWithButtons(message: string, buttons?: Array<{ label: string; action: string }>): string {
-    if (!buttons || buttons.length === 0) {
-      return message
-    }
-    
-    let formatted = message
-    formatted += '\n\n'
-    formatted += '━━━━━━━━━━━━━━━━\n'
-    formatted += '📌 *Opciones rápidas:*\n\n'
-    
-    buttons.forEach((btn, idx) => {
-      const emoji = idx === 0 ? '1️⃣' : idx === 1 ? '2️⃣' : idx === 2 ? '3️⃣' : idx === 3 ? '4️⃣' : '•'
-      formatted += `${emoji} *${btn.label}*\n   → Escribe: *${btn.action}*\n\n`
-    })
-    
-    formatted += '━━━━━━━━━━━━━━━━'
-    
-    return formatted
-  }
 
   try {
     const bodyLower = body.toLowerCase()
@@ -530,14 +508,6 @@ async function handleTwilioWebhook(formData: FormData) {
 • Escribe *deuda* para ver tu saldo pendiente
 
 ❓ Escribe *ayuda* en cualquier momento para ver este menú`
-      
-      // Marcar para agregar botones visuales
-      buttonsToShow = [
-        { label: 'Ver Productos', action: '1' },
-        { label: 'Crear Presupuesto', action: '2' },
-        { label: 'Consultar Estado', action: '3' },
-        { label: 'Ver Deuda', action: 'deuda' }
-      ]
     }
     // Comando: Opciones del menú numérico
     else if (body === '1' || bodyLower === 'opcion 1') {
@@ -915,12 +885,6 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
           })
           
           responseMessage += `\n💬 Para ordenar escribe:\n*[CODIGO] [CANTIDAD]*\nEj: POLLO001 5`
-          
-          // Agregar botones visuales después de mostrar productos
-          buttonsToShow = [
-            { label: 'Crear Presupuesto', action: 'POLLO001 5' },
-            { label: 'Volver al Menú', action: 'menu' }
-          ]
         } else {
           responseMessage = 'No hay productos con stock disponible en este momento.'
         }
@@ -1138,15 +1102,11 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
     responseMessage = 'Error al procesar tu mensaje. Intenta de nuevo.'
   }
 
-  const finalMessage = buttonsToShow 
-    ? formatMessageWithButtons(responseMessage, buttonsToShow)
-    : responseMessage
-
   // Responder con TwiML
   return new Response(
     `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Message>${finalMessage.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</Message>
+  <Message>${responseMessage.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</Message>
 </Response>`,
     {
       status: 200,
