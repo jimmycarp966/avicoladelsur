@@ -10,11 +10,15 @@ import { crearAlertaSchema } from '@/lib/schemas/reparto'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createClient()
-    
+
+    // Obtener parámetros
+    const resolvedParams = await params
+    const { id } = resolvedParams
+
     // Verificar autenticación
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
@@ -23,12 +27,12 @@ export async function POST(
         { status: 401 }
       )
     }
-    
+
     // Validar body
     const body = await request.json()
     const validated = crearAlertaSchema.parse({
       ...body,
-      rutaId: params.id
+      rutaId: id
     })
     
     // Insertar alerta

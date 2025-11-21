@@ -9,11 +9,15 @@ import { createClient } from '@/lib/supabase/server'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createClient()
-    
+
+    // Obtener parámetros
+    const resolvedParams = await params
+    const { id } = resolvedParams
+
     // Verificar autenticación
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
@@ -22,8 +26,8 @@ export async function GET(
         { status: 401 }
       )
     }
-    
-    const rutaId = params.id
+
+    const rutaId = id
     
     // Obtener ruta planificada con polyline
     const { data: rutaPlanificada, error: rutaError } = await supabase

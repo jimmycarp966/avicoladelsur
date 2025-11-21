@@ -134,9 +134,16 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
   const parsePolyline = (polyline: string): [number, number][] => {
     if (!polyline) return []
     return polyline.split(';').map(p => {
-      const [lat, lng] = p.split(',')
-      return [parseFloat(lat), parseFloat(lng)]
-    }).filter(([lat, lng]) => !isNaN(lat) && !isNaN(lng))
+      const coords = p.split(',')
+      if (coords.length >= 2) {
+        const lat = parseFloat(coords[0])
+        const lng = parseFloat(coords[1])
+        if (!isNaN(lat) && !isNaN(lng)) {
+          return [lat, lng] as [number, number]
+        }
+      }
+      return null
+    }).filter((point): point is [number, number] => point !== null)
   }
 
   // Calcular centro del mapa

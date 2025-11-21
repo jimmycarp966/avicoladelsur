@@ -1,5 +1,3 @@
-'use server'
-
 import { Metadata } from 'next'
 
 import { createClient } from '@/lib/supabase/server'
@@ -40,7 +38,11 @@ export default async function PlanificacionRutasPage() {
       .from('vehiculos')
       .select('id, patente, marca, modelo, capacidad_kg')
       .eq('activo', true)
-      .order('patente', { ascending: true }),
+      .order('patente', { ascending: true })
+      .then(({ data, error }) => ({
+        data: data?.map(v => ({ ...v, nombre: v.patente })),
+        error
+      })),
     supabase
       .from('usuarios')
       .select('id, nombre, apellido')

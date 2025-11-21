@@ -21,30 +21,10 @@ export async function generateRutaOptimizada({
   rutaId,
   usarGoogle = false,
 }: GenerateRutaOptions) {
-  // Obtener ruta con pedidos y coordenadas
+  // Obtener información de la ruta
   const { data: ruta, error: rutaError } = await supabase
     .from('rutas_reparto')
-    .select(
-      `
-        id,
-        fecha_ruta,
-        zona_id,
-        vehiculo_id,
-        detalles_ruta (
-          id,
-          pedido_id,
-          orden_entrega,
-          pedidos (
-            cliente_id,
-            clientes (
-              id,
-              nombre,
-              coordenadas
-            )
-          )
-        )
-      `
-    )
+    .select('id, fecha_ruta, zona_id, vehiculo_id')
     .eq('id', rutaId)
     .single()
 
@@ -52,7 +32,34 @@ export async function generateRutaOptimizada({
     throw new Error('Ruta no encontrada para generar optimización')
   }
 
-  const detalles = ruta.detalles_ruta ?? []
+  // Obtener detalles de ruta con pedidos y coordenadas
+  const { data: detalles, error: detallesError } = await supabase
+    .from('detalles_ruta')
+    .select(
+      `
+        id,
+        pedido_id,
+        orden_entrega,
+        pedidos (
+          cliente_id,
+          clientes (
+            id,
+            nombre,
+            coordenadas
+          )
+        )
+      `
+    )
+    .eq('ruta_id', rutaId)
+    .order('orden_entrega', { ascending: true })
+
+  if (detallesError) {
+    throw new Error('Error al obtener detalles de ruta')
+  }
+
+  if (!detalles || detalles.length === 0) {
+    throw new Error('La ruta no tiene pedidos asignados para optimizar')
+  }
   if (detalles.length === 0) {
     throw new Error('La ruta no tiene pedidos asignados para optimizar')
   }
@@ -133,14 +140,14 @@ export async function generateRutaOptimizada({
     duracionTotal = localResult.estimatedDuration
   }
 
-  const { data: rutaPlanificada, error: saveError } = await supabase
+  const { data: rutaPlanificada, error: saveError } = await (supabase as any)
     .from('rutas_planificadas')
     .upsert(
       {
         ruta_reparto_id: rutaId,
-        fecha: ruta.fecha_ruta,
+        fecha: (ruta as any).fecha_ruta,
         zona_id: (ruta as any).zona_id,
-        vehiculo_id: ruta.vehiculo_id,
+        vehiculo_id: (ruta as any).vehiculo_id,
         estado: 'optimizada',
         orden_visita: ordenVisita,
         polyline,

@@ -47,13 +47,25 @@ export async function GET(request: NextRequest) {
     }
     
     // Si hay zona_id, filtrar por rutas de esa zona
+    let rutaIds: string[] = []
     if (zonaId) {
-      query = query.in('ruta_reparto_id', 
-        supabase
-          .from('rutas_reparto')
-          .select('id')
-          .eq('zona_id', zonaId)
-      )
+      const { data: rutas, error: rutasError } = await supabase
+        .from('rutas_reparto')
+        .select('id')
+        .eq('zona_id', zonaId)
+
+      if (rutasError) throw rutasError
+      rutaIds = rutas?.map(r => r.id) || []
+
+      if (rutaIds.length > 0) {
+        query = query.in('ruta_reparto_id', rutaIds)
+      } else {
+        // Si no hay rutas para la zona, devolver array vacío
+        return NextResponse.json({
+          success: true,
+          data: []
+        })
+      }
     }
     
     const { data, error } = await query
