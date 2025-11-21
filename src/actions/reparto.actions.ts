@@ -770,6 +770,121 @@ export async function obtenerVehiculos(): Promise<ApiResponse<any[]>> {
   }
 }
 
+// Obtener vehículo por ID
+export async function obtenerVehiculoPorId(
+  vehiculoId: string
+): Promise<ApiResponse<any>> {
+  try {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+      .from('vehiculos')
+      .select('*')
+      .eq('id', vehiculoId)
+      .single()
+
+    if (error) throw error
+
+    if (!data) {
+      return {
+        success: false,
+        error: 'Vehículo no encontrado',
+      }
+    }
+
+    return {
+      success: true,
+      data,
+    }
+  } catch (error: any) {
+    console.error('Error al obtener vehículo:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al obtener vehículo',
+    }
+  }
+}
+
+// Actualizar vehículo
+export async function actualizarVehiculo(
+  vehiculoId: string,
+  params: Partial<CrearVehiculoParams>
+): Promise<ApiResponse> {
+  try {
+    const supabase = await createClient()
+
+    // Verificar permisos (admin)
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, error: 'Usuario no autenticado' }
+    }
+
+    const { data: usuario } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (!usuario || usuario.rol !== 'admin') {
+      return { success: false, error: 'No tienes permisos para actualizar vehículos' }
+    }
+
+    // Verificar que la patente no exista en otro vehículo
+    if (params.patente) {
+      const { data: vehiculoExistente } = await supabase
+        .from('vehiculos')
+        .select('id')
+        .eq('patente', params.patente)
+        .neq('id', vehiculoId)
+        .single()
+
+      if (vehiculoExistente) {
+        return { success: false, error: 'Ya existe otro vehículo con esa patente' }
+      }
+    }
+
+    const updateData: any = {
+      updated_at: new Date().toISOString(),
+    }
+
+    if (params.patente) updateData.patente = params.patente
+    if (params.marca !== undefined) updateData.marca = params.marca
+    if (params.modelo !== undefined) updateData.modelo = params.modelo
+    if (params.tipo_vehiculo) updateData.tipo_vehiculo = params.tipo_vehiculo
+    if (params.capacidad_kg) updateData.capacidad_kg = params.capacidad_kg
+    if (params.fecha_vto_seguro !== undefined) {
+      updateData.fecha_vto_seguro = params.fecha_vto_seguro || null
+    }
+    if (params.seguro_vigente !== undefined) {
+      updateData.seguro_vigente = params.seguro_vigente
+    }
+    if (params.activo !== undefined) {
+      updateData.activo = params.activo
+    }
+
+    const { error } = await supabase
+      .from('vehiculos')
+      .update(updateData)
+      .eq('id', vehiculoId)
+
+    if (error) throw error
+
+    revalidatePath('/(admin)/(dominios)/reparto/vehiculos')
+    revalidatePath(`/(admin)/(dominios)/reparto/vehiculos/${vehiculoId}`)
+
+    return {
+      success: true,
+      message: 'Vehículo actualizado exitosamente',
+    }
+  } catch (error: any) {
+    console.error('Error al actualizar vehículo:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al actualizar vehículo',
+    }
+  }
+}
+
 // Obtener rutas
 export async function obtenerRutas(): Promise<ApiResponse<any[]>> {
   try {

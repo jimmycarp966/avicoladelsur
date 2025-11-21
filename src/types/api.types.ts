@@ -140,6 +140,9 @@ export interface CrearVehiculoParams {
   modelo?: string
   capacidad_kg: number
   tipo_vehiculo?: string
+  fecha_vto_seguro?: string
+  seguro_vigente?: boolean
+  activo?: boolean
 }
 
 export interface ChecklistVehiculoParams {
