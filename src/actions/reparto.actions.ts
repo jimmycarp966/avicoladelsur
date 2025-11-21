@@ -610,7 +610,7 @@ export async function obtenerRutaActiva(
   }
 }
 
-// Eliminar vehículo (soft delete)
+// Eliminar vehículo (DELETE real)
 export async function eliminarVehiculo(
   vehiculoId: string
 ): Promise<ApiResponse> {
@@ -633,12 +633,27 @@ export async function eliminarVehiculo(
       return { success: false, error: 'No tienes permisos para eliminar vehículos' }
     }
 
+    // Verificar si el vehículo está siendo usado en rutas activas
+    const { data: rutasActivas, error: rutasError } = await supabase
+      .from('rutas_reparto')
+      .select('id, numero_ruta')
+      .eq('vehiculo_id', vehiculoId)
+      .in('estado', ['planificada', 'en_curso'])
+      .limit(1)
+
+    if (rutasError) throw rutasError
+
+    if (rutasActivas && rutasActivas.length > 0) {
+      return {
+        success: false,
+        error: 'No se puede eliminar el vehículo porque está asignado a rutas activas',
+      }
+    }
+
+    // Eliminar vehículo (DELETE real)
     const { error } = await supabase
       .from('vehiculos')
-      .update({
-        activo: false,
-        updated_at: new Date().toISOString(),
-      })
+      .delete()
       .eq('id', vehiculoId)
 
     if (error) throw error
@@ -647,7 +662,7 @@ export async function eliminarVehiculo(
 
     return {
       success: true,
-      message: 'Vehículo desactivado exitosamente',
+      message: 'Vehículo eliminado exitosamente',
     }
   } catch (error: any) {
     console.error('Error al eliminar vehículo:', error)
@@ -729,7 +744,7 @@ export async function crearMantenimientoVehiculo(
   }
 }
 
-// Obtener vehículos
+// Obtener vehículos (solo activos)
 export async function obtenerVehiculos(): Promise<ApiResponse<any[]>> {
   try {
     const supabase = await createClient()
@@ -737,6 +752,7 @@ export async function obtenerVehiculos(): Promise<ApiResponse<any[]>> {
     const { data, error } = await supabase
       .from('vehiculos')
       .select('*')
+      .eq('activo', true)
       .order('patente', { ascending: true })
 
     if (error) throw error

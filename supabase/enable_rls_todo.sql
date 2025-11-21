@@ -1,12 +1,10 @@
 -- ===========================================
--- DESACTIVAR RLS TEMPORALMENTE (SOLO PRUEBAS)
+-- REACTIVAR RLS DE TODO EL SISTEMA
 -- ===========================================
--- ⚠️ ADVERTENCIA: Este script desactiva RLS de TODAS las tablas
--- ⚠️ SOLO USAR EN AMBIENTE DE DESARROLLO/PRUEBAS
--- ⚠️ NUNCA EJECUTAR EN PRODUCCIÓN
+-- Script para reactivar RLS después de pruebas
 -- ===========================================
 
--- Desactivar RLS de TODAS las tablas del sistema (verificando existencia)
+-- Reactivar RLS de TODAS las tablas del sistema (verificando existencia)
 -- ===========================================
 
 DO $$ 
@@ -67,20 +65,19 @@ BEGIN
             WHERE table_schema = 'public' 
             AND table_name = v_table_name
         ) THEN
-            EXECUTE format('ALTER TABLE %I DISABLE ROW LEVEL SECURITY', v_table_name);
-            RAISE NOTICE 'RLS desactivado en tabla: %', v_table_name;
+            EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', v_table_name);
+            RAISE NOTICE 'RLS reactivado en tabla: %', v_table_name;
         ELSE
             RAISE NOTICE 'Tabla no encontrada (se omite): %', v_table_name;
         END IF;
     END LOOP;
     
-    RAISE NOTICE 'Proceso completado. RLS desactivado en todas las tablas existentes.';
+    RAISE NOTICE 'Proceso completado. RLS reactivado en todas las tablas existentes.';
 END $$;
 
 -- ===========================================
--- PARA REACTIVAR RLS DESPUÉS DE PRUEBAS:
+-- NOTA: Después de reactivar RLS, asegúrate de que
+-- las políticas estén creadas correctamente.
+-- Ver: supabase/migrations/20251127_fix_rls_vehiculos.sql
 -- ===========================================
--- Ejecutar el script: supabase/enable_rls_todo.sql
--- O reactivar manualmente cada tabla con:
--- ALTER TABLE [nombre_tabla] ENABLE ROW LEVEL SECURITY;
 
