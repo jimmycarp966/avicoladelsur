@@ -88,13 +88,11 @@ export function VehiculosTableWrapper() {
   }
 
   const handleMaintenance = (vehiculo: Vehiculo) => {
-    // Simulación de mantenimiento
-    showToast('info', `Programando mantenimiento para ${vehiculo.patente}`)
+    router.push(`/reparto/vehiculos/${vehiculo.id}/mantenimiento`)
   }
 
   const handleInspection = (vehiculo: Vehiculo) => {
-    // Simulación de checklist
-    showToast('info', `Abriendo checklist diario para ${vehiculo.patente}`)
+    router.push(`/reparto/vehiculos/${vehiculo.id}/checklist`)
   }
 
   return (

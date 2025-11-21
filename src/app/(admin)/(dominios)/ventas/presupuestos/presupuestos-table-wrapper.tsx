@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { PresupuestosTable } from '@/components/tables/PresupuestosTable'
 import { useNotificationStore } from '@/store/notificationStore'
-import { obtenerPresupuestosAction, enviarPresupuestoAlmacenAction, recalcularPresupuestoAction } from '@/actions/presupuestos.actions'
+import { obtenerPresupuestosAction, enviarPresupuestoAlmacenAction, recalcularPresupuestoAction, reservarStockAction, confirmarPresupuestoAction } from '@/actions/presupuestos.actions'
 import type { Database } from '@/types/database.types'
 
 type Presupuesto = {
@@ -87,9 +87,14 @@ export function PresupuestosTableWrapper() {
       const formData = new FormData()
       formData.append('presupuesto_id', presupuesto.id)
 
-      // Aquí iría la llamada a reservarStockAction
-      // Por ahora, solo mostramos el toast
-      showToast('info', 'Funcionalidad de reserva de stock en desarrollo')
+      const result = await reservarStockAction(formData)
+
+      if (result.success) {
+        showToast('success', result.message || 'Stock reservado exitosamente')
+        await loadPresupuestos()
+      } else {
+        showToast('error', result.message || 'Error al reservar stock')
+      }
     } catch (error) {
       console.error('Error reservando stock:', error)
       showToast('error', 'Error al reservar stock')
@@ -98,12 +103,26 @@ export function PresupuestosTableWrapper() {
 
   const handleConvertToOrder = async (presupuesto: Presupuesto) => {
     try {
+      if (!confirm(`¿Estás seguro de convertir el presupuesto ${presupuesto.numero_presupuesto} a pedido?`)) {
+        return
+      }
+
       const formData = new FormData()
       formData.append('presupuesto_id', presupuesto.id)
-      // Opcionalmente agregar caja_id si es necesario
+      // caja_id es opcional, se puede agregar después si es necesario
 
-      // Aquí iría la llamada a confirmarPresupuestoAction
-      showToast('info', 'Funcionalidad de conversión a pedido en desarrollo')
+      const result = await confirmarPresupuestoAction(formData)
+
+      if (result.success) {
+        showToast('success', result.message || 'Presupuesto convertido a pedido exitosamente')
+        await loadPresupuestos()
+        // Redirigir al pedido creado si hay ID
+        if (result.data?.pedido_id) {
+          router.push(`/ventas/pedidos/${result.data.pedido_id}`)
+        }
+      } else {
+        showToast('error', result.message || 'Error al convertir presupuesto')
+      }
     } catch (error) {
       console.error('Error convirtiendo presupuesto:', error)
       showToast('error', 'Error al convertir presupuesto')

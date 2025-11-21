@@ -5,9 +5,10 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { obtenerPresupuestoAction, enviarPresupuestoAlmacenAction, convertirPresupuestoACotizacionAction } from '@/actions/presupuestos.actions'
+import { obtenerPresupuestoAction } from '@/actions/presupuestos.actions'
 import { PresupuestoDetalleSkeleton } from './presupuesto-detalle-skeleton'
 import { AsignarTurnoZonaForm } from './asignar-turno-zona-form'
+import { PresupuestoAccionesButtons } from './presupuesto-acciones-buttons'
 import { createClient } from '@/lib/supabase/server'
 
 interface PresupuestoDetallePageProps {
@@ -40,49 +41,6 @@ async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) 
     .select('*')
     .eq('activo', true)
 
-  async function handleEnviarAlmacen() {
-    // Validar que tenga turno y zona antes de enviar
-    if (!presupuesto.turno || !presupuesto.zona_id) {
-      return { success: false, message: 'El presupuesto debe tener turno y zona asignados antes de enviar a almacén' }
-    }
-
-    try {
-      const response = await fetch('/api/ventas/presupuestos/enviar-almacen', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ presupuesto_id: presupuestoId })
-      })
-
-      const result = await response.json()
-      return result
-    } catch (error) {
-      return { success: false, message: 'Error de conexión' }
-    }
-  }
-
-  async function handleConvertirACotizacion() {
-    try {
-      const result = await convertirPresupuestoACotizacionAction(presupuestoId)
-      return result
-    } catch (error) {
-      return { success: false, message: 'Error al convertir a cotización' }
-    }
-  }
-
-  async function handleFacturarDirecto() {
-    try {
-      const response = await fetch('/api/ventas/presupuestos/facturar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ presupuesto_id: presupuestoId })
-      })
-
-      const result = await response.json()
-      return result
-    } catch (error) {
-      return { success: false, message: 'Error de conexión' }
-    }
-  }
 
   const getEstadoConfig = (estado: string) => {
     const configs = {
@@ -110,55 +68,12 @@ async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) 
           <h1 className="text-2xl font-bold">Presupuesto {presupuesto.numero_presupuesto}</h1>
           <p className="text-muted-foreground">Detalle completo del presupuesto</p>
         </div>
-        {presupuesto.estado === 'pendiente' && (
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={async () => {
-                const result = await handleConvertirACotizacion()
-                if (result.success) {
-                  window.location.reload()
-                } else {
-                  alert(result.message || 'Error al convertir a cotización')
-                }
-              }}
-            >
-              <FileText className="mr-2 h-4 w-4" />
-              Convertir a Cotización
-            </Button>
-            {puedeFacturarDirecto && (
-              <Button
-                className="bg-green-600 hover:bg-green-700 text-white"
-                onClick={async () => {
-                  const result = await handleFacturarDirecto()
-                  if (result.success) {
-                    window.location.reload()
-                  } else {
-                    alert(result.message || 'Error al facturar presupuesto')
-                  }
-                }}
-              >
-                <CreditCard className="mr-2 h-4 w-4" />
-                Facturar sin Almacén
-              </Button>
-            )}
-            <Button
-              onClick={async () => {
-                const result = await handleEnviarAlmacen()
-                if (result.success) {
-                  window.location.reload()
-                } else {
-                  alert(result.message || 'Error al enviar a almacén')
-                }
-              }}
-              className="bg-blue-600 hover:bg-blue-700"
-              disabled={!presupuesto.turno || !presupuesto.zona_id}
-            >
-              <Package className="mr-2 h-4 w-4" />
-              Enviar a Almacén
-            </Button>
-          </div>
-        )}
+        <PresupuestoAccionesButtons
+          presupuestoId={presupuestoId}
+          estado={presupuesto.estado}
+          puedeFacturarDirecto={puedeFacturarDirecto}
+          tieneTurnoYZona={!!presupuesto.turno && !!presupuesto.zona_id}
+        />
       </div>
 
       {/* Información general */}
