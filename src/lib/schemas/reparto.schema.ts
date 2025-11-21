@@ -25,8 +25,8 @@ export const vehiculoSchema = z.object({
     .max(10000, 'La capacidad es demasiado alta'),
 
   tipo_vehiculo: z
-    .enum(['camioneta', 'furgon', 'camion', 'moto'])
-    .default('camioneta'),
+    .enum(['fiat_fiorino', 'toyota_hilux', 'ford_f4000'])
+    .default('fiat_fiorino'),
 
   seguro_vigente: z
     .boolean()
@@ -155,7 +155,7 @@ export const validarEntregaSchema = z.object({
 // Esquema para búsqueda y filtros de vehículos
 export const vehiculosFilterSchema = z.object({
   search: z.string().optional(),
-  tipo_vehiculo: z.enum(['camioneta', 'furgon', 'camion', 'moto']).optional(),
+  tipo_vehiculo: z.enum(['fiat_fiorino', 'toyota_hilux', 'ford_f4000']).optional(),
   activo: z.boolean().optional(),
   seguro_vigente: z.boolean().optional(),
   page: z.number().int().min(1).default(1),

@@ -58,10 +58,9 @@ export function VehiculosTable({ data, onView, onEdit, onDelete, onMaintenance, 
       cell: ({ row }) => {
         const tipo = row.getValue('tipo_vehiculo') as string
         const tipoConfig = {
-          camioneta: { label: 'Camioneta', color: 'bg-blue-100 text-blue-800' },
-          furgon: { label: 'Furgón', color: 'bg-green-100 text-green-800' },
-          moto: { label: 'Moto', color: 'bg-purple-100 text-purple-800' },
-          bicicleta: { label: 'Bicicleta', color: 'bg-orange-100 text-orange-800' },
+          fiat_fiorino: { label: 'Fiat Fiorino', color: 'bg-blue-100 text-blue-800' },
+          toyota_hilux: { label: 'Toyota Hilux', color: 'bg-green-100 text-green-800' },
+          ford_f4000: { label: 'Ford F-4000', color: 'bg-purple-100 text-purple-800' },
         }
 
         const config = tipoConfig[tipo as keyof typeof tipoConfig] || {

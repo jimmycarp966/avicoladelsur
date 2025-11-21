@@ -22,7 +22,7 @@ export async function crearVehiculo(
       .from('vehiculos')
       .insert({
         ...params,
-        tipo_vehiculo: params.tipo_vehiculo || 'camioneta',
+        tipo_vehiculo: params.tipo_vehiculo || 'fiat_fiorino',
         seguro_vigente: true,
         activo: true,
       })

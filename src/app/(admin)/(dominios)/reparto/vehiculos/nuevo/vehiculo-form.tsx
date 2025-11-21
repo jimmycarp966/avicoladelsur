@@ -18,12 +18,36 @@ const crearVehiculoSchema = z.object({
   patente: z.string().min(1, 'La patente es requerida'),
   marca: z.string().min(1, 'La marca es requerida'),
   modelo: z.string().min(1, 'El modelo es requerido'),
-  tipo_vehiculo: z.enum(['camioneta', 'furgon', 'moto', 'camion']),
+  tipo_vehiculo: z.enum(['fiat_fiorino', 'toyota_hilux', 'ford_f4000']),
   capacidad_kg: z.number().positive('La capacidad debe ser mayor a 0'),
   fecha_vto_seguro: z.string().optional(),
 })
 
 type CrearVehiculoFormData = z.infer<typeof crearVehiculoSchema>
+
+// Configuración de vehículos disponibles
+const vehiculosConfig = {
+  fiat_fiorino: {
+    marca: 'Fiat',
+    modelo: 'Fiorino',
+    capacidad_kg: 600,
+    label: 'Fiat Fiorino',
+  },
+  toyota_hilux: {
+    marca: 'Toyota',
+    modelo: 'Hilux',
+    capacidad_kg: 1500,
+    label: 'Toyota Hilux',
+  },
+  ford_f4000: {
+    marca: 'Ford',
+    modelo: 'F-4000',
+    capacidad_kg: 4000,
+    label: 'Ford F-4000',
+  },
+} as const
+
+type TipoVehiculo = keyof typeof vehiculosConfig
 
 export function VehiculoForm() {
   const router = useRouter()
@@ -42,7 +66,7 @@ export function VehiculoForm() {
       patente: '',
       marca: '',
       modelo: '',
-      tipo_vehiculo: 'camioneta',
+      tipo_vehiculo: 'fiat_fiorino',
       capacidad_kg: 0,
       fecha_vto_seguro: '',
     },
@@ -102,16 +126,22 @@ export function VehiculoForm() {
               <Label htmlFor="tipo_vehiculo">Tipo de Vehículo *</Label>
               <Select
                 value={watch('tipo_vehiculo')}
-                onValueChange={(value) => setValue('tipo_vehiculo', value as 'camioneta' | 'furgon' | 'moto' | 'camion')}
+                onValueChange={(value) => {
+                  const tipo = value as TipoVehiculo
+                  const config = vehiculosConfig[tipo]
+                  setValue('tipo_vehiculo', tipo)
+                  setValue('marca', config.marca)
+                  setValue('modelo', config.modelo)
+                  setValue('capacidad_kg', config.capacidad_kg)
+                }}
               >
                 <SelectTrigger id="tipo_vehiculo" className={errors.tipo_vehiculo ? 'border-red-500' : ''}>
                   <SelectValue placeholder="Selecciona un tipo" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="camioneta">Camioneta</SelectItem>
-                  <SelectItem value="furgon">Furgón</SelectItem>
-                  <SelectItem value="moto">Moto</SelectItem>
-                  <SelectItem value="camion">Camión</SelectItem>
+                  <SelectItem value="fiat_fiorino">{vehiculosConfig.fiat_fiorino.label}</SelectItem>
+                  <SelectItem value="toyota_hilux">{vehiculosConfig.toyota_hilux.label}</SelectItem>
+                  <SelectItem value="ford_f4000">{vehiculosConfig.ford_f4000.label}</SelectItem>
                 </SelectContent>
               </Select>
               {errors.tipo_vehiculo && (
