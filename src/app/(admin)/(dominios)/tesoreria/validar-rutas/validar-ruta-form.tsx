@@ -127,7 +127,8 @@ export function ValidarRutaForm({ ruta, cajas }: ValidarRutaFormProps) {
         <ul className="space-y-1 text-muted-foreground">
           <li>• Total registrado: ${totalRegistrado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</li>
           <li>• Entregas con pago: {ruta.detalles_ruta?.filter((d: any) => d.pago_registrado && d.monto_cobrado_registrado > 0).length || 0}</li>
-          <li>• Al validar se crearán movimientos de caja agrupados por método de pago</li>
+          <li>• Al validar se crearán movimientos de caja agrupados por método de pago (efectivo, transferencia, QR, tarjeta)</li>
+          <li>• Los pagos en cuenta corriente se aplicarán a la cuenta del cliente (no afectan caja)</li>
           <li>• Los pedidos se marcarán como pagados</li>
         </ul>
       </div>

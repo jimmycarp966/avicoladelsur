@@ -68,12 +68,18 @@ export default async function ValidarRutasPage() {
             
             const totalRegistrado = ruta.recaudacion_total_registrada || 0
             
-            // Agrupar por método de pago
+            // Agrupar por método de pago (incluyendo cuenta_corriente)
             const pagosPorMetodo: Record<string, number> = {}
             entregasConPago.forEach((detalle: any) => {
               const metodo = detalle.metodo_pago_registrado || 'efectivo'
               pagosPorMetodo[metodo] = (pagosPorMetodo[metodo] || 0) + Number(detalle.monto_cobrado_registrado)
             })
+            
+            // Separar totales: caja vs cuenta corriente
+            const totalCaja = Object.entries(pagosPorMetodo)
+              .filter(([metodo]) => metodo !== 'cuenta_corriente')
+              .reduce((sum, [, monto]) => sum + monto, 0)
+            const totalCuentaCorriente = pagosPorMetodo['cuenta_corriente'] || 0
 
             return (
               <Card key={ruta.id} className="border-l-4 border-l-primary">
@@ -121,14 +127,33 @@ export default async function ValidarRutasPage() {
                       </span>
                     </div>
                     
+                    {totalCaja > 0 && (
+                      <div className="mb-2 p-2 bg-blue-100 rounded text-sm">
+                        <span className="font-medium text-blue-900">Total para caja: </span>
+                        <span className="font-bold text-blue-900">
+                          ${totalCaja.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    )}
+                    
+                    {totalCuentaCorriente > 0 && (
+                      <div className="mb-2 p-2 bg-green-100 rounded text-sm">
+                        <span className="font-medium text-green-900">Total cuenta corriente: </span>
+                        <span className="font-bold text-green-900">
+                          ${totalCuentaCorriente.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                        </span>
+                        <span className="text-xs text-green-700 ml-2">(no afecta caja)</span>
+                      </div>
+                    )}
+                    
                     {Object.keys(pagosPorMetodo).length > 0 && (
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
                         {Object.entries(pagosPorMetodo).map(([metodo, monto]) => (
-                          <div key={metodo} className="text-sm">
-                            <span className="text-blue-700 font-medium capitalize">
+                          <div key={metodo} className={`text-sm ${metodo === 'cuenta_corriente' ? 'bg-green-50 p-1 rounded' : ''}`}>
+                            <span className={`font-medium capitalize ${metodo === 'cuenta_corriente' ? 'text-green-700' : 'text-blue-700'}`}>
                               {metodo.replace('_', ' ')}:
                             </span>
-                            <span className="ml-1 text-blue-900 font-semibold">
+                            <span className={`ml-1 font-semibold ${metodo === 'cuenta_corriente' ? 'text-green-900' : 'text-blue-900'}`}>
                               ${Number(monto).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                             </span>
                           </div>

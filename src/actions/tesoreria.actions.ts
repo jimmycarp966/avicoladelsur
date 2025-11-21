@@ -756,19 +756,26 @@ export async function validarRutaAction(formData: FormData) {
 
     // Agrupar pagos por método de pago
     const pagosPorMetodo: Record<string, { total: number; detalles: any[] }> = {}
+    const pagosCuentaCorriente: any[] = []
     
     ruta.detalles_ruta?.forEach((detalle: any) => {
       if (detalle.pago_registrado && detalle.monto_cobrado_registrado > 0) {
         const metodo = detalle.metodo_pago_registrado || 'efectivo'
-        if (!pagosPorMetodo[metodo]) {
-          pagosPorMetodo[metodo] = { total: 0, detalles: [] }
+        
+        // Separar cuenta corriente de otros métodos
+        if (metodo === 'cuenta_corriente') {
+          pagosCuentaCorriente.push(detalle)
+        } else {
+          if (!pagosPorMetodo[metodo]) {
+            pagosPorMetodo[metodo] = { total: 0, detalles: [] }
+          }
+          pagosPorMetodo[metodo].total += Number(detalle.monto_cobrado_registrado)
+          pagosPorMetodo[metodo].detalles.push(detalle)
         }
-        pagosPorMetodo[metodo].total += Number(detalle.monto_cobrado_registrado)
-        pagosPorMetodo[metodo].detalles.push(detalle)
       }
     })
 
-    // Crear movimientos de caja agrupados por método de pago
+    // Crear movimientos de caja agrupados por método de pago (excluyendo cuenta_corriente)
     const movimientosCreados: string[] = []
     
     for (const [metodo, datos] of Object.entries(pagosPorMetodo)) {
@@ -795,6 +802,79 @@ export async function validarRutaAction(formData: FormData) {
         p_caja_id: caja_id,
         p_monto: datos.total,
       })
+    }
+
+    // Procesar pagos en cuenta corriente (reducir saldo de cuenta, NO crear movimiento de caja)
+    for (const detalle of pagosCuentaCorriente) {
+      // Obtener pedido para acceder al cliente_id
+      const { data: pedido } = await supabase
+        .from('pedidos')
+        .select('cliente_id, numero_pedido')
+        .eq('id', detalle.pedido_id)
+        .single()
+
+      if (pedido) {
+        // Asegurar que existe cuenta corriente (RPC retorna UUID directamente)
+        const { data: cuentaIdResult, error: cuentaError } = await supabase.rpc('fn_asegurar_cuenta_corriente', {
+          p_cliente_id: pedido.cliente_id,
+        })
+
+        if (cuentaError || !cuentaIdResult) {
+          console.error('Error al asegurar cuenta corriente:', cuentaError)
+          continue
+        }
+
+        const cuentaId = cuentaIdResult as string
+
+        // Reducir saldo de cuenta corriente
+        const monto = Number(detalle.monto_cobrado_registrado)
+        
+        // Obtener saldo actual y límite
+        const { data: cuentaActual } = await supabase
+          .from('cuentas_corrientes')
+          .select('saldo, limite_credito')
+          .eq('id', cuentaId)
+          .single()
+
+        if (cuentaActual) {
+          const nuevoSaldo = Math.max((cuentaActual.saldo || 0) - monto, 0)
+          const { error: updateCuentaError } = await supabase
+            .from('cuentas_corrientes')
+            .update({
+              saldo: nuevoSaldo,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', cuentaId)
+
+          if (updateCuentaError) throw updateCuentaError
+
+          // Crear movimiento en cuenta corriente
+          const { error: movCuentaError } = await supabase
+            .from('cuentas_movimientos')
+            .insert({
+              cuenta_corriente_id: cuentaId,
+              tipo: 'pago',
+              monto: monto,
+              descripcion: `Pago validado ruta ${ruta.numero_ruta} - Pedido ${pedido.numero_pedido}`,
+              origen_tipo: 'pedido',
+              origen_id: detalle.pedido_id,
+            })
+
+          if (movCuentaError) throw movCuentaError
+
+          // Verificar si cliente debe ser desbloqueado
+          const debeBloquear = nuevoSaldo > (cuentaActual.limite_credito || 0)
+          const { error: updateClienteError } = await supabase
+            .from('clientes')
+            .update({
+              bloqueado_por_deuda: debeBloquear,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', pedido.cliente_id)
+
+          if (updateClienteError) throw updateClienteError
+        }
+      }
     }
 
     // Actualizar ruta como validada
@@ -839,9 +919,21 @@ export async function validarRutaAction(formData: FormData) {
     revalidatePath('/(admin)/(dominios)/reparto/rutas')
     revalidatePath('/(admin)/(dominios)/tesoreria')
 
+    const totalMovimientosCaja = movimientosCreados.length
+    const totalPagosCuentaCorriente = pagosCuentaCorriente.length
+    let mensaje = 'Ruta validada exitosamente.'
+    
+    if (totalMovimientosCaja > 0) {
+      mensaje += ` Se crearon ${totalMovimientosCaja} movimiento(s) de caja agrupado(s) por método de pago.`
+    }
+    
+    if (totalPagosCuentaCorriente > 0) {
+      mensaje += ` Se procesaron ${totalPagosCuentaCorriente} pago(s) en cuenta corriente (no afectan caja).`
+    }
+
     return {
       success: true,
-      message: 'Ruta validada exitosamente. Los movimientos de caja han sido creados.',
+      message: mensaje,
     }
   } catch (error: any) {
     console.error('Error en validarRutaAction:', error)
