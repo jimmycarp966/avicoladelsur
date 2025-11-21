@@ -27,6 +27,7 @@ import { iniciarRuta, finalizarRuta } from '@/actions/reparto.actions'
 import { ChecklistInicioForm } from './checklist-inicio-form'
 import { ChecklistFinForm } from './checklist-fin-form'
 import { EntregaCard } from './entrega-card'
+import GpsTracker from '@/components/reparto/GpsTracker'
 
 interface RutaHojaContentProps {
   ruta: any
@@ -145,6 +146,17 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
           </div>
         </div>
       </div>
+
+      {/* GPS Tracker - Solo cuando la ruta está en curso */}
+      {ruta.estado === 'en_curso' && (
+        <div className="px-4">
+          <GpsTracker
+            repartidorId={ruta.repartidor_id}
+            vehiculoId={ruta.vehiculo_id}
+            rutaId={ruta.id}
+          />
+        </div>
+      )}
 
       {/* Estadísticas */}
       <div className="px-4 grid grid-cols-3 gap-4">

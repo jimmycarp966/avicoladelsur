@@ -2,6 +2,7 @@
 export * from './almacen.actions'
 export * from './ventas.actions'
 export * from './reparto.actions'
+export * from './plan-rutas.actions'
 export * from './tesoreria.actions'
 export * from './gastos.actions'
 export * from './presupuestos.actions'

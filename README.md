@@ -1,6 +1,18 @@
-# Avícola del Sur ERP
+# 🚀 Avícola del Sur ERP - Sistema Completo
 
-Sistema de Gestión Integral para Avícola del Sur - ERP modular con aplicación web administrativa, PWA para repartidores y Bot Vendedor automatizado.
+**ERP modular completo** con aplicación web administrativa, PWA móvil para repartidores con GPS tracking, planificación semanal de rutas, optimización automática con Google Directions + fallback local, y bot de WhatsApp automatizado para toma de pedidos.
+
+## ✨ Características Principales
+
+- 🗓️ **Planificación Semanal**: Rutas fijas por zona/día/turno con vehículos asignados
+- 📱 **PWA Móvil**: App nativa-like para repartidores con GPS tracking en tiempo real
+- 🤖 **Bot WhatsApp**: Toma automática de pedidos con validación de stock
+- 🗺️ **Optimización de Rutas**: Google Directions API + fallback local (Nearest Neighbor + 2-opt)
+- 📍 **GPS Tracking**: Seguimiento en tiempo real con alertas de desvío
+- ⚖️ **FIFO Automático**: Gestión inteligente de stock por lotes
+- 💰 **Tesorería Completa**: Cuentas corrientes, cajas, cierres automáticos
+- 📊 **Reportes Avanzados**: CSV/PDF con business intelligence
+- 🔐 **RLS Completo**: Seguridad por roles (admin, vendedor, repartidor, almacenista)
 
 ## 🚀 Inicio Rápido
 
@@ -46,15 +58,17 @@ Sistema de Gestión Integral para Avícola del Sur - ERP modular con aplicación
 ## 🏗️ Arquitectura del Sistema
 
 ### Stack Tecnológico
-- **Framework**: Next.js 15 (App Router)
-- **Frontend**: React 19 + TypeScript
-- **Backend**: Server Actions + Supabase
-- **UI**: Tailwind CSS + shadcn/ui
-- **Estado**: Zustand
-- **Formularios**: React Hook Form + Zod
-- **Tablas**: TanStack Table
-- **Storage**: Supabase Storage (para adjuntos de gastos)
-- **PDF**: pdfkit (para generación de reportes PDF)
+- **Framework**: Next.js 15 (App Router, Server Components)
+- **Frontend**: React 19 + TypeScript + Tailwind CSS + shadcn/ui
+- **Backend**: Server Actions + Supabase (Postgres + Auth + Storage + Realtime)
+- **Estado**: Zustand (solo estado global: sesión, notificaciones)
+- **Formularios**: React Hook Form + Zod validation
+- **Tablas**: TanStack Table (paginación, filtros, sorting)
+- **Mapas**: Leaflet + OpenStreetMap (GPS tracking)
+- **Chatbot**: Twilio WhatsApp (procesamiento directo)
+- **PDF**: pdfkit + Supabase Storage
+- **GPS**: Navigator API + polling cada 5s
+- **Optimización**: Google Directions API + fallback local
 
 ### Estructura Modular
 - **App Admin**: Dashboard administrativo (`/(admin)`)
@@ -71,31 +85,120 @@ Sistema de Gestión Integral para Avícola del Sur - ERP modular con aplicación
 
 ```
 src/
-├── app/                          # Rutas Next.js
-│   ├── (admin)/                  # Dashboard Admin
-│   ├── (repartidor)/            # PWA Repartidor
-│   ├── api/bot/                 # Webhook Botpress
-│   └── globals.css              # Sistema de colores y estilos globales
-├── actions/                      # Server Actions
-├── components/                   # Componentes React
-│   ├── ui/
-│   │   ├── logo.tsx             # ⭐ Componente Logo
-│   │   ├── button.tsx           # Botones con variantes de colores
-│   │   ├── card.tsx             # Cards con sombras verdes
-│   │   └── ...                  # Otros componentes shadcn/ui
-│   ├── layout/
-│   │   ├── admin/               # Layouts con diseño verde
-│   │   └── repartidor/          # Layouts móviles
-│   ├── forms/                   # Formularios con bordes coloridos
-│   └── tables/                  # Tablas de datos
-├── lib/                          # Utilidades y configuración
-├── store/                        # Zustand stores
-└── types/                        # TypeScript types
+├── app/                          # Rutas Next.js (App Router)
+│   ├── (admin)/                  # Dashboard administrativo
+│   │   ├── (dominios)/          # Módulos principales
+│   │   │   ├── almacen/         # Gestión de stock/lotes
+│   │   │   ├── reparto/         # ⭐ Rutas, planificación, monitor GPS
+│   │   │   │   ├── planificacion/  # ⭐ Gestión semanal de rutas
+│   │   │   │   ├── monitor/       # ⭐ Monitor GPS en tiempo real
+│   │   │   │   └── rutas/         # Gestión de rutas
+│   │   │   ├── tesoreria/       # Cajas, movimientos, cierres
+│   │   │   └── ventas/          # Presupuestos, pedidos, clientes
+│   │   └── dashboard/           # Dashboard principal
+│   ├── (repartidor)/            # ⭐ PWA móvil completa
+│   │   ├── entregas/           # Lista de entregas
+│   │   ├── home/               # Dashboard repartidor
+│   │   └── ruta/[ruta_id]/     # ⭐ Hoja ruta con GPS tracking
+│   ├── api/                     # Endpoints API
+│   │   ├── bot/                # Webhook WhatsApp
+│   │   ├── rutas/              # ⭐ Generación y optimización
+│   │   ├── reparto/            # ⭐ GPS tracking y alertas
+│   │   └── integrations/       # ⭐ Google Directions
+│   └── login/                  # Autenticación
+├── actions/                     # Server Actions (lógica de negocio)
+│   ├── plan-rutas.actions.ts   # ⭐ Gestión planificación semanal
+│   └── [otros].actions.ts      # Módulos específicos
+├── components/                  # Componentes React reutilizables
+│   ├── reparto/                # ⭐ Monitor GPS y GPS tracker
+│   │   ├── MonitorMap.tsx     # Mapa Leaflet admin
+│   │   └── GpsTracker.tsx     # GPS tracking PWA
+│   ├── tables/                 # Tablas con TanStack
+│   ├── forms/                  # Formularios con validación
+│   ├── ui/                     # shadcn/ui + componentes base
+│   └── layout/                 # Layouts admin/repartidor
+├── lib/                         # Utilidades y configuración
+│   ├── rutas/                  # ⭐ Algoritmos optimización
+│   │   ├── google-directions.ts # Google Directions API
+│   │   └── local-optimizer.ts   # Fallback local
+│   ├── services/               # ⭐ Servicios core
+│   │   └── ruta-optimizer.ts   # Optimización híbrida
+│   └── supabase/               # Clientes y configuración
+├── store/                       # Zustand (estado mínimo)
+└── types/                       # TypeScript types completas
+
+supabase/                        # Scripts SQL y migraciones
+├── migrations/                  # Historial BD (9 migraciones)
+└── *.sql                        # Funciones RPC y setup
 
 public/
-└── images/
-    └── logo-avicola.png         # Logo de la empresa
+├── images/
+│   └── logo-avicola.png        # Logo empresa
+└── [static assets]
+
+scripts/                         # Scripts de automatización
+├── demo-rutas.sh               # ⭐ Demo completo rutas
+├── setup-bot-automatico.sh    # Configuración WhatsApp
+└── [otros scripts]
 ```
+
+## 🎯 Características del Sistema - COMPLETO
+
+### 🗓️ **Planificación Semanal de Rutas**
+- **Nueva tabla**: `plan_rutas_semanal` con zona/día/turno/vehículo/capacidad
+- **Vehículos base**: Fiorino (600kg), Hilux (1500kg), F-4000 (4000kg) precargados
+- **UI completa**: `/reparto/planificacion` para crear/editar/eliminar planes semanales
+- **Asignación automática**: Pedidos se asignan a rutas planificadas según zona/turno/día
+- **Validación capacidad**: Peso final ≤ capacidad del vehículo planificada
+
+### 🤖 **Bot WhatsApp Automatizado**
+- **Procesamiento directo**: Sin Botpress, implementación nativa en Next.js
+- **Comandos inteligentes**: `hola`, `catalogo`, `pedido POLLO001 5kg`
+- **Validación stock**: Consulta lotes disponibles en tiempo real
+- **Reserva automática**: FIFO inteligente al crear presupuestos
+- **Confirmación explícita**: SÍ/NO obligatorio antes de procesar
+
+### 📱 **PWA Móvil Completa para Repartidores**
+- **App nativa-like**: Dashboard, entregas, GPS tracking
+- **Hoja ruta digital**: `/repartidor/ruta/[ruta_id]` con optimización visual
+- **GPS tracking**: Envío automático cada 5s durante reparto activo
+- **Cobros integrados**: Registro de pagos con referencias PAY-XXXXXX
+- **Firma digital**: QR verificación + subida automática a Storage
+
+### 🗺️ **Optimización de Rutas Híbrida**
+- **Google Directions API**: Optimización profesional con waypoints
+- **Fallback local**: Nearest Neighbor + 2-opt cuando Google falla
+- **Polylines**: Visualización de rutas optimizadas en mapas
+- **Re-optimización**: Automática al agregar nuevos pedidos
+- **Monitor admin**: Mapa Leaflet con tracking en tiempo real
+
+### 📍 **GPS Tracking y Alertas**
+- **Polling inteligente**: Cada 5s durante rutas activas
+- **Alertas automáticas**: Desvío (>200m), cliente saltado (<100m)
+- **Monitor en tiempo real**: `/reparto/monitor` con mapa Leaflet
+- **Historial completo**: Rutas_planificadas con orden visita y tiempos
+- **Trazabilidad total**: Desde ubicación hasta entrega confirmada
+
+### ⚖️ **FIFO Automático de Stock**
+- **Descuento inteligente**: Lotes ordenados por vencimiento/ingreso
+- **Reserva preventiva**: Presupuestos no descuentan físicamente
+- **Conversión automática**: Al pasar a pedido, descuento real
+- **Trazabilidad lote**: Cada ítem ligado a lote específico
+- **Movimientos auditados**: Tabla `movimientos_stock` completa
+
+### 💰 **Tesorería Completa**
+- **Cuentas corrientes**: Control automático de saldos por cliente
+- **Cajas múltiples**: Por sucursal con cierres automáticos
+- **Movimientos atómicos**: RPC `fn_crear_movimiento_caja()`
+- **Referencias pago**: PAY-YYYYMMDD-XXXXXX para seguimiento
+- **Reportes CSV/PDF**: Business intelligence completa
+
+### 🔐 **Seguridad y Roles**
+- **4 roles definidos**: admin, vendedor, repartidor, almacenista
+- **RLS completo**: Políticas por tabla/rol en Supabase
+- **Server Actions**: Toda lógica crítica protegida
+- **Validaciones preventivas**: Clientes deudores bloqueados
+- **Auditoría completa**: Logs de todas las operaciones
 
 ## 🔧 Scripts Disponibles
 
@@ -450,10 +553,11 @@ Sistema de autenticación basado en Supabase Auth con 4 roles:
 - Reportes y estadísticas
 
 ### PWA Repartidor
-- Hoja de ruta digital
-- Tracking GPS en tiempo real
+- Hoja de ruta digital con orden optimizado
+- **Tracking GPS en tiempo real** (envío cada 5 segundos)
 - Firma digital y QR
 - Modo offline básico
+- **Visualización de ruta optimizada en mapa**
 
 ### Bot Vendedor ✅ (FUNCIONANDO)
 - ✅ Toma de pedidos vía WhatsApp con validación de stock en tiempo real
@@ -534,6 +638,120 @@ El sistema está diseñado con una identidad visual moderna y profesional basada
 - **Reparto**: Tasa de entregas exitosas, tiempo de ruta
 - **Cliente**: Satisfacción, tiempo de respuesta
 
+## 🗺️ Rutas Optimizadas y Tracking GPS
+
+### Estado: ✅ IMPLEMENTADO
+
+Sistema completo de optimización de rutas y tracking en tiempo real integrado al flujo de reparto.
+
+**Características principales:**
+- 🗺️ **Optimización de Rutas**: Google Directions API con fallback local (Nearest Neighbor + 2-opt)
+- 🗂️ **Plan Semanal**: Las rutas (zona + día + turno + vehículo + repartidor) se cargan en `/reparto/planificacion`
+- 📍 **Tracking GPS**: Envío automático de ubicaciones cada 5 segundos desde PWA del repartidor
+- 🚨 **Alertas Automáticas**: Desvío de ruta (>200m) y cliente saltado (<100m sin entregar)
+- 📊 **Monitor Admin**: Visualización en tiempo real de vehículos, rutas y alertas en mapa Leaflet
+- 🔄 **Polling Inteligente**: Actualización automática cada 5 segundos en monitor admin
+- 🕕 **Turnos Automáticos**: Pedidos confirmados antes de las 06:00 → turno mañana; desde las 06:00 → turno tarde
+- 🚚 **Asignación a Rutas Planificadas**: Cada pedido facturado se ubica en la ruta diaria definida (fecha + zona + turno). Si no hay plan para esa combinación se bloquea la conversión.
+
+### Configuración
+
+**Variables de entorno requeridas:**
+```env
+# Google Maps API Key (opcional - si no está, usa fallback local)
+GOOGLE_MAPS_API_KEY=tu-api-key-aqui
+```
+
+**Cómo obtener la API Key:**
+
+Ver la guía completa en [`docs/GOOGLE_MAPS_SETUP.md`](./docs/GOOGLE_MAPS_SETUP.md)
+
+**Resumen rápido:**
+1. Ir a [Google Cloud Console](https://console.cloud.google.com/)
+2. Crear proyecto o seleccionar existente
+3. Habilitar "Directions API"
+4. Crear credenciales (API Key)
+5. Agregar restricciones de dominio/IP para seguridad
+6. Configurar en `.env.local`:
+   ```env
+   GOOGLE_MAPS_API_KEY=tu-api-key-aqui
+   ```
+
+**Costos estimados:**
+- Google Directions API: ~$5 por 1000 requests
+- Para 10 rutas/día con 20 paradas: ~$1.50/mes
+- Fallback local: Gratis, adecuado para 5-50 paradas
+
+### Endpoints API
+
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| `POST` | `/api/reparto/ubicacion` | Registrar ubicación GPS (repartidor) |
+| `GET` | `/api/reparto/ubicaciones` | Obtener últimas ubicaciones por vehículo |
+| `POST` | `/api/rutas/generar` | Generar ruta optimizada (Google o local) |
+| `GET` | `/api/rutas/:id/recorrido` | Obtener polyline e historial del día |
+| `POST` | `/api/rutas/:id/alerta` | Crear alerta manual |
+| `GET` | `/api/reparto/alertas` | Listar alertas (desvíos, cliente saltado) |
+| `POST` | `/api/integrations/google/directions` | Endpoint interno para Google Directions |
+
+### Páginas y Componentes
+
+**Admin:**
+- `/reparto/monitor` - Monitor en tiempo real con mapa Leaflet
+- Visualiza vehículos activos, rutas planificadas y alertas
+- `/reparto/planificacion` - Define el plan semanal (zona + día + turno + vehículo + repartidor)
+- Controla qué rutas existen cada día y su capacidad disponible (vehículos base: Fiat Fiorino 600 kg, Toyota Hilux 1500 kg, Ford F-4000 4000 kg)
+
+**Repartidor:**
+- `/repartidor/ruta/[ruta_id]` - Hoja de ruta con GPS tracker integrado
+- Componente `GpsTracker` envía ubicaciones automáticamente cuando la ruta está en curso
+
+### Cómo Probar
+
+```bash
+# 1. Ejecutar script de demo
+./scripts/demo-rutas.sh
+
+# 2. Abrir monitor admin
+# Navegar a: http://localhost:3000/reparto/monitor
+
+# 3. Abrir PWA repartidor
+# Navegar a: http://localhost:3000/repartidor/ruta/[ruta_id]
+# Iniciar tracking GPS desde el componente
+
+# 4. Verificar alertas
+curl http://localhost:3000/api/reparto/alertas
+
+# 5. Turnos automáticos
+#   - Confirmar presupuesto antes de las 06:00 -> pedido turno mañana
+#   - Confirmar presupuesto después de las 06:00 -> pedido turno tarde
+
+# 6. Asignación automática de rutas
+#   - Tras convertir un presupuesto, consultar la tabla rutas_reparto y detalles_ruta
+#   - Cada pedido debe quedar asignado a la ruta del día por zona/turno
+```
+
+### Migraciones SQL
+
+Aplicar migración:
+```bash
+psql -U postgres -d avicola_db -f supabase/migrations/20251124_rutas_tracking.sql
+```
+
+**Tablas nuevas:**
+- `ubicaciones_repartidores` - Registro de ubicaciones GPS
+- `rutas_planificadas` - Rutas optimizadas con orden de visita y polyline
+- `alertas_reparto` - Alertas de desvío y cliente saltado
+- `vehiculos_estado` - Cache de última ubicación por vehículo
+
+**Funciones RPC:**
+- `fn_obtener_ultima_ubicacion_por_vehiculo()` - Última ubicación por vehículo
+- `fn_generar_ruta_local()` - Optimización local (fallback)
+- `fn_marcar_alerta_desvio()` - Registrar alerta de desvío
+- `fn_marcar_alerta_cliente_saltado()` - Registrar alerta de cliente saltado
+
+---
+
 ## 🚀 Despliegue
 
 ### Vercel (Recomendado)
@@ -554,6 +772,9 @@ TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 TWILIO_AUTH_TOKEN=your-twilio-auth-token
 TWILIO_WHATSAPP_NUMBER=+14155238886
 BOTPRESS_WEBHOOK_TOKEN=your-random-secure-token
+
+# Google Maps (Rutas Optimizadas - Opcional)
+GOOGLE_MAPS_API_KEY=your-google-maps-api-key
 
 # Botpress (Opcional - solo si usas NLU avanzado)
 BOTPRESS_WEBHOOK_URL=https://your-botpress-webhook

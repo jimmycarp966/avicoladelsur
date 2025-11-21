@@ -109,13 +109,105 @@ Aunque los archivos tienen fechas cronológicas, el orden de ejecución debe seg
   - Requiere `presupuestos`, `presupuesto_items`, `pedidos` (de migraciones anteriores)
   - Requiere `tesoreria_cajas`, `cuentas_corrientes` (de migración 1)
 
-**Ejecutar último porque:**
+**Ejecutar cuarto porque:**
 - Reemplaza una función creada en migración 3 y modificada en migración 2
 - Es una actualización/ajuste final
 
 **Comando:**
 ```sql
 \i supabase/migrations/20251122_ventas_presupuestos_ajustes.sql
+```
+
+---
+
+### 5️⃣ **20251123_localidades.sql** ⭐ LOCALIDADES
+
+**¿Qué hace?**
+- Crea tabla `localidades` y agrega campo `localidad_id` a `clientes`
+- **Dependencias**: 
+  - Requiere `zonas` (de migración 2)
+  - Requiere `clientes` (del schema base)
+
+**Ejecutar quinto porque:**
+- Agrega funcionalidad de localidades que complementa zonas
+
+**Comando:**
+```sql
+\i supabase/migrations/20251123_localidades.sql
+```
+
+---
+
+### 6️⃣ **20251124_rutas_tracking.sql** ⭐ RUTAS OPTIMIZADAS Y TRACKING
+
+**¿Qué hace?**
+- Crea tablas: `ubicaciones_repartidores`, `rutas_planificadas`, `alertas_reparto`, `vehiculos_estado`
+- Crea funciones RPC: `fn_obtener_ultima_ubicacion_por_vehiculo`, `fn_generar_ruta_local`, `fn_marcar_alerta_desvio`, `fn_marcar_alerta_cliente_saltado`
+- Implementa RLS para nuevas tablas
+- **Dependencias**: 
+  - Requiere `usuarios`, `vehiculos`, `rutas_reparto`, `zonas`, `clientes`, `pedidos` (de migraciones anteriores)
+  - Requiere función `crear_notificacion` (de migraciones anteriores)
+
+**Ejecutar último porque:**
+- Agrega funcionalidad de tracking y optimización de rutas
+- Depende de todas las estructuras base anteriores
+
+**Comando:**
+```sql
+\i supabase/migrations/20251124_rutas_tracking.sql
+```
+
+---
+
+### 7️⃣ **20251125_turnos_auto.sql** ⭐ TURNOS AUTOMÁTICOS
+
+**¿Qué hace?**
+- Actualiza `fn_convertir_presupuesto_a_pedido` para asignar turno según hora (<= 06:00 → mañana, > 06:00 → tarde)
+- Permite convertir presupuestos sin turno (solo exige zona)
+- Invoca automáticamente el flujo de asignación de ruta al crear el pedido
+
+**Dependencias:**
+- Requiere tablas `presupuestos`, `pedidos`, `rutas_reparto`
+
+**Comando:**
+```sql
+\i supabase/migrations/20251125_turnos_auto.sql
+```
+
+---
+
+### 8️⃣ **20251125_ruta_assignment.sql** ⭐ ASIGNACIÓN AUTOMÁTICA DE RUTAS
+
+**¿Qué hace?**
+- Crea la función `fn_asignar_pedido_a_ruta`
+- Busca o crea rutas diarias por fecha/zona/turno
+- Inserta el pedido en `detalles_ruta`
+
+**Dependencias:**
+- Requiere `rutas_reparto`, `vehiculos`, `usuarios`, `detalles_ruta`
+
+**Comando:**
+```sql
+\i supabase/migrations/20251125_ruta_assignment.sql
+```
+
+---
+
+### 9️⃣ **20251126_plan_rutas_semanal.sql** ⭐ PLAN SEMANAL + VEHÍCULOS BASE
+
+**¿Qué hace?**
+- Crea la tabla `plan_rutas_semanal` (zona + día semana + turno + vehículo + repartidor)
+- Agrega columna `plan_ruta_id` a `rutas_reparto` y políticas RLS
+- Inserta vehículos base (Fiorino, Hilux, F-4000)
+- Actualiza `fn_asignar_pedido_a_ruta` para usar el plan y validar capacidad
+- Actualiza `fn_convertir_presupuesto_a_pedido` para devolver `ruta_id` y delegar la asignación
+
+**Dependencias:**
+- Requiere migraciones previas (zonas, vehiculos, rutas_reparto, etc.)
+
+**Comando:**
+```sql
+\i supabase/migrations/20251126_plan_rutas_semanal.sql
 ```
 
 ---
@@ -133,13 +225,22 @@ psql -U postgres -d avicola_db -f supabase/migrations/20251114_hito_intermedio.s
 psql -U postgres -d avicola_db -f supabase/migrations/20251121_flujo_completo.sql
 psql -U postgres -d avicola_db -f supabase/migrations/20251120_hito_presupuestos.sql
 psql -U postgres -d avicola_db -f supabase/migrations/20251122_ventas_presupuestos_ajustes.sql
+psql -U postgres -d avicola_db -f supabase/migrations/20251123_localidades.sql
+psql -U postgres -d avicola_db -f supabase/migrations/20251124_rutas_tracking.sql
+psql -U postgres -d avicola_db -f supabase/migrations/20251125_turnos_auto.sql
+psql -U postgres -d avicola_db -f supabase/migrations/20251125_ruta_assignment.sql
+psql -U postgres -d avicola_db -f supabase/migrations/20251126_plan_rutas_semanal.sql
 ```
 
 **Razón del orden:**
 1. `20251114_hito_intermedio.sql` → Base de tesorería (sin dependencias críticas)
 2. `20251121_flujo_completo.sql` → Crea `zonas` y agrega campos (debe ir antes de presupuestos)
 3. `20251120_hito_presupuestos.sql` → Crea presupuestos que referencian `zonas` (ya existe)
-4. `20251122_ventas_presupuestos_ajustes.sql` → Ajusta funciones de presupuestos (último)
+4. `20251122_ventas_presupuestos_ajustes.sql` → Ajusta funciones de presupuestos
+5. `20251123_localidades.sql` → Agrega localidades (depende de zonas)
+6. `20251124_rutas_tracking.sql` → Rutas optimizadas y tracking (depende de todas las anteriores)
+7. `20251125_turnos_auto.sql` → Turnos automáticos y hook a asignación de rutas
+8. `20251125_ruta_assignment.sql` → Función de asignación automática de rutas
 
 ### ⚠️ Orden Cronológico (NO USAR - FALLA)
 
@@ -221,6 +322,11 @@ WHERE table_name = 'presupuestos'
 3. ✅ `20251121_flujo_completo.sql` (crea zonas y agrega campos)
 4. ✅ `20251120_hito_presupuestos.sql` (sistema de presupuestos)
 5. ✅ `20251122_ventas_presupuestos_ajustes.sql` (ajustes finales)
+6. ✅ `20251123_localidades.sql` (localidades)
+7. ✅ `20251124_rutas_tracking.sql` (rutas optimizadas y tracking)
+8. ✅ `20251125_turnos_auto.sql` (turnos automáticos)
+9. ✅ `20251125_ruta_assignment.sql` (asignación automática de rutas)
+10. ✅ `20251126_plan_rutas_semanal.sql` (planificación semanal + vehículos base)
 
 **Nota:** Los archivos 3 y 4 podrían intercambiarse si `20251120_hito_presupuestos.sql` maneja correctamente la ausencia de `zonas`, pero es más seguro crear `zonas` primero.
 

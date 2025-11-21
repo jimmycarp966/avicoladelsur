@@ -2,9 +2,9 @@
 
 ## 📋 TL;DR (Resumen Ejecutivo)
 
-Sistema ERP modular para Avícola del Sur que unifica Almacén (WMS), Ventas (CRM), Reparto (TMS) y Tesorería en una única fuente de verdad con Supabase. Incluye bot de WhatsApp automatizado para pedidos, PWA móvil para repartidores con GPS, y arquitectura server-side con Next.js 15, React 19, TypeScript y Server Actions. Implementa FIFO automático, RLS completo, validaciones atómicas y trazabilidad total desde ingreso hasta entrega.
+Sistema ERP modular completo para Avícola del Sur que unifica Almacén (WMS), Ventas (CRM), Reparto (TMS) y Tesorería en una única fuente de verdad con Supabase. Incluye bot de WhatsApp automatizado para pedidos, PWA móvil para repartidores con GPS tracking, planificación semanal de rutas, optimización automática con Google Directions + fallback local, y arquitectura server-side con Next.js 15, React 19, TypeScript y Server Actions. Implementa FIFO automático, RLS completo, validaciones atómicas y trazabilidad total desde ingreso hasta entrega.
 
-**Estado actual**: ✅ Flujo completo implementado - Presupuestos → Almacén → Reparto → Tesorería funcionando end-to-end. Sistema listo para pruebas de integración.
+**Estado actual**: ✅ **COMPLETO Y FUNCIONAL** - Flujo end-to-end Presupuestos → Pedidos → Rutas Planificadas → Almacén → Reparto → Tesorería funcionando automáticamente. Sistema listo para producción con plan semanal de rutas implementado.
 
 ## 🛠️ Tecnologías Principales
 
@@ -47,30 +47,38 @@ supabase/                         # Scripts SQL y migraciones
 
 ## 🔄 Flujo Principal del Sistema (Pasos)
 
-1. **Cliente contacta** → Bot WhatsApp recibe pedido
-2. **Validación stock** → Consulta lotes disponibles (FIFO)
-3. **Creación pedido** → fn_crear_pedido_bot() (atómica)
-4. **Descuento stock** → Actualiza lotes con FIFO
-5. **Generación referencia** → PAY-YYYYMMDD-XXXXXX para pagos diferidos
-6. **Notificación admin** → Dashboard recibe alerta
-7. **Preparación almacén** → Vendedor revisa y envía a picking
-8. **Reparto asignación** → Optimización de rutas por zona/peso
-9. **Entrega** → Firma digital + QR verificación
-10. **Cobro** → Actualización cuentas corrientes + caja
-11. **Conciliación** → Reportes CSV/PDF de movimientos
+### **Flujo Automático Completo**:
+1. **Planificación semanal** → Admin configura rutas por zona/día/turno/vehículo
+2. **Cliente contacta** → Bot WhatsApp recibe pedido o vendedor crea presupuesto
+3. **Validación stock** → Consulta lotes disponibles (FIFO automático)
+4. **Creación pedido** → fn_convertir_presupuesto_a_pedido() (atómica)
+5. **Turno automático** → Si no definido, asigna mañana (<06:00) o tarde (≥06:00)
+6. **Asignación automática** → fn_asignar_pedido_a_ruta() busca ruta planificada por zona/turno/día
+7. **Validación capacidad** → Verifica peso final ≤ capacidad vehículo planificada
+8. **Descuento stock** → Actualiza lotes con FIFO y reservas consumidas
+9. **Generación referencia** → PAY-YYYYMMDD-XXXXXX para pagos diferidos
+10. **Optimización ruta** → Google Directions o fallback local genera orden visita + polyline
+11. **Notificación admin** → Dashboard recibe alerta de nuevo pedido asignado
+12. **Preparación almacén** → Almacenista pesa productos balanza, actualiza pesos finales
+13. **Reparto asignación** → PWA repartidor recibe hoja ruta con GPS tracking
+14. **Entrega** → Firma digital + QR verificación + registro cobro
+15. **Cobro automático** → Actualización cuentas corrientes + caja en tiempo real
+16. **Conciliación** → Reportes CSV/PDF de movimientos y rutas
 
-## 🔑 10 Puntos Clave del Diseño y Comportamiento
+## 🔑 12 Puntos Clave del Diseño y Comportamiento
 
 1. **Single Source of Truth**: Todo gira alrededor de Supabase como BD central
 2. **Server-Side First**: Server Actions manejan toda lógica crítica, validaciones y operaciones atómicas
-3. **FIFO Automático**: Sistema de lotes con descuento automático del más antiguo primero
-4. **RLS Estricto**: Cada tabla tiene Row Level Security por roles (admin, vendedor, repartidor, almacenista)
-5. **Validación Preventiva**: Clientes bloqueados por deuda no pueden crear pedidos
-6. **Operaciones Atómicas**: Todas las transacciones críticas usan RPCs de Postgres
-7. **Trazabilidad Completa**: Desde lote específico usado hasta firma digital de entrega
-8. **Referencias de Pago**: Generación automática con formato PAY-YYYYMMDD-XXXXXX
-9. **Adjuntos en Storage**: Gastos, firmas, checklists guardados en Supabase Storage
-10. **PWA Mobile-First**: Repartidores tienen app nativa-like con GPS y offline básico
+3. **Planificación Semanal**: Rutas se definen por semana (zona/día/turno/vehículo) y pedidos se asignan automáticamente
+4. **Turnos Automáticos**: Pedidos sin turno definido lo heredan según hora de confirmación (<06:00 mañana, ≥06:00 tarde)
+5. **Asignación Automática**: fn_asignar_pedido_a_ruta() busca rutas planificadas y valida capacidad por peso final
+6. **FIFO Automático**: Sistema de lotes con descuento automático del más antiguo primero
+7. **RLS Estricto**: Cada tabla tiene Row Level Security por roles (admin, vendedor, repartidor, almacenista)
+8. **Validación Preventiva**: Clientes bloqueados por deuda no pueden crear pedidos
+9. **Operaciones Atómicas**: Todas las transacciones críticas usan RPCs de Postgres
+10. **Trazabilidad Completa**: Desde lote específico usado hasta firma digital de entrega
+11. **Referencias de Pago**: Generación automática con formato PAY-YYYYMMDD-XXXXXX
+12. **PWA Mobile-First**: Repartidores tienen app nativa-like con GPS tracking y optimización de rutas
 
 ## 📦 Descripción Breve de Cada Módulo Importante
 
@@ -93,10 +101,14 @@ supabase/                         # Scripts SQL y migraciones
 - **Reclamos**: Seguimiento con estados y asignación
 
 ### 🚛 **Reparto (TMS)**: Logística y Entregas
-- **Vehículos**: Flota con mantenimientos y seguros
-- **Rutas**: Optimización por zona, peso y tiempo
-- **PWA Móvil**: Hoja ruta digital con GPS tracking
-- **Firma Digital**: Verificación con QR y subida a Storage
+- **Planificación Semanal**: Rutas fijas por zona/día/turno/vehículo con capacidad definida
+- **Vehículos Base**: Fiorino (600kg), Hilux (1500kg), F-4000 (4000kg) precargados
+- **Asignación Automática**: Pedidos se asignan a rutas planificadas según zona/turno/día
+- **Optimización de Rutas**: Google Directions API con fallback local (Nearest Neighbor + 2-opt)
+- **GPS Tracking**: PWA móvil envía ubicación cada 5s durante reparto activo
+- **Alertas Automáticas**: Desvío (>200m) y cliente saltado (<100m sin entrega)
+- **PWA Móvil**: Hoja ruta digital con GPS, entregas y cobros en tiempo real
+- **Firma Digital**: Verificación con QR y subida automática a Supabase Storage
 
 ### 💵 **Tesorería**: Control Financiero
 - **Cajas**: Por sucursal con saldos iniciales/actuales
@@ -117,28 +129,66 @@ supabase/                         # Scripts SQL y migraciones
 
 ### 📊 **Reportes**: Business Intelligence
 - **Formatos**: CSV (separado por ;) y PDF (profesional con paginación)
-- **Módulos**: Ventas, gastos, movimientos caja, cuentas corrientes
+- **Módulos**: Ventas, gastos, movimientos caja, cuentas corrientes, rutas y entregas
 - **Server-side**: Generación con pdfkit, descarga directa
+
+### 🗓️ **Planificación Semanal**: Gestión de Rutas
+- **Nueva tabla**: `plan_rutas_semanal` con zona/día/turno/vehículo/repartidor/capacidad
+- **Vehículos fijos**: 3 modelos precargados (Fiorino 600kg, Hilux 1500kg, F-4000 4000kg)
+- **UI de planificación**: `/reparto/planificacion` para crear/editar/eliminar planes semanales
+- **Asignación automática**: Pedidos se asignan a rutas planificadas según zona/turno/día
+- **Validación capacidad**: Peso final del pedido ≤ capacidad del vehículo planificada
+- **RPC integrada**: `fn_asignar_pedido_a_ruta()` busca planes y valida restricciones
 
 ---
 
-## 🎯 Flujo de Presupuestos Implementado
+## 🎯 Flujo Completo Automatizado Implementado
 
-**Estado**: ✅ Completo y verificado
+**Estado**: ✅ **COMPLETO Y FUNCIONAL** - Flujo end-to-end automático desde presupuesto hasta cobro
 
-**Flujo**: `Bot WhatsApp → Presupuesto (Pendiente) → Almacén (Pesaje) → Pedido (Facturado) → Reparto (Entrega/Cobro) → Tesorería (Tiempo Real)`
+**Flujo automático**: `Plan Semanal → Bot WhatsApp/Vendedor → Presupuesto (Pendiente) → Turno Auto → Asignación Ruta → Almacén (Pesaje) → Pedido (Facturado) → Optimización Ruta → Reparto (GPS Tracking) → Entrega/Cobro → Tesorería (Tiempo Real)`
 
-**Características clave:**
-- Clientes son deudores por defecto hasta confirmar reparto
-- Presupuestos con múltiples métodos de pago y recargos
-- Reserva preventiva de stock (no descuenta físicamente)
-- Pesaje obligatorio solo para productos categoría "balanza"
-- Facturación directa disponible para presupuestos sin pesables
-- Asignación automática de vehículos por peso y capacidad
-- Cobros del reparto se registran automáticamente en tesorería
-- Devoluciones con motivo y observaciones
+### **Fases Automáticas**:
 
-**Ver [`TESTING.md`](../TESTING.md) para guía completa de pruebas.**
+#### **1. Planificación Semanal** (Previa)
+- Admin configura rutas fijas: zona/día/turno/vehículo/capacidad
+- Vehículos base: Fiorino (600kg), Hilux (1500kg), F-4000 (4000kg)
+- UI: `/reparto/planificacion` para gestión completa
+
+#### **2. Creación de Pedidos** (Automática)
+- **Bot WhatsApp**: Toma pedidos naturales, valida stock, reserva FIFO
+- **Vendedor Web**: Crea presupuestos con zona opcional
+- **Turno automático**: Si no definido → <06:00 mañana, ≥06:00 tarde
+- **Asignación automática**: Busca ruta planificada por zona/turno/día, valida capacidad
+
+#### **3. Procesamiento en Almacén** (Semi-automático)
+- Reserva preventiva → descuento físico al convertir a pedido
+- Pesaje obligatorio para productos "balanza" (actualiza precios finales)
+- Actualización automática de subtotales/totales del pedido
+- Revalidación de capacidad del vehículo con pesos finales
+
+#### **4. Reparto con GPS** (Automático)
+- **Optimización**: Google Directions API + fallback local (Nearest Neighbor + 2-opt)
+- **PWA móvil**: Hoja ruta digital con GPS tracking cada 5s
+- **Monitor admin**: Mapa Leaflet en tiempo real con polylíneas y alertas
+- **Alertas**: Desvío (>200m) y cliente saltado (<100m sin entrega)
+
+#### **5. Cobro y Conciliación** (Automático)
+- Cobros en PWA → actualización inmediata en cuentas corrientes
+- Referencias PAY-XXXXXX para seguimiento
+- Reportes CSV/PDF de movimientos y rutas
+
+### **Características Técnicas**:
+- **Vehículos fijos**: 3 modelos con capacidades específicas
+- **Planificación semanal**: Rutas predeterminadas por zona/día/turno
+- **Validación de capacidad**: Peso final ≤ capacidad vehículo planificada
+- **Turnos automáticos**: Basados en hora de confirmación Buenos Aires
+- **GPS tracking**: Polling cada 5s durante reparto activo
+- **Optimización híbrida**: Google Directions + fallback local robusto
+- **RLS completo**: Políticas por rol en todas las tablas
+- **Operaciones atómicas**: Todas las transacciones críticas en RPCs
+
+**Ver [`TESTING.md`](../TESTING.md) para guía completa de pruebas del flujo automático.**
 
 ---
 

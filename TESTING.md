@@ -16,6 +16,10 @@ Este documento define el flujo de pruebas End-to-End para validar la lógica de 
 
 ## 🧪 1. Flujo de Ventas (Bot y Vendedor)
 
+### 0. Planificación Semanal (Prerequisito)
+- [ ] **Crear plan** en `/reparto/planificacion`: definir zona, día, turno, vehículo (Fiorino 600 kg, Hilux 1500 kg o F-4000 4000 kg) y opcional repartidor.
+- [ ] **Verificar** que el plan figure en la tabla y que coincida con los pedidos que se probarán (misma zona/turno/día).
+
 ### 1.1 Entrada por WhatsApp (Bot)
 **Objetivo**: Validar que el bot tome presupuestos y reserve stock virtualmente.
 
@@ -29,7 +33,8 @@ Este documento define el flujo de pruebas End-to-End para validar la lógica de 
 
 - [ ] **Revisión de Presupuesto**: Entrar al módulo Ventas.
     - *Acción*: Abrir el presupuesto pendiente.
-    - *Acción*: Asignar **Zona** y **Turno** (Mañana/Tarde).
+    - *Acción*: Asignar **Zona** (obligatoria) y, si corresponde, **Turno** (opcional).
+    - *Nota*: Si no se define turno manualmente, el sistema lo calcula al confirmar (≤ 06:00 → Mañana, > 06:00 → Tarde).
     - *Acción*: Verificar formas de pago (ej. Efectivo + Transferencia). Verificar si aplica recargo.
 - [ ] **Bifurcación de Flujo**:
     - **Caso A (Con Balanza)**: Si hay productos categoría 'BALANZA', el botón debe decir "Enviar a Almacén".
@@ -65,8 +70,8 @@ Este documento define el flujo de pruebas End-to-End para validar la lógica de 
         2. Se crea un `pedido` oficial (`PED-...`).
         3. Se consume la reserva y se descuenta stock físico real de `lotes`.
 - [ ] **Asignación Vehicular**:
-    - *Prueba*: Ejecutar función de asignación automática.
-    - *Validación*: El sistema asigna el pedido al vehículo con capacidad disponible para esa zona.
+    - *Prueba*: Tras la conversión, consultar las tablas `rutas_reparto` y `detalles_ruta`.
+    - *Validación*: Cada pedido queda insertado automáticamente en la ruta del día (fecha + zona + turno). Si no existía ruta, se crea una nueva en estado `planificada` con vehículo y repartidor disponibles.
 
 ### 2.4 Recepción y Producción (Ingresos/Egresos)
 - [ ] **Ingreso Mercadería**: Registrar ingreso en `kg` o `unidades`.
@@ -84,6 +89,8 @@ Este documento define el flujo de pruebas End-to-End para validar la lógica de 
 - [ ] **Checklist Inicial**:
     - *Acción*: Chofer completa estado del vehículo (aceite, ruedas) en App.
     - *Validación*: No deja iniciar ruta sin checklist.
+- [ ] **Ruta Autogenerada**:
+    - *Validación*: Luego de convertir un presupuesto, `/reparto/monitor` muestra la ruta del día (fecha + zona + turno) con el pedido incorporado y polilínea optimizada.
 
 ### 3.2 Gestión de Entregas
 **Objetivo**: Trazabilidad y Cobranza en sitio.
@@ -154,4 +161,15 @@ ORDER BY created_at DESC LIMIT 1;
 SELECT tipo, monto, metodo_pago, origen_tipo 
 FROM tesoreria_movimientos 
 WHERE created_at > NOW() - INTERVAL '1 hour';
+
+-- 5. Verificar Asignación Automática de Ruta
+SELECT 
+  rr.fecha_ruta,
+  rr.turno,
+  rr.zona_id,
+  dr.pedido_id
+FROM rutas_reparto rr
+JOIN detalles_ruta dr ON dr.ruta_id = rr.id
+ORDER BY rr.fecha_ruta DESC, rr.turno
+LIMIT 10;
 ```

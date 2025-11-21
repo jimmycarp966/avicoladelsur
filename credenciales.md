@@ -65,6 +65,21 @@ https://console.twilio.com/us1/develop/sms/try-it-out/whatsapp-learn
 
 ---
 
+## 🗺️ Google Maps API
+
+### API Key (Directions API)
+```
+AIzaSyAfsPP-qnCmulna4zNbLEQkDk_88MB-n3o
+```
+
+### Configuración
+- **API Habilitada**: Directions API
+- **Uso**: Optimización de rutas de reparto
+- **Fallback**: Si no está disponible, usa algoritmo local (Nearest Neighbor + 2-opt)
+- **Configurada en**: `.env.local` y Vercel (producción)
+
+---
+
 ## 📝 Notas
 
 - Fecha de creación: 7 de Noviembre, 2025
@@ -72,6 +87,7 @@ https://console.twilio.com/us1/develop/sms/try-it-out/whatsapp-learn
 - Proyecto: Avícola del Sur ERP
 - Las credenciales de Supabase están activas y configuradas ✅
 - Las credenciales de Twilio están configuradas ✅
+- ✅ La API Key de Google Maps está configurada ✅
 - La integración de Botpress está pendiente (opcional)
 
 ---

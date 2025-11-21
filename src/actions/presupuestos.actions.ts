@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { createNotification } from './index'
+import { generateRutaOptimizada } from '@/lib/services/ruta-optimizer'
 
 // Schemas de validación
 const crearPresupuestoSchema = z.object({
@@ -223,6 +224,18 @@ export async function confirmarPresupuestoAction(formData: FormData) {
 
     if (!result.success) {
       return { success: false, message: result.error || 'Error en la conversión del presupuesto' }
+    }
+
+    if (result.ruta_id) {
+      try {
+        await generateRutaOptimizada({
+          supabase,
+          rutaId: result.ruta_id,
+          usarGoogle: true,
+        })
+      } catch (optError) {
+        console.error('No se pudo optimizar la ruta planificada automáticamente:', optError)
+      }
     }
 
     // Crear notificación
@@ -603,8 +616,8 @@ export async function enviarPresupuestoAlmacenAction(presupuestoId: string) {
       return { success: false, message: 'Solo se pueden enviar presupuestos pendientes a almacén' }
     }
 
-    if (!presupuesto.turno || !presupuesto.zona_id) {
-      return { success: false, message: 'El presupuesto debe tener turno y zona asignados antes de enviar a almacén' }
+    if (!presupuesto.zona_id) {
+      return { success: false, message: 'El presupuesto debe tener una zona asignada antes de enviar a almacén' }
     }
 
     // Actualizar estado y usuario almacén

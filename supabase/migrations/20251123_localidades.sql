@@ -65,3 +65,4 @@ COMMENT ON COLUMN localidades.zona_id IS 'Zona de entrega a la que pertenece la 
 COMMENT ON COLUMN clientes.localidad_id IS 'Localidad del cliente (opcional, puede usar zona_entrega como alternativa)';
 COMMENT ON FUNCTION fn_obtener_localidades_activas() IS 'Retorna todas las localidades activas con su zona asociada, ordenadas por nombre';
 
+
