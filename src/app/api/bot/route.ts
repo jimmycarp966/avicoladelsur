@@ -937,15 +937,33 @@ ${detalleProductos}
         responseMessage = 'No tienes ningún pedido pendiente.'
       }
     }
-    // Comando: Pedido múltiple (POLLO001 5, HUEVO001 2, POLLO003 3)
-    else if (body.includes(',')) {
-        const items = body.split(',').map(item => item.trim())
+    // Comando: Pedido múltiple (acepta comas o líneas separadas)
+    // Formato: POLLO001 5, HUEVO001 2, POLLO003 3
+    // O también: POLLO001 5\nHUEVO001 2\nPOLLO003 3
+    else if (true) {
+        // Detectar si hay múltiples productos (por comas o líneas separadas)
+        const lines = body.split('\n').map(l => l.trim()).filter(l => l.length > 0)
+        const hasCommas = body.includes(',')
+        const validLines = lines.filter(line => line.match(/^[A-Z]{3,10}\d{3,4}\s+\d+(?:\.\d+)?$/i))
+        const multipleLines = validLines.length > 1
+        
+        if (hasCommas || multipleLines) {
+        // Dividir por comas o por saltos de línea
+        let items: string[] = []
+        if (hasCommas) {
+          items = body.split(',').map(item => item.trim()).filter(item => item.length > 0)
+        } else {
+          // Usar las líneas válidas detectadas
+          items = validLines
+        }
+        
         const productos = []
         let totalPreview = 0
         let hayError = false
         let errorMsg = ''
 
         for (const item of items) {
+          // Patrón más flexible: código seguido de cantidad (puede tener espacios)
           const match = item.match(/^([A-Z]{3,10}\d{3,4})\s+(\d+(?:\.\d+)?)$/i)
           if (match) {
             const codigo = match[1].toUpperCase()
@@ -963,12 +981,12 @@ ${detalleProductos}
             const { data: productoConStock } = await supabase
               .from('productos_con_stock')
               .select('stock_disponible')
-              .eq('id', producto.id)
-              .single()
-            
-            const stockDisponible = productoConStock ? Number(productoConStock.stock_disponible) || 0 : 0
-            
-            if (stockDisponible <= 0) {
+            .eq('id', producto.id)
+            .single()
+          
+          const stockDisponible = productoConStock ? Number(productoConStock?.stock_disponible) || 0 : 0
+
+          if (stockDisponible <= 0) {
               hayError = true
               errorMsg = `Sin stock disponible de ${producto.nombre}`
               break
@@ -994,8 +1012,13 @@ ${detalleProductos}
         } else if (productos.length === 0) {
           responseMessage = `❌ Formato incorrecto para pedido múltiple.
 
-Ejemplo:
-*POLLO001 5, HUEVO001 2, POLLO003 3*`
+Ejemplos válidos:
+*POLLO001 5, HUEVO001 2, POLLO003 3*
+
+O también:
+*POLLO001 5
+HUEVO001 2
+POLLO003 3*`
         } else {
           const cliente = await findClienteByPhone(phoneNumber)
           if (!cliente) {
@@ -1016,9 +1039,11 @@ Ejemplo:
             responseMessage += `¿Confirmas este pedido?\n\nResponde *SÍ* para confirmar o *NO* para cancelar.`
           }
         }
+        }
     }
-    // Comando: Pedido simple con confirmación
-    else if (/^[A-Z]{3,10}\d{3,4}\s+\d+$/i.test(body.trim())) {
+    // Comando: Pedido simple con confirmación (solo si es una sola línea)
+    // Si hay múltiples líneas con formato de pedido, se procesará como pedido múltiple arriba
+    else if (/^[A-Z]{3,10}\d{3,4}\s+\d+(?:\.\d+)?$/i.test(body.trim()) && !body.includes('\n')) {
       const parts = body.trim().split(/\s+/)
       const codigo = parts[0].toUpperCase()
       const cantidad = parseFloat(parts[1])
@@ -1037,16 +1062,16 @@ Ejemplo:
           const { data: productoConStock } = await supabase
             .from('productos_con_stock')
             .select('stock_disponible')
-            .eq('id', producto.id)
+            .eq('id', producto!.id)
             .single()
           
-          const stockDisponible = productoConStock ? Number(productoConStock.stock_disponible) || 0 : 0
+          const stockDisponible = productoConStock?.stock_disponible ? Number(productoConStock?.stock_disponible) : 0
 
           if (stockDisponible <= 0) {
             responseMessage = `❌ *Sin stock disponible*
 
-📦 *Producto:* ${producto.nombre}
-📊 *Solicitado:* ${cantidad} ${producto.unidad_medida}
+📦 *Producto:* ${producto!.nombre}
+📊 *Solicitado:* ${cantidad} ${producto!.unidad_medida}
 📦 *Disponible:* Sin stock
 
 💡 *Opciones:*
@@ -1056,12 +1081,12 @@ Ejemplo:
           } else if (stockDisponible < cantidad) {
             responseMessage = `❌ *Stock insuficiente*
 
-📦 *Producto:* ${producto.nombre}
-📊 *Solicitado:* ${cantidad} ${producto.unidad_medida}
-📦 *Disponible:* ${Math.floor(stockDisponible)} ${producto.unidad_medida}
+📦 *Producto:* ${producto!.nombre}
+📊 *Solicitado:* ${cantidad} ${producto!.unidad_medida}
+📦 *Disponible:* ${Math.floor(stockDisponible)} ${producto!.unidad_medida}
 
 💡 *Sugerencias:*
-   • Reduce la cantidad a ${Math.floor(stockDisponible)} ${producto.unidad_medida}
+   • Reduce la cantidad a ${Math.floor(stockDisponible)} ${producto!.unidad_medida}
    • Consulta productos similares escribiendo *productos*
    • Contacta a tu vendedor para más opciones`
           } else {
@@ -1071,11 +1096,11 @@ Ejemplo:
               timestamp: Date.now()
             })
 
-            const total = cantidad * producto.precio_venta
+            const total = cantidad * producto!.precio_venta
             responseMessage = `📦 *Resumen de tu pedido:*
 
-• ${producto.nombre}
-  ${cantidad} ${producto.unidad_medida} x $${producto.precio_venta}
+• ${producto!.nombre}
+  ${cantidad} ${producto!.unidad_medida} x $${producto!.precio_venta}
   
 💰 *Total: $${total.toFixed(2)}*
 
@@ -1109,16 +1134,16 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
       if (error) {
         console.error('Error obteniendo productos:', error)
         responseMessage = 'Error al obtener productos. Intenta de nuevo.'
-      } else if (!productos || productos.length === 0) {
+      } else if (!productos || productos?.length === 0) {
         responseMessage = 'No hay productos disponibles en este momento.'
       } else {
-        const categorias = [...new Set(productos.map(p => p.categoria || 'Otros'))]
+        const categorias = [...new Set(productos!.map(p => p.categoria || 'Otros'))]
         
         responseMessage = `📦 *Catálogo de Productos*\n\n`
         
         categorias.forEach(categoria => {
           responseMessage += `*${categoria}:*\n`
-          productos
+          productos!
             .filter(p => (p.categoria || 'Otros') === categoria)
             .forEach((p) => {
               const stock = Number(p.stock_disponible) || 0
@@ -1141,10 +1166,10 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
       if (!cliente) {
         responseMessage = '❌ No encontramos tu cuenta. Comunícate con un asesor.'
       } else {
-        const cuenta = await getCuentaCorriente(cliente.id)
+        const cuenta = await getCuentaCorriente(cliente!.id)
         const saldo = Number(cuenta?.saldo || 0)
         if (saldo > 0) {
-          responseMessage = `📄 *Estado de cuenta*\n\nCliente: ${cliente.nombre}\nSaldo pendiente: *$${saldo.toFixed(
+          responseMessage = `📄 *Estado de cuenta*\n\nCliente: ${cliente!.nombre}\nSaldo pendiente: *$${saldo.toFixed(
             2
           )}*\n\nPuedes abonar al repartidor o solicitar un link de pago respondiendo *pagar*.`
         } else {
@@ -1177,31 +1202,31 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
               const { data: productoConStock } = await supabase
                 .from('productos_con_stock')
                 .select('stock_disponible')
-                .eq('id', producto.id)
+                .eq('id', producto!.id)
                 .single()
               
-              const stockDisponible = productoConStock ? Number(productoConStock.stock_disponible) || 0 : 0
+              const stockDisponible = productoConStock?.stock_disponible ? Number(productoConStock?.stock_disponible) : 0
 
           if (stockDisponible < cantidad) {
             responseMessage = `❌ *Stock insuficiente*
 
-📦 *Producto:* ${producto.nombre}
-📊 *Solicitado:* ${cantidad} ${producto.unidad_medida}
-📦 *Disponible:* ${Math.floor(stockDisponible)} ${producto.unidad_medida}
+📦 *Producto:* ${producto!.nombre}
+📊 *Solicitado:* ${cantidad} ${producto!.unidad_medida}
+📦 *Disponible:* ${Math.floor(stockDisponible)} ${producto!.unidad_medida}
 
 💡 *Opciones:*
-   • Reduce la cantidad a ${Math.floor(stockDisponible)} ${producto.unidad_medida}
+   • Reduce la cantidad a ${Math.floor(stockDisponible)} ${producto!.unidad_medida}
    • Consulta otros productos escribiendo *productos*
    • Contacta a tu vendedor para alternativas`
               } else {
                 // Crear presupuesto
                 const formData = new FormData()
-                formData.append('cliente_id', cliente.id)
+                formData.append('cliente_id', cliente!.id)
                 formData.append('observaciones', 'Presupuesto creado desde WhatsApp')
                 formData.append('items', JSON.stringify([{
-                  producto_id: producto.id,
+                  producto_id: producto!.id,
                   cantidad_solicitada: cantidad,
-                  precio_unit_est: producto.precio_venta
+                  precio_unit_est: producto!.precio_venta
                 }]))
 
                 const result = await crearPresupuestoAction(formData)
@@ -1214,8 +1239,8 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
                   responseMessage = `✅ *¡Presupuesto Creado!*
 
 📋 *Número:* ${numeroPresupuesto}
-📦 *Producto:* ${producto.nombre}
-📊 *Cantidad:* ${cantidad} ${producto.unidad_medida}
+📦 *Producto:* ${producto!.nombre}
+📊 *Cantidad:* ${cantidad} ${producto!.unidad_medida}
 💰 *Total estimado:* $${totalEstimado.toFixed(2)}
 
 🔗 *Seguimiento:*
@@ -1243,7 +1268,7 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
       const match = body.match(/PED-[\w-]+/i)
       
       if (match) {
-        const numeroPedido = match[0].toUpperCase()
+        const numeroPedido = match![0].toUpperCase()
         const pedido = await getPedidoStatus(numeroPedido)
         
         if (!pedido) {
@@ -1267,22 +1292,22 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
             cancelado: 'Cancelado'
           }
           
-          const emoji = estadosEmoji[pedido.estado] || '📋'
-          const estadoTexto = estadosTexto[pedido.estado] || pedido.estado
+          const emoji = estadosEmoji[pedido!.estado] || '📋'
+          const estadoTexto = estadosTexto[pedido!.estado] || pedido!.estado
           
           responseMessage = `${emoji} *Estado de Pedido*
 
-📋 Número: *${pedido.numero_pedido}*
+📋 Número: *${pedido!.numero_pedido}*
 🔄 Estado: *${estadoTexto}*
-📅 Fecha: ${new Date(pedido.fecha_pedido).toLocaleDateString('es-AR')}
-💰 Total: $${pedido.total}`
+📅 Fecha: ${new Date(pedido!.fecha_pedido).toLocaleDateString('es-AR')}
+💰 Total: $${pedido!.total}`
 
-          if (pedido.fecha_entrega_estimada) {
-            responseMessage += `\n🚚 Entrega estimada: ${new Date(pedido.fecha_entrega_estimada).toLocaleDateString('es-AR')}`
+          if (pedido!.fecha_entrega_estimada) {
+            responseMessage += `\n🚚 Entrega estimada: ${new Date(pedido!.fecha_entrega_estimada).toLocaleDateString('es-AR')}`
           }
           
-          if (pedido.fecha_entrega_real) {
-            responseMessage += `\n✅ Entregado: ${new Date(pedido.fecha_entrega_real).toLocaleDateString('es-AR')}`
+          if (pedido!.fecha_entrega_real) {
+            responseMessage += `\n✅ Entregado: ${new Date(pedido!.fecha_entrega_real).toLocaleDateString('es-AR')}`
           }
         }
       } else {
@@ -1295,15 +1320,17 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
           const { data: pedidos } = await supabase
             .from('pedidos')
             .select('numero_pedido, estado, total, fecha_pedido')
-            .eq('cliente_id', cliente.id)
+            .eq('cliente_id', cliente!.id)
             .order('fecha_pedido', { ascending: false })
             .limit(5)
 
-          if (!pedidos || pedidos.length === 0) {
+          const pedidosList = pedidos ?? []
+
+          if (pedidosList.length === 0) {
             responseMessage = 'No tienes pedidos registrados.'
           } else {
             responseMessage = `📋 *Tus últimos pedidos:*\n\n`
-            pedidos.forEach(p => {
+            pedidosList.forEach(p => {
               const estadosEmoji: Record<string, string> = {
                 pendiente: '⏳',
                 confirmado: '✅',

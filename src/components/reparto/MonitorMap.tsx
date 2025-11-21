@@ -311,17 +311,24 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
   )
 }
 
-// Importar L de leaflet solo en cliente
-let L: any = null
-if (typeof window !== 'undefined') {
-  L = require('leaflet')
-  
-  // Fix para iconos de Leaflet en Next.js
-  delete (L.Icon.Default.prototype as any)._getIconUrl
-  L.Icon.Default.mergeOptions({
+type LeafletModule = typeof import('leaflet')
+let L: LeafletModule | null = null
+
+const ensureLeafletLoaded = async () => {
+  if (typeof window === 'undefined' || L) {
+    return
+  }
+
+  const Leaflet = await import('leaflet')
+  L = Leaflet
+
+  delete (Leaflet.Icon.Default.prototype as any)._getIconUrl
+  Leaflet.Icon.Default.mergeOptions({
     iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
     iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
     shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png'
   })
 }
+
+void ensureLeafletLoaded()
 

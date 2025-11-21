@@ -51,7 +51,7 @@ async function AjustarStockContent({ loteId }: { loteId: string }) {
             No se puede ajustar este lote
           </h2>
           <p className="text-muted-foreground">
-            Solo se pueden ajustar lotes en estado "disponible". Este lote está en estado "{lote.estado}".
+            Solo se pueden ajustar lotes en estado 'disponible'. Este lote está en estado '{lote.estado}'.
           </p>
         </div>
       </div>

@@ -413,13 +413,20 @@ export default function RutaMap({
   )
 }
 
-// Helper icons
-let L: any = null
-if (typeof window !== 'undefined') {
-  L = require('leaflet')
-  if (L?.Icon?.Default) {
-    delete (L.Icon.Default.prototype as any)._getIconUrl
-    L.Icon.Default.mergeOptions({
+type LeafletModule = typeof import('leaflet')
+let L: LeafletModule | null = null
+
+const ensureLeafletLoaded = async () => {
+  if (typeof window === 'undefined' || L) {
+    return
+  }
+
+  const Leaflet = await import('leaflet')
+  L = Leaflet
+
+  if (Leaflet.Icon?.Default) {
+    delete (Leaflet.Icon.Default.prototype as any)._getIconUrl
+    Leaflet.Icon.Default.mergeOptions({
       iconRetinaUrl:
         'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
       iconUrl:
@@ -429,6 +436,8 @@ if (typeof window !== 'undefined') {
     })
   }
 }
+
+void ensureLeafletLoaded()
 
 function createOrderIcon(order: number | undefined) {
   if (!L) return undefined

@@ -447,7 +447,7 @@ export async function crearCotizacion(
     // Calcular totales
     let subtotal = 0
     for (const item of params.items) {
-      if (!item.precio_unitario!) {
+      if (item.precio_unitario == null) {
         const { data: producto, error: productoError } = await supabase
           .from('productos')
           .select('precio_venta')
@@ -455,9 +455,9 @@ export async function crearCotizacion(
           .single()
 
         if (productoError) throw productoError
-        item.precio_unitario! = producto.precio_venta
+        item.precio_unitario = producto.precio_venta
       }
-      subtotal += item.cantidad * item.precio_unitario!
+      subtotal += item.cantidad * (item.precio_unitario ?? 0)
     }
 
     const total = subtotal - (params.descuento || 0)
@@ -485,9 +485,9 @@ export async function crearCotizacion(
       cotizacion_id: cotizacion.id,
       producto_id: item.producto_id,
       cantidad: item.cantidad,
-      precio_unitario: item.precio_unitario!!,
+      precio_unitario: item.precio_unitario ?? 0,
       descuento: 0,
-      subtotal: item.cantidad * item.precio_unitario!!,
+      subtotal: item.cantidad * (item.precio_unitario ?? 0),
     }))
 
     const { error: detallesError } = await supabase

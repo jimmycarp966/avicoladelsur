@@ -45,7 +45,7 @@ async function EditarRutaContent({ rutaId }: { rutaId: string }) {
             No se puede editar esta ruta
           </h2>
           <p className="text-muted-foreground">
-            Solo se pueden editar rutas en estado "planificada". Esta ruta está en estado "{ruta.estado}".
+            Solo se pueden editar rutas en estado 'planificada'. Esta ruta está en estado '{ruta.estado}'.
           </p>
         </div>
       </div>
