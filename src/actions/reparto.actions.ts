@@ -155,6 +155,112 @@ export async function crearRuta(
   }
 }
 
+// Actualizar ruta (solo rutas planificadas)
+export async function actualizarRuta(
+  rutaId: string,
+  params: Partial<CrearRutaParams>
+): Promise<ApiResponse> {
+  try {
+    const supabase = await createClient()
+
+    // Verificar permisos
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, error: 'Usuario no autenticado' }
+    }
+
+    const { data: usuario } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (!usuario || usuario.rol !== 'admin') {
+      return { success: false, error: 'Solo los administradores pueden editar rutas' }
+    }
+
+    // Verificar que la ruta existe y está en estado planificada
+    const { data: ruta, error: rutaError } = await supabase
+      .from('rutas_reparto')
+      .select('estado')
+      .eq('id', rutaId)
+      .single()
+
+    if (rutaError) throw rutaError
+    if (!ruta) {
+      return { success: false, error: 'Ruta no encontrada' }
+    }
+
+    if (ruta.estado !== 'planificada') {
+      return {
+        success: false,
+        error: `No se puede editar una ruta en estado "${ruta.estado}". Solo se pueden editar rutas planificadas.`,
+      }
+    }
+
+    // Validar turno si se proporciona
+    if (params.turno && !['mañana', 'tarde'].includes(params.turno)) {
+      return { success: false, error: 'Turno inválido. Debe ser "mañana" o "tarde"' }
+    }
+
+    // Validar repartidor si se proporciona
+    if (params.repartidor_id) {
+      const { data: repartidor, error: repartidorError } = await supabase
+        .from('usuarios')
+        .select('id')
+        .eq('id', params.repartidor_id)
+        .eq('rol', 'repartidor')
+        .single()
+
+      if (repartidorError || !repartidor) {
+        return { success: false, error: 'Repartidor no encontrado o no válido' }
+      }
+    }
+
+    // Preparar datos de actualización
+    const updateData: any = {
+      updated_at: new Date().toISOString(),
+    }
+
+    if (params.vehiculo_id) updateData.vehiculo_id = params.vehiculo_id
+    if (params.repartidor_id) updateData.repartidor_id = params.repartidor_id
+    if (params.fecha_ruta) updateData.fecha_ruta = params.fecha_ruta
+    if (params.turno) updateData.turno = params.turno
+    if (params.zona_id) updateData.zona_id = params.zona_id
+    if (params.observaciones !== undefined) updateData.observaciones = params.observaciones
+
+    // Actualizar ruta
+    const { error: updateError } = await supabase
+      .from('rutas_reparto')
+      .update(updateData)
+      .eq('id', rutaId)
+
+    if (updateError) throw updateError
+
+    // Si se proporcionan nuevos pedidos, reasignar
+    if (params.pedidos_ids && params.pedidos_ids.length > 0) {
+      // Eliminar asignaciones anteriores
+      await supabase.from('detalles_ruta').delete().eq('ruta_id', rutaId)
+      // Asignar nuevos pedidos
+      await asignarPedidosARuta(rutaId, params.pedidos_ids)
+    }
+
+    revalidatePath('/(admin)/(dominios)/reparto/rutas')
+    revalidatePath(`/(admin)/(dominios)/reparto/rutas/${rutaId}`)
+
+    return {
+      success: true,
+      message: 'Ruta actualizada exitosamente',
+    }
+  } catch (error: any) {
+    console.error('Error al actualizar ruta:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al actualizar ruta',
+    }
+  }
+}
+
 // Asignar pedidos a ruta
 export async function asignarPedidosARuta(
   rutaId: string,
@@ -415,6 +521,48 @@ export async function registrarDevolucionAction(formData: FormData): Promise<Api
     return {
       success: false,
       error: error.message || 'Error al registrar devolución',
+    }
+  }
+}
+
+// Obtener ruta por ID
+export async function obtenerRutaPorId(rutaId: string): Promise<ApiResponse<any>> {
+  try {
+    const supabase = await createClient()
+
+    const { data: ruta, error } = await supabase
+      .from('rutas_reparto')
+      .select(`
+        *,
+        repartidor:usuarios!rutas_reparto_repartidor_id_fkey(id, nombre, apellido),
+        vehiculo:vehiculos(id, patente, marca, modelo, capacidad_kg),
+        zona:zonas(id, nombre),
+        detalles_ruta (
+          id,
+          pedido_id,
+          pedido:pedidos(id, numero_pedido, cliente:clientes(nombre))
+        )
+      `)
+      .eq('id', rutaId)
+      .single()
+
+    if (error) throw error
+    if (!ruta) {
+      return {
+        success: false,
+        error: 'Ruta no encontrada',
+      }
+    }
+
+    return {
+      success: true,
+      data: ruta,
+    }
+  } catch (error: any) {
+    console.error('Error al obtener ruta:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al obtener ruta',
     }
   }
 }
@@ -766,6 +914,82 @@ export async function obtenerVehiculos(): Promise<ApiResponse<any[]>> {
     return {
       success: false,
       error: error.message || 'Error al obtener vehículos',
+    }
+  }
+}
+
+// Cancelar ruta (solo rutas planificadas)
+export async function cancelarRuta(rutaId: string): Promise<ApiResponse> {
+  try {
+    const supabase = await createClient()
+
+    // Verificar permisos
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, error: 'Usuario no autenticado' }
+    }
+
+    const { data: usuario } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (!usuario) {
+      return { success: false, error: 'Usuario no encontrado' }
+    }
+
+    // Obtener ruta para validar estado y permisos
+    const { data: ruta, error: rutaError } = await supabase
+      .from('rutas_reparto')
+      .select('estado, repartidor_id')
+      .eq('id', rutaId)
+      .single()
+
+    if (rutaError) throw rutaError
+    if (!ruta) {
+      return { success: false, error: 'Ruta no encontrada' }
+    }
+
+    // Validar que solo rutas planificadas pueden cancelarse
+    if (ruta.estado !== 'planificada') {
+      return {
+        success: false,
+        error: `No se puede cancelar una ruta en estado "${ruta.estado}". Solo se pueden cancelar rutas planificadas.`,
+      }
+    }
+
+    // Validar permisos: admin o repartidor asignado
+    if (usuario.rol !== 'admin' && ruta.repartidor_id !== user.id) {
+      return {
+        success: false,
+        error: 'No tienes permisos para cancelar esta ruta',
+      }
+    }
+
+    // Actualizar estado a cancelada
+    const { error: updateError } = await supabase
+      .from('rutas_reparto')
+      .update({
+        estado: 'cancelada',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', rutaId)
+
+    if (updateError) throw updateError
+
+    revalidatePath('/(admin)/(dominios)/reparto/rutas')
+    revalidatePath('/(repartidor)/ruta/*')
+
+    return {
+      success: true,
+      message: 'Ruta cancelada exitosamente',
+    }
+  } catch (error: any) {
+    console.error('Error al cancelar ruta:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al cancelar ruta',
     }
   }
 }

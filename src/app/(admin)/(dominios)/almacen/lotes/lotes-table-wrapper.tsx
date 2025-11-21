@@ -14,20 +14,20 @@ export function LotesTableWrapper() {
   const [loading, setLoading] = useState(true)
 
   // Cargar lotes reales de la base de datos
-  useEffect(() => {
-    async function cargarLotes() {
-      setLoading(true)
-      const result = await obtenerLotes()
-      
-      if (result.success && result.data) {
-        setLotes(result.data as Lote[])
-      } else {
-        showToast('error', 'Error al cargar lotes')
-      }
-      setLoading(false)
-    }
+  const loadLotes = async () => {
+    setLoading(true)
+    const result = await obtenerLotes()
     
-    cargarLotes()
+    if (result.success && result.data) {
+      setLotes(result.data as Lote[])
+    } else {
+      showToast('error', 'Error al cargar lotes')
+    }
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    loadLotes()
   }, [showToast])
 
   const handleView = (lote: Lote) => {
@@ -39,13 +39,19 @@ export function LotesTableWrapper() {
   }
 
   const handleDelete = async (lote: Lote) => {
-    if (confirm(`¿Estás seguro de que quieres eliminar el lote ${lote.numero_lote}?`)) {
+    if (confirm(`¿Estás seguro de que quieres eliminar el lote ${lote.numero_lote}?\n\nSolo se pueden eliminar lotes sin movimientos de stock y que no estén asociados a pedidos activos.`)) {
       try {
-        // TODO: Implementar eliminación real
-        setLotes(prev => prev.filter(l => l.id !== lote.id))
-        showToast('success', `Lote ${lote.numero_lote} eliminado exitosamente`)
-      } catch (error) {
-        showToast('error', 'Error al eliminar lote')
+        const { eliminarLote } = await import('@/actions/almacen.actions')
+        const result = await eliminarLote(lote.id)
+        if (result.success) {
+          await loadLotes()
+          showToast('success', result.message || `Lote ${lote.numero_lote} eliminado exitosamente`)
+        } else {
+          showToast('error', result.error || 'Error al eliminar lote')
+        }
+      } catch (error: any) {
+        console.error('Error al eliminar lote:', error)
+        showToast('error', error.message || 'Error al eliminar lote')
       }
     }
   }

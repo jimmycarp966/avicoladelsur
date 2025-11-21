@@ -112,7 +112,39 @@ export function DataTable<TData, TValue>({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => navigator.clipboard.writeText(JSON.stringify(row.original))}>
+              <DropdownMenuItem
+                onClick={() => {
+                  const rowData = row.original as any
+                  // Intentar obtener el ID del objeto
+                  let idToCopy = rowData.id
+                  
+                  // Si no existe 'id', buscar campos que terminen en '_id'
+                  if (!idToCopy) {
+                    const idFields = Object.keys(rowData).filter(key => key.endsWith('_id'))
+                    if (idFields.length > 0) {
+                      idToCopy = rowData[idFields[0]]
+                    }
+                  }
+                  
+                  // Si aún no hay ID, buscar cualquier UUID en el objeto
+                  if (!idToCopy) {
+                    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+                    for (const value of Object.values(rowData)) {
+                      if (typeof value === 'string' && uuidPattern.test(value)) {
+                        idToCopy = value
+                        break
+                      }
+                    }
+                  }
+                  
+                  // Si no se encuentra ningún ID, usar el primer valor del objeto
+                  if (!idToCopy) {
+                    idToCopy = Object.values(rowData)[0] || 'N/A'
+                  }
+                  
+                  navigator.clipboard.writeText(String(idToCopy))
+                }}
+              >
                 Copiar ID
               </DropdownMenuItem>
               <DropdownMenuSeparator />

@@ -80,9 +80,15 @@ export function PedidosTableWrapper() {
   }
 
   const handlePrint = (pedido: Pedido) => {
-    // Simulación de impresión
-    window.print()
-    showToast('info', `Imprimiendo pedido ${pedido.numero_pedido}`)
+    // Generar y descargar PDF
+    const url = `/api/pedidos/${pedido.id}/pdf`
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `pedido-${pedido.numero_pedido}.pdf`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    showToast('success', `Generando PDF del pedido ${pedido.numero_pedido}`)
   }
 
   if (loading) {

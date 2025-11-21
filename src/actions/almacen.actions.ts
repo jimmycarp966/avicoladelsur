@@ -185,6 +185,23 @@ export async function ajustarStock(
   try {
     const supabase = await createClient()
 
+    // Obtener usuario actual
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, error: 'Usuario no autenticado' }
+    }
+
+    // Verificar permisos (almacenista o admin)
+    const { data: usuario } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (!usuario || !['admin', 'almacenista'].includes(usuario.rol)) {
+      return { success: false, error: 'No tienes permisos para ajustar stock' }
+    }
+
     // Obtener lote actual
     const { data: lote, error: loteError } = await supabase
       .from('lotes')
@@ -216,10 +233,21 @@ export async function ajustarStock(
 
     if (updateError) throw updateError
 
-    // Registrar movimiento
-    await supabase.from('movimientos_stock').insert(params)
+    // Registrar movimiento con usuario_id
+    const movimientoData: any = {
+      lote_id: params.lote_id,
+      tipo_movimiento: params.tipo_movimiento,
+      cantidad: params.cantidad,
+      motivo: params.motivo || 'Ajuste de stock',
+      usuario_id: user.id,
+    }
+    
+    const { error: movimientoError } = await supabase.from('movimientos_stock').insert(movimientoData)
+
+    if (movimientoError) throw movimientoError
 
     revalidatePath('/(admin)/(dominios)/almacen')
+    revalidatePath(`/(admin)/(dominios)/almacen/lotes/${params.lote_id}`)
 
     return {
       success: true,
@@ -230,6 +258,41 @@ export async function ajustarStock(
     return {
       success: false,
       error: error.message || 'Error al ajustar stock',
+    }
+  }
+}
+
+// Obtener lote por ID
+export async function obtenerLotePorId(loteId: string): Promise<ApiResponse<any>> {
+  try {
+    const supabase = await createClient()
+
+    const { data: lote, error } = await supabase
+      .from('lotes')
+      .select(`
+        *,
+        producto:productos(id, codigo, nombre, unidad_medida, categoria)
+      `)
+      .eq('id', loteId)
+      .single()
+
+    if (error) throw error
+    if (!lote) {
+      return {
+        success: false,
+        error: 'Lote no encontrado',
+      }
+    }
+
+    return {
+      success: true,
+      data: lote,
+    }
+  } catch (error: any) {
+    console.error('Error al obtener lote:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al obtener lote',
     }
   }
 }
@@ -703,6 +766,87 @@ export async function eliminarProducto(
     return {
       success: false,
       error: error.message || 'Error al eliminar producto',
+    }
+  }
+}
+
+// Eliminar lote (solo si no tiene movimientos y no está asociado a pedidos)
+export async function eliminarLote(loteId: string): Promise<ApiResponse> {
+  try {
+    const supabase = await createClient()
+
+    // Verificar permisos (almacenista o admin)
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, error: 'Usuario no autenticado' }
+    }
+
+    const { data: usuario } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (!usuario || !['admin', 'almacenista'].includes(usuario.rol)) {
+      return { success: false, error: 'No tienes permisos para eliminar lotes' }
+    }
+
+    // Obtener lote para validar condiciones
+    const { data: lote, error: loteError } = await supabase
+      .from('lotes')
+      .select('cantidad_disponible, cantidad_ingresada')
+      .eq('id', loteId)
+      .single()
+
+    if (loteError) throw loteError
+    if (!lote) {
+      return { success: false, error: 'Lote no encontrado' }
+    }
+
+    // Validar que cantidad_disponible === cantidad_ingresada (sin movimientos)
+    if (lote.cantidad_disponible !== lote.cantidad_ingresada) {
+      return {
+        success: false,
+        error: 'No se puede eliminar un lote que tiene movimientos de stock. La cantidad disponible debe ser igual a la cantidad ingresada.',
+      }
+    }
+
+    // Verificar que el lote no esté asociado a pedidos activos
+    const { data: detallesPedido, error: detallesError } = await supabase
+      .from('detalles_pedido')
+      .select('pedido_id, pedidos!inner(estado)')
+      .eq('lote_id', loteId)
+      .in('pedidos.estado', ['pendiente', 'confirmado', 'preparando', 'enviado'])
+
+    if (detallesError) throw detallesError
+
+    if (detallesPedido && detallesPedido.length > 0) {
+      return {
+        success: false,
+        error: 'No se puede eliminar un lote que está asociado a pedidos activos',
+      }
+    }
+
+    // Eliminar lote (DELETE real)
+    const { error: deleteError } = await supabase
+      .from('lotes')
+      .delete()
+      .eq('id', loteId)
+
+    if (deleteError) throw deleteError
+
+    revalidatePath('/(admin)/(dominios)/almacen/lotes')
+    revalidatePath('/(admin)/(dominios)/almacen')
+
+    return {
+      success: true,
+      message: 'Lote eliminado exitosamente',
+    }
+  } catch (error: any) {
+    console.error('Error al eliminar lote:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al eliminar lote',
     }
   }
 }

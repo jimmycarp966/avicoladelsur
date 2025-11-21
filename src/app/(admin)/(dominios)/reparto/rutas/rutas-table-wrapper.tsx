@@ -45,9 +45,14 @@ export function RutasTableWrapper() {
   const handleDelete = async (ruta: Ruta) => {
     if (confirm(`¿Estás seguro de que quieres cancelar la ruta ${ruta.numero_ruta}?`)) {
       try {
-        // TODO: Implementar cancelación de ruta cuando esté disponible
-        await loadRutas()
-        showToast('success', `Ruta ${ruta.numero_ruta} cancelada exitosamente`)
+        const { cancelarRuta } = await import('@/actions/reparto.actions')
+        const result = await cancelarRuta(ruta.id)
+        if (result.success) {
+          await loadRutas()
+          showToast('success', result.message || `Ruta ${ruta.numero_ruta} cancelada exitosamente`)
+        } else {
+          showToast('error', result.error || 'Error al cancelar ruta')
+        }
       } catch (error: any) {
         console.error('Error al cancelar ruta:', error)
         showToast('error', error.message || 'Error al cancelar ruta')
