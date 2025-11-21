@@ -5,6 +5,12 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion'
 import { createClient } from '@/lib/supabase/server'
 import { PresupuestosDiaSkeleton } from './presupuestos-dia-skeleton'
 import { PresupuestosDiaFiltros } from './presupuestos-dia-filtros'
@@ -22,6 +28,19 @@ async function PresupuestosDiaContent({
   searchParams?: { fecha?: string; zona_id?: string; turno?: string }
 }) {
   const supabase = await createClient()
+  const presupuestoSelect = `
+      *,
+      cliente:clientes(nombre, telefono),
+      zona:zonas(nombre),
+      items:presupuesto_items(
+        id,
+        cantidad_solicitada,
+        cantidad_reservada,
+        pesable,
+        peso_final,
+        producto:productos(nombre, codigo, categoria)
+      )
+    `
 
   // Obtener parámetros de filtro
   const fecha = searchParams?.fecha || new Date().toISOString().split('T')[0]
@@ -38,19 +57,7 @@ async function PresupuestosDiaContent({
   // Construir query con filtros
   let query = supabase
     .from('presupuestos')
-    .select(`
-      *,
-      cliente:clientes(nombre, telefono),
-      zona:zonas(nombre),
-      items:presupuesto_items(
-        id,
-        cantidad_solicitada,
-        cantidad_reservada,
-        pesable,
-        peso_final,
-        producto:productos(nombre, codigo, categoria)
-      )
-    `)
+    .select(presupuestoSelect)
     .eq('estado', 'en_almacen')
     .eq('fecha_entrega_estimada', fecha)
 
@@ -68,6 +75,17 @@ async function PresupuestosDiaContent({
     console.error('Error obteniendo presupuestos:', error)
   }
 
+  const { data: presupuestosDiaData, error: presupuestosDiaError } = await supabase
+    .from('presupuestos')
+    .select(presupuestoSelect)
+    .eq('estado', 'en_almacen')
+    .eq('fecha_entrega_estimada', fecha)
+    .order('fecha_entrega_estimada', { ascending: true })
+
+  if (presupuestosDiaError) {
+    console.error('Error obteniendo resumen del día:', presupuestosDiaError)
+  }
+
   const calcularKgItem = (item: any) => {
     if (!item) return 0
     if (item.pesable && item.peso_final) {
@@ -75,6 +93,142 @@ async function PresupuestosDiaContent({
     }
     return item.cantidad_solicitada || 0
   }
+
+  const presupuestosDelDia = presupuestosDiaData || []
+
+  const totalPresupuestosDia = presupuestosDelDia.length
+  const totalKgDia =
+    presupuestosDelDia.reduce(
+      (acc, presupuesto) =>
+        acc + (presupuesto.items?.reduce((sum: number, item: any) => sum + calcularKgItem(item), 0) || 0),
+      0,
+    ) || 0
+  const totalItemsPesablesPendientesDia =
+    presupuestosDelDia.reduce(
+      (acc, presupuesto) =>
+        acc + (presupuesto.items?.filter((item: any) => item.pesable && !item.peso_final).length || 0),
+      0,
+    ) || 0
+
+  const resumenPorZona = Object.values(
+    (presupuestosDelDia || []).reduce(
+      (acc: Record<string, { nombre: string; totalKg: number; totalPresupuestos: number }>, presupuesto: any) => {
+        const key = presupuesto.zona_id || 'sin-zona'
+        if (!acc[key]) {
+          acc[key] = {
+            nombre: presupuesto.zona?.nombre || 'Sin zona',
+            totalKg: 0,
+            totalPresupuestos: 0,
+          }
+        }
+        acc[key].totalPresupuestos += 1
+        acc[key].totalKg += presupuesto.items?.reduce((sum: number, item: any) => sum + calcularKgItem(item), 0) || 0
+        return acc
+      },
+      {},
+    ),
+  ).sort((a, b) => b.totalKg - a.totalKg)
+
+  const resumenPorTurno = Object.values(
+    (presupuestosDelDia || []).reduce(
+      (acc: Record<string, { nombre: string; totalKg: number; totalPresupuestos: number }>, presupuesto: any) => {
+        const key = presupuesto.turno || 'sin-turno'
+        if (!acc[key]) {
+          acc[key] = {
+            nombre: presupuesto.turno ? presupuesto.turno : 'Sin turno',
+            totalKg: 0,
+            totalPresupuestos: 0,
+          }
+        }
+        acc[key].totalPresupuestos += 1
+        acc[key].totalKg += presupuesto.items?.reduce((sum: number, item: any) => sum + calcularKgItem(item), 0) || 0
+        return acc
+      },
+      {},
+    ),
+  ).sort((a, b) => b.totalKg - a.totalKg)
+
+  const preparacionPorZonaTurno = (presupuestosDelDia || []).reduce(
+    (
+      acc: Record<
+        string,
+        {
+          zona: string
+          turno: string
+          productos: Record<
+            string,
+            {
+              nombre: string
+              pesable: boolean
+              totalCantidad: number
+              presupuestosIds: Set<string>
+            }
+          >
+          totalKgPesables: number
+        }
+      >,
+      presupuesto: any,
+    ) => {
+      const coincideZona = !zonaId || presupuesto.zona_id === zonaId
+      const coincideTurno = !turno || presupuesto.turno === turno
+
+      if (!coincideZona || !coincideTurno) {
+        return acc
+      }
+
+      const key = `${presupuesto.zona_id || 'sin-zona'}-${presupuesto.turno || 'sin-turno'}`
+      if (!acc[key]) {
+        acc[key] = {
+          zona: presupuesto.zona?.nombre || 'Sin zona',
+          turno: presupuesto.turno || 'Sin turno',
+          productos: {},
+          totalKgPesables: 0,
+        }
+      }
+
+      ;(presupuesto.items || []).forEach((item: any) => {
+        const productoKey = item.producto?.codigo || `${item.producto?.nombre || 'producto'}-${item.id}`
+        const cantidad = calcularKgItem(item)
+
+        if (item.pesable) {
+          acc[key].totalKgPesables += cantidad
+        }
+
+        if (!acc[key].productos[productoKey]) {
+          acc[key].productos[productoKey] = {
+            nombre: item.producto?.nombre || 'Producto sin nombre',
+            pesable: !!item.pesable,
+            totalCantidad: 0,
+            presupuestosIds: new Set<string>(),
+          }
+        }
+
+        acc[key].productos[productoKey].totalCantidad += cantidad
+        acc[key].productos[productoKey].presupuestosIds.add(presupuesto.id)
+      })
+
+      return acc
+    },
+    {},
+  )
+
+  const listaPreparacion = Object.entries(preparacionPorZonaTurno).map(([key, grupo]) => ({
+    key,
+    zona: grupo.zona,
+    turno: grupo.turno,
+    totalKgPesables: grupo.totalKgPesables,
+    productos: Object.values(grupo.productos)
+      .map((producto) => ({
+        nombre: producto.nombre,
+        pesable: producto.pesable,
+        totalCantidad: producto.totalCantidad,
+        presupuestos: producto.presupuestosIds.size,
+      }))
+      .sort((a, b) => b.totalCantidad - a.totalCantidad),
+  }))
+
+  const formatearCantidad = (cantidad: number, pesable: boolean) =>
+    pesable ? `${cantidad.toFixed(1)} kg` : `${cantidad.toFixed(0)} u`
 
   const { data: sugerenciasVehiculos } = await supabase.rpc('fn_asignar_vehiculos_por_peso', {
     p_fecha: fecha,
@@ -256,6 +410,78 @@ async function PresupuestosDiaContent({
         </Card>
       </div>
 
+      {/* Resumen consolidado del día */}
+      {totalPresupuestosDia > 0 && (
+        <Card className="border border-primary/20 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Filter className="h-4 w-4" />
+              Resumen consolidado del día
+            </CardTitle>
+            <CardDescription>
+              Totales considerando todos los presupuestos del día sin importar filtros
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="rounded-lg border border-primary/10 bg-white p-4 shadow-sm">
+                <p className="text-xs uppercase text-muted-foreground">Presupuestos del día</p>
+                <p className="text-3xl font-semibold mt-1">{totalPresupuestosDia}</p>
+              </div>
+              <div className="rounded-lg border border-primary/10 bg-white p-4 shadow-sm">
+                <p className="text-xs uppercase text-muted-foreground">Kg estimados totales</p>
+                <p className="text-3xl font-semibold mt-1">{totalKgDia.toFixed(1)} kg</p>
+              </div>
+              <div className="rounded-lg border border-primary/10 bg-white p-4 shadow-sm">
+                <p className="text-xs uppercase text-muted-foreground">Items pesables pendientes</p>
+                <p className="text-3xl font-semibold mt-1">{totalItemsPesablesPendientesDia}</p>
+              </div>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              <div>
+                <p className="text-sm font-semibold mb-3">Distribución por zona</p>
+                <div className="space-y-3">
+                  {resumenPorZona.length === 0 && (
+                    <p className="text-sm text-muted-foreground">Sin zonas asignadas</p>
+                  )}
+                  {resumenPorZona.map((zona) => (
+                    <div key={zona.nombre} className="flex items-center justify-between rounded-lg border border-primary/10 bg-white p-3">
+                      <div>
+                        <p className="font-medium">{zona.nombre}</p>
+                        <p className="text-xs text-muted-foreground">{zona.totalPresupuestos} presupuesto(s)</p>
+                      </div>
+                      <Badge variant="outline" className="text-sm">
+                        {zona.totalKg.toFixed(1)} kg
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-semibold mb-3">Distribución por turno</p>
+                <div className="space-y-3">
+                  {resumenPorTurno.length === 0 && (
+                    <p className="text-sm text-muted-foreground">Sin turnos asignados</p>
+                  )}
+                  {resumenPorTurno.map((turnoResumen) => (
+                    <div key={turnoResumen.nombre} className="flex items-center justify-between rounded-lg border border-primary/10 bg-white p-3">
+                      <div>
+                        <p className="font-medium capitalize">{turnoResumen.nombre}</p>
+                        <p className="text-xs text-muted-foreground">{turnoResumen.totalPresupuestos} presupuesto(s)</p>
+                      </div>
+                      <Badge variant="outline" className="text-sm">
+                        {turnoResumen.totalKg.toFixed(1)} kg
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Sugerencias de asignación automática */}
       {asignacionesResumen.length > 0 && (
         <Card className="border-l-4 border-l-primary/50">
@@ -313,6 +539,59 @@ async function PresupuestosDiaContent({
 
       {/* Filtros */}
       <PresupuestosDiaFiltros zonas={zonas || []} fecha={fecha} zonaId={zonaId} turno={turno} />
+
+      {/* Lista de preparación consolidada */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Package className="h-5 w-5" />
+            Lista de preparación del día
+          </CardTitle>
+          <CardDescription>
+            Consolidado de productos por zona y turno considerando los filtros seleccionados
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {listaPreparacion.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground">
+              No hay presupuestos que coincidan con los filtros actuales.
+            </div>
+          )}
+
+          {listaPreparacion.map((grupo) => (
+            <div key={grupo.key} className="rounded-lg border border-dashed border-primary/20 p-4">
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">{grupo.turno === 'Sin turno' ? 'Turno sin asignar' : `Turno ${grupo.turno}`}</p>
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <MapPin className="h-4 w-4" />
+                    {grupo.zona}
+                  </h3>
+                </div>
+                <Badge variant="outline" className="text-sm">
+                  {grupo.totalKgPesables.toFixed(1)} kg pesables
+                </Badge>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {grupo.productos.map((producto) => (
+                  <div key={`${grupo.key}-${producto.nombre}`} className="flex items-start justify-between rounded-md border border-slate-100 bg-white/80 px-3 py-2 text-sm">
+                    <div>
+                      <p className="font-medium">{producto.nombre}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {producto.presupuestos} presupuesto(s) • {producto.pesable ? 'Pesable' : 'Unidad'}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-base font-semibold">{formatearCantidad(producto.totalCantidad, producto.pesable)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
       {/* Agrupación por zona y turno */}
       {Object.keys(presupuestosPorZonaTurno).length > 0 && (
@@ -419,6 +698,63 @@ async function PresupuestosDiaContent({
                                   }}
                                 ></div>
                               </div>
+                            </div>
+                          )}
+
+                          {presupuesto.items?.length > 0 && (
+                            <div className="mt-4">
+                              <Accordion type="single" collapsible className="rounded-lg border border-slate-200">
+                                <AccordionItem value={`items-${presupuesto.id}`}>
+                                  <AccordionTrigger className="px-4 py-2 text-sm">
+                                    Ver productos ({presupuesto.items.length})
+                                  </AccordionTrigger>
+                                  <AccordionContent>
+                                    <div className="space-y-3 px-4 pb-4">
+                                      {presupuesto.items.map((item: any) => (
+                                        <div
+                                          key={item.id}
+                                          className="flex items-start justify-between gap-4 rounded-md border border-slate-100 bg-white/80 px-3 py-2 text-sm"
+                                        >
+                                          <div>
+                                            <p className="font-medium">
+                                              {item.producto?.nombre || 'Producto'}
+                                              {item.producto?.codigo && (
+                                                <span className="text-xs text-muted-foreground ml-1">
+                                                  ({item.producto.codigo})
+                                                </span>
+                                              )}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                              {item.pesable ? 'Pesable' : 'Unidad'} • Solicitado:{' '}
+                                              {item.cantidad_solicitada ?? 0} {item.pesable ? 'kg' : 'u'}
+                                              {item.pesable && (
+                                                <>
+                                                  {' '}•{' '}
+                                                  {item.peso_final
+                                                    ? `Final: ${item.peso_final} kg`
+                                                    : 'Pendiente de pesaje'}
+                                                </>
+                                              )}
+                                            </p>
+                                          </div>
+                                          <Badge
+                                            variant="outline"
+                                            className={
+                                              item.pesable
+                                                ? item.peso_final
+                                                  ? 'border-green-200 bg-green-50 text-green-700'
+                                                  : 'border-yellow-200 bg-yellow-50 text-yellow-700'
+                                                : 'border-slate-200 bg-slate-50 text-slate-700'
+                                            }
+                                          >
+                                            {item.pesable ? (item.peso_final ? 'Pesado' : 'Pendiente') : 'Sin balanza'}
+                                          </Badge>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </AccordionContent>
+                                </AccordionItem>
+                              </Accordion>
                             </div>
                           )}
                         </CardContent>
@@ -539,6 +875,63 @@ async function PresupuestosDiaContent({
                               }}
                             ></div>
                           </div>
+                        </div>
+                      )}
+
+                      {presupuesto.items?.length > 0 && (
+                        <div className="mt-4">
+                          <Accordion type="single" collapsible className="rounded-lg border border-slate-200">
+                            <AccordionItem value={`items-${presupuesto.id}`}>
+                              <AccordionTrigger className="px-4 py-2 text-sm">
+                                Ver productos ({presupuesto.items.length})
+                              </AccordionTrigger>
+                              <AccordionContent>
+                                <div className="space-y-3 px-4 pb-4">
+                                  {presupuesto.items.map((item: any) => (
+                                    <div
+                                      key={item.id}
+                                      className="flex items-start justify-between gap-4 rounded-md border border-slate-100 bg-white/80 px-3 py-2 text-sm"
+                                    >
+                                      <div>
+                                        <p className="font-medium">
+                                          {item.producto?.nombre || 'Producto'}
+                                          {item.producto?.codigo && (
+                                            <span className="text-xs text-muted-foreground ml-1">
+                                              ({item.producto.codigo})
+                                            </span>
+                                          )}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                          {item.pesable ? 'Pesable' : 'Unidad'} • Solicitado:{' '}
+                                          {item.cantidad_solicitada ?? 0} {item.pesable ? 'kg' : 'u'}
+                                          {item.pesable && (
+                                            <>
+                                              {' '}•{' '}
+                                              {item.peso_final
+                                                ? `Final: ${item.peso_final} kg`
+                                                : 'Pendiente de pesaje'}
+                                            </>
+                                          )}
+                                        </p>
+                                      </div>
+                                      <Badge
+                                        variant="outline"
+                                        className={
+                                          item.pesable
+                                            ? item.peso_final
+                                              ? 'border-green-200 bg-green-50 text-green-700'
+                                              : 'border-yellow-200 bg-yellow-50 text-yellow-700'
+                                            : 'border-slate-200 bg-slate-50 text-slate-700'
+                                        }
+                                      >
+                                        {item.pesable ? (item.peso_final ? 'Pesado' : 'Pendiente') : 'Sin balanza'}
+                                      </Badge>
+                                    </div>
+                                  ))}
+                                </div>
+                              </AccordionContent>
+                            </AccordionItem>
+                          </Accordion>
                         </div>
                       )}
                     </CardContent>
