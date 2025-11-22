@@ -285,6 +285,22 @@ div[class*="min-h-screen"] {
   background-color: #FAFAFA !important;
 }
 
+/* Excepción para página de login - fondo verde oscuro */
+.login-page {
+  background-color: #2F7058 !important;
+}
+
+/* Asegurar que html y body también tengan fondo verde en login */
+body:has(.login-page),
+html:has(.login-page) {
+  background-color: #2F7058 !important;
+}
+
+#__next:has(.login-page),
+main:has(.login-page) {
+  background-color: #2F7058 !important;
+}
+
 .bg-gradient-header {
   background: #2F7058 !important;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12) !important;
