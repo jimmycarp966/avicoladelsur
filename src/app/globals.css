@@ -285,8 +285,10 @@ div[class*="min-h-screen"] {
   background-color: #FAFAFA !important;
 }
 
-/* Excepción para página de login - fondo verde oscuro */
-.login-page {
+/* Excepción para página de login - fondo verde oscuro - Mayor especificidad */
+div.login-page[class*="min-h-screen"],
+.login-page.min-h-screen,
+div.login-page {
   background-color: #2F7058 !important;
 }
 
@@ -298,6 +300,11 @@ html:has(.login-page) {
 
 #__next:has(.login-page),
 main:has(.login-page) {
+  background-color: #2F7058 !important;
+}
+
+/* Asegurar que el div login-page tenga fondo verde */
+body:has(.login-page) .login-page {
   background-color: #2F7058 !important;
 }
 
