@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Logo } from '@/components/ui/logo'
-import { Menu, Bell, LogOut, Settings, User } from 'lucide-react'
+import { Menu, Bell, LogOut } from 'lucide-react'
 import type { Usuario } from '@/types/domain.types'
 
 interface AdminHeaderProps {
@@ -93,15 +93,6 @@ export function AdminHeader({ user, onMenuClick }: AdminHeaderProps) {
                   </p>
                 </div>
               </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <User className="mr-2 h-4 w-4" />
-                <span>Perfil</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Settings className="mr-2 h-4 w-4" />
-                <span>Configuración</span>
-              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
                 <LogOut className="mr-2 h-4 w-4" />

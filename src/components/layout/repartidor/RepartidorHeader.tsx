@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Logo } from '@/components/ui/logo'
-import { Bell, LogOut, Settings, User, Wifi, WifiOff } from 'lucide-react'
+import { Bell, LogOut, Wifi, WifiOff } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import type { Usuario } from '@/types/domain.types'
 
@@ -112,15 +112,6 @@ export function RepartidorHeader({ user }: RepartidorHeaderProps) {
                   </p>
                 </div>
               </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <User className="mr-2 h-4 w-4" />
-                <span>Perfil</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Settings className="mr-2 h-4 w-4" />
-                <span>Configuración</span>
-              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
                 <LogOut className="mr-2 h-4 w-4" />
