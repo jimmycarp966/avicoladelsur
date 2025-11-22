@@ -63,3 +63,5 @@ COMMENT ON POLICY "admin_vehiculos_full" ON vehiculos IS 'Admin tiene acceso com
 COMMENT ON POLICY "logistica_vehiculos_read" ON vehiculos IS 'Almacenista puede leer vehículos para asignación de rutas';
 COMMENT ON POLICY "repartidor_vehiculos_read" ON vehiculos IS 'Repartidor puede leer vehículos (incluido el asignado)';
 
+
+

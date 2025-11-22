@@ -1,24 +1,24 @@
 'use client'
 
 import { useState } from 'react'
-import { useAuth } from '@/components/providers/AuthProvider'
 import { AdminSidebar } from './AdminSidebar'
 import { AdminHeader } from './AdminHeader'
 import { cn } from '@/lib/utils'
+import type { Usuario } from '@/types/domain.types'
 
 interface AdminLayoutProps {
   children: React.ReactNode
+  user: Usuario | null // Usuario pasado desde Server Component
 }
 
-export function AdminLayout({ children }: AdminLayoutProps) {
+export function AdminLayout({ children, user }: AdminLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const { user } = useAuth()
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Sidebar para desktop */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
-        <AdminSidebar />
+        <AdminSidebar user={user} />
       </div>
 
       {/* Sidebar móvil */}
@@ -36,7 +36,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
         {/* Sidebar móvil */}
         <div className="fixed left-0 top-0 bottom-0 w-72 bg-white shadow-lg">
-          <AdminSidebar onClose={() => setSidebarOpen(false)} />
+          <AdminSidebar onClose={() => setSidebarOpen(false)} user={user} />
         </div>
       </div>
 

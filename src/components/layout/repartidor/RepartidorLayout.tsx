@@ -14,7 +14,7 @@ export function RepartidorLayout({ children }: RepartidorLayoutProps) {
   const { user } = useAuth()
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <RepartidorHeader user={user} />
 

@@ -17,19 +17,18 @@ export const metadata = {
 export default function RutasPage() {
   return (
     <div className="space-y-6">
-      {/* Header con fondo colorido */}
-      <div className="relative overflow-hidden rounded-lg bg-gradient-to-br from-primary/5 via-white to-secondary/5 p-6 shadow-sm border border-primary/10">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-10"></div>
+      {/* Header - Estilo limpio y profesional */}
+      <div className="bg-white rounded-lg border border-border p-6 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Rutas de Reparto</h1>
-            <p className="text-muted-foreground mt-1">
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">Rutas de Reparto</h1>
+            <p className="text-muted-foreground mt-2 text-base">
               Planificación y seguimiento de rutas de entrega
             </p>
           </div>
-          <Button asChild className="bg-primary hover:bg-primary/90 shadow-sm">
+          <Button asChild className="bg-primary hover:bg-primary/90 shadow-sm h-10 px-6">
             <Link href="/reparto/rutas/nueva">
-              <Plus className="mr-2 h-4 w-4" />
+              <Plus className="mr-2 h-5 w-5" />
               Nueva Ruta
             </Link>
           </Button>
@@ -38,69 +37,69 @@ export default function RutasPage() {
 
       {/* Alertas importantes */}
       <div className="grid gap-4 md:grid-cols-4">
-        <Card className="border-t-[3px] border-t-success bg-success/5 hover:shadow-lg transition-all duration-300 hover:scale-105 cursor-pointer">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Rutas Activas</CardTitle>
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
-              <Truck className="h-5 w-5 text-success" />
+        <Card className="border-t-[4px] border-t-success hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-base font-semibold text-foreground">Rutas Activas</CardTitle>
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-success/10">
+              <Truck className="h-6 w-6 text-success" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-success">
+            <div className="text-4xl font-bold text-success mb-2">
               <Suspense fallback="...">3</Suspense>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground font-medium">
               En curso hoy
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border-t-[3px] border-t-info bg-info/5 hover:shadow-lg transition-all duration-300 hover:scale-105 cursor-pointer">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Planificadas</CardTitle>
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-info/10">
-              <MapPin className="h-5 w-5 text-info" />
+        <Card className="border-t-[4px] border-t-info hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-base font-semibold text-foreground">Planificadas</CardTitle>
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-info/10">
+              <MapPin className="h-6 w-6 text-info" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-info">
+            <div className="text-4xl font-bold text-info mb-2">
               <Suspense fallback="...">7</Suspense>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground font-medium">
               Para los próximos días
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border-t-[3px] border-t-warning bg-warning/5 hover:shadow-lg transition-all duration-300 hover:scale-105 cursor-pointer">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Entregas Pendientes</CardTitle>
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning/10">
-              <Clock className="h-5 w-5 text-warning" />
+        <Card className="border-t-[4px] border-t-warning hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-base font-semibold text-foreground">Entregas Pendientes</CardTitle>
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-warning/10">
+              <Clock className="h-6 w-6 text-warning" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-warning">
+            <div className="text-4xl font-bold text-warning mb-2">
               <Suspense fallback="...">24</Suspense>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground font-medium">
               Hoy y mañana
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border-t-[3px] border-t-secondary bg-secondary/5 hover:shadow-lg transition-all duration-300 hover:scale-105 cursor-pointer">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completadas Hoy</CardTitle>
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary/10">
-              <CheckCircle className="h-5 w-5 text-secondary" />
+        <Card className="border-t-[4px] border-t-secondary hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-base font-semibold text-foreground">Completadas Hoy</CardTitle>
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-secondary/10">
+              <CheckCircle className="h-6 w-6 text-secondary" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-secondary">
+            <div className="text-4xl font-bold text-secondary mb-2">
               <Suspense fallback="...">18</Suspense>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground font-medium">
               +12% vs ayer
             </p>
           </CardContent>
@@ -109,9 +108,9 @@ export default function RutasPage() {
 
       {/* Tabla de rutas */}
       <Card>
-        <CardHeader>
-          <CardTitle>Lista de Rutas</CardTitle>
-          <CardDescription>
+        <CardHeader className="pb-4">
+          <CardTitle className="text-xl font-bold">Lista de Rutas</CardTitle>
+          <CardDescription className="text-base mt-1">
             Todas las rutas planificadas y en ejecución
           </CardDescription>
         </CardHeader>

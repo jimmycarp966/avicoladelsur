@@ -347,7 +347,7 @@ export async function obtenerPresupuestosAction(filtros?: {
         *,
         cliente:clientes(nombre, telefono, zona_entrega),
         zona:zonas(nombre),
-        usuario_vendedor_obj:usuarios!presupuestos_usuario_vendedor_fkey(nombre),
+        usuario_vendedor:usuarios(nombre),
         items:presupuesto_items(
           id,
           producto:productos(codigo, nombre),
@@ -403,7 +403,7 @@ export async function obtenerPresupuestoAction(presupuestoId: string) {
         *,
         cliente:clientes(*),
         zona:zonas(nombre),
-        usuario_vendedor_obj:usuarios!presupuestos_usuario_vendedor_fkey(nombre),
+        usuario_vendedor:usuarios(nombre),
         usuario_almacen:usuarios(nombre),
         usuario_repartidor:usuarios(nombre),
         pedido_convertido:pedidos(numero_pedido),

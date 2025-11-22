@@ -90,133 +90,133 @@
 :root {
   --radius: 0.625rem;
   
-  /* Colores de fondo */
-  --background: #f0f8f4;
-  --foreground: #1a1a1a;
+  /* Colores de fondo - Profesional Corporativo */
+  --background: #FAFAFA;
+  --foreground: #1F2937;
   
   /* Cards y superficies */
   --card: #ffffff;
-  --card-foreground: #1a1a1a;
-  --card-border: rgba(26, 77, 46, 0.1);
+  --card-foreground: #1F2937;
+  --card-border: rgba(0, 0, 0, 0.06);
   --popover: #ffffff;
-  --popover-foreground: #1a1a1a;
+  --popover-foreground: #1F2937;
   
-  /* Primary - Verde oscuro del logo */
-  --primary: #1a4d2e;
+  /* Primary - Verde oscuro de la página web */
+  --primary: #2F7058;
   --primary-foreground: #ffffff;
-  --primary-hover: #2d6a4f;
-  --primary-light: #e8f3ed;
-  --primary-lighter: #f0f8f4;
-  --primary-dark: #14362a;
+  --primary-hover: #3d8a6f;
+  --primary-light: #D9EBC6;
+  --primary-lighter: #E8F3ED;
+  --primary-dark: #255a47;
   
-  /* Secondary - Verde medio */
-  --secondary: #2d6a4f;
-  --secondary-foreground: #ffffff;
-  --secondary-light: #d4e5dd;
-  --secondary-lighter: #eaf4ee;
+  /* Secondary - Amarillo/Crema de la página web */
+  --secondary: #FCDE8D;
+  --secondary-foreground: #334155;
+  --secondary-light: #FEF4D6;
+  --secondary-lighter: #FFF9E8;
   
-  /* Accent - Rojo profundo del logo */
-  --accent: #8b2635;
+  /* Accent - Rojo de la página web */
+  --accent: #CB3433;
   --accent-foreground: #ffffff;
-  --accent-hover: #a52a2a;
-  --accent-light: #fef2f2;
-  --accent-lighter: #fff7f7;
+  --accent-hover: #e03d3c;
+  --accent-light: #FEF2F2;
+  --accent-lighter: #FFF7F7;
   
-  /* Neutral warm - Beige del logo */
-  --neutral-warm: #f5e6d3;
-  --neutral-warm-dark: #e8d4ba;
-  --neutral-medium: #9d7e5c;
-  --neutral-gold: #d4a574;
-  --neutral-gold-light: #f4e4d0;
+  /* Neutral warm - Mantener beige para compatibilidad */
+  --neutral-warm: #FCDE8D;
+  --neutral-warm-dark: #F4D574;
+  --neutral-medium: #7A7A7A;
+  --neutral-gold: #FCDE8D;
+  --neutral-gold-light: #FEF4D6;
   
-  /* Muted */
-  --muted: #e8f3ed;
-  --muted-foreground: #6b7280;
+  /* Muted - Grises sutiles para profesionalismo */
+  --muted: #F3F4F6;
+  --muted-foreground: #6B7280;
   
-  /* Destructive */
-  --destructive: #8b2635;
+  /* Destructive - Rojo de la página web */
+  --destructive: #CB3433;
   --destructive-foreground: #ffffff;
   
-  /* Success */
-  --success: #2d6a4f;
+  /* Success - Verde oscuro de la página web */
+  --success: #2F7058;
   --success-foreground: #ffffff;
   
-  /* Warning */
-  --warning: #d4a574;
-  --warning-foreground: #1a1a1a;
+  /* Warning - Amarillo/Crema de la página web */
+  --warning: #FCDE8D;
+  --warning-foreground: #334155;
   
-  /* Info */
-  --info: #3b7c8f;
+  /* Info - Gris medio de la página web */
+  --info: #43474E;
   --info-foreground: #ffffff;
   
-  /* Bordes y inputs */
-  --border: #e5e7eb;
-  --input: #e5e7eb;
-  --ring: #1a4d2e;
+  /* Bordes y inputs - Muy sutiles */
+  --border: #E5E7EB;
+  --input: #F3F4F6;
+  --ring: #2F7058;
   
-  /* Charts - Usando paleta del logo */
-  --chart-1: #1a4d2e;
-  --chart-2: #2d6a4f;
-  --chart-3: #8b2635;
-  --chart-4: #d4a574;
-  --chart-5: #9d7e5c;
+  /* Charts - Usando paleta de la página web */
+  --chart-1: #2F7058;
+  --chart-2: #FCDE8D;
+  --chart-3: #CB3433;
+  --chart-4: #D9EBC6;
+  --chart-5: #43474E;
   
-  /* Sidebar */
-  --sidebar: #ffffff;
-  --sidebar-foreground: #1a1a1a;
-  --sidebar-primary: #1a4d2e;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f5e6d3;
-  --sidebar-accent-foreground: #1a1a1a;
-  --sidebar-border: #e5e7eb;
-  --sidebar-ring: #1a4d2e;
+  /* Sidebar - Verde oscuro como la página web */
+  --sidebar: #2F7058;
+  --sidebar-foreground: #FFFFFF;
+  --sidebar-primary: #FCDE8D;
+  --sidebar-primary-foreground: #2F7058;
+  --sidebar-accent: rgba(252, 222, 141, 0.2);
+  --sidebar-accent-foreground: #FCDE8D;
+  --sidebar-border: rgba(255, 255, 255, 0.2);
+  --sidebar-ring: #FCDE8D;
 }
 
 .dark {
   /* Fondos oscuros con tono verde */
-  --background: #0f1410;
-  --foreground: #f5f5f5;
+  --background: #0E131B;
+  --foreground: #F5F7F9;
   
   /* Cards y superficies */
   --card: #1a1f1c;
-  --card-foreground: #f5f5f5;
+  --card-foreground: #F5F7F9;
   --popover: #1a1f1c;
-  --popover-foreground: #f5f5f5;
+  --popover-foreground: #F5F7F9;
   
   /* Primary - Verde más claro para modo oscuro */
-  --primary: #2d6a4f;
+  --primary: #3d8a6f;
   --primary-foreground: #ffffff;
-  --primary-hover: #3d8a6f;
+  --primary-hover: #4daa8f;
   --primary-light: #1a2f24;
   --primary-lighter: #152419;
-  --primary-dark: #1f5038;
+  --primary-dark: #255a47;
   
-  /* Secondary */
-  --secondary: #3d8a6f;
-  --secondary-foreground: #ffffff;
-  --secondary-light: #2a4f3d;
-  --secondary-lighter: #1f3a2d;
+  /* Secondary - Amarillo/Crema más oscuro para modo oscuro */
+  --secondary: #F4D574;
+  --secondary-foreground: #0E131B;
+  --secondary-light: #2d2518;
+  --secondary-lighter: #1f1a10;
   
   /* Accent - Rojo más claro para modo oscuro */
-  --accent: #c93545;
+  --accent: #e03d3c;
   --accent-foreground: #ffffff;
-  --accent-hover: #e94555;
+  --accent-hover: #f04d4c;
   --accent-light: #2f1215;
   --accent-lighter: #1f0c0f;
   
   /* Neutral warm - Ajustado para oscuro */
   --neutral-warm: #2d2518;
   --neutral-warm-dark: #221c12;
-  --neutral-medium: #7d6e5c;
-  --neutral-gold: #d4a574;
+  --neutral-medium: #7A7A7A;
+  --neutral-gold: #F4D574;
   --neutral-gold-light: #3a3020;
   
   /* Muted */
   --muted: #1f2420;
-  --muted-foreground: #a1a1a1;
+  --muted-foreground: #7A7A7A;
   
   /* Destructive */
-  --destructive: #c93545;
+  --destructive: #e03d3c;
   --destructive-foreground: #ffffff;
   
   /* Success */
@@ -224,34 +224,34 @@
   --success-foreground: #ffffff;
   
   /* Warning */
-  --warning: #d4a574;
-  --warning-foreground: #1a1a1a;
+  --warning: #F4D574;
+  --warning-foreground: #0E131B;
   
   /* Info */
-  --info: #5b9caf;
+  --info: #43474E;
   --info-foreground: #ffffff;
   
   /* Bordes y inputs */
   --border: #2d3330;
   --input: #2d3330;
-  --ring: #2d6a4f;
+  --ring: #3d8a6f;
   
   /* Charts */
-  --chart-1: #2d6a4f;
-  --chart-2: #3d8a6f;
-  --chart-3: #c93545;
-  --chart-4: #d4a574;
-  --chart-5: #9d7e5c;
+  --chart-1: #3d8a6f;
+  --chart-2: #F4D574;
+  --chart-3: #e03d3c;
+  --chart-4: #1a2f24;
+  --chart-5: #43474E;
   
   /* Sidebar */
   --sidebar: #1a1f1c;
-  --sidebar-foreground: #f5f5f5;
-  --sidebar-primary: #2d6a4f;
+  --sidebar-foreground: #F5F7F9;
+  --sidebar-primary: #3d8a6f;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #2d2518;
-  --sidebar-accent-foreground: #f5f5f5;
+  --sidebar-accent-foreground: #F5F7F9;
   --sidebar-border: #2d3330;
-  --sidebar-ring: #2d6a4f;
+  --sidebar-ring: #3d8a6f;
 }
 
 @layer base {
@@ -260,45 +260,60 @@
   }
   body {
     @apply text-foreground;
-    background-color: #f0f8f4 !important;
+    background-color: #FAFAFA !important;
   }
 }
 
 /* Estilos personalizados globales */
 html {
-  background-color: #f0f8f4 !important;
+  background-color: #FAFAFA !important;
 }
 
-#__next, main {
-  background-color: #f0f8f4 !important;
+body {
+  background-color: #FAFAFA !important;
+}
+
+#__next {
+  background-color: #FAFAFA !important;
+}
+
+main {
+  background-color: #FAFAFA !important;
+}
+
+div[class*="min-h-screen"] {
+  background-color: #FAFAFA !important;
 }
 
 .bg-gradient-header {
-  background: linear-gradient(90deg, #ffffff 0%, #f0f8f4 50%, #e8f3ed 100%) !important;
+  background: #2F7058 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12) !important;
 }
 
 .bg-gradient-sidebar {
-  background: linear-gradient(180deg, #ffffff 0%, #f4faf7 50%, #eaf5f0 100%) !important;
+  background: #2F7058 !important;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.08) !important;
 }
 
-/* Mejoras para todas las Cards */
+/* Cards - Estilo Profesional Corporativo */
 [data-slot="card"] {
-  box-shadow: 0 1px 3px 0 rgba(26, 77, 46, 0.08), 
-              0 1px 2px -1px rgba(26, 77, 46, 0.08) !important;
-  border: 1px solid rgba(26, 77, 46, 0.08) !important;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 
+              0 1px 2px 0 rgba(0, 0, 0, 0.06) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  transition: all 0.2s ease-in-out !important;
+  background: #ffffff !important;
 }
 
 [data-slot="card"]:hover {
-  box-shadow: 0 4px 6px -1px rgba(26, 77, 46, 0.12), 
-              0 2px 4px -2px rgba(26, 77, 46, 0.12) !important;
-  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 
+              0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+  transform: translateY(-1px) !important;
 }
 
 /* Cards específicas del sistema */
 .rounded-lg.bg-gradient-to-br {
-  box-shadow: 0 2px 4px 0 rgba(26, 77, 46, 0.1), 
-              0 1px 3px -1px rgba(26, 77, 46, 0.1) !important;
+  box-shadow: 0 2px 4px 0 rgba(47, 112, 88, 0.1), 
+              0 1px 3px -1px rgba(47, 112, 88, 0.1) !important;
 }
 
 /* Estilos para Leaflet (mapas) */

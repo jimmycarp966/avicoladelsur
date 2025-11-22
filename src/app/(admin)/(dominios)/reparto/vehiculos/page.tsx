@@ -17,19 +17,18 @@ export const metadata = {
 export default function VehiculosPage() {
   return (
     <div className="space-y-6">
-      {/* Header con fondo colorido */}
-      <div className="relative overflow-hidden rounded-lg bg-gradient-to-br from-primary/5 via-white to-secondary/5 p-6 shadow-sm border border-primary/10">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-10"></div>
+      {/* Header - Estilo limpio y profesional */}
+      <div className="bg-white rounded-lg border border-border p-6 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Vehículos</h1>
-            <p className="text-muted-foreground mt-1">
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">Vehículos</h1>
+            <p className="text-muted-foreground mt-2 text-base">
               Control de la flota de vehículos y mantenimientos
             </p>
           </div>
-          <Button asChild className="bg-primary hover:bg-primary/90 shadow-sm">
+          <Button asChild className="bg-primary hover:bg-primary/90 shadow-sm h-10 px-6">
             <Link href="/reparto/vehiculos/nuevo">
-              <Plus className="mr-2 h-4 w-4" />
+              <Plus className="mr-2 h-5 w-5" />
               Nuevo Vehículo
             </Link>
           </Button>
@@ -38,69 +37,69 @@ export default function VehiculosPage() {
 
       {/* Alertas importantes */}
       <div className="grid gap-4 md:grid-cols-4">
-        <Card className="border-t-[3px] border-t-success bg-success/5 hover:shadow-lg transition-all duration-300 hover:scale-105 cursor-pointer">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Vehículos Activos</CardTitle>
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
-              <Truck className="h-5 w-5 text-success" />
+        <Card className="border-t-[4px] border-t-success hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-base font-semibold text-foreground">Vehículos Activos</CardTitle>
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-success/10">
+              <Truck className="h-6 w-6 text-success" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-success">
+            <div className="text-4xl font-bold text-success mb-2">
               <Suspense fallback="...">8</Suspense>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground font-medium">
               Listos para reparto
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border-t-[3px] border-t-warning bg-warning/5 hover:shadow-lg transition-all duration-300 hover:scale-105 cursor-pointer">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">En Mantenimiento</CardTitle>
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning/10">
-              <Wrench className="h-5 w-5 text-warning" />
+        <Card className="border-t-[4px] border-t-warning hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-base font-semibold text-foreground">En Mantenimiento</CardTitle>
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-warning/10">
+              <Wrench className="h-6 w-6 text-warning" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-warning">
+            <div className="text-4xl font-bold text-warning mb-2">
               <Suspense fallback="...">2</Suspense>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground font-medium">
               Fuera de servicio
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border-t-[3px] border-t-destructive bg-destructive/5 hover:shadow-lg transition-all duration-300 hover:scale-105 cursor-pointer">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Seguros por Vencer</CardTitle>
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
+        <Card className="border-t-[4px] border-t-destructive hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-base font-semibold text-foreground">Seguros por Vencer</CardTitle>
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-destructive/10">
+              <AlertTriangle className="h-6 w-6 text-destructive" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-destructive">
+            <div className="text-4xl font-bold text-destructive mb-2">
               <Suspense fallback="...">3</Suspense>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground font-medium">
               Próximos 30 días
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border-t-[3px] border-t-info bg-info/5 hover:shadow-lg transition-all duration-300 hover:scale-105 cursor-pointer">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Service Pendiente</CardTitle>
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-info/10">
-              <Wrench className="h-5 w-5 text-info" />
+        <Card className="border-t-[4px] border-t-info hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-base font-semibold text-foreground">Service Pendiente</CardTitle>
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-info/10">
+              <Wrench className="h-6 w-6 text-info" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-info">
+            <div className="text-4xl font-bold text-info mb-2">
               <Suspense fallback="...">4</Suspense>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground font-medium">
               Requieren mantenimiento
             </p>
           </CardContent>
@@ -109,9 +108,9 @@ export default function VehiculosPage() {
 
       {/* Tabla de vehículos */}
       <Card>
-        <CardHeader>
-          <CardTitle>Flota de Vehículos</CardTitle>
-          <CardDescription>
+        <CardHeader className="pb-4">
+          <CardTitle className="text-xl font-bold">Flota de Vehículos</CardTitle>
+          <CardDescription className="text-base mt-1">
             Todos los vehículos registrados en el sistema de reparto
           </CardDescription>
         </CardHeader>

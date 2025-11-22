@@ -33,11 +33,11 @@ export function AdminHeader({ user, onMenuClick }: AdminHeaderProps) {
   }
 
   return (
-    <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 bg-gradient-header px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
+    <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-white/10 bg-gradient-header px-6 shadow-sm">
       {/* Botón menú móvil */}
       <button
         type="button"
-        className="-m-2.5 p-2.5 text-gray-700 lg:hidden"
+        className="-m-2.5 p-2.5 text-white hover:bg-white/10 rounded-lg transition-colors lg:hidden"
         onClick={onMenuClick}
       >
         <Menu className="h-6 w-6" />
@@ -45,10 +45,9 @@ export function AdminHeader({ user, onMenuClick }: AdminHeaderProps) {
 
       {/* Logo - visible en desktop */}
       <div className="hidden lg:flex items-center gap-3">
-        <Logo size="md" variant="full" />
+        <Logo size="md" variant="full" light />
         {user && (
-          <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 text-xs font-medium" suppressHydrationWarning>
-            <div className="w-1.5 h-1.5 bg-primary rounded-full mr-1.5 animate-pulse" suppressHydrationWarning></div>
+          <Badge className="bg-[#FCDE8D] text-[#2F7058] border-0 text-xs font-semibold px-2.5 py-0.5">
             {user.rol.charAt(0).toUpperCase() + user.rol.slice(1)}
           </Badge>
         )}
@@ -59,27 +58,25 @@ export function AdminHeader({ user, onMenuClick }: AdminHeaderProps) {
         <div className="flex flex-1"></div>
 
         {/* Panel derecho */}
-        <div className="flex items-center gap-x-4 lg:gap-x-6">
+        <div className="flex items-center gap-x-3">
           {/* Notificaciones */}
-          <Button variant="ghost" size="sm" className="relative">
+          <Button variant="ghost" size="sm" className="relative text-white hover:bg-white/10 h-9 w-9 p-0">
             <Bell className="h-5 w-5" />
-            <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-accent text-xs text-white flex items-center justify-center">
+            <span className="absolute -top-0.5 -right-0.5 h-5 w-5 rounded-full bg-[#CB3433] text-xs text-white flex items-center justify-center font-semibold shadow-lg">
               3
             </span>
           </Button>
 
           {/* Menú de usuario */}
-          <DropdownMenu>
+          <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                <Avatar className="h-8 w-8 ring-2 ring-primary/20 ring-offset-2 hover:ring-primary/40 transition-all">
-                  <AvatarFallback className="bg-primary/10 text-primary">
+              <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0 hover:bg-white/10" suppressHydrationWarning>
+                <Avatar className="h-9 w-9 ring-2 ring-[#FCDE8D] transition-all">
+                  <AvatarFallback className="bg-white/20 text-white font-semibold">
                     {user?.nombre?.charAt(0).toUpperCase()}
                     {user?.apellido?.charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                {/* Indicador activo */}
-                <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-primary rounded-full border-2 border-white"></div>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56" align="end" forceMount>

@@ -89,11 +89,11 @@ export default async function RepartidorDashboard() {
   return (
     <div className="space-y-6 p-4">
       {/* Header */}
-      <div className="text-center">
-        <h1 className="text-2xl font-bold text-gray-900">
+      <div className="bg-white rounded-lg border border-border p-6 shadow-sm text-center">
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">
           ¡Hola, {user?.nombre}!
         </h1>
-        <p className="text-gray-600 mt-1">
+        <p className="text-muted-foreground mt-2 text-base">
           Bienvenido a tu panel de repartidor
         </p>
       </div>
@@ -115,12 +115,12 @@ export default async function RepartidorDashboard() {
           <CardContent>
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">{entregasCompletadas}</div>
-                <div className="text-sm text-gray-500">Completadas</div>
+                <div className="text-4xl font-bold text-success mb-2">{entregasCompletadas}</div>
+                <div className="text-sm text-muted-foreground font-medium">Completadas</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-orange-600">{entregasPendientes}</div>
-                <div className="text-sm text-gray-500">Pendientes</div>
+                <div className="text-4xl font-bold text-warning mb-2">{entregasPendientes}</div>
+                <div className="text-sm text-muted-foreground font-medium">Pendientes</div>
               </div>
             </div>
 
@@ -169,9 +169,9 @@ export default async function RepartidorDashboard() {
 
       {/* Próximas entregas */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Próximas Entregas</CardTitle>
-          <CardDescription>
+        <CardHeader className="pb-4">
+          <CardTitle className="text-xl font-bold">Próximas Entregas</CardTitle>
+          <CardDescription className="text-base mt-1">
             {entregasPendientes} entregas pendientes
           </CardDescription>
         </CardHeader>
@@ -216,37 +216,37 @@ export default async function RepartidorDashboard() {
 
       {/* Estadísticas rápidas */}
       <div className="grid grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-3 text-center">
-            <div className="text-xl font-bold text-blue-600">
+        <Card className="border-t-[4px] border-t-info">
+          <CardContent className="p-4 text-center">
+            <div className="text-3xl font-bold text-info mb-2">
               {rutaActiva ? `${rutaActiva?.distancia_estimada_km || '--'} km` : '--'}
             </div>
-            <div className="text-xs text-gray-500">Distancia</div>
+            <div className="text-sm text-muted-foreground font-medium">Distancia</div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-3 text-center">
-            <div className="text-xl font-bold text-green-600">
+        <Card className="border-t-[4px] border-t-success">
+          <CardContent className="p-4 text-center">
+            <div className="text-3xl font-bold text-success mb-2">
               {rutaActiva?.estado === 'en_curso' ? 'En curso' : 'Planificada'}
             </div>
-            <div className="text-xs text-gray-500">Tiempo</div>
+            <div className="text-sm text-muted-foreground font-medium">Estado</div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-3 text-center">
-            <div className="text-xl font-bold text-orange-600">
+        <Card className="border-t-[4px] border-t-warning">
+          <CardContent className="p-4 text-center">
+            <div className="text-3xl font-bold text-warning mb-2">
               85%
             </div>
-            <div className="text-xs text-gray-500">Eficiencia</div>
+            <div className="text-sm text-muted-foreground font-medium">Eficiencia</div>
           </CardContent>
         </Card>
       </div>
 
       {/* Gráficos de rendimiento */}
       <div className="space-y-6">
-        <h2 className="text-xl font-semibold text-gray-900">Mi Rendimiento</h2>
+        <h2 className="text-xl font-bold text-foreground">Mi Rendimiento</h2>
 
         <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
           <EntregasDiariasRepartidorChart />
@@ -255,37 +255,37 @@ export default async function RepartidorDashboard() {
 
         {/* Estadísticas adicionales */}
         <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Puntuación General</CardTitle>
+          <Card className="border-t-[4px] border-t-success">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+              <CardTitle className="text-base font-semibold text-foreground">Puntuación General</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">9.2/10</div>
-              <p className="text-xs text-muted-foreground">
+              <div className="text-4xl font-bold text-success mb-2">9.2/10</div>
+              <p className="text-sm text-muted-foreground font-medium">
                 Basado en entregas y eficiencia
               </p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Tiempo Promedio</CardTitle>
+          <Card className="border-t-[4px] border-t-info">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+              <CardTitle className="text-base font-semibold text-foreground">Tiempo Promedio</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-blue-600">24 min</div>
-              <p className="text-xs text-muted-foreground">
+              <div className="text-4xl font-bold text-info mb-2">24 min</div>
+              <p className="text-sm text-muted-foreground font-medium">
                 Por entrega completada
               </p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Combustible Ahorrado</CardTitle>
+          <Card className="border-t-[4px] border-t-success">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+              <CardTitle className="text-base font-semibold text-foreground">Combustible Ahorrado</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">12%</div>
-              <p className="text-xs text-muted-foreground">
+              <div className="text-4xl font-bold text-success mb-2">12%</div>
+              <p className="text-sm text-muted-foreground font-medium">
                 Vs rutas no optimizadas
               </p>
             </CardContent>

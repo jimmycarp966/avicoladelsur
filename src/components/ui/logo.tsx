@@ -6,6 +6,7 @@ interface LogoProps {
   variant?: 'full' | 'icon'
   className?: string
   priority?: boolean
+  light?: boolean // Para usar en fondos oscuros
 }
 
 const sizeMap = {
@@ -20,6 +21,7 @@ export function Logo({
   variant = 'full',
   className,
   priority = false,
+  light = false,
 }: LogoProps) {
   const dimensions = sizeMap[size]
 
@@ -36,10 +38,16 @@ export function Logo({
       />
       {variant === 'full' && size !== 'sm' && (
         <div className="flex flex-col">
-          <span className="text-sm font-semibold text-primary leading-tight">
+          <span className={cn(
+            "text-sm font-semibold leading-tight",
+            light ? "text-white" : "text-primary"
+          )}>
             Avícola
           </span>
-          <span className="text-xs text-muted-foreground leading-tight">
+          <span className={cn(
+            "text-xs leading-tight",
+            light ? "text-white/80" : "text-muted-foreground"
+          )}>
             del Sur
           </span>
         </div>

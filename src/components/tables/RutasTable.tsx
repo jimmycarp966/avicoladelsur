@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Edit, Trash2, Eye, Truck, MapPin, Navigation, CheckCircle } from 'lucide-react'
-import { formatDate } from '@/lib/utils'
+import { formatDate, cn } from '@/lib/utils'
 import type { RutaReparto as Ruta } from '@/types/domain.types'
 
 interface RutasTableProps {
@@ -39,7 +39,7 @@ export function RutasTable({ data, onView, onEdit, onDelete, onStart, onComplete
       cell: ({ row }) => {
         const numero = row.getValue('numero_ruta') as string
         return (
-          <div className="font-medium text-blue-600">
+          <div className="font-semibold text-primary text-base">
             #{numero}
           </div>
         )
@@ -53,7 +53,7 @@ export function RutasTable({ data, onView, onEdit, onDelete, onStart, onComplete
       cell: ({ row }) => {
         const fecha = row.getValue('fecha_planificada') as string
         return (
-          <div className="text-sm text-muted-foreground">
+          <div className="text-base text-foreground font-medium">
             {formatDate(fecha)}
           </div>
         )
@@ -70,7 +70,7 @@ export function RutasTable({ data, onView, onEdit, onDelete, onStart, onComplete
             <Avatar className="h-6 w-6">
               <AvatarFallback className="text-xs">R</AvatarFallback>
             </Avatar>
-            <span className="text-sm">Repartidor {repartidorId}</span>
+            <span className="text-base font-medium text-foreground">Repartidor {repartidorId}</span>
           </div>
         )
       },
@@ -86,7 +86,7 @@ export function RutasTable({ data, onView, onEdit, onDelete, onStart, onComplete
             <div className="p-1 bg-blue-100 rounded">
               <Truck className="h-3 w-3 text-blue-600" />
             </div>
-            <span className="text-sm">Vehículo {vehiculoId}</span>
+            <span className="text-base font-medium text-foreground">Vehículo {vehiculoId}</span>
           </div>
         )
       },
@@ -98,7 +98,7 @@ export function RutasTable({ data, onView, onEdit, onDelete, onStart, onComplete
         const peso = row.getValue('peso_total_kg') as number
         return (
           <div className="text-center">
-            <div className="font-medium">{peso || 0} kg</div>
+            <div className="font-bold text-foreground text-base">{peso || 0} kg</div>
           </div>
         )
       },
@@ -110,7 +110,7 @@ export function RutasTable({ data, onView, onEdit, onDelete, onStart, onComplete
         const estado = row.getValue('estado') as string
         const config = getEstadoConfig(estado)
         return (
-          <Badge variant={config.variant} className={config.color}>
+          <Badge variant={config.variant} className={cn(config.color, "text-sm font-semibold px-2.5 py-1")}>
             {config.label}
           </Badge>
         )
@@ -122,13 +122,13 @@ export function RutasTable({ data, onView, onEdit, onDelete, onStart, onComplete
       cell: ({ row }) => {
         const tiempoMin = row.getValue('tiempo_estimado_min') as number
 
-        if (!tiempoMin) return <span className="text-muted-foreground">Sin estimar</span>
+        if (!tiempoMin) return <span className="text-muted-foreground text-base">Sin estimar</span>
 
         const horas = Math.floor(tiempoMin / 60)
         const minutos = tiempoMin % 60
 
         return (
-          <div className="text-sm text-muted-foreground">
+          <div className="text-base text-foreground font-medium">
             {horas > 0 ? `${horas}h ` : ''}{minutos}min
           </div>
         )

@@ -23,7 +23,7 @@ export function ProductosTable({ data, onView, onEdit, onDelete }: ProductosTabl
         <SortableHeader column={column}>Código</SortableHeader>
       ),
       cell: ({ row }) => (
-        <div className="font-medium">{row.getValue('codigo')}</div>
+        <div className="font-semibold text-primary text-base">{row.getValue('codigo')}</div>
       ),
     },
     {
@@ -32,7 +32,7 @@ export function ProductosTable({ data, onView, onEdit, onDelete }: ProductosTabl
         <SortableHeader column={column}>Nombre</SortableHeader>
       ),
       cell: ({ row }) => (
-        <div className="font-medium">{row.getValue('nombre')}</div>
+        <div className="font-semibold text-foreground text-base">{row.getValue('nombre')}</div>
       ),
     },
     {
@@ -41,9 +41,9 @@ export function ProductosTable({ data, onView, onEdit, onDelete }: ProductosTabl
       cell: ({ row }) => {
         const categoria = row.getValue('categoria') as string
         return categoria ? (
-          <Badge variant="outline">{categoria}</Badge>
+          <Badge variant="outline" className="text-sm font-medium">{categoria}</Badge>
         ) : (
-          <span className="text-muted-foreground">Sin categoría</span>
+          <span className="text-muted-foreground text-base">Sin categoría</span>
         )
       },
     },
@@ -55,7 +55,7 @@ export function ProductosTable({ data, onView, onEdit, onDelete }: ProductosTabl
       cell: ({ row }) => {
         const precio = row.getValue('precio_venta') as number
         return (
-          <div className="text-right font-medium">
+          <div className="text-right font-bold text-foreground text-base">
             {formatCurrency(precio)}
           </div>
         )
@@ -69,7 +69,7 @@ export function ProductosTable({ data, onView, onEdit, onDelete }: ProductosTabl
       cell: ({ row }) => {
         const stock = row.getValue('stock_minimo') as number
         return (
-          <div className="text-center">
+          <div className="text-center font-semibold text-foreground text-base">
             {stock}
           </div>
         )

@@ -11,10 +11,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 
 // Datos de ejemplo - en producción vendrían de la base de datos
 const data = [
-  { name: 'Aves', value: 45, color: '#2D5A27' },
-  { name: 'Huevos', value: 25, color: '#F4C430' },
-  { name: 'Procesados', value: 20, color: '#4A7C59' },
-  { name: 'Otros', value: 10, color: '#E65100' },
+  { name: 'Aves', value: 45, color: '#2F7058' },
+  { name: 'Huevos', value: 25, color: '#FCDE8D' },
+  { name: 'Procesados', value: 20, color: '#D9EBC6' },
+  { name: 'Otros', value: 10, color: '#CB3433' },
 ]
 
 export function ProductosPorCategoriaChart() {

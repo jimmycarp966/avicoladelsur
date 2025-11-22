@@ -39,73 +39,73 @@ export default async function AdminDashboard() {
 
   return (
     <div className="space-y-8">
-      {/* Header con fondo colorido */}
-      <div className="relative overflow-hidden rounded-lg bg-gradient-to-br from-primary/5 via-white to-secondary/5 p-6 shadow-sm border border-primary/10">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-10"></div>
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-secondary/5 rounded-full blur-3xl -z-10"></div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground mt-1">
-          Bienvenido de vuelta, {user?.nombre}. Aquí tienes un resumen de tu negocio.
+      {/* Header de bienvenida - Estilo profesional */}
+      <div className="bg-white rounded-lg border border-border p-6 shadow-sm">
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">
+          Dashboard
+        </h1>
+        <p className="text-muted-foreground mt-2">
+          Bienvenido de vuelta, <span className="font-semibold text-primary">{user?.nombre}</span>. Aquí tienes un resumen de tu negocio.
         </p>
       </div>
 
       {/* Métricas principales */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-t-[3px] border-t-primary bg-primary/5 hover:shadow-lg transition-all duration-300 hover:scale-105 cursor-pointer">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Productos</CardTitle>
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 transition-colors group-hover:bg-primary/20">
-              <Package className="h-5 w-5 text-primary" />
+        <Card className="border-t-[4px] border-t-primary hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-base font-semibold text-foreground">Productos</CardTitle>
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+              <Package className="h-6 w-6 text-primary" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics.totalProductos}</div>
-            <p className="text-xs text-muted-foreground">
+            <div className="text-4xl font-bold text-primary mb-2">{metrics.totalProductos}</div>
+            <p className="text-sm text-muted-foreground font-medium">
               +2.5% desde el mes pasado
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border-t-[3px] border-t-warning bg-warning/5 hover:shadow-lg transition-all duration-300 hover:scale-105 cursor-pointer">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pedidos Pendientes</CardTitle>
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning/10 transition-colors group-hover:bg-warning/20">
-              <Clock className="h-5 w-5 text-warning" />
+        <Card className="border-t-[4px] border-t-warning hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-base font-semibold text-foreground">Pedidos Pendientes</CardTitle>
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-warning/10">
+              <Clock className="h-6 w-6 text-warning" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics.pedidosPendientes}</div>
-            <p className="text-xs text-muted-foreground">
+            <div className="text-4xl font-bold text-warning mb-2">{metrics.pedidosPendientes}</div>
+            <p className="text-sm text-muted-foreground font-medium">
               Requieren atención
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border-t-[3px] border-t-info bg-info/5 hover:shadow-lg transition-all duration-300 hover:scale-105 cursor-pointer">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Entregas Hoy</CardTitle>
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-info/10 transition-colors group-hover:bg-info/20">
-              <Truck className="h-5 w-5 text-info" />
+        <Card className="border-t-[4px] border-t-info hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-base font-semibold text-foreground">Entregas Hoy</CardTitle>
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-info/10">
+              <Truck className="h-6 w-6 text-info" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics.entregasHoy}</div>
-            <p className="text-xs text-muted-foreground">
+            <div className="text-4xl font-bold text-info mb-2">{metrics.entregasHoy}</div>
+            <p className="text-sm text-muted-foreground font-medium">
               6 completadas, 2 pendientes
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border-t-[3px] border-t-secondary bg-secondary/5 hover:shadow-lg transition-all duration-300 hover:scale-105 cursor-pointer">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Clientes Activos</CardTitle>
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary/10 transition-colors group-hover:bg-secondary/20">
-              <Users className="h-5 w-5 text-secondary" />
+        <Card className="border-t-[4px] border-t-secondary hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-base font-semibold text-foreground">Clientes Activos</CardTitle>
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-secondary/10">
+              <Users className="h-6 w-6 text-secondary" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics.clientesActivos}</div>
-            <p className="text-xs text-muted-foreground">
+            <div className="text-4xl font-bold text-secondary mb-2">{metrics.clientesActivos}</div>
+            <p className="text-sm text-muted-foreground font-medium">
               +12% desde el mes pasado
             </p>
           </CardContent>
@@ -127,9 +127,9 @@ export default async function AdminDashboard() {
           <EntregasPorDiaChart />
         </div>
         <Card>
-          <CardHeader>
-            <CardTitle>Métricas de Rendimiento</CardTitle>
-            <CardDescription>
+          <CardHeader className="pb-4">
+            <CardTitle className="text-xl font-bold">Métricas de Rendimiento</CardTitle>
+            <CardDescription className="text-base mt-1">
               Indicadores clave de rendimiento del mes
             </CardDescription>
           </CardHeader>
@@ -180,9 +180,9 @@ export default async function AdminDashboard() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         {/* Actividad reciente */}
         <Card className="col-span-4">
-          <CardHeader>
-            <CardTitle>Actividad Reciente</CardTitle>
-            <CardDescription>
+          <CardHeader className="pb-4">
+            <CardTitle className="text-xl font-bold">Actividad Reciente</CardTitle>
+            <CardDescription className="text-base mt-1">
               Las últimas acciones en el sistema
             </CardDescription>
           </CardHeader>
@@ -226,9 +226,9 @@ export default async function AdminDashboard() {
 
         {/* Estado del sistema */}
         <Card className="col-span-3">
-          <CardHeader>
-            <CardTitle>Estado del Sistema</CardTitle>
-            <CardDescription>
+          <CardHeader className="pb-4">
+            <CardTitle className="text-xl font-bold">Estado del Sistema</CardTitle>
+            <CardDescription className="text-base mt-1">
               Componentes del ERP
             </CardDescription>
           </CardHeader>

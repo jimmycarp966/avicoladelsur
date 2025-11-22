@@ -61,37 +61,37 @@ export const ESTADOS_ENTREGA = {
 
 export type EstadoEntrega = typeof ESTADOS_ENTREGA[keyof typeof ESTADOS_ENTREGA]
 
-// Paleta de colores basada en el logo
+// Paleta de colores basada en la página web de Avícola del Sur
 export const colors = {
   primary: {
-    green: '#2D5A27',
-    yellow: '#F4C430',
-    red: '#D32F2F',
+    green: '#2F7058', // Verde oscuro de la página web
+    yellow: '#FCDE8D', // Amarillo/Crema de la página web
+    red: '#CB3433', // Rojo de la página web
   },
   secondary: {
-    dark: '#1B3A1F',
-    light: '#4A7C59',
-    orange: '#E65100',
+    dark: '#255a47', // Verde oscuro más intenso
+    light: '#D9EBC6', // Verde claro de la página web
+    orange: '#CB3433', // Usar rojo en lugar de naranja
   },
   neutral: {
     white: '#FFFFFF',
     gray: {
-      50: '#F9FAFB',
-      100: '#F3F4F6',
+      50: '#F5F7F9', // Gris muy claro de la página web
+      100: '#F5F7F9',
       200: '#E5E7EB',
       300: '#D1D5DB',
-      400: '#9CA3AF',
-      500: '#6B7280',
-      600: '#4B5563',
-      700: '#374151',
-      800: '#1F2937',
-      900: '#111827',
+      400: '#7A7A7A', // Gris claro de la página web
+      500: '#43474E', // Gris medio de la página web
+      600: '#334155', // Gris oscuro de la página web (foreground)
+      700: '#334155',
+      800: '#0E131B', // Gris muy oscuro de la página web
+      900: '#0E131B',
     },
   },
   status: {
-    success: '#10B981',
-    warning: '#F59E0B',
-    error: '#EF4444',
-    info: '#3B82F6',
+    success: '#2F7058', // Verde oscuro de la página web
+    warning: '#FCDE8D', // Amarillo/Crema de la página web
+    error: '#CB3433', // Rojo de la página web
+    info: '#43474E', // Gris medio de la página web
   },
 }

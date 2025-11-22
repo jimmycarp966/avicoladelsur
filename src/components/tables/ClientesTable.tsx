@@ -36,9 +36,9 @@ export function ClientesTable({ data, onView, onEdit, onDelete, onCall, onWhatsA
               </AvatarFallback>
             </Avatar>
             <div>
-              <div className="font-medium">{nombre}</div>
+              <div className="font-semibold text-foreground text-base">{nombre}</div>
               {telefono && (
-                <div className="text-sm text-muted-foreground">{telefono}</div>
+                <div className="text-sm text-muted-foreground mt-0.5">{telefono}</div>
               )}
             </div>
           </div>
@@ -62,7 +62,7 @@ export function ClientesTable({ data, onView, onEdit, onDelete, onCall, onWhatsA
         }
 
         return (
-          <Badge variant={config.variant}>
+          <Badge variant={config.variant} className="text-sm font-semibold px-2.5 py-1">
             {config.label}
           </Badge>
         )
@@ -74,9 +74,9 @@ export function ClientesTable({ data, onView, onEdit, onDelete, onCall, onWhatsA
       cell: ({ row }) => {
         const zona = row.getValue('zona_entrega') as string
         return zona ? (
-          <Badge variant="outline">{zona}</Badge>
+          <Badge variant="outline" className="text-sm font-medium">{zona}</Badge>
         ) : (
-          <span className="text-muted-foreground">Sin zona</span>
+          <span className="text-muted-foreground text-base">Sin zona</span>
         )
       },
     },
@@ -120,7 +120,7 @@ export function ClientesTable({ data, onView, onEdit, onDelete, onCall, onWhatsA
       cell: ({ row }) => {
         const fecha = row.getValue('created_at') as string
         return (
-          <div className="text-sm text-muted-foreground">
+          <div className="text-base text-foreground font-medium">
             {formatDate(fecha)}
           </div>
         )

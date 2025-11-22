@@ -5,7 +5,7 @@ import { DataTable, SortableHeader, StatusBadge } from '@/components/ui/data-tab
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Edit, Trash2, Eye, Truck, Wrench, FileCheck } from 'lucide-react'
-import { formatDate } from '@/lib/utils'
+import { formatDate, cn } from '@/lib/utils'
 import type { Vehiculo } from '@/types/domain.types'
 
 interface VehiculosTableProps {
@@ -43,8 +43,8 @@ export function VehiculosTable({ data, onView, onEdit, onDelete, onMaintenance, 
               <Truck className="h-4 w-4 text-blue-600" />
             </div>
             <div>
-              <div className="font-medium">{patente}</div>
-              <div className="text-sm text-muted-foreground">
+              <div className="font-semibold text-primary text-base">{patente}</div>
+              <div className="text-sm text-muted-foreground mt-0.5">
                 {vehiculo.marca} {vehiculo.modelo}
               </div>
             </div>
@@ -71,7 +71,7 @@ export function VehiculosTable({ data, onView, onEdit, onDelete, onMaintenance, 
         }
 
         return (
-          <Badge variant="outline" className={config.color}>
+          <Badge variant="outline" className={cn(config.color, "text-sm font-semibold px-2.5 py-1")}>
             {config.label}
           </Badge>
         )
@@ -86,7 +86,7 @@ export function VehiculosTable({ data, onView, onEdit, onDelete, onMaintenance, 
         const capacidad = row.getValue('capacidad_kg') as number
         return (
           <div className="text-center">
-            <div className="font-medium">{capacidad}kg</div>
+            <div className="font-bold text-foreground text-base">{capacidad}kg</div>
           </div>
         )
       },
@@ -99,11 +99,11 @@ export function VehiculosTable({ data, onView, onEdit, onDelete, onMaintenance, 
         const fechaVto = row.original.fecha_vto_seguro
         return (
           <div className="text-center">
-            <Badge variant={vigente ? "default" : "destructive"}>
+            <Badge variant={vigente ? "default" : "destructive"} className="text-sm font-semibold px-2.5 py-1">
               {vigente ? "Vigente" : "Vencido"}
             </Badge>
             {fechaVto && (
-              <div className="text-xs text-muted-foreground mt-1">
+              <div className="text-sm text-muted-foreground mt-1 font-medium">
                 Vence: {formatDate(fechaVto)}
               </div>
             )}
@@ -124,7 +124,7 @@ export function VehiculosTable({ data, onView, onEdit, onDelete, onMaintenance, 
         }
         const config = estadoConfig[estado as keyof typeof estadoConfig] || { label: estado, variant: 'outline' as const }
         return (
-          <Badge variant={config.variant}>
+          <Badge variant={config.variant} className="text-sm font-semibold px-2.5 py-1">
             {config.label}
           </Badge>
         )

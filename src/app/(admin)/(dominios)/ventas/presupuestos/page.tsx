@@ -16,19 +16,18 @@ export const metadata = {
 export default function PresupuestosPage() {
   return (
     <div className="space-y-6">
-      {/* Header con fondo colorido */}
-      <div className="relative overflow-hidden rounded-lg bg-gradient-to-br from-primary/5 via-white to-secondary/5 p-6 shadow-sm border border-primary/10">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-10"></div>
+      {/* Header - Estilo limpio y profesional */}
+      <div className="bg-white rounded-lg border border-border p-6 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Presupuestos</h1>
-            <p className="text-muted-foreground mt-1">
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">Presupuestos</h1>
+            <p className="text-muted-foreground mt-2 text-base">
               Gestiona todos los presupuestos del sistema
             </p>
           </div>
-          <Button asChild className="bg-primary hover:bg-primary/90 shadow-sm">
+          <Button asChild className="bg-primary hover:bg-primary/90 shadow-sm h-10 px-6">
             <Link href="/ventas/presupuestos/nuevo">
-              <Plus className="mr-2 h-4 w-4" />
+              <Plus className="mr-2 h-5 w-5" />
               Nuevo Presupuesto
             </Link>
           </Button>
@@ -37,86 +36,86 @@ export default function PresupuestosPage() {
 
       {/* Estadísticas rápidas */}
       <div className="grid gap-4 md:grid-cols-5">
-        <Card className="border-t-[3px] border-t-primary bg-primary/5 hover:shadow-lg transition-all duration-300 hover:scale-105 cursor-pointer">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Presupuestos</CardTitle>
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <FileText className="h-5 w-5 text-primary" />
+        <Card className="border-t-[4px] border-t-primary hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-base font-semibold text-foreground">Total Presupuestos</CardTitle>
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
+              <FileText className="h-6 w-6 text-primary" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-4xl font-bold text-primary mb-2">
               <Suspense fallback="...">89</Suspense>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground font-medium">
               Este mes
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border-t-[3px] border-t-warning bg-warning/5 hover:shadow-lg transition-all duration-300 hover:scale-105 cursor-pointer">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pendientes</CardTitle>
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning/10">
-              <Clock className="h-5 w-5 text-warning" />
+        <Card className="border-t-[4px] border-t-warning hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-base font-semibold text-foreground">Pendientes</CardTitle>
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-warning/10">
+              <Clock className="h-6 w-6 text-warning" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-warning">
+            <div className="text-4xl font-bold text-warning mb-2">
               <Suspense fallback="...">23</Suspense>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground font-medium">
               Requieren atención
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border-t-[3px] border-t-secondary bg-secondary/5 hover:shadow-lg transition-all duration-300 hover:scale-105 cursor-pointer">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">En Almacén</CardTitle>
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary/10">
-              <Package className="h-5 w-5 text-secondary" />
+        <Card className="border-t-[4px] border-t-secondary hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-base font-semibold text-foreground">En Almacén</CardTitle>
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-secondary/10">
+              <Package className="h-6 w-6 text-secondary" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-secondary">
+            <div className="text-4xl font-bold text-secondary mb-2">
               <Suspense fallback="...">12</Suspense>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground font-medium">
               Pesaje pendiente
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border-t-[3px] border-t-success bg-success/5 hover:shadow-lg transition-all duration-300 hover:scale-105 cursor-pointer">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Facturados Hoy</CardTitle>
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
-              <CheckCircle className="h-5 w-5 text-success" />
+        <Card className="border-t-[4px] border-t-success hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-base font-semibold text-foreground">Facturados Hoy</CardTitle>
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-success/10">
+              <CheckCircle className="h-6 w-6 text-success" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-success">
+            <div className="text-4xl font-bold text-success mb-2">
               <Suspense fallback="...">8</Suspense>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground font-medium">
               Convertidos a pedidos
             </p>
           </CardContent>
         </Card>
 
-        <Card className="border-t-[3px] border-t-destructive bg-destructive/5 hover:shadow-lg transition-all duration-300 hover:scale-105 cursor-pointer">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Anulados</CardTitle>
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
+        <Card className="border-t-[4px] border-t-destructive hover:shadow-md transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-base font-semibold text-foreground">Anulados</CardTitle>
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-destructive/10">
+              <AlertTriangle className="h-6 w-6 text-destructive" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-destructive">
+            <div className="text-4xl font-bold text-destructive mb-2">
               <Suspense fallback="...">3</Suspense>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground font-medium">
               Este mes
             </p>
           </CardContent>
@@ -125,9 +124,9 @@ export default function PresupuestosPage() {
 
       {/* Tabla de presupuestos */}
       <Card>
-        <CardHeader>
-          <CardTitle>Lista de Presupuestos</CardTitle>
-          <CardDescription>
+        <CardHeader className="pb-4">
+          <CardTitle className="text-xl font-bold">Lista de Presupuestos</CardTitle>
+          <CardDescription className="text-base mt-1">
             Todos los presupuestos registrados en el sistema
           </CardDescription>
         </CardHeader>

@@ -41,8 +41,8 @@ export function VentasMensualesChart() {
           <AreaChart data={data}>
             <defs>
               <linearGradient id="ventasGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#2D5A27" stopOpacity={0.3}/>
-                <stop offset="95%" stopColor="#2D5A27" stopOpacity={0}/>
+                <stop offset="5%" stopColor="#2F7058" stopOpacity={0.3}/>
+                <stop offset="95%" stopColor="#2F7058" stopOpacity={0}/>
               </linearGradient>
             </defs>
             <XAxis
@@ -64,7 +64,7 @@ export function VentasMensualesChart() {
                   return (
                     <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
                       <p className="font-medium text-gray-900 mb-2">{`Mes: ${label}`}</p>
-                      <p className="text-green-600">
+                      <p className="text-[#2F7058]">
                         {`Ventas: ${formatCurrency(payload[0]?.value as number)}`}
                       </p>
                       {ventasData?.pedidos && (
@@ -81,7 +81,7 @@ export function VentasMensualesChart() {
             <Area
               type="monotone"
               dataKey="ventas"
-              stroke="#2D5A27"
+              stroke="#2F7058"
               strokeWidth={2}
               fill="url(#ventasGradient)"
             />

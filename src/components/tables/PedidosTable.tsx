@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Edit, Trash2, Eye, Truck, FileText, Phone } from 'lucide-react'
-import { formatDate, formatCurrency } from '@/lib/utils'
+import { formatDate, formatCurrency, cn } from '@/lib/utils'
 import type { Pedido } from '@/types/domain.types'
 
 interface PedidosTableProps {
@@ -40,7 +40,7 @@ export function PedidosTable({ data, onView, onEdit, onDelete, onDeliver, onPrin
       cell: ({ row }) => {
         const numero = row.getValue('numero_pedido') as string
         return (
-          <div className="font-medium text-blue-600">
+          <div className="font-semibold text-primary text-base">
             #{numero}
           </div>
         )
@@ -54,7 +54,7 @@ export function PedidosTable({ data, onView, onEdit, onDelete, onDeliver, onPrin
       cell: ({ row }) => {
         const fecha = row.getValue('fecha_pedido') as string
         return (
-          <div className="text-sm text-muted-foreground">
+          <div className="text-base text-foreground font-medium">
             {formatDate(fecha)}
           </div>
         )
@@ -71,7 +71,7 @@ export function PedidosTable({ data, onView, onEdit, onDelete, onDeliver, onPrin
             <Avatar className="h-6 w-6">
               <AvatarFallback className="text-xs">C</AvatarFallback>
             </Avatar>
-            <span className="text-sm">Cliente {clienteId.slice(-4)}</span>
+            <span className="text-base font-medium text-foreground">Cliente {clienteId.slice(-4)}</span>
           </div>
         )
       },
@@ -84,7 +84,7 @@ export function PedidosTable({ data, onView, onEdit, onDelete, onDeliver, onPrin
       cell: ({ row }) => {
         const total = row.getValue('total') as number
         return (
-          <div className="font-medium">
+          <div className="font-bold text-foreground text-base">
             {formatCurrency(total)}
           </div>
         )
@@ -97,7 +97,7 @@ export function PedidosTable({ data, onView, onEdit, onDelete, onDeliver, onPrin
         const estado = row.getValue('estado') as string
         const config = getEstadoConfig(estado)
         return (
-          <Badge variant={config.variant} className={config.color}>
+          <Badge variant={config.variant} className={cn(config.color, "text-sm font-semibold px-2.5 py-1")}>
             {config.label}
           </Badge>
         )
@@ -109,11 +109,11 @@ export function PedidosTable({ data, onView, onEdit, onDelete, onDeliver, onPrin
       cell: ({ row }) => {
         const fecha = row.getValue('fecha_entrega_estimada') as string
         return fecha ? (
-          <div className="text-sm text-muted-foreground">
+          <div className="text-base text-foreground font-medium">
             {formatDate(fecha)}
           </div>
         ) : (
-          <span className="text-muted-foreground">Sin fecha</span>
+          <span className="text-muted-foreground text-base">Sin fecha</span>
         )
       },
     },

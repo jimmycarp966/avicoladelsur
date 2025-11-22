@@ -2,7 +2,6 @@
 
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { useAuth } from '@/components/providers/AuthProvider'
 import { Logo } from '@/components/ui/logo'
 import { cn } from '@/lib/utils'
 import { colors } from '@/lib/config'
@@ -21,6 +20,7 @@ import type { Usuario } from '@/types/domain.types'
 
 interface AdminSidebarProps {
   onClose?: () => void
+  user: Usuario | null
 }
 
 const navigation = [
@@ -111,28 +111,28 @@ function NavigationItem({ item, pathname, user, onClose }: NavigationItemProps) 
         href={item.href}
         onClick={onClose}
         className={cn(
-          'group relative flex items-center rounded-md px-3 py-2 text-sm font-medium transition-all duration-200',
+          'group relative flex items-center rounded-lg px-4 py-3 text-sm font-medium transition-all duration-200',
           isActive
-            ? 'bg-primary/10 text-primary shadow-sm'
-            : 'text-gray-700 hover:bg-primary/5 hover:text-primary hover:translate-x-1'
+            ? 'bg-[#FCDE8D] text-[#2F7058] shadow-md'
+            : 'text-white hover:bg-white/10 hover:text-white'
         )}
       >
-        {/* Indicador verde para item activo */}
+        {/* Barra lateral amarillo/crema para item activo */}
         {isActive && (
-          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-8 bg-primary rounded-r-full"></div>
+          <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#FCDE8D] rounded-r-full"></div>
         )}
         <item.icon
           className={cn(
             'mr-3 h-5 w-5 flex-shrink-0 transition-all duration-200',
-            isActive ? 'text-primary scale-110' : 'text-gray-400 group-hover:text-primary group-hover:scale-105'
+            isActive ? 'text-[#2F7058]' : 'text-white/80 group-hover:text-white'
           )}
         />
-        {item.name}
+        <span className={cn(isActive && 'font-semibold')}>{item.name}</span>
       </Link>
 
       {/* Submenú */}
       {item.children && isActive && (
-        <div className="mt-1 space-y-1">
+        <div className="mt-2 ml-4 space-y-1 border-l-2 border-white/20 pl-4">
           {item.children.map((child) => {
             const childIsActive = pathname === child.href
             return (
@@ -141,15 +141,15 @@ function NavigationItem({ item, pathname, user, onClose }: NavigationItemProps) 
                 href={child.href}
                 onClick={onClose}
                 className={cn(
-                  'group relative flex items-center rounded-md py-2 pl-9 pr-3 text-sm font-medium transition-all duration-200',
+                  'group relative flex items-center rounded-lg py-2 px-3 text-sm font-medium transition-all duration-200',
                   childIsActive
-                    ? 'bg-primary/10 text-primary font-semibold'
-                    : 'text-gray-600 hover:bg-primary/5 hover:text-primary hover:translate-x-1'
+                    ? 'bg-white/15 text-white font-semibold'
+                    : 'text-white/70 hover:bg-white/10 hover:text-white'
                 )}
               >
-                {/* Punto verde para submenu activo */}
+                {/* Punto amarillo/crema para submenu activo */}
                 {childIsActive && (
-                  <div className="absolute left-5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-primary rounded-full"></div>
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-[#FCDE8D] rounded-full -ml-6"></div>
                 )}
                 {child.name}
               </Link>
@@ -161,25 +161,22 @@ function NavigationItem({ item, pathname, user, onClose }: NavigationItemProps) 
   )
 }
 
-export function AdminSidebar({ onClose }: AdminSidebarProps) {
+export function AdminSidebar({ onClose, user }: AdminSidebarProps) {
   const pathname = usePathname()
-  const { user } = useAuth()
 
   return (
-    <div className="relative flex grow flex-col gap-y-5 overflow-y-auto bg-gradient-sidebar px-6 pb-4 shadow-sm border-r border-gray-200">
-      {/* Barra de acento verde */}
-      <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-primary via-secondary to-primary"></div>
-      {/* Logo y título */}
-      <div className="flex h-16 shrink-0 items-center justify-between">
+    <div className="relative flex grow flex-col overflow-y-auto bg-gradient-sidebar">
+      {/* Logo y título - Destacado */}
+      <div className="flex h-20 shrink-0 items-center justify-between px-6 border-b border-white/10">
         <div className="flex items-center gap-3">
-          <Logo size="lg" variant="full" />
+          <Logo size="lg" variant="full" light />
         </div>
 
         {/* Botón cerrar (móvil) */}
         {onClose && (
           <button
             type="button"
-            className="rounded-md p-1.5 text-gray-400 hover:bg-gray-50 hover:text-gray-500 lg:hidden"
+            className="rounded-md p-1.5 text-white/60 hover:bg-white/10 hover:text-white lg:hidden"
             onClick={onClose}
           >
             <X className="h-6 w-6" />
@@ -188,10 +185,10 @@ export function AdminSidebar({ onClose }: AdminSidebarProps) {
       </div>
 
       {/* Navegación */}
-      <nav className="flex flex-1 flex-col">
-        <ul role="list" className="flex flex-1 flex-col gap-y-7">
+      <nav className="flex flex-1 flex-col px-4 py-6">
+        <ul role="list" className="flex flex-1 flex-col space-y-2">
           <li>
-            <ul role="list" className="-mx-2 space-y-1">
+            <ul role="list" className="space-y-1">
               {navigation.map((item) => (
                 <li key={item.name}>
                   <NavigationItem
@@ -209,19 +206,19 @@ export function AdminSidebar({ onClose }: AdminSidebarProps) {
 
       {/* Información del usuario */}
       {user && (
-        <div className="mt-auto border-t border-gray-200 pt-4">
+        <div className="mt-auto border-t border-white/10 px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100">
-              <span className="text-sm font-medium text-gray-600">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 ring-2 ring-white/30">
+              <span className="text-sm font-semibold text-white">
                 {user.nombre?.charAt(0).toUpperCase()}
                 {user.apellido?.charAt(0).toUpperCase()}
               </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">
+              <p className="text-sm font-semibold text-white truncate">
                 {user.nombre} {user.apellido}
               </p>
-              <p className="text-xs text-gray-500 capitalize">{user.rol}</p>
+              <p className="text-xs text-white/60 capitalize mt-0.5">{user.rol}</p>
             </div>
           </div>
         </div>

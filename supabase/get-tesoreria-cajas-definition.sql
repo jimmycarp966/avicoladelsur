@@ -30,3 +30,5 @@ WHERE tc.table_name = 'tesoreria_cajas'
 AND tc.table_schema = 'public';
 
 
+
+

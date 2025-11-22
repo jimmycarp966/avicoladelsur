@@ -5,7 +5,7 @@ import { DataTable, SortableHeader, StatusBadge } from '@/components/ui/data-tab
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Edit, Trash2, Eye, AlertTriangle, Package } from 'lucide-react'
-import { formatDate } from '@/lib/utils'
+import { formatDate, cn } from '@/lib/utils'
 import type { Lote } from '@/types/domain.types'
 
 interface LotesTableProps {
@@ -50,7 +50,7 @@ export function LotesTable({ data, onView, onEdit, onDelete, onAdjust }: LotesTa
       cell: ({ row }) => {
         const numero = row.getValue('numero_lote') as string
         return (
-          <div className="font-medium text-blue-600">
+          <div className="font-semibold text-primary text-base">
             #{numero}
           </div>
         )
@@ -71,12 +71,12 @@ export function LotesTable({ data, onView, onEdit, onDelete, onAdjust }: LotesTa
         }
 
         const producto = productosMock[productoId as keyof typeof productosMock]
-        if (!producto) return <span className="text-muted-foreground">Sin producto</span>
+        if (!producto) return <span className="text-muted-foreground text-base">Sin producto</span>
 
         return (
           <div>
-            <div className="font-medium">{producto.nombre}</div>
-            <div className="text-sm text-muted-foreground">Código: {producto.codigo}</div>
+            <div className="font-semibold text-foreground text-base">{producto.nombre}</div>
+            <div className="text-sm text-muted-foreground mt-0.5">Código: {producto.codigo}</div>
           </div>
         )
       },
@@ -91,8 +91,8 @@ export function LotesTable({ data, onView, onEdit, onDelete, onAdjust }: LotesTa
         const lote = row.original
         return (
           <div className="text-center">
-            <div className="font-medium">{cantidad}</div>
-            <div className="text-sm text-muted-foreground">
+            <div className="font-bold text-foreground text-lg">{cantidad}</div>
+            <div className="text-sm text-muted-foreground mt-1 font-medium">
               Disponible: {lote.cantidad_disponible}
             </div>
           </div>
@@ -107,7 +107,7 @@ export function LotesTable({ data, onView, onEdit, onDelete, onAdjust }: LotesTa
       cell: ({ row }) => {
         const fecha = row.getValue('fecha_ingreso') as string
         return (
-          <div className="text-sm text-muted-foreground">
+          <div className="text-base text-foreground font-medium">
             {formatDate(fecha)}
           </div>
         )
@@ -125,15 +125,17 @@ export function LotesTable({ data, onView, onEdit, onDelete, onAdjust }: LotesTa
         const diasParaVencer = Math.ceil((fechaVenc.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24))
 
         return (
-          <div className="text-sm">
-            {formatDate(fecha)}
+          <div>
+            <div className="text-base text-foreground font-medium">
+              {formatDate(fecha)}
+            </div>
             {diasParaVencer <= 7 && diasParaVencer > 0 && (
-              <div className="text-xs text-orange-600 font-medium">
+              <div className="text-sm text-warning font-semibold mt-1">
                 {diasParaVencer} días
               </div>
             )}
             {diasParaVencer <= 0 && (
-              <div className="text-xs text-red-600 font-medium">
+              <div className="text-sm text-destructive font-semibold mt-1">
                 Vencido
               </div>
             )}
@@ -149,7 +151,7 @@ export function LotesTable({ data, onView, onEdit, onDelete, onAdjust }: LotesTa
         const vencimiento = row.original.fecha_vencimiento
         const config = getEstadoConfig(estado, vencimiento)
         return (
-          <Badge variant={config.variant} className={config.color}>
+          <Badge variant={config.variant} className={cn(config.color, "text-sm font-semibold px-2.5 py-1")}>
             {config.label}
           </Badge>
         )
@@ -161,9 +163,9 @@ export function LotesTable({ data, onView, onEdit, onDelete, onAdjust }: LotesTa
       cell: ({ row }) => {
         const ubicacion = row.getValue('ubicacion_almacen') as string
         return ubicacion ? (
-          <Badge variant="outline">{ubicacion}</Badge>
+          <Badge variant="outline" className="text-sm font-medium">{ubicacion}</Badge>
         ) : (
-          <span className="text-muted-foreground">Sin ubicación</span>
+          <span className="text-muted-foreground text-base">Sin ubicación</span>
         )
       },
     },

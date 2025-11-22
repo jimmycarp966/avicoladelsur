@@ -21,5 +21,5 @@ export default async function AdminLayoutWrapper({
     redirect('/unauthorized')
   }
 
-  return <AdminLayout>{children}</AdminLayout>
+  return <AdminLayout user={user}>{children}</AdminLayout>
 }
