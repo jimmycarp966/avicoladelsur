@@ -49,7 +49,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
     <Card className="w-full max-w-md mx-auto shadow-2xl border-2 border-primary/20 bg-white">
       <CardHeader className="space-y-6 pb-6">
         <div className="flex items-center justify-center mb-4">
-          <Logo size="xl" variant="full" priority />
+          <Logo size="xl" variant="full" priority light />
         </div>
         <div className="text-center space-y-2">
           <CardTitle className="text-3xl font-bold text-foreground">Bienvenido</CardTitle>
