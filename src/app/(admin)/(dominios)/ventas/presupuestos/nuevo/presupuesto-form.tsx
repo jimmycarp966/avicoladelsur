@@ -309,6 +309,10 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
               onRemove={removeItem}
               errors={errors.items?.[index]}
               canRemove={fields.length > 1}
+              watch={watch}
+              setValue={setValue}
+              register={register}
+              watchedItem={watchedItems?.[index]}
             />
           ))}
 

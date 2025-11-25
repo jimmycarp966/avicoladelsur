@@ -1,7 +1,7 @@
 'use client'
 
 import { memo, useMemo } from 'react'
-import { useFormContext } from 'react-hook-form'
+import { UseFormRegister, UseFormSetValue, UseFormWatch } from 'react-hook-form'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -20,6 +20,10 @@ interface ProductoItemRowProps {
   onRemove: (index: number) => void
   errors?: any
   canRemove: boolean
+  watch: UseFormWatch<any>
+  setValue: UseFormSetValue<any>
+  register: UseFormRegister<any>
+  watchedItem?: any
 }
 
 const ProductoItemRow = memo(function ProductoItemRow({
@@ -32,9 +36,11 @@ const ProductoItemRow = memo(function ProductoItemRow({
   onRemove,
   errors,
   canRemove,
+  watch,
+  setValue,
+  register,
+  watchedItem,
 }: ProductoItemRowProps) {
-  const { watch, setValue, register } = useFormContext()
-  const watchedItem = watch(`items.${index}`)
   const debouncedSearch = useDebounce(productoSearch, 300)
 
   // Filtrar productos con debounce
@@ -162,7 +168,8 @@ const ProductoItemRow = memo(function ProductoItemRow({
     prevProps.fieldId === nextProps.fieldId &&
     prevProps.productoSearch === nextProps.productoSearch &&
     prevProps.canRemove === nextProps.canRemove &&
-    JSON.stringify(prevProps.errors) === JSON.stringify(nextProps.errors)
+    JSON.stringify(prevProps.errors) === JSON.stringify(nextProps.errors) &&
+    JSON.stringify(prevProps.watchedItem) === JSON.stringify(nextProps.watchedItem)
   )
 })
 
