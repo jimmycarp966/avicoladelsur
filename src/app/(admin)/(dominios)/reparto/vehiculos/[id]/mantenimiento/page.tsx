@@ -57,7 +57,8 @@ async function MantenimientoContent({ vehiculoId }: { vehiculoId: string }) {
   )
 }
 
-export default function MantenimientoPage({ params }: MantenimientoPageProps) {
-  return <MantenimientoContent vehiculoId={params.id} />
+export default async function MantenimientoPage({ params }: MantenimientoPageProps) {
+  const { id } = await params
+  return <MantenimientoContent vehiculoId={id} />
 }
 

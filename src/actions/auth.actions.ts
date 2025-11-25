@@ -69,7 +69,7 @@ export async function login(data: LoginFormData): Promise<ApiResponse<{ redirect
         redirectTo = '/dashboard'
         break
       case 'vendedor':
-        redirectTo = '/ventas/pedidos'
+        redirectTo = '/almacen/pedidos'
         break
       case 'repartidor':
         redirectTo = '/home'

@@ -292,9 +292,9 @@ async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) 
                 <p className="text-sm text-muted-foreground mt-1">
                   Presupuesto {presupuesto.numero_presupuesto} creado en estado "{presupuesto.estado}"
                 </p>
-                {presupuesto.usuario_vendedor && (
+                {presupuesto.usuario_vendedor_obj && (
                   <p className="text-xs text-muted-foreground mt-1">
-                    Vendedor: {(presupuesto.usuario_vendedor as any)?.nombre || 'N/A'}
+                    Vendedor: {(presupuesto.usuario_vendedor_obj as any)?.nombre || 'N/A'}
                   </p>
                 )}
               </div>
@@ -323,9 +323,9 @@ async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) 
                   <p className="text-sm text-muted-foreground mt-1">
                     Presupuesto enviado para procesamiento en almacén
                   </p>
-                  {presupuesto.usuario_almacen && (
+                  {presupuesto.usuario_almacen_obj && (
                     <p className="text-xs text-muted-foreground mt-1">
-                      Almacenista: {(presupuesto.usuario_almacen as any)?.nombre || 'N/A'}
+                      Almacenista: {(presupuesto.usuario_almacen_obj as any)?.nombre || 'N/A'}
                     </p>
                   )}
                 </div>
@@ -412,10 +412,15 @@ async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) 
   )
 }
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function PresupuestoDetallePage({ params }: PresupuestoDetallePageProps) {
+  // En Next.js 16, params es una Promise y debe ser await
+  const { id } = await params
   return (
     <Suspense fallback={<PresupuestoDetalleSkeleton />}>
-      <PresupuestoDetalle presupuestoId={params.id} />
+      <PresupuestoDetalle presupuestoId={id} />
     </Suspense>
   )
 }

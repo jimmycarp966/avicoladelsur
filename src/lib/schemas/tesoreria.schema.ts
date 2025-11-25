@@ -29,6 +29,7 @@ export const registrarGastoSchema = z.object({
   comprobante_url: z.string().url('URL inválida').optional(),
   afecta_caja: z.boolean().default(false),
   caja_id: z.string().uuid().optional(),
+  metodo_pago: z.enum(['efectivo', 'transferencia', 'qr', 'tarjeta']).default('efectivo'),
 })
 
 export const registrarPagoPedidoSchema = z.object({

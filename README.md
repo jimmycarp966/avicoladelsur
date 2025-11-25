@@ -227,17 +227,27 @@ node scripts/verificar-bot.js
 
 Sistema completo de presupuestos que transforma el proceso operativo:
 
-**Flujo**: `Bot → Presupuesto → Reserva Stock → Almacén → Pesaje → Pedido → Reparto → Tesorería`
+**Flujo**: `Bot/Vendedor → Presupuesto (Auto: Turno + Fecha + Estado) → Almacén (Pesaje) → Pedido → Reparto → Tesorería`
 
 ### Características Principales
 - 🤖 **Bot Actualizado**: Crea presupuestos en lugar de pedidos directos
 - 📋 **Números Únicos**: PRES-YYYYMMDD-XXXX con links de seguimiento
-- 🏭 **Control de Almacén**: Reserva preventiva + pesaje obligatorio para productos de categoría "balanza"
+- ⏰ **Asignación Automática de Turno**: Al crear presupuesto, se asigna turno según horario:
+  - Antes de 5:00 AM → Turno mañana del mismo día
+  - Entre 5:00 AM y 3:00 PM → Turno tarde del mismo día
+  - Después de 3:00 PM → Turno mañana del día siguiente
+- 📅 **Fecha Automática**: Fecha de entrega estimada se asigna automáticamente (editable)
+- 🏭 **Control de Almacén**: 
+  - Presupuestos se crean directamente en estado `'en_almacen'` para aparecer automáticamente en "Presupuestos del Día"
+  - Reserva preventiva + pesaje obligatorio para productos de categoría "balanza"
+  - Conversión masiva e individual a pedidos desde "Presupuestos del Día"
 - 🚛 **Reparto Integrado**: PWA completa con registro de entregas, cobros (múltiples métodos) y devoluciones
 - 💰 **Tesorería Tiempo Real**: Movimientos automáticos por operaciones, totales por método de pago
 - 👥 **Clientes Deudores**: Todos los clientes son deudores hasta confirmar reparto
 - 💳 **Múltiples Métodos de Pago**: Soporte para efectivo, transferencia, QR, tarjeta, cuenta corriente con recargos
 - 🚚 **Asignación Automática**: Vehículos asignados automáticamente según peso y capacidad
+- 🔍 **Selectores Buscables**: Búsqueda por código o nombre en selectores de clientes y productos
+- 📦 **Pedidos en Almacén**: Módulo de Pedidos movido de Ventas a Almacén para mejor organización operativa
 
 ### Cómo Probar la Demo
 ```bash

@@ -227,7 +227,7 @@ export function PedidoForm({ pedido, onSuccess }: PedidoFormProps) {
       if (onSuccess) {
         onSuccess()
       } else {
-        router.push('/ventas/pedidos')
+        router.push('/almacen/pedidos')
       }
     } catch (error: any) {
       console.error('Error saving pedido:', error)
@@ -474,7 +474,7 @@ export function PedidoForm({ pedido, onSuccess }: PedidoFormProps) {
       {/* Acciones */}
       <div className="flex items-center justify-between sticky bottom-4 bg-background/95 backdrop-blur-sm p-4 rounded-lg border border-primary/10 shadow-lg">
         <Button type="button" variant="outline" asChild disabled={isLoading} className="hover:bg-primary/5 hover:text-primary hover:border-primary/30">
-          <Link href="/ventas/pedidos">
+          <Link href="/almacen/pedidos">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Volver
           </Link>

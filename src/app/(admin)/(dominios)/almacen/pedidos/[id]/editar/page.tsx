@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
-import { NuevoPedidoForm } from '@/app/(admin)/(dominios)/ventas/pedidos/nuevo/pedido-form'
-import { PedidoFormSkeleton } from '@/app/(admin)/(dominios)/ventas/pedidos/nuevo/pedido-form-skeleton'
+import { NuevoPedidoForm } from '@/app/(admin)/(dominios)/almacen/pedidos/nuevo/pedido-form'
+import { PedidoFormSkeleton } from '@/app/(admin)/(dominios)/almacen/pedidos/nuevo/pedido-form-skeleton'
 // import { getPedidoById } from '@/actions/ventas.actions' // TODO: Implementar cuando esté disponible
 
 interface EditarPedidoPageProps {
@@ -18,7 +18,8 @@ export const metadata = {
 }
 
 export default async function EditarPedidoPage({ params }: EditarPedidoPageProps) {
-  const pedidoId = params.id
+  const { id } = await params
+  const pedidoId = id
 
   // En producción, esto sería una llamada real a la base de datos
   // const pedido = await getPedidoById(pedidoId)

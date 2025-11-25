@@ -26,7 +26,7 @@ export default function PedidosPage() {
             </p>
           </div>
           <Button asChild className="bg-primary hover:bg-primary/90 shadow-sm h-10 px-6">
-            <Link href="/ventas/pedidos/nuevo">
+            <Link href="/almacen/pedidos/nuevo">
               <Plus className="mr-2 h-5 w-5" />
               Nuevo Pedido
             </Link>

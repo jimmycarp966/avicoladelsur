@@ -19,20 +19,30 @@ async function RecepcionAlmacenContent({
 }) {
   const supabase = await createClient()
 
-  // Obtener productos para el formulario
+  // Obtener productos para el formulario (con categoría)
   const { data: productos } = await supabase
     .from('productos')
-    .select('id, nombre, codigo, unidad_medida')
+    .select('id, nombre, codigo, unidad_medida, categoria')
     .eq('activo', true)
     .order('nombre')
 
-  // Obtener lotes para ingresos
+  // Obtener lotes para ingresos (con proveedor)
   const { data: lotes } = await supabase
     .from('lotes')
-    .select('id, numero_lote, producto_id, cantidad_disponible')
+    .select('id, numero_lote, producto_id, cantidad_disponible, proveedor')
     .eq('estado', 'disponible')
     .gt('cantidad_disponible', 0)
     .order('fecha_ingreso', { ascending: false })
+
+  // Obtener categorías únicas de productos activos
+  const categorias = productos
+    ? [...new Set(productos.map(p => p.categoria).filter(Boolean))]
+    : []
+
+  // Obtener proveedores únicos de lotes disponibles
+  const proveedores = lotes
+    ? [...new Set(lotes.map(l => l.proveedor).filter(Boolean))]
+    : []
 
   // Obtener recepciones con filtros
   const tipo = searchParams?.tipo
@@ -78,7 +88,12 @@ async function RecepcionAlmacenContent({
       </div>
 
       {/* Formulario de recepción */}
-      <RecepcionAlmacenForm productos={productos || []} lotes={lotes || []} />
+      <RecepcionAlmacenForm 
+        productos={productos || []} 
+        lotes={lotes || []}
+        categorias={categorias}
+        proveedores={proveedores}
+      />
 
       {/* Lista de recepciones */}
       <RecepcionAlmacenLista

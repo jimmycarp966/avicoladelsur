@@ -264,7 +264,7 @@ export default async function LoteDetallePage({ params }: LoteDetallePageProps) 
                   return (
                     <TableRow key={detalle.id}>
                       <TableCell>
-                        <Link href={`/ventas/pedidos/${pedido?.id}`} className="text-primary hover:underline">
+                        <Link href={`/almacen/pedidos/${pedido?.id}`} className="text-primary hover:underline">
                           {pedido?.numero_pedido || 'N/A'}
                         </Link>
                       </TableCell>

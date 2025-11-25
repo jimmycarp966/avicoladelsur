@@ -57,8 +57,9 @@ async function EditarVehiculoContent({ vehiculoId }: { vehiculoId: string }) {
 }
 
 export default async function EditarVehiculoPage({ params }: EditarVehiculoPageProps) {
+  const { id } = await params
   return (
-    <EditarVehiculoContent vehiculoId={params.id} />
+    <EditarVehiculoContent vehiculoId={id} />
   )
 }
 

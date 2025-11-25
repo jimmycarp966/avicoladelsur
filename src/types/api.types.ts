@@ -203,6 +203,7 @@ export interface RegistrarGastoParams {
   comprobante_url?: string
   afecta_caja?: boolean
   caja_id?: string
+  metodo_pago?: 'efectivo' | 'transferencia' | 'qr' | 'tarjeta'
 }
 
 export interface RegistrarPagoPedidoParams {

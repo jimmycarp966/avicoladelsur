@@ -34,7 +34,8 @@ const estadoConfig = (estado: string) => {
 }
 
 export default async function PedidoDetallePage({ params }: PedidoDetallePageProps) {
-  const pedidoId = params.id
+  const { id } = await params
+  const pedidoId = id
   const [pedidoResult, cajas] = await Promise.all([obtenerPedidoPorId(pedidoId), listarCajas()])
 
   if (!pedidoResult.success || !pedidoResult.data?.pedido) {
@@ -53,7 +54,7 @@ export default async function PedidoDetallePage({ params }: PedidoDetallePagePro
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center space-x-4">
           <Button variant="outline" size="sm" asChild>
-            <Link href="/ventas/pedidos">
+            <Link href="/almacen/pedidos">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Volver
             </Link>
@@ -69,7 +70,7 @@ export default async function PedidoDetallePage({ params }: PedidoDetallePagePro
             Imprimir
           </Button>
           <Button variant="outline" asChild>
-            <Link href={`/ventas/pedidos/${pedido.id}/editar`}>
+            <Link href={`/almacen/pedidos/${pedido.id}/editar`}>
               <Edit className="mr-2 h-4 w-4" />
               Editar
             </Link>

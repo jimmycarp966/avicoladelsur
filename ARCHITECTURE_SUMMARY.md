@@ -159,16 +159,28 @@ supabase/                         # Scripts SQL y migraciones
 - Vehículos base: Fiorino (600kg), Hilux (1500kg), F-4000 (4000kg)
 - UI: `/reparto/planificacion` para gestión completa
 
-#### **2. Creación de Pedidos** (Automática)
-- **Bot WhatsApp**: Toma pedidos naturales, valida stock, reserva FIFO
-- **Vendedor Web**: Crea presupuestos con zona opcional
-- **Turno automático**: Si no definido → <05:00 mañana mismo día, 05:00-15:00 tarde mismo día, ≥15:00 mañana día siguiente
-- **Asignación automática**: Busca ruta planificada por zona/turno/día, valida capacidad
+#### **2. Creación de Presupuestos** (Automática)
+- **Bot WhatsApp**: Crea presupuestos, valida stock, reserva FIFO
+- **Vendedor Web**: Crea presupuestos con selectores buscables (clientes y productos)
+- **Asignación automática al crear**:
+  - **Turno**: <05:00 mañana mismo día, 05:00-15:00 tarde mismo día, ≥15:00 mañana día siguiente
+  - **Fecha entrega**: Automática según horario (editable)
+  - **Estado**: 'en_almacen' (aparece automáticamente en Presupuestos del Día)
+- **Asignación automática al convertir**: Si no tiene turno, se asigna con misma lógica
+- **Asignación de ruta**: Busca ruta planificada por zona/turno/día, valida capacidad
 
 #### **3. Procesamiento en Almacén** (Semi-automático)
-- Reserva preventiva → descuento físico al convertir a pedido
-- Pesaje obligatorio para productos "balanza" (actualiza precios finales)
-- Actualización automática de subtotales/totales del pedido
+- **Presupuestos del Día**: Vista filtrada por fecha/turno/zona
+  - Presupuestos aparecen automáticamente al crearse
+  - Conversión masiva: Todos los presupuestos visibles a pedidos
+  - Conversión individual: Botón por presupuesto
+- **Pesaje**: Obligatorio para productos "balanza"
+  - Edición de pesos en tiempo real
+  - Actualización automática de precios y totales
+- **Pedidos del Día**: Gestión de pedidos (módulo movido a Almacén)
+  - Filtros por fecha y turno
+  - Generación de rutas diarias (automática y manual)
+- **Conversión**: Reserva preventiva → descuento físico al convertir a pedido
 - Revalidación de capacidad del vehículo con pesos finales
 
 #### **4. Reparto con GPS** (Automático)

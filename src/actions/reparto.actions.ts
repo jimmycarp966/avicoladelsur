@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { generateRutaOptimizada } from '@/lib/services/ruta-optimizer'
 import type {
   CrearVehiculoParams,
   ChecklistVehiculoParams,
@@ -344,7 +345,7 @@ export async function asignarPedidosARuta(
       .in('id', pedidosIds)
 
     revalidatePath('/(admin)/(dominios)/reparto/rutas')
-    revalidatePath('/(admin)/(dominios)/ventas/pedidos')
+    revalidatePath('/(admin)/(dominios)/almacen/pedidos')
 
     return {
       success: true,
@@ -675,7 +676,7 @@ export async function validarEntrega(
     }
 
     revalidatePath('/(admin)/(dominios)/reparto/rutas')
-    revalidatePath('/(admin)/(dominios)/ventas/pedidos')
+    revalidatePath('/(admin)/(dominios)/almacen/pedidos')
 
     return {
       success: true,
@@ -1145,6 +1146,252 @@ export async function obtenerRutas(): Promise<ApiResponse<any[]>> {
     return {
       success: false,
       error: error.message || 'Error al obtener rutas',
+    }
+  }
+}
+
+// Generar ruta diaria automática
+export async function generarRutaDiariaAutomatica(
+  fecha: string,
+  turno: string
+): Promise<ApiResponse<{ rutasCreadas: number; rutasIds: string[] }>> {
+  try {
+    const supabase = await createClient()
+
+    // Obtener pedidos del turno/fecha con estado "preparando"
+    const { data: pedidos, error: pedidosError } = await supabase
+      .from('pedidos')
+      .select(`
+        id,
+        numero_pedido,
+        fecha_entrega_estimada,
+        turno,
+        zona_id,
+        estado,
+        cliente:clientes(zona_entrega)
+      `)
+      .eq('fecha_entrega_estimada', fecha)
+      .eq('turno', turno)
+      .eq('estado', 'preparando')
+
+    if (pedidosError) throw pedidosError
+
+    if (!pedidos || pedidos.length === 0) {
+      return {
+        success: false,
+        error: 'No hay pedidos disponibles para el turno seleccionado',
+      }
+    }
+
+    // Validar que todos tengan zona
+    const pedidosSinZona = pedidos.filter(
+      (p) => !p.zona_id && !(p.cliente as any)?.zona_entrega
+    )
+    if (pedidosSinZona.length > 0) {
+      return {
+        success: false,
+        error: `${pedidosSinZona.length} pedido(s) no tienen zona asignada`,
+      }
+    }
+
+    // Agrupar pedidos por zona
+    const pedidosPorZona = new Map<string, typeof pedidos>()
+    for (const pedido of pedidos) {
+      const zonaId = pedido.zona_id || (pedido.cliente as any)?.zona_entrega
+      if (!zonaId) continue
+
+      if (!pedidosPorZona.has(zonaId)) {
+        pedidosPorZona.set(zonaId, [])
+      }
+      pedidosPorZona.get(zonaId)!.push(pedido)
+    }
+
+    const rutasIds: string[] = []
+    let rutasCreadas = 0
+
+    // Crear rutas por zona usando fn_asignar_pedido_a_ruta
+    for (const [zonaId, pedidosZona] of pedidosPorZona.entries()) {
+      try {
+        // Intentar asignar cada pedido a una ruta (la función crea la ruta si no existe)
+        for (const pedido of pedidosZona) {
+          const { data: resultado, error: asignacionError } = await supabase.rpc(
+            'fn_asignar_pedido_a_ruta',
+            {
+              p_pedido_id: pedido.id,
+            }
+          )
+
+          if (asignacionError) {
+            console.error(
+              `Error asignando pedido ${pedido.numero_pedido}:`,
+              asignacionError
+            )
+            continue
+          }
+
+          if (resultado?.success && resultado?.ruta_id) {
+            const rutaId = resultado.ruta_id as string
+            if (!rutasIds.includes(rutaId)) {
+              rutasIds.push(rutaId)
+              rutasCreadas++
+
+              // Generar optimización de ruta
+              try {
+                await generateRutaOptimizada({
+                  supabase,
+                  rutaId,
+                  usarGoogle: true,
+                })
+              } catch (optError) {
+                console.error(
+                  `Error optimizando ruta ${rutaId}:`,
+                  optError
+                )
+              }
+            }
+          }
+        }
+      } catch (error: any) {
+        console.error(`Error procesando zona ${zonaId}:`, error)
+      }
+    }
+
+    if (rutasCreadas === 0) {
+      return {
+        success: false,
+        error: 'No se pudieron crear rutas. Verifique que existan planes semanales para las zonas.',
+      }
+    }
+
+    revalidatePath('/(admin)/(dominios)/reparto/rutas')
+    revalidatePath('/(admin)/(dominios)/almacen/pedidos')
+
+    return {
+      success: true,
+      data: { rutasCreadas, rutasIds },
+      message: `Se crearon ${rutasCreadas} ruta(s) diaria(s) exitosamente`,
+    }
+  } catch (error: any) {
+    console.error('Error generando ruta diaria automática:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al generar ruta diaria automática',
+    }
+  }
+}
+
+// Generar ruta diaria manual
+export async function generarRutaDiariaManual(
+  pedidosIds: string[],
+  fecha: string,
+  zonaId: string,
+  turno: string
+): Promise<ApiResponse<{ rutaId: string }>> {
+  try {
+    const supabase = await createClient()
+
+    // Validar que todos los pedidos sean del mismo turno y tengan estado preparando
+    const { data: pedidos, error: pedidosError } = await supabase
+      .from('pedidos')
+      .select(`
+        id,
+        numero_pedido,
+        fecha_entrega_estimada,
+        turno,
+        zona_id,
+        estado
+      `)
+      .in('id', pedidosIds)
+      .eq('estado', 'preparando')
+
+    if (pedidosError) throw pedidosError
+
+    if (!pedidos || pedidos.length === 0) {
+      return {
+        success: false,
+        error: 'No se encontraron pedidos válidos con estado "preparando"',
+      }
+    }
+
+    // Validar que todos sean del mismo turno
+    const turnosDiferentes = pedidos.filter((p) => p.turno !== turno)
+    if (turnosDiferentes.length > 0) {
+      return {
+        success: false,
+        error: 'Todos los pedidos deben ser del mismo turno',
+      }
+    }
+
+    // Validar que todos tengan la misma zona
+    const zonasDiferentes = pedidos.filter(
+      (p) => p.zona_id !== zonaId && p.zona_id !== null
+    )
+    if (zonasDiferentes.length > 0) {
+      return {
+        success: false,
+        error: 'Todos los pedidos deben ser de la misma zona',
+      }
+    }
+
+    // Crear ruta usando fn_asignar_pedido_a_ruta para cada pedido
+    // Esto creará la ruta automáticamente si no existe
+    let rutaId: string | null = null
+    const errores: string[] = []
+
+    for (const pedido of pedidos) {
+      const { data: resultado, error: asignacionError } = await supabase.rpc(
+        'fn_asignar_pedido_a_ruta',
+        {
+          p_pedido_id: pedido.id,
+        }
+      )
+
+      if (asignacionError) {
+        errores.push(`${pedido.numero_pedido}: ${asignacionError.message}`)
+        continue
+      }
+
+      if (resultado?.success && resultado?.ruta_id) {
+        rutaId = resultado.ruta_id as string
+      } else {
+        errores.push(
+          `${pedido.numero_pedido}: ${resultado?.error || 'Error desconocido'}`
+        )
+      }
+    }
+
+    if (!rutaId) {
+      return {
+        success: false,
+        error: `No se pudo crear la ruta. Errores: ${errores.join(', ')}`,
+      }
+    }
+
+    // Generar optimización de ruta
+    try {
+      await generateRutaOptimizada({
+        supabase,
+        rutaId,
+        usarGoogle: true,
+      })
+    } catch (optError) {
+      console.error('Error optimizando ruta:', optError)
+      // No fallar si la optimización falla
+    }
+
+    revalidatePath('/(admin)/(dominios)/reparto/rutas')
+    revalidatePath('/(admin)/(dominios)/almacen/pedidos')
+
+    return {
+      success: true,
+      data: { rutaId },
+      message: `Ruta creada exitosamente con ${pedidos.length} pedido(s)`,
+    }
+  } catch (error: any) {
+    console.error('Error generando ruta diaria manual:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al generar ruta diaria manual',
     }
   }
 }

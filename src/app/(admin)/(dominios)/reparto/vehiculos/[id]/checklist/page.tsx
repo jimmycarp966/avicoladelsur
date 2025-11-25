@@ -57,7 +57,8 @@ async function ChecklistContent({ vehiculoId }: { vehiculoId: string }) {
   )
 }
 
-export default function ChecklistPage({ params }: ChecklistPageProps) {
-  return <ChecklistContent vehiculoId={params.id} />
+export default async function ChecklistPage({ params }: ChecklistPageProps) {
+  const { id } = await params
+  return <ChecklistContent vehiculoId={id} />
 }
 

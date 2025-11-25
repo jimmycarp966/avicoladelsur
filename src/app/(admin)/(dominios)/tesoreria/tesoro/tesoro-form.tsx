@@ -2,24 +2,35 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowDownCircle, ArrowUpCircle, Wallet, CreditCard } from 'lucide-react'
+import { ArrowDownCircle, ArrowUpCircle, Wallet, CreditCard, Receipt } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { registrarRetiroTesoroAction, registrarDepositoBancarioAction } from '@/actions/tesoreria.actions'
+import { registrarGasto } from '@/actions/gastos.actions'
 import { toast } from 'sonner'
 
-export function TesoroForm() {
+interface TesoroFormProps {
+  categorias: Array<{ id: string; nombre: string }>
+}
+
+export function TesoroForm({ categorias }: TesoroFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [action, setAction] = useState<'retiro' | 'deposito'>('retiro')
+  const [action, setAction] = useState<'retiro' | 'deposito' | 'gasto'>('retiro')
   const [tipo, setTipo] = useState<'efectivo' | 'transferencia' | 'qr' | 'tarjeta'>('efectivo')
   const [monto, setMonto] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [numeroTransaccion, setNumeroTransaccion] = useState('')
+  
+  // Estados para gasto
+  const [categoriaId, setCategoriaId] = useState('')
+  const [fechaGasto, setFechaGasto] = useState(new Date().toISOString().split('T')[0])
+  const [metodoPagoGasto, setMetodoPagoGasto] = useState<'efectivo' | 'transferencia' | 'qr' | 'tarjeta'>('transferencia')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -49,6 +60,33 @@ export function TesoroForm() {
           router.refresh()
         } else {
           toast.error(result.message || 'Error al registrar retiro')
+        }
+      } else if (action === 'gasto') {
+        // Registrar gasto desde tesoro
+        if (!categoriaId) {
+          toast.error('Selecciona una categoría')
+          setLoading(false)
+          return
+        }
+
+        const result = await registrarGasto({
+          categoria_id: categoriaId,
+          monto: parseFloat(monto),
+          descripcion: descripcion || undefined,
+          fecha: fechaGasto,
+          metodo_pago: metodoPagoGasto,
+          afecta_caja: false, // No afecta caja cuando se registra desde tesoro
+        })
+
+        if (result.success) {
+          toast.success(result.message || 'Gasto registrado exitosamente')
+          setMonto('')
+          setDescripcion('')
+          setCategoriaId('')
+          setFechaGasto(new Date().toISOString().split('T')[0])
+          router.refresh()
+        } else {
+          toast.error(result.error || 'Error al registrar gasto')
         }
       } else {
         // Depósito bancario
@@ -95,12 +133,12 @@ export function TesoroForm() {
           Operaciones de Tesoro
         </CardTitle>
         <CardDescription>
-          Registra retiros o depósitos bancarios del tesoro
+          Registra retiros, depósitos bancarios o gastos del tesoro
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Tabs value={action} onValueChange={(value) => setAction(value as 'retiro' | 'deposito')}>
-          <TabsList className="grid w-full grid-cols-2">
+        <Tabs value={action} onValueChange={(value) => setAction(value as 'retiro' | 'deposito' | 'gasto')}>
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="retiro" className="flex items-center gap-2">
               <ArrowDownCircle className="h-4 w-4" />
               Retiro
@@ -108,6 +146,10 @@ export function TesoroForm() {
             <TabsTrigger value="deposito" className="flex items-center gap-2">
               <ArrowUpCircle className="h-4 w-4" />
               Depósito Bancario
+            </TabsTrigger>
+            <TabsTrigger value="gasto" className="flex items-center gap-2">
+              <Receipt className="h-4 w-4" />
+              Gasto
             </TabsTrigger>
           </TabsList>
 
@@ -199,6 +241,92 @@ export function TesoroForm() {
 
               <Button type="submit" disabled={loading} className="w-full">
                 {loading ? 'Registrando...' : 'Registrar Depósito'}
+              </Button>
+            </form>
+          </TabsContent>
+
+          <TabsContent value="gasto" className="space-y-4 mt-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="categoria-gasto">Categoría *</Label>
+                  <Select value={categoriaId} onValueChange={setCategoriaId} required>
+                    <SelectTrigger id="categoria-gasto">
+                      <SelectValue placeholder="Selecciona una categoría" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categorias.map((categoria) => (
+                        <SelectItem key={categoria.id} value={categoria.id}>
+                          {categoria.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="fecha-gasto">Fecha *</Label>
+                  <Input
+                    id="fecha-gasto"
+                    type="date"
+                    value={fechaGasto}
+                    onChange={(e) => setFechaGasto(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="monto-gasto">Monto *</Label>
+                  <Input
+                    id="monto-gasto"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={monto}
+                    onChange={(e) => setMonto(e.target.value)}
+                    placeholder="0.00"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="metodo-pago-gasto">Método de pago *</Label>
+                  <Select
+                    value={metodoPagoGasto}
+                    onValueChange={(value) => setMetodoPagoGasto(value as typeof metodoPagoGasto)}
+                    required
+                  >
+                    <SelectTrigger id="metodo-pago-gasto">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="transferencia">Transferencia</SelectItem>
+                      <SelectItem value="efectivo">Efectivo</SelectItem>
+                      <SelectItem value="qr">QR</SelectItem>
+                      <SelectItem value="tarjeta">Tarjeta</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Si es transferencia, se registrará automáticamente en tesoro
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="descripcion-gasto">Descripción</Label>
+                <Textarea
+                  id="descripcion-gasto"
+                  value={descripcion}
+                  onChange={(e) => setDescripcion(e.target.value)}
+                  placeholder="Detalle del gasto..."
+                  rows={3}
+                />
+              </div>
+
+              <Button type="submit" disabled={loading} className="w-full">
+                {loading ? 'Registrando...' : 'Registrar Gasto'}
               </Button>
             </form>
           </TabsContent>

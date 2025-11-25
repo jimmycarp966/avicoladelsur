@@ -31,12 +31,65 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [loading, setLoading] = useState(true)
+  const [configError, setConfigError] = useState<string | null>(null)
   const router = useRouter()
 
   const { user, setUser, setSession, logout: storeLogout } = useUserStore()
   const { showToast } = useNotificationStore()
 
-  const supabase = createClient()
+  // Crear cliente con manejo de errores
+  let supabase: ReturnType<typeof createClient>
+  try {
+    supabase = createClient()
+  } catch (error: any) {
+    setConfigError(error.message)
+    setLoading(false)
+    
+    // Si hay error de configuración, mostrar mensaje
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-white to-secondary/5 p-4">
+        <div className="max-w-2xl w-full bg-white rounded-lg shadow-lg border border-red-200 p-8">
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0">
+              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                <span className="text-2xl">⚠️</span>
+              </div>
+            </div>
+            <div className="flex-1">
+              <h1 className="text-2xl font-bold text-red-600 mb-2">
+                Configuración Requerida
+              </h1>
+              <div className="prose prose-sm max-w-none">
+                <pre className="bg-gray-50 p-4 rounded border overflow-x-auto text-xs">
+                  {configError || 'Variables de entorno de Supabase no configuradas'}
+                </pre>
+              </div>
+              <div className="mt-4 space-y-2 text-sm">
+                <p className="font-semibold">Pasos para solucionar:</p>
+                <ol className="list-decimal list-inside space-y-1 ml-2">
+                  <li>Crea un archivo <code className="bg-gray-100 px-1 rounded">.env.local</code> en la raíz del proyecto</li>
+                  <li>Copia el contenido de <code className="bg-gray-100 px-1 rounded">env.example</code></li>
+                  <li>Reemplaza los valores con tus credenciales reales de Supabase</li>
+                  <li>Reinicia el servidor de desarrollo (<code className="bg-gray-100 px-1 rounded">npm run dev</code>)</li>
+                </ol>
+                <div className="mt-4 p-3 bg-blue-50 rounded border border-blue-200">
+                  <p className="font-semibold text-blue-900 mb-1">Obtén tus credenciales:</p>
+                  <a
+                    href="https://supabase.com/dashboard/project/_/settings/api"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline"
+                  >
+                    https://supabase.com/dashboard/project/_/settings/api
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   // Función para obtener datos del usuario desde la base de datos
   const fetchUserData = async (userId: string): Promise<Usuario | null> => {
@@ -127,7 +180,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             redirectTo = '/dashboard'
             break
           case 'vendedor':
-            redirectTo = '/ventas/pedidos'
+            redirectTo = '/almacen/pedidos'
             break
           case 'repartidor':
             redirectTo = '/home'

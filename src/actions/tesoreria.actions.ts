@@ -677,7 +677,7 @@ export async function registrarPagoPedido(data: {
 
     if (updateError) throw updateError
 
-    revalidatePath('/(admin)/(dominios)/ventas/pedidos')
+    revalidatePath('/(admin)/(dominios)/almacen/pedidos')
     revalidatePath('/(admin)/(dominios)/tesoreria')
 
     return {

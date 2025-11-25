@@ -329,10 +329,15 @@ async function PesajeContent({ presupuestoId }: { presupuestoId: string }) {
   )
 }
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function PesajePage({ params }: PesajePageProps) {
+  // En Next.js 16, params es una Promise y debe ser await
+  const { id } = await params
   return (
     <Suspense fallback={<PesajeSkeleton />}>
-      <PesajeContent presupuestoId={params.id} />
+      <PesajeContent presupuestoId={id} />
     </Suspense>
   )
 }

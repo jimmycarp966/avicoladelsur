@@ -39,6 +39,7 @@ const navigation = [
       { name: 'Productos', href: '/almacen/productos' },
       { name: 'Lotes', href: '/almacen/lotes' },
       { name: 'Presupuestos del Día', href: '/almacen/presupuestos-dia' },
+      { name: 'Pedidos', href: '/almacen/pedidos' },
       { name: 'Recepción', href: '/almacen/recepcion' },
     ],
   },
@@ -49,7 +50,6 @@ const navigation = [
     roles: ['admin', 'vendedor'],
     children: [
       { name: 'Presupuestos', href: '/ventas/presupuestos' },
-      { name: 'Pedidos', href: '/ventas/pedidos' },
       { name: 'Clientes', href: '/ventas/clientes' },
     ],
   },

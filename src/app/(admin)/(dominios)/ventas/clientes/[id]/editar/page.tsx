@@ -18,7 +18,8 @@ export const metadata = {
 }
 
 export default async function EditarClientePage({ params }: EditarClientePageProps) {
-  const clienteId = params.id
+  const { id } = await params
+  const clienteId = id
 
   // En producción, esto sería una llamada real a la base de datos
   // const cliente = await getClienteById(clienteId)

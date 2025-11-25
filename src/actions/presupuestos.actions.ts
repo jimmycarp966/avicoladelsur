@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { createNotification } from './index'
 import { generateRutaOptimizada } from '@/lib/services/ruta-optimizer'
+import { confirmarPresupuestosAgrupadosSchema } from '@/lib/schemas/presupuestos.schema'
 
 // Schemas de validación
 const crearPresupuestoSchema = z.object({
@@ -72,12 +73,13 @@ export async function crearPresupuestoAction(formData: FormData) {
       precio_unitario: item.precio_unit_est,
     }))
 
-    // Llamar RPC para crear presupuesto
+    // Llamar RPC para crear presupuesto (ahora con asignación automática de turno)
     const { data: result, error } = await supabase.rpc('fn_crear_presupuesto_desde_bot', {
       p_cliente_id: data.cliente_id,
       p_items: itemsJson,
       p_observaciones: data.observaciones,
       p_zona_id: data.zona_id,
+      p_fecha_entrega_estimada: data.fecha_entrega_estimada || null,
     })
 
     if (error) {
@@ -251,7 +253,7 @@ export async function confirmarPresupuestoAction(formData: FormData) {
     })
 
     revalidatePath('/ventas/presupuestos')
-    revalidatePath('/ventas/pedidos')
+    revalidatePath('/almacen/pedidos')
     revalidatePath('/tesoreria/cajas')
     revalidatePath('/almacen/presupuestos-dia')
 
@@ -263,6 +265,101 @@ export async function confirmarPresupuestoAction(formData: FormData) {
 
   } catch (error) {
     console.error('Error en confirmarPresupuestoAction:', error)
+    if (error instanceof z.ZodError) {
+      return { success: false, message: 'Datos inválidos: ' + error.issues[0].message }
+    }
+    return { success: false, message: 'Error interno del servidor' }
+  }
+}
+
+// Acción para convertir múltiples presupuestos agrupados en un solo pedido
+export async function confirmarPresupuestosAgrupadosAction(formData: FormData) {
+  try {
+    const supabase = await createClient()
+
+    // Obtener usuario actual
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, message: 'Usuario no autenticado' }
+    }
+
+    // Verificar permisos (admin, vendedor o almacenista)
+    const { data: usuario } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (!usuario || !['admin', 'vendedor', 'almacenista'].includes(usuario.rol)) {
+      return { success: false, message: 'No tienes permisos para confirmar presupuestos' }
+    }
+
+    // Parsear y validar datos
+    const rawData = Object.fromEntries(formData)
+    const presupuestosIds = rawData.presupuestos_ids
+      ? (typeof rawData.presupuestos_ids === 'string' 
+          ? JSON.parse(rawData.presupuestos_ids) 
+          : rawData.presupuestos_ids)
+      : []
+
+    const data = confirmarPresupuestosAgrupadosSchema.parse({
+      presupuestos_ids: presupuestosIds,
+      caja_id: rawData.caja_id || undefined,
+    })
+
+    // Llamar RPC para convertir presupuestos agrupados a pedido
+    const { data: result, error } = await supabase.rpc('fn_convertir_presupuestos_agrupados_a_pedido', {
+      p_presupuestos_ids: data.presupuestos_ids,
+      p_user_id: user.id,
+      p_caja_id: data.caja_id,
+    })
+
+    if (error) {
+      console.error('Error convirtiendo presupuestos agrupados:', error)
+      return { success: false, message: 'Error al convertir presupuestos a pedido' }
+    }
+
+    if (!result.success) {
+      return { success: false, message: result.error || 'Error en la conversión de los presupuestos' }
+    }
+
+    if (result.ruta_id) {
+      try {
+        await generateRutaOptimizada({
+          supabase,
+          rutaId: result.ruta_id,
+          usarGoogle: true,
+        })
+      } catch (optError) {
+        console.error('No se pudo optimizar la ruta planificada automáticamente:', optError)
+      }
+    }
+
+    // Crear notificación
+    await createNotification({
+      titulo: 'Presupuestos convertidos a pedido',
+      mensaje: `Pedido ${result.numero_pedido} creado desde ${data.presupuestos_ids.length} presupuesto(s)`,
+      tipo: 'success',
+      usuario_id: null,
+      metadata: {
+        pedido_id: result.pedido_id,
+        presupuestos_ids: data.presupuestos_ids
+      }
+    })
+
+    revalidatePath('/ventas/presupuestos')
+    revalidatePath('/almacen/pedidos')
+    revalidatePath('/tesoreria/cajas')
+    revalidatePath('/almacen/presupuestos-dia')
+
+    return {
+      success: true,
+      message: `${data.presupuestos_ids.length} presupuesto(s) convertido(s) a pedido ${result.numero_pedido} exitosamente`,
+      data: result
+    }
+
+  } catch (error) {
+    console.error('Error en confirmarPresupuestosAgrupadosAction:', error)
     if (error instanceof z.ZodError) {
       return { success: false, message: 'Datos inválidos: ' + error.issues[0].message }
     }
@@ -345,12 +442,12 @@ export async function obtenerPresupuestosAction(filtros?: {
       .from('presupuestos')
       .select(`
         *,
-        cliente:clientes(nombre, telefono, zona_entrega),
-        zona:zonas(nombre),
-        usuario_vendedor:usuarios(nombre),
+        cliente:clientes!presupuestos_cliente_id_fkey(nombre, telefono, zona_entrega),
+        zona:zonas!presupuestos_zona_id_fkey(nombre),
+        usuario_vendedor_obj:usuarios!presupuestos_usuario_vendedor_fkey(nombre),
         items:presupuesto_items(
           id,
-          producto:productos(codigo, nombre),
+          producto:productos!presupuesto_items_producto_id_fkey(codigo, nombre),
           cantidad_solicitada,
           cantidad_reservada,
           precio_unit_est,
@@ -381,7 +478,12 @@ export async function obtenerPresupuestosAction(filtros?: {
 
     if (error) {
       console.error('Error obteniendo presupuestos:', error)
-      return { success: false, message: 'Error al obtener presupuestos' }
+      // Mostrar el error real para debugging
+      return { 
+        success: false, 
+        message: `Error al obtener presupuestos: ${error.message || error.code || 'Error desconocido'}`,
+        error: error
+      }
     }
 
     return { success: true, data }
@@ -397,33 +499,81 @@ export async function obtenerPresupuestoAction(presupuestoId: string) {
   try {
     const supabase = await createClient()
 
-    const { data, error } = await supabase
+    // Primero obtener el presupuesto básico
+    console.log('Buscando presupuesto con ID:', presupuestoId)
+    const { data: presupuestoData, error: presupuestoError } = await supabase
       .from('presupuestos')
-      .select(`
-        *,
-        cliente:clientes(*),
-        zona:zonas(nombre),
-        usuario_vendedor:usuarios(nombre),
-        usuario_almacen:usuarios(nombre),
-        usuario_repartidor:usuarios(nombre),
-        pedido_convertido:pedidos(numero_pedido),
-        items:presupuesto_items(
-          *,
-          producto:productos(*),
-          lote_reservado:lotes(*),
-          reservas:stock_reservations(
-            cantidad,
-            expires_at,
-            estado
-          )
-        )
-      `)
+      .select('*')
       .eq('id', presupuestoId)
       .single()
 
-    if (error) {
-      console.error('Error obteniendo presupuesto:', error)
-      return { success: false, message: 'Presupuesto no encontrado' }
+    console.log('Resultado query presupuesto:', { 
+      hasData: !!presupuestoData, 
+      hasError: !!presupuestoError,
+      error: presupuestoError 
+    })
+
+    if (presupuestoError) {
+      console.error('Error obteniendo presupuesto:', presupuestoError)
+      // Si el error es "no encontrado", dar mensaje más claro
+      if (presupuestoError.code === 'PGRST116' || presupuestoError.message?.includes('No rows')) {
+        return { 
+          success: false, 
+          message: `Presupuesto con ID ${presupuestoId} no encontrado en la base de datos`,
+          error: presupuestoError
+        }
+      }
+      return { 
+        success: false, 
+        message: `Error al obtener presupuesto: ${presupuestoError.message || presupuestoError.code || 'Error desconocido'}`,
+        error: presupuestoError
+      }
+    }
+
+    if (!presupuestoData) {
+      console.error('Presupuesto no encontrado (data es null):', presupuestoId)
+      return { 
+        success: false, 
+        message: `Presupuesto con ID ${presupuestoId} no encontrado`
+      }
+    }
+
+    // Obtener relaciones por separado para evitar conflictos
+    const [clienteResult, zonaResult, vendedorResult, almacenResult, repartidorResult, pedidoResult, itemsResult] = await Promise.all([
+      presupuestoData.cliente_id ? supabase.from('clientes').select('*').eq('id', presupuestoData.cliente_id).single() : Promise.resolve({ data: null, error: null }),
+      presupuestoData.zona_id ? supabase.from('zonas').select('nombre').eq('id', presupuestoData.zona_id).single() : Promise.resolve({ data: null, error: null }),
+      presupuestoData.usuario_vendedor ? supabase.from('usuarios').select('nombre').eq('id', presupuestoData.usuario_vendedor).single() : Promise.resolve({ data: null, error: null }),
+      presupuestoData.usuario_almacen ? supabase.from('usuarios').select('nombre').eq('id', presupuestoData.usuario_almacen).single() : Promise.resolve({ data: null, error: null }),
+      presupuestoData.usuario_repartidor ? supabase.from('usuarios').select('nombre').eq('id', presupuestoData.usuario_repartidor).single() : Promise.resolve({ data: null, error: null }),
+      presupuestoData.pedido_convertido_id ? supabase.from('pedidos').select('numero_pedido').eq('id', presupuestoData.pedido_convertido_id).single() : Promise.resolve({ data: null, error: null }),
+      supabase.from('presupuesto_items')
+        .select(`
+          *,
+          producto:productos(*),
+          lote_reservado:lotes(*)
+        `)
+        .eq('presupuesto_id', presupuestoId)
+    ])
+
+    // Obtener reservas de stock
+    const { data: reservasData } = await supabase
+      .from('stock_reservations')
+      .select('cantidad, expires_at, estado')
+      .eq('presupuesto_id', presupuestoId)
+
+    // Construir objeto de respuesta con todas las relaciones
+    const data = {
+      ...presupuestoData,
+      cliente: clienteResult.data,
+      zona: zonaResult.data,
+      usuario_vendedor_obj: vendedorResult.data,
+      usuario_almacen_obj: almacenResult.data,
+      usuario_repartidor_obj: repartidorResult.data,
+      pedido_convertido: pedidoResult.data,
+      items: (itemsResult.data || []).map((item: any) => ({
+        ...item,
+        reservas: reservasData?.filter((r: any) => r.producto_id === item.producto_id) || []
+      }))
     }
 
     return { success: true, data }

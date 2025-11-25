@@ -81,7 +81,7 @@ export default async function HomePage() {
       case 'admin':
         redirect('/dashboard')
       case 'vendedor':
-        redirect('/ventas/pedidos')
+        redirect('/almacen/pedidos')
       case 'repartidor':
         redirect('/home')
       case 'almacenista':

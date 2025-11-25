@@ -3,6 +3,7 @@ import { PiggyBank, DollarSign, ArrowDownCircle, ArrowUpCircle, CreditCard } fro
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { createClient } from '@/lib/supabase/server'
+import { listarCategoriasGasto } from '@/actions/gastos.actions'
 import { TesoroResumen } from './tesoro-resumen'
 import { TesoroMovimientos } from './tesoro-movimientos'
 import { TesoroForm } from './tesoro-form'
@@ -46,6 +47,10 @@ async function TesoroContent({
 
   const { data: movimientos } = await query
 
+  // Obtener categorías de gastos
+  const categoriasResult = await listarCategoriasGasto()
+  const categorias = categoriasResult.data || []
+
   // Calcular saldos por tipo
   const saldosPorTipo = {
     efectivo: 0,
@@ -76,8 +81,8 @@ async function TesoroContent({
       {/* Resumen de saldos */}
       <TesoroResumen saldosPorTipo={saldosPorTipo} />
 
-      {/* Formulario de retiro/depósito */}
-      <TesoroForm />
+      {/* Formulario de retiro/depósito/gasto */}
+      <TesoroForm categorias={categorias} />
 
       {/* Movimientos */}
       <TesoroMovimientos

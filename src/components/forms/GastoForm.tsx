@@ -29,6 +29,7 @@ export function GastoForm({ categorias, cajas }: GastoFormProps) {
     resolver: zodResolver(registrarGastoSchema) as Resolver<RegistrarGastoFormData>,
     defaultValues: {
       afecta_caja: false,
+      metodo_pago: 'efectivo',
     },
   })
 
@@ -147,6 +148,29 @@ export function GastoForm({ categorias, cajas }: GastoFormProps) {
                 <p className="text-sm text-destructive">{form.formState.errors.monto.message}</p>
               )}
             </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Método de pago</label>
+              <Select
+                value={form.watch('metodo_pago') || 'efectivo'}
+                onValueChange={(value) => form.setValue('metodo_pago', value as 'efectivo' | 'transferencia' | 'qr' | 'tarjeta')}
+              >
+                <SelectTrigger disabled={isPending}>
+                  <SelectValue placeholder="Selecciona método de pago" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="efectivo">Efectivo</SelectItem>
+                  <SelectItem value="transferencia">Transferencia</SelectItem>
+                  <SelectItem value="qr">QR</SelectItem>
+                  <SelectItem value="tarjeta">Tarjeta</SelectItem>
+                </SelectContent>
+              </Select>
+              {form.formState.errors.metodo_pago && (
+                <p className="text-sm text-destructive">{form.formState.errors.metodo_pago.message}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">¿Afecta caja?</label>
               <Select

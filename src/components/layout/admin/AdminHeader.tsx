@@ -1,6 +1,5 @@
 'use client'
 
-import { useAuth } from '@/components/providers/AuthProvider'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -19,14 +18,13 @@ import type { Usuario } from '@/types/domain.types'
 interface AdminHeaderProps {
   user: Usuario | null
   onMenuClick: () => void
+  onLogout: () => Promise<void>
 }
 
-export function AdminHeader({ user, onMenuClick }: AdminHeaderProps) {
-  const { logout } = useAuth()
-
+export function AdminHeader({ user, onMenuClick, onLogout }: AdminHeaderProps) {
   const handleLogout = async () => {
     try {
-      await logout()
+      await onLogout()
     } catch (error) {
       console.error('Error al cerrar sesión:', error)
     }

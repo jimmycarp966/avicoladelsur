@@ -329,7 +329,7 @@ export async function crearPedido(
       throw new Error(data?.error || 'Error al crear pedido')
     }
 
-    revalidatePath('/(admin)/(dominios)/ventas/pedidos')
+    revalidatePath('/(admin)/(dominios)/almacen/pedidos')
 
     return {
       success: true,
@@ -378,7 +378,7 @@ export async function crearPedidoBot(
       throw new Error(data.error || 'Error al crear pedido desde bot')
     }
 
-    revalidatePath('/(admin)/(dominios)/ventas/pedidos')
+    revalidatePath('/(admin)/(dominios)/almacen/pedidos')
 
     return {
       success: true,
@@ -419,7 +419,7 @@ export async function actualizarEstadoPedido(
 
     if (error) throw error
 
-    revalidatePath('/(admin)/(dominios)/ventas/pedidos')
+    revalidatePath('/(admin)/(dominios)/almacen/pedidos')
 
     return {
       success: true,
@@ -576,7 +576,7 @@ export async function convertirCotizacionAPedido(
       .update({ estado: 'aprobada' })
       .eq('id', cotizacionId)
 
-    revalidatePath('/(admin)/(dominios)/ventas/pedidos')
+    revalidatePath('/(admin)/(dominios)/almacen/pedidos')
     revalidatePath('/(admin)/(dominios)/ventas/cotizaciones')
 
     return {
@@ -721,6 +721,8 @@ export async function obtenerPedidos(
     cliente_id?: string
     fecha_desde?: string
     fecha_hasta?: string
+    fecha_entrega?: string
+    turno?: string
     page?: number
     limit?: number
   }
@@ -749,6 +751,12 @@ export async function obtenerPedidos(
     }
     if (filtros?.fecha_hasta) {
       query = query.lte('fecha_pedido', filtros.fecha_hasta)
+    }
+    if (filtros?.fecha_entrega) {
+      query = query.eq('fecha_entrega_estimada', filtros.fecha_entrega)
+    }
+    if (filtros?.turno) {
+      query = query.eq('turno', filtros.turno)
     }
     if (filtros?.search) {
       query = query.or(`numero_pedido.ilike.%${filtros.search}%,clientes.nombre.ilike.%${filtros.search}%`)

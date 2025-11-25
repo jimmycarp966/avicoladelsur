@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowDownCircle, ArrowUpCircle, Package } from 'lucide-react'
+import { ArrowDownCircle, ArrowUpCircle, Package, Search, X } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -13,11 +13,13 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { toast } from 'sonner'
 
 interface RecepcionAlmacenFormProps {
-  productos: Array<{ id: string; nombre: string; codigo: string; unidad_medida: string }>
-  lotes: Array<{ id: string; numero_lote: string; producto_id: string; cantidad_disponible: number }>
+  productos: Array<{ id: string; nombre: string; codigo: string; unidad_medida: string; categoria?: string }>
+  lotes: Array<{ id: string; numero_lote: string; producto_id: string; cantidad_disponible: number; proveedor?: string }>
+  categorias: string[]
+  proveedores: string[]
 }
 
-export function RecepcionAlmacenForm({ productos, lotes }: RecepcionAlmacenFormProps) {
+export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores }: RecepcionAlmacenFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [tipo, setTipo] = useState<'ingreso' | 'egreso'>('ingreso')
@@ -27,15 +29,57 @@ export function RecepcionAlmacenForm({ productos, lotes }: RecepcionAlmacenFormP
   const [unidadMedida, setUnidadMedida] = useState('kg')
   const [motivo, setMotivo] = useState('')
   const [destinoProduccion, setDestinoProduccion] = useState(false)
+  
+  // Filtros de búsqueda
+  const [busquedaProducto, setBusquedaProducto] = useState('')
+  const [filtroCategoria, setFiltroCategoria] = useState<string>('')
+  const [filtroProveedor, setFiltroProveedor] = useState<string>('')
+
+  // Filtrar productos por búsqueda, categoría y proveedor
+  const productosFiltrados = useMemo(() => {
+    let filtrados = productos
+
+    // Filtro por búsqueda (nombre o código)
+    if (busquedaProducto) {
+      const busqueda = busquedaProducto.toLowerCase()
+      filtrados = filtrados.filter(p => 
+        p.nombre.toLowerCase().includes(busqueda) ||
+        p.codigo.toLowerCase().includes(busqueda)
+      )
+    }
+
+    // Filtro por categoría
+    if (filtroCategoria) {
+      filtrados = filtrados.filter(p => p.categoria === filtroCategoria)
+    }
+
+    // Filtro por proveedor (a través de lotes)
+    if (filtroProveedor) {
+      const productosConProveedor = lotes
+        .filter(l => l.proveedor === filtroProveedor)
+        .map(l => l.producto_id)
+      filtrados = filtrados.filter(p => productosConProveedor.includes(p.id))
+    }
+
+    return filtrados
+  }, [productos, lotes, busquedaProducto, filtroCategoria, filtroProveedor])
 
   // Filtrar lotes por producto seleccionado
-  const lotesFiltrados = productoId
-    ? lotes.filter(l => l.producto_id === productoId)
-    : []
+  const lotesFiltrados = useMemo(() => {
+    if (!productoId) return []
+    return lotes.filter(l => l.producto_id === productoId)
+  }, [lotes, productoId])
 
-  // Obtener unidad de medida del producto seleccionado
+  // Obtener unidad de medida del producto seleccionado y asignarla automáticamente
   const productoSeleccionado = productos.find(p => p.id === productoId)
   const unidadMedidaProducto = productoSeleccionado?.unidad_medida || 'kg'
+
+  // Efecto para asignar automáticamente la unidad de medida cuando se selecciona un producto
+  useEffect(() => {
+    if (productoId && productoSeleccionado) {
+      setUnidadMedida(productoSeleccionado.unidad_medida)
+    }
+  }, [productoId, productoSeleccionado])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -78,6 +122,10 @@ export function RecepcionAlmacenForm({ productos, lotes }: RecepcionAlmacenFormP
         setCantidad('')
         setMotivo('')
         setDestinoProduccion(false)
+        setBusquedaProducto('')
+        setFiltroCategoria('')
+        setFiltroProveedor('')
+        setUnidadMedida('kg')
         router.refresh()
       } else {
         toast.error(result.message || 'Error al registrar recepción')
@@ -115,19 +163,97 @@ export function RecepcionAlmacenForm({ productos, lotes }: RecepcionAlmacenFormP
 
           <TabsContent value="ingreso" className="space-y-4 mt-4">
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Filtros de búsqueda */}
+              <div className="grid gap-4 md:grid-cols-3 p-4 bg-muted/50 rounded-lg border">
+                <div className="space-y-2">
+                  <Label htmlFor="busqueda-producto">Buscar Producto</Label>
+                  <div className="relative">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="busqueda-producto"
+                      placeholder="Nombre o código..."
+                      value={busquedaProducto}
+                      onChange={(e) => setBusquedaProducto(e.target.value)}
+                      className="pl-8"
+                    />
+                    {busquedaProducto && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-1 top-1 h-6 w-6 p-0"
+                        onClick={() => setBusquedaProducto('')}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="filtro-categoria">Categoría</Label>
+                  <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
+                    <SelectTrigger id="filtro-categoria">
+                      <SelectValue placeholder="Todas las categorías" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Todas las categorías</SelectItem>
+                      {categorias.map(cat => (
+                        <SelectItem key={cat} value={cat}>
+                          {cat}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="filtro-proveedor">Proveedor</Label>
+                  <Select value={filtroProveedor} onValueChange={setFiltroProveedor}>
+                    <SelectTrigger id="filtro-proveedor">
+                      <SelectValue placeholder="Todos los proveedores" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Todos los proveedores</SelectItem>
+                      {proveedores.map(prov => (
+                        <SelectItem key={prov} value={prov}>
+                          {prov}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="producto-ingreso">Producto *</Label>
-                  <Select value={productoId} onValueChange={setProductoId} required>
+                  <Select 
+                    value={productoId} 
+                    onValueChange={(value) => {
+                      setProductoId(value)
+                      // Asignar automáticamente la unidad de medida
+                      const producto = productos.find(p => p.id === value)
+                      if (producto) {
+                        setUnidadMedida(producto.unidad_medida)
+                      }
+                    }} 
+                    required
+                  >
                     <SelectTrigger id="producto-ingreso">
                       <SelectValue placeholder="Selecciona un producto" />
                     </SelectTrigger>
                     <SelectContent>
-                      {productos.map(producto => (
-                        <SelectItem key={producto.id} value={producto.id}>
-                          {producto.nombre} ({producto.codigo})
-                        </SelectItem>
-                      ))}
+                      {productosFiltrados.length > 0 ? (
+                        productosFiltrados.map(producto => (
+                          <SelectItem key={producto.id} value={producto.id}>
+                            {producto.nombre} ({producto.codigo})
+                            {producto.categoria && ` - ${producto.categoria}`}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                          No se encontraron productos
+                        </div>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -178,17 +304,25 @@ export function RecepcionAlmacenForm({ productos, lotes }: RecepcionAlmacenFormP
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="unidad-ingreso">Unidad de Medida</Label>
-                  <Select value={unidadMedida} onValueChange={setUnidadMedida}>
+                  <Label htmlFor="unidad-ingreso">Unidad de Medida *</Label>
+                  <Select value={unidadMedida} onValueChange={setUnidadMedida} required>
                     <SelectTrigger id="unidad-ingreso">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="kg">Kilogramos (kg)</SelectItem>
+                      <SelectItem value="g">Gramos (g)</SelectItem>
+                      <SelectItem value="docena">Docena</SelectItem>
                       <SelectItem value="unidad">Unidades</SelectItem>
-                      <SelectItem value="litro">Litros</SelectItem>
+                      <SelectItem value="litro">Litros (L)</SelectItem>
+                      <SelectItem value="ml">Mililitros (ml)</SelectItem>
                     </SelectContent>
                   </Select>
+                  {productoSeleccionado && (
+                    <p className="text-xs text-muted-foreground">
+                      Unidad por defecto del producto: {productoSeleccionado.unidad_medida}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -216,18 +350,96 @@ export function RecepcionAlmacenForm({ productos, lotes }: RecepcionAlmacenFormP
 
           <TabsContent value="egreso" className="space-y-4 mt-4">
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Filtros de búsqueda */}
+              <div className="grid gap-4 md:grid-cols-3 p-4 bg-muted/50 rounded-lg border">
+                <div className="space-y-2">
+                  <Label htmlFor="busqueda-producto-egreso">Buscar Producto</Label>
+                  <div className="relative">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="busqueda-producto-egreso"
+                      placeholder="Nombre o código..."
+                      value={busquedaProducto}
+                      onChange={(e) => setBusquedaProducto(e.target.value)}
+                      className="pl-8"
+                    />
+                    {busquedaProducto && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-1 top-1 h-6 w-6 p-0"
+                        onClick={() => setBusquedaProducto('')}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="filtro-categoria-egreso">Categoría</Label>
+                  <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
+                    <SelectTrigger id="filtro-categoria-egreso">
+                      <SelectValue placeholder="Todas las categorías" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Todas las categorías</SelectItem>
+                      {categorias.map(cat => (
+                        <SelectItem key={cat} value={cat}>
+                          {cat}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="filtro-proveedor-egreso">Proveedor</Label>
+                  <Select value={filtroProveedor} onValueChange={setFiltroProveedor}>
+                    <SelectTrigger id="filtro-proveedor-egreso">
+                      <SelectValue placeholder="Todos los proveedores" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Todos los proveedores</SelectItem>
+                      {proveedores.map(prov => (
+                        <SelectItem key={prov} value={prov}>
+                          {prov}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="producto-egreso">Producto *</Label>
-                <Select value={productoId} onValueChange={setProductoId} required>
+                <Select 
+                  value={productoId} 
+                  onValueChange={(value) => {
+                    setProductoId(value)
+                    // Asignar automáticamente la unidad de medida
+                    const producto = productos.find(p => p.id === value)
+                    if (producto) {
+                      setUnidadMedida(producto.unidad_medida)
+                    }
+                  }} 
+                  required
+                >
                   <SelectTrigger id="producto-egreso">
                     <SelectValue placeholder="Selecciona un producto" />
                   </SelectTrigger>
                   <SelectContent>
-                    {productos.map(producto => (
-                      <SelectItem key={producto.id} value={producto.id}>
-                        {producto.nombre} ({producto.codigo})
-                      </SelectItem>
-                    ))}
+                    {productosFiltrados.length > 0 ? (
+                      productosFiltrados.map(producto => (
+                        <SelectItem key={producto.id} value={producto.id}>
+                          {producto.nombre} ({producto.codigo})
+                          {producto.categoria && ` - ${producto.categoria}`}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                        No se encontraron productos
+                      </div>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -248,17 +460,25 @@ export function RecepcionAlmacenForm({ productos, lotes }: RecepcionAlmacenFormP
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="unidad-egreso">Unidad de Medida</Label>
-                  <Select value={unidadMedida} onValueChange={setUnidadMedida}>
+                  <Label htmlFor="unidad-egreso">Unidad de Medida *</Label>
+                  <Select value={unidadMedida} onValueChange={setUnidadMedida} required>
                     <SelectTrigger id="unidad-egreso">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="kg">Kilogramos (kg)</SelectItem>
+                      <SelectItem value="g">Gramos (g)</SelectItem>
+                      <SelectItem value="docena">Docena</SelectItem>
                       <SelectItem value="unidad">Unidades</SelectItem>
-                      <SelectItem value="litro">Litros</SelectItem>
+                      <SelectItem value="litro">Litros (L)</SelectItem>
+                      <SelectItem value="ml">Mililitros (ml)</SelectItem>
                     </SelectContent>
                   </Select>
+                  {productoSeleccionado && (
+                    <p className="text-xs text-muted-foreground">
+                      Unidad por defecto del producto: {productoSeleccionado.unidad_medida}
+                    </p>
+                  )}
                 </div>
               </div>
 

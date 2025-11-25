@@ -1478,11 +1478,37 @@ CREATE POLICY "repartidor_rutas_propias" ON pedidos FOR SELECT USING (
 
 Nuevo flujo operativo implementado que transforma el proceso de ventas desde pedidos directos a un sistema de presupuestos con control de stock preventivo, pesaje en almacén y trazabilidad completa.
 
-### 🔄 Pasos del Flujo
+### 🔄 Pasos del Flujo Completo
 
 ```
-Cliente (WhatsApp) → Bot crea presupuesto → Reserva stock preventiva → Vendedor revisa →
-Almacén pesa → Convierte a pedido → Reparto entrega → Tesorería registra cobro
+1. Creación (Bot/Vendedor):
+   Cliente (WhatsApp) / Vendedor Web → Crear presupuesto
+   ↓
+   Asignación automática:
+   - Turno (según horario: <5AM mañana, 5AM-3PM tarde, ≥3PM mañana siguiente)
+   - Fecha entrega (automática, editable)
+   - Estado: 'en_almacen' (aparece automáticamente en Presupuestos del Día)
+   ↓
+   Reserva stock preventiva (FIFO)
+
+2. Almacén:
+   Presupuestos del Día → Ver presupuestos del día/turno
+   ↓
+   Pesaje (productos balanza) → Editar pesos → Actualizar presupuesto
+   ↓
+   Conversión a Pedido (masiva o individual)
+   ↓
+   Pedidos del Día → Filtrar por fecha/turno
+
+3. Reparto:
+   Pedidos → Generar Ruta Diaria (automática o manual)
+   ↓
+   Optimización de ruta → Asignación de vehículos
+   ↓
+   Repartidor PWA → Entrega → Cobro
+
+4. Tesorería:
+   Validación de rutas → Cierre de caja → Movimientos registrados
 ```
 
 ### 🗄️ Nuevas Tablas y Funciones
@@ -1495,9 +1521,17 @@ Almacén pesa → Convierte a pedido → Reparto entrega → Tesorería registra
 #### Funciones RPC Atómicas
 - **`fn_reservar_stock_por_presupuesto()`**: Reserva stock FIFO por items
 - **`fn_convertir_presupuesto_a_pedido()`**: Conversión atómica con descuento de stock
+  - Asigna turno automáticamente si no existe (misma lógica que creación)
+  - Valida productos pesables antes de convertir
 - **`fn_actualizar_peso_item_presupuesto()`**: Recálculo de precios por peso
 - **`fn_asignar_vehiculos_por_peso()`**: Heurística de asignación por capacidad
-- **`fn_crear_presupuesto_desde_bot()`**: Creación desde WhatsApp
+- **`fn_crear_presupuesto_desde_bot()`**: Creación desde WhatsApp/Vendedor
+  - Asigna turno automáticamente según horario de corte
+  - Asigna fecha de entrega automáticamente
+  - Crea presupuesto en estado 'en_almacen' para aparecer en Presupuestos del Día
+- **`fn_asignar_turno_zona_presupuesto()`**: Asignación manual de turno y zona
+- **`fn_generar_ruta_diaria_automatica()`**: Genera rutas automáticas por turno
+- **`fn_generar_ruta_diaria_manual()`**: Genera ruta con pedidos seleccionados manualmente
 
 ### 🎨 Interfaz de Usuario
 
@@ -1505,10 +1539,20 @@ Almacén pesa → Convierte a pedido → Reparto entrega → Tesorería registra
 - **`/ventas/presupuestos`**: Lista completa con filtros y acciones
 - **Estados**: Pendiente → En Almacén → Facturado → Anulado
 - **Acciones**: Enviar a almacén, Reservar stock, Convertir a pedido
+- **Nuevo Presupuesto**: 
+  - Selector de clientes buscable (nombre, teléfono, zona)
+  - Selector de productos buscable (código, nombre)
+  - Fecha de entrega automática (hoy por defecto, editable)
+  - Asignación automática de turno y fecha según horario
 
 #### Dashboard Almacén
-- **`/almacen/presupuestos-dia`**: Vista por fecha/zona con totales
-- **`/[id]/pesaje`**: Interfaz de balanza con simulación
+- **`/almacen/presupuestos-dia`**: Vista por fecha/zona/turno con totales
+  - Presupuestos aparecen automáticamente al crearse (estado 'en_almacen')
+  - Botones de conversión masiva e individual a pedidos
+- **`/almacen/pedidos`**: Gestión de pedidos (movido desde Ventas)
+  - Filtros por fecha y turno
+  - Generación de rutas diarias (automática y manual)
+- **`/almacen/presupuesto/[id]/pesaje`**: Interfaz de balanza con simulación
 - **Badge "BALANZA"**: Identifica items pesables automáticamente
 
 #### PWA Repartidor (Base Implementada)

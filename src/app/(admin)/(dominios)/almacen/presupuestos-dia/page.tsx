@@ -14,6 +14,7 @@ import {
 import { createClient } from '@/lib/supabase/server'
 import { PresupuestosDiaSkeleton } from './presupuestos-dia-skeleton'
 import { PresupuestosDiaFiltros } from './presupuestos-dia-filtros'
+import { PresupuestosDiaAcciones, PresupuestoIndividualAccion } from '@/components/almacen/PresupuestosDiaAcciones'
 
 export const dynamic = 'force-dynamic'
 
@@ -349,6 +350,9 @@ async function PresupuestosDiaContent({
               <Calendar className="mr-1 h-3 w-3" />
               {new Date().toLocaleDateString('es-AR')}
             </Badge>
+            {presupuestos && presupuestos.length > 0 && (
+              <PresupuestosDiaAcciones presupuestos={presupuestos} />
+            )}
           </div>
         </div>
       </div>
@@ -680,6 +684,7 @@ async function PresupuestosDiaContent({
                                   Comenzar Pesaje
                                 </Link>
                               </Button>
+                              <PresupuestoIndividualAccion presupuesto={presupuesto} />
                             </div>
                           </div>
 
@@ -857,6 +862,7 @@ async function PresupuestosDiaContent({
                               Comenzar Pesaje
                             </Link>
                           </Button>
+                          <PresupuestoIndividualAccion presupuesto={presupuesto} />
                         </div>
                       </div>
 

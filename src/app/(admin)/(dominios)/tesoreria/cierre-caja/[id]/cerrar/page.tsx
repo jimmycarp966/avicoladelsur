@@ -156,10 +156,11 @@ async function CerrarCierreCajaContent({ cierreId }: { cierreId: string }) {
   )
 }
 
-export default function CerrarCierreCajaPage({ params }: CerrarCierreCajaPageProps) {
+export default async function CerrarCierreCajaPage({ params }: CerrarCierreCajaPageProps) {
+  const { id } = await params
   return (
     <Suspense fallback={<div>Cargando...</div>}>
-      <CerrarCierreCajaContent cierreId={params.id} />
+      <CerrarCierreCajaContent cierreId={id} />
     </Suspense>
   )
 }

@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
-import { Loader2, Save, Plus, Trash2 } from 'lucide-react'
+import { Loader2, Save, Plus, Trash2, Search, X } from 'lucide-react'
 import { crearPresupuestoAction } from '@/actions/presupuestos.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 import { formatCurrency } from '@/lib/utils'
@@ -40,6 +40,10 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
   const router = useRouter()
   const { showToast } = useNotificationStore()
   const [isLoading, setIsLoading] = useState(false)
+  const [productoSearch, setProductoSearch] = useState<{ [key: number]: string }>({})
+  const [productoDropdownOpen, setProductoDropdownOpen] = useState<{ [key: number]: boolean }>({})
+  const [clienteSearch, setClienteSearch] = useState('')
+  const [clienteDropdownOpen, setClienteDropdownOpen] = useState(false)
 
   const {
     register,
@@ -51,7 +55,7 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
   } = useForm<CrearPresupuestoFormData>({
     resolver: zodResolver(crearPresupuestoSchema),
     defaultValues: {
-      fecha_entrega_estimada: '',
+      fecha_entrega_estimada: new Date().toISOString().split('T')[0], // Fecha de hoy por defecto
       observaciones: '',
       items: [{ producto_id: '', cantidad_solicitada: 1, precio_unit_est: 0 }],
     },
@@ -79,6 +83,27 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
     if (producto) {
       setValue(`items.${index}.precio_unit_est`, producto.precio_venta)
     }
+  }
+
+  // Función para filtrar productos por búsqueda
+  const getFilteredProductos = (index: number) => {
+    const searchTerm = (productoSearch[index] || '').toLowerCase()
+    if (!searchTerm) return productos
+    return productos.filter(p => 
+      p.codigo.toLowerCase().includes(searchTerm) ||
+      p.nombre.toLowerCase().includes(searchTerm)
+    )
+  }
+
+  // Función para filtrar clientes por búsqueda
+  const getFilteredClientes = () => {
+    const searchTerm = clienteSearch.toLowerCase()
+    if (!searchTerm) return clientes
+    return clientes.filter(c => 
+      c.nombre.toLowerCase().includes(searchTerm) ||
+      (c.telefono && c.telefono.includes(searchTerm)) ||
+      (c.zona_entrega && c.zona_entrega.toLowerCase().includes(searchTerm))
+    )
   }
 
   const addItem = () => {
@@ -112,7 +137,14 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
 
       if (result.success) {
         showToast('success', result.message || 'Presupuesto creado exitosamente')
-        router.push(`/ventas/presupuestos/${result.data?.presupuesto_id}`)
+        const presupuestoId = result.data?.presupuesto_id
+        if (presupuestoId) {
+          // Redirigir directamente, el router.refresh() se encargará de cargar los datos
+          router.push(`/ventas/presupuestos/${presupuestoId}`)
+        } else {
+          // Si no hay ID, redirigir a la lista de presupuestos
+          router.push('/ventas/presupuestos')
+        }
       } else {
         showToast('error', result.message || 'Error al crear presupuesto')
       }
@@ -139,17 +171,68 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
             <Label htmlFor="cliente_id">Cliente *</Label>
             <Select
               value={watchedCliente || ''}
-              onValueChange={(value) => setValue('cliente_id', value)}
+              onValueChange={(value) => {
+                setValue('cliente_id', value)
+                setClienteSearch('')
+                setClienteDropdownOpen(false)
+              }}
+              onOpenChange={(open) => {
+                setClienteDropdownOpen(open)
+                if (!open) {
+                  setClienteSearch('')
+                }
+              }}
             >
               <SelectTrigger id="cliente_id" className={errors.cliente_id ? 'border-red-500' : ''}>
-                <SelectValue placeholder="Selecciona un cliente" />
+                <SelectValue placeholder="Buscar por nombre, teléfono o zona..." />
               </SelectTrigger>
-              <SelectContent>
-                {clientes.map((cliente) => (
-                  <SelectItem key={cliente.id} value={cliente.id}>
-                    {cliente.nombre} {cliente.telefono && `- ${cliente.telefono}`}
-                  </SelectItem>
-                ))}
+              <SelectContent className="max-h-[300px]">
+                <div className="sticky top-0 bg-background p-2 border-b">
+                  <div className="relative">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar cliente..."
+                      value={clienteSearch}
+                      onChange={(e) => {
+                        setClienteSearch(e.target.value)
+                      }}
+                      className="pl-8"
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    />
+                    {clienteSearch && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-1 top-1 h-6 w-6 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setClienteSearch('')
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <div className="max-h-[200px] overflow-y-auto">
+                  {(() => {
+                    const filtered = getFilteredClientes()
+                    return filtered.length > 0 ? (
+                      filtered.map((cliente) => (
+                        <SelectItem key={cliente.id} value={cliente.id}>
+                          {cliente.nombre} {cliente.telefono && `- ${cliente.telefono}`}
+                          {cliente.zona_entrega && ` (${cliente.zona_entrega})`}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                        No se encontraron clientes
+                      </div>
+                    )
+                  })()}
+                </div>
               </SelectContent>
             </Select>
             {errors.cliente_id && (
@@ -204,24 +287,74 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
             <div key={field.id} className="grid gap-4 md:grid-cols-12 p-4 border rounded-lg">
               <div className="md:col-span-5">
                 <Label>Producto *</Label>
-                <Select
-                  value={watchedItems?.[index]?.producto_id || ''}
-                  onValueChange={(value) => {
-                    setValue(`items.${index}.producto_id`, value)
-                    handleProductoChange(index, value)
-                  }}
-                >
-                  <SelectTrigger className={errors.items?.[index]?.producto_id ? 'border-red-500' : ''}>
-                    <SelectValue placeholder="Selecciona un producto" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {productos.map((producto) => (
-                      <SelectItem key={producto.id} value={producto.id}>
-                        {producto.codigo} - {producto.nombre} ({formatCurrency(producto.precio_venta)})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="relative">
+                  <Select
+                    value={watchedItems?.[index]?.producto_id || ''}
+                    onValueChange={(value) => {
+                      setValue(`items.${index}.producto_id`, value)
+                      handleProductoChange(index, value)
+                      setProductoSearch(prev => ({ ...prev, [index]: '' }))
+                      setProductoDropdownOpen(prev => ({ ...prev, [index]: false }))
+                    }}
+                    onOpenChange={(open) => {
+                      setProductoDropdownOpen(prev => ({ ...prev, [index]: open }))
+                      if (!open) {
+                        setProductoSearch(prev => ({ ...prev, [index]: '' }))
+                      }
+                    }}
+                  >
+                    <SelectTrigger className={errors.items?.[index]?.producto_id ? 'border-red-500' : ''}>
+                      <SelectValue placeholder="Buscar por código o nombre..." />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[300px]">
+                      <div className="sticky top-0 bg-background p-2 border-b">
+                        <div className="relative">
+                          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            placeholder="Buscar producto..."
+                            value={productoSearch[index] || ''}
+                            onChange={(e) => {
+                              setProductoSearch(prev => ({ ...prev, [index]: e.target.value }))
+                            }}
+                            className="pl-8"
+                            onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => e.stopPropagation()}
+                          />
+                          {productoSearch[index] && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="absolute right-1 top-1 h-6 w-6 p-0"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setProductoSearch(prev => ({ ...prev, [index]: '' }))
+                              }}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="max-h-[200px] overflow-y-auto">
+                        {(() => {
+                          const filtered = getFilteredProductos(index)
+                          return filtered.length > 0 ? (
+                            filtered.map((producto) => (
+                              <SelectItem key={producto.id} value={producto.id}>
+                                {producto.codigo} - {producto.nombre} ({formatCurrency(producto.precio_venta)})
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                              No se encontraron productos
+                            </div>
+                          )
+                        })()}
+                      </div>
+                    </SelectContent>
+                  </Select>
+                </div>
                 {errors.items?.[index]?.producto_id && (
                   <p className="text-sm text-red-500 mt-1">{errors.items[index]?.producto_id?.message}</p>
                 )}

@@ -61,6 +61,7 @@ export async function registrarGasto(data: RegistrarGastoParams): Promise<ApiRes
       p_creado_por: user?.id ?? null,
       p_afectar_caja: data.afecta_caja ?? false,
       p_caja_id: data.caja_id ?? null,
+      p_metodo_pago: data.metodo_pago ?? 'efectivo',
     })
 
     if (error) throw error
@@ -70,6 +71,7 @@ export async function registrarGasto(data: RegistrarGastoParams): Promise<ApiRes
 
     revalidatePath('/(admin)/(dominios)/gastos')
     revalidatePath('/(admin)/(dominios)/tesoreria/movimientos')
+    revalidatePath('/(admin)/(dominios)/tesoreria/tesoro')
 
     return {
       success: true,

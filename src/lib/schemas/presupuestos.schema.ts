@@ -56,3 +56,9 @@ export const filtrarPresupuestosSchema = z.object({
   fecha_hasta: z.string().optional(),
 })
 
+// Schema para confirmar múltiples presupuestos agrupados
+export const confirmarPresupuestosAgrupadosSchema = z.object({
+  presupuestos_ids: z.array(z.string().uuid()).min(1),
+  caja_id: z.string().uuid().optional(),
+})
+

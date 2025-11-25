@@ -1,8 +1,12 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { AdminSidebar } from './AdminSidebar'
 import { AdminHeader } from './AdminHeader'
+import { createClient } from '@/lib/supabase/client'
+import { useUserStore } from '@/store/userStore'
+import { useNotificationStore } from '@/store/notificationStore'
 import { cn } from '@/lib/utils'
 import type { Usuario } from '@/types/domain.types'
 
@@ -13,6 +17,24 @@ interface AdminLayoutProps {
 
 export function AdminLayout({ children, user }: AdminLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const router = useRouter()
+  const { logout: storeLogout } = useUserStore()
+  const { showToast } = useNotificationStore()
+
+  // Función logout local que no depende del AuthProvider
+  const handleLogout = async () => {
+    try {
+      const supabase = createClient()
+      await supabase.auth.signOut()
+      storeLogout()
+      showToast('success', 'Sesión cerrada exitosamente')
+      router.push('/login')
+      router.refresh()
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error)
+      showToast('error', 'Error al cerrar sesión')
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -45,6 +67,7 @@ export function AdminLayout({ children, user }: AdminLayoutProps) {
         <AdminHeader
           user={user}
           onMenuClick={() => setSidebarOpen(true)}
+          onLogout={handleLogout}
         />
 
         <main className="py-10">

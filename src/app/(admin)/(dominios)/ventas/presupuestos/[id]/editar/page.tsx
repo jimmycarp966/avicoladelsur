@@ -63,6 +63,7 @@ async function EditarPresupuestoContent({ presupuestoId }: { presupuestoId: stri
 }
 
 export default async function EditarPresupuestoPage({ params }: EditarPresupuestoPageProps) {
+  const { id } = await params
   return (
     <Suspense fallback={
       <div className="space-y-6">
@@ -70,7 +71,7 @@ export default async function EditarPresupuestoPage({ params }: EditarPresupuest
         <div className="h-96 bg-gray-200 animate-pulse rounded" />
       </div>
     }>
-      <EditarPresupuestoContent presupuestoId={params.id} />
+      <EditarPresupuestoContent presupuestoId={id} />
     </Suspense>
   )
 }
