@@ -104,10 +104,20 @@ BEGIN
     -- Procesar items
     FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)
     LOOP
-        -- Obtener precio del producto
-        SELECT precio_venta INTO v_precio_unit
-        FROM productos
-        WHERE id = (v_item->>'producto_id')::UUID;
+        -- Usar precio_unitario del JSON si está presente, sino obtener precio_venta de la BD
+        IF (v_item->>'precio_unitario') IS NOT NULL AND (v_item->>'precio_unitario')::DECIMAL > 0 THEN
+            v_precio_unit := (v_item->>'precio_unitario')::DECIMAL;
+        ELSE
+            -- Fallback: obtener precio del producto desde BD
+            SELECT precio_venta INTO v_precio_unit
+            FROM productos
+            WHERE id = (v_item->>'producto_id')::UUID;
+            
+            -- Si el precio de BD es NULL o 0, usar 0 como último recurso
+            IF v_precio_unit IS NULL OR v_precio_unit = 0 THEN
+                v_precio_unit := 0;
+            END IF;
+        END IF;
 
         -- Calcular subtotal
         v_subtotal := (v_item->>'cantidad')::DECIMAL * v_precio_unit;

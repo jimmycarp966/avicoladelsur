@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useMemo, useCallback, memo } from 'react'
 import { useRouter } from 'next/navigation'
-import { useForm, useFieldArray } from 'react-hook-form'
+import { useForm, useFieldArray, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,8 @@ import { Loader2, Save, Plus, Trash2, Search, X } from 'lucide-react'
 import { crearPresupuestoAction } from '@/actions/presupuestos.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 import { formatCurrency } from '@/lib/utils'
+import { useDebounce } from '@/lib/hooks/useDebounce'
+import { ProductoItemRow } from './producto-item-row'
 
 const crearPresupuestoSchema = z.object({
   cliente_id: z.string().uuid('Debes seleccionar un cliente'),
@@ -66,55 +68,65 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
     name: 'items',
   })
 
-  const watchedItems = watch('items')
-  const watchedCliente = watch('cliente_id')
+  // Optimizar watch usando useWatch para mejor rendimiento
+  const watchedItems = useWatch({ control, name: 'items' })
+  const watchedCliente = useWatch({ control, name: 'cliente_id' })
 
-  // Calcular total estimado
-  const totalEstimado = watchedItems?.reduce((sum, item) => {
-    return sum + (item.cantidad_solicitada * (item.precio_unit_est || 0))
-  }, 0) || 0
+  // Debouncing para búsquedas (solo para cliente, productos se manejan individualmente)
+  const debouncedClienteSearch = useDebounce(clienteSearch, 300)
 
-  // Obtener cliente seleccionado
-  const clienteSeleccionado = clientes.find(c => c.id === watchedCliente)
+  // Memoizar total estimado
+  const totalEstimado = useMemo(() => {
+    return watchedItems?.reduce((sum, item) => {
+      return sum + (item.cantidad_solicitada * (item.precio_unit_est || 0))
+    }, 0) || 0
+  }, [watchedItems])
 
-  // Actualizar precio cuando cambia el producto
-  const handleProductoChange = (index: number, productoId: string) => {
+  // Memoizar cliente seleccionado
+  const clienteSeleccionado = useMemo(() => {
+    return clientes.find(c => c.id === watchedCliente)
+  }, [clientes, watchedCliente])
+
+  // Memoizar handleProductoChange
+  const handleProductoChange = useCallback((index: number, productoId: string) => {
     const producto = productos.find(p => p.id === productoId)
     if (producto) {
       setValue(`items.${index}.precio_unit_est`, producto.precio_venta)
     }
-  }
+  }, [productos, setValue])
 
-  // Función para filtrar productos por búsqueda
-  const getFilteredProductos = (index: number) => {
-    const searchTerm = (productoSearch[index] || '').toLowerCase()
-    if (!searchTerm) return productos
+  // Memoizar función para filtrar productos
+  const getFilteredProductos = useCallback((index: number, searchTerm: string) => {
+    const term = searchTerm.toLowerCase()
+    if (!term) return productos
     return productos.filter(p => 
-      p.codigo.toLowerCase().includes(searchTerm) ||
-      p.nombre.toLowerCase().includes(searchTerm)
+      p.codigo.toLowerCase().includes(term) ||
+      p.nombre.toLowerCase().includes(term)
     )
-  }
+  }, [productos])
 
-  // Función para filtrar clientes por búsqueda
-  const getFilteredClientes = () => {
-    const searchTerm = clienteSearch.toLowerCase()
-    if (!searchTerm) return clientes
+  // Memoizar función para filtrar clientes
+  const getFilteredClientes = useCallback((searchTerm: string) => {
+    const term = searchTerm.toLowerCase()
+    if (!term) return clientes
     return clientes.filter(c => 
-      c.nombre.toLowerCase().includes(searchTerm) ||
-      (c.telefono && c.telefono.includes(searchTerm)) ||
-      (c.zona_entrega && c.zona_entrega.toLowerCase().includes(searchTerm))
+      c.nombre.toLowerCase().includes(term) ||
+      (c.telefono && c.telefono.includes(term)) ||
+      (c.zona_entrega && c.zona_entrega.toLowerCase().includes(term))
     )
-  }
+  }, [clientes])
 
-  const addItem = () => {
+  // Memoizar addItem
+  const addItem = useCallback(() => {
     append({ producto_id: '', cantidad_solicitada: 1, precio_unit_est: 0 })
-  }
+  }, [append])
 
-  const removeItem = (index: number) => {
+  // Memoizar removeItem
+  const removeItem = useCallback((index: number) => {
     if (fields.length > 1) {
       remove(index)
     }
-  }
+  }, [fields.length, remove])
 
   const onSubmit = async (data: CrearPresupuestoFormData) => {
     try {
@@ -218,7 +230,7 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
                 </div>
                 <div className="max-h-[200px] overflow-y-auto">
                   {(() => {
-                    const filtered = getFilteredClientes()
+                    const filtered = getFilteredClientes(debouncedClienteSearch)
                     return filtered.length > 0 ? (
                       filtered.map((cliente) => (
                         <SelectItem key={cliente.id} value={cliente.id}>
@@ -284,124 +296,20 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
         </CardHeader>
         <CardContent className="space-y-4">
           {fields.map((field, index) => (
-            <div key={field.id} className="grid gap-4 md:grid-cols-12 p-4 border rounded-lg">
-              <div className="md:col-span-5">
-                <Label>Producto *</Label>
-                <div className="relative">
-                  <Select
-                    value={watchedItems?.[index]?.producto_id || ''}
-                    onValueChange={(value) => {
-                      setValue(`items.${index}.producto_id`, value)
-                      handleProductoChange(index, value)
-                      setProductoSearch(prev => ({ ...prev, [index]: '' }))
-                      setProductoDropdownOpen(prev => ({ ...prev, [index]: false }))
-                    }}
-                    onOpenChange={(open) => {
-                      setProductoDropdownOpen(prev => ({ ...prev, [index]: open }))
-                      if (!open) {
-                        setProductoSearch(prev => ({ ...prev, [index]: '' }))
-                      }
-                    }}
-                  >
-                    <SelectTrigger className={errors.items?.[index]?.producto_id ? 'border-red-500' : ''}>
-                      <SelectValue placeholder="Buscar por código o nombre..." />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-[300px]">
-                      <div className="sticky top-0 bg-background p-2 border-b">
-                        <div className="relative">
-                          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            placeholder="Buscar producto..."
-                            value={productoSearch[index] || ''}
-                            onChange={(e) => {
-                              setProductoSearch(prev => ({ ...prev, [index]: e.target.value }))
-                            }}
-                            className="pl-8"
-                            onClick={(e) => e.stopPropagation()}
-                            onKeyDown={(e) => e.stopPropagation()}
-                          />
-                          {productoSearch[index] && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="absolute right-1 top-1 h-6 w-6 p-0"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setProductoSearch(prev => ({ ...prev, [index]: '' }))
-                              }}
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                      <div className="max-h-[200px] overflow-y-auto">
-                        {(() => {
-                          const filtered = getFilteredProductos(index)
-                          return filtered.length > 0 ? (
-                            filtered.map((producto) => (
-                              <SelectItem key={producto.id} value={producto.id}>
-                                {producto.codigo} - {producto.nombre} ({formatCurrency(producto.precio_venta)})
-                              </SelectItem>
-                            ))
-                          ) : (
-                            <div className="px-2 py-6 text-center text-sm text-muted-foreground">
-                              No se encontraron productos
-                            </div>
-                          )
-                        })()}
-                      </div>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {errors.items?.[index]?.producto_id && (
-                  <p className="text-sm text-red-500 mt-1">{errors.items[index]?.producto_id?.message}</p>
-                )}
-              </div>
-
-              <div className="md:col-span-3">
-                <Label>Cantidad *</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  {...register(`items.${index}.cantidad_solicitada`, { valueAsNumber: true })}
-                  className={errors.items?.[index]?.cantidad_solicitada ? 'border-red-500' : ''}
-                />
-                {errors.items?.[index]?.cantidad_solicitada && (
-                  <p className="text-sm text-red-500 mt-1">{errors.items[index]?.cantidad_solicitada?.message}</p>
-                )}
-              </div>
-
-              <div className="md:col-span-3">
-                <Label>Precio Unit. *</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  {...register(`items.${index}.precio_unit_est`, { valueAsNumber: true })}
-                  className={errors.items?.[index]?.precio_unit_est ? 'border-red-500' : ''}
-                />
-                {errors.items?.[index]?.precio_unit_est && (
-                  <p className="text-sm text-red-500 mt-1">{errors.items[index]?.precio_unit_est?.message}</p>
-                )}
-              </div>
-
-              <div className="md:col-span-1 flex items-end">
-                {fields.length > 1 && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeItem(index)}
-                    className="text-red-600 hover:text-red-700"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-            </div>
+            <ProductoItemRow
+              key={field.id}
+              index={index}
+              fieldId={field.id}
+              productos={productos}
+              productoSearch={productoSearch[index] || ''}
+              onProductoSearchChange={(value) => {
+                setProductoSearch(prev => ({ ...prev, [index]: value }))
+              }}
+              onProductoChange={handleProductoChange}
+              onRemove={removeItem}
+              errors={errors.items?.[index]}
+              canRemove={fields.length > 1}
+            />
           ))}
 
           {errors.items && errors.items.root && (
