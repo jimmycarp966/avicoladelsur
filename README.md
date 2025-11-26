@@ -79,7 +79,8 @@
 1. **Almacén (WMS)**: Control de stock, lotes, picking
 2. **Ventas (CRM)**: Clientes, pedidos, cotizaciones, reclamos
 3. **Reparto (TMS)**: Vehículos, rutas, entregas, GPS
-4. **Chatbot**: Toma de pedidos y consultas vía WhatsApp
+4. **RRHH**: Gestión de empleados, asistencia, liquidaciones, adelantos, evaluaciones
+5. **Chatbot**: Toma de pedidos y consultas vía WhatsApp
 
 ## 📁 Estructura del Proyecto
 
@@ -94,6 +95,7 @@ src/
 │   │   │   │   ├── monitor/       # ⭐ Monitor GPS en tiempo real
 │   │   │   │   └── rutas/         # Gestión de rutas
 │   │   │   ├── tesoreria/       # Cajas, movimientos, cierres
+│   │   │   ├── rrhh/            # Recursos Humanos (empleados, asistencia, liquidaciones, adelantos)
 │   │   │   └── ventas/          # Presupuestos, pedidos, clientes
 │   │   └── dashboard/           # Dashboard principal
 │   ├── (repartidor)/            # ⭐ PWA móvil completa
@@ -194,6 +196,16 @@ scripts/                         # Scripts de automatización
 - **Referencias pago**: PAY-YYYYMMDD-XXXXXX para seguimiento
 - **Validación de cobros**: Repartidores registran pagos durante ruta, tesorero valida antes de acreditar en caja
 - **Reportes CSV/PDF**: Business intelligence completa
+
+### 👥 **RRHH (Recursos Humanos)**
+- **Gestión de empleados**: CRUD completo con datos personales, laborales y bancarios
+- **Control de asistencia**: Registro diario con reglas críticas (1 falta sin aviso = pérdida presentismo + jornal)
+- **Liquidaciones automáticas**: Cálculo mensual con horas extras, producción y descuentos
+- **Adelantos controlados**: Gestión de adelantos en dinero/productos con límite automático del 30% del sueldo básico
+- **Licencias y descansos**: Gestión de vacaciones, enfermedad, maternidad, estudio
+- **Evaluaciones de desempeño**: Sistema por sucursal con 5 criterios (escala 1-5)
+- **Novedades internas**: Comunicación segmentada (general, sucursal, categoría)
+- **Reportes avanzados**: 6 tipos de reportes exportables (Excel/CSV)
 
 ### 🔐 **Seguridad y Roles**
 - **4 roles definidos**: admin, vendedor, repartidor, almacenista

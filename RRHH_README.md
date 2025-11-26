@@ -27,12 +27,17 @@ Módulo completo de Recursos Humanos implementado para Avícola del Sur ERP, que
 - ✅ Workflow: Borrador → Calculada → Aprobada → Pagada
 - ✅ Detalle desglosado de cada concepto
 
-### 💸 **Gestión de Adelantos**
-- ✅ **Límite automático del 30% del sueldo básico**
-- ✅ Adelantos en dinero o productos
-- ✅ Workflow de aprobación
-- ✅ Control de porcentajes por empleado/mes
-- ✅ Función RPC `fn_validar_limite_adelanto()`
+### 💸 **Gestión de Adelantos** ✅ **COMPLETAMENTE IMPLEMENTADO**
+- ✅ **Página principal** (`/rrhh/adelantos`) con tabla interactiva y estadísticas
+- ✅ **Formulario de creación** (`/rrhh/adelantos/nuevo`) con validación en tiempo real
+- ✅ **Límite automático del 30% del sueldo básico** validado antes de aprobar
+- ✅ **Adelantos en dinero o productos** con campos dinámicos según tipo
+- ✅ **Workflow de aprobación** con botones de aprobar/rechazar desde la tabla
+- ✅ **Control de porcentajes** por empleado/mes con reinicio automático
+- ✅ **Función RPC** `fn_validar_limite_adelanto()` para validación atómica
+- ✅ **Estadísticas en tiempo real**: Total, aprobados, pendientes, total aprobado
+- ✅ **Distribución por tipo**: Visualización de adelantos en dinero vs productos
+- ✅ **Tabla completa** con columnas: Empleado, Tipo, Monto/Valor, Producto, % Sueldo, Fecha, Estado, Aprobado Por
 
 ### 📋 **Licencias y Descansos**
 - ✅ Tipos: Vacaciones, Enfermedad, Maternidad, Estudio, Otro
@@ -66,13 +71,23 @@ Módulo completo de Recursos Humanos implementado para Avícola del Sur ERP, que
 src/
 ├── app/(admin)/(dominios)/rrhh/
 │   ├── empleados/           # ✅ CRUD empleados
+│   │   └── nuevo/          # ✅ Formulario creación
 │   ├── asistencia/          # ✅ Control asistencia
+│   │   └── marcar/         # ✅ Formulario marcado
 │   ├── liquidaciones/       # ✅ Cálculo sueldos
+│   │   └── calcular/       # ✅ Calculadora masiva
 │   ├── adelantos/           # ✅ Gestión adelantos
+│   │   ├── nuevo/          # ✅ Formulario creación
+│   │   └── adelantos-table-wrapper.tsx  # ✅ Wrapper acciones
 │   ├── licencias/           # ✅ Licencias y descansos
+│   │   └── nueva/          # ✅ Formulario creación
 │   ├── evaluaciones/        # ✅ Evaluaciones desempeño
+│   │   └── nueva/          # ✅ Formulario creación
 │   ├── novedades/           # ✅ Comunicación interna
+│   │   └── nueva/          # ✅ Formulario creación
 │   └── reportes/            # ✅ Generador reportes
+├── components/tables/
+│   └── AdelantosTable.tsx   # ✅ Tabla interactiva adelantos
 ├── actions/rrhh.actions.ts  # ✅ Server Actions completas
 ├── lib/
 │   ├── schemas/rrhh.schema.ts # ✅ Validaciones Zod
@@ -144,14 +159,20 @@ RRHH
 ```
 
 ### **Páginas Implementadas**
-- ✅ **Empleados**: Listado + CRUD completo
-- ✅ **Asistencia**: Control diario con estadísticas
-- ✅ **Liquidaciones**: Calculadora masiva + detalles
-- ✅ **Adelantos**: Solicitudes con validación límites
-- ✅ **Licencias**: Solicitudes con aprobación
-- ✅ **Evaluaciones**: Formularios por sucursal
-- ✅ **Novedades**: Comunicación segmentada
-- ✅ **Reportes**: Generador con filtros múltiples
+- ✅ **Empleados** (`/rrhh/empleados`): Listado + CRUD completo con estadísticas
+- ✅ **Asistencia** (`/rrhh/asistencia`): Control diario con estadísticas y marcado manual
+- ✅ **Liquidaciones** (`/rrhh/liquidaciones`): Calculadora masiva + detalles con workflow completo
+- ✅ **Adelantos** (`/rrhh/adelantos`): 
+  - Listado completo con tabla interactiva
+  - Estadísticas (total, aprobados, pendientes, total aprobado)
+  - Distribución por tipo (dinero/productos)
+  - Formulario para crear nuevos adelantos (`/rrhh/adelantos/nuevo`)
+  - Aprobación/rechazo desde la tabla
+  - Validación automática del límite del 30% del sueldo básico
+- ✅ **Licencias** (`/rrhh/licencias`): Solicitudes con aprobación y cálculo automático de días
+- ✅ **Evaluaciones** (`/rrhh/evaluaciones`): Formularios por sucursal con 5 criterios
+- ✅ **Novedades** (`/rrhh/novedades`): Comunicación segmentada con prioridades
+- ✅ **Reportes** (`/rrhh/reportes`): Generador con filtros múltiples y exportación
 
 ## 📊 **Estadísticas y KPIs**
 

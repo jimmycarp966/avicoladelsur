@@ -120,6 +120,17 @@ supabase/                         # Scripts SQL y migraciones
 - **Página de Validación**: `/tesoreria/validar-rutas` para revisar y validar rutas completadas
 - **Reportes**: CSV/PDF export con pdfkit
 
+### 👥 **RRHH (Recursos Humanos)**: Gestión de Personal
+- **Empleados**: CRUD completo con datos personales, laborales y bancarios
+- **Asistencia**: Control diario con reglas críticas (1 falta sin aviso = pérdida presentismo + jornal)
+- **Liquidaciones**: Cálculo automático mensual con horas extras, producción y descuentos
+- **Adelantos**: Gestión de adelantos en dinero/productos con límite automático del 30% del sueldo básico
+- **Licencias**: Gestión de vacaciones, enfermedad, maternidad, estudio
+- **Evaluaciones**: Sistema de evaluación por sucursal con 5 criterios (1-5 escala)
+- **Novedades**: Comunicación interna segmentada (general, sucursal, categoría)
+- **Reportes**: 6 tipos de reportes exportables (Excel/CSV)
+- **Rutas**: `/rrhh/empleados`, `/rrhh/asistencia`, `/rrhh/liquidaciones`, `/rrhh/adelantos`, `/rrhh/licencias`, `/rrhh/evaluaciones`, `/rrhh/novedades`, `/rrhh/reportes`
+
 ### 🤖 **Bot WhatsApp**: Automatización de Ventas
 - **Sin Botpress**: Procesamiento directo en Next.js (más rápido/simple)
 - **Comandos**: hola, 1(catalogo), 2(instrucciones), POLLO001 5, etc.
