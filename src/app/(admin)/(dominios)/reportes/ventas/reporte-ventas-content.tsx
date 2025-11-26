@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { DollarSign, TrendingUp, Users, ShoppingCart, CreditCard, Package, UserCheck, UserPlus } from 'lucide-react'
+import { DollarSign, TrendingUp, Users, ShoppingCart, CreditCard, Package, UserCheck, UserPlus, BarChart3 } from 'lucide-react'
 import { KpiCard } from '@/components/reportes/KpiCard'
 import { ReportFilters } from '@/components/reportes/ReportFilters'
 import { ExportButton } from '@/components/reportes/ExportButton'
@@ -159,18 +159,36 @@ export function ReporteVentasContent({
   const kpisData = kpis || {}
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Background Pattern */}
+      <div className="fixed inset-0 -z-50 overflow-hidden pointer-events-none">
+        <div className="absolute top-40 left-10 w-96 h-96 bg-primary/2 rounded-full blur-3xl" />
+        <div className="absolute top-60 right-20 w-80 h-80 bg-secondary/2 rounded-full blur-3xl" />
+        <div className="absolute bottom-40 left-1/2 w-72 h-72 bg-accent/2 rounded-full blur-3xl" />
+        <div className="absolute bottom-60 right-10 w-64 h-64 bg-info/2 rounded-full blur-3xl" />
+      </div>
       {/* Header */}
-      <div className="relative overflow-hidden rounded-lg bg-gradient-to-br from-primary/5 via-white to-secondary/5 p-6 shadow-sm border border-primary/10">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-10" />
-        <div className="flex items-center justify-between">
+      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-primary via-primary/90 to-secondary p-8 shadow-2xl border border-primary/20">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -z-10" />
+        <div className="absolute -top-4 -right-4 w-32 h-32 bg-accent/20 rounded-full blur-2xl" />
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-secondary/20 rounded-full blur-3xl" />
+        <div className="flex items-center justify-between relative z-10">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Reporte de Ventas</h1>
-            <p className="text-muted-foreground mt-1">
-              Análisis completo de ventas con KPIs, gráficos y métricas detalladas
+            <h1 className="text-4xl font-bold tracking-tight text-white drop-shadow-lg">
+              Reporte de Ventas
+            </h1>
+            <p className="text-white/90 mt-2 text-lg drop-shadow">
+              Análisis completo con KPIs, gráficos y métricas detalladas
             </p>
           </div>
-          <ExportButton onExport={handleExport} />
+          <div className="flex items-center gap-4">
+            <div className="hidden md:block">
+              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+                <BarChart3 className="h-8 w-8 text-white" />
+              </div>
+            </div>
+            <ExportButton onExport={handleExport} />
+          </div>
         </div>
       </div>
 
@@ -301,8 +319,81 @@ export function ReporteVentasContent({
         />
       </div>
 
+      {/* Insights Destacados */}
+      <div className="grid gap-6 md:grid-cols-3 animate-in fade-in-0 duration-700">
+        <div className="animate-in slide-in-from-left-5 duration-500 delay-100">
+        <Card className="relative overflow-hidden border-0 shadow-xl bg-gradient-to-br from-success/10 via-success/5 to-white hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-success to-success/60" />
+          <div className="absolute top-4 right-4 w-12 h-12 bg-success/10 rounded-full blur-lg" />
+          <CardContent className="p-6 relative z-10">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 bg-success/15 rounded-lg">
+                <TrendingUp className="h-5 w-5 text-success" />
+              </div>
+              <span className="text-sm font-semibold text-success/80">Mejor Zona</span>
+            </div>
+            <p className="text-2xl font-bold text-success">
+              {ventasPorZona.length > 0 ?
+                ventasPorZona.reduce((max, zona) =>
+                  Number(zona.ventas || 0) > Number(max.ventas || 0) ? zona : max
+                ).zona : 'Sin datos'
+              }
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Mayor volumen de ventas
+            </p>
+          </CardContent>
+        </Card>
+        </div>
+        <div className="animate-in slide-in-from-bottom-5 duration-500 delay-200">
+        <Card className="relative overflow-hidden border-0 shadow-xl bg-gradient-to-br from-info/10 via-info/5 to-white hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-info to-info/60" />
+          <div className="absolute top-4 right-4 w-12 h-12 bg-info/10 rounded-full blur-lg" />
+          <CardContent className="p-6 relative z-10">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 bg-info/15 rounded-lg">
+                <Users className="h-5 w-5 text-info" />
+              </div>
+              <span className="text-sm font-semibold text-info/80">Mejor Vendedor</span>
+            </div>
+            <p className="text-2xl font-bold text-info">
+              {topVendedores.length > 0 ?
+                topVendedores[0].vendedor_nombre : 'Sin datos'
+              }
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              ${topVendedores.length > 0 ? Number(topVendedores[0].ventas || 0).toLocaleString('es-AR') : '0'} en ventas
+            </p>
+          </CardContent>
+        </Card>
+        </div>
+
+        <div className="animate-in slide-in-from-right-5 duration-500 delay-300">
+        <Card className="relative overflow-hidden border-0 shadow-xl bg-gradient-to-br from-warning/10 via-warning/5 to-white hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-warning to-warning/60" />
+          <div className="absolute top-4 right-4 w-12 h-12 bg-warning/10 rounded-full blur-lg" />
+          <CardContent className="p-6 relative z-10">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 bg-warning/15 rounded-lg">
+                <Package className="h-5 w-5 text-warning" />
+              </div>
+              <span className="text-sm font-semibold text-warning/80">Producto Estrella</span>
+            </div>
+            <p className="text-2xl font-bold text-warning">
+              {topProductos.length > 0 ?
+                topProductos[0].producto_nombre || topProductos[0].nombre : 'Sin datos'
+              }
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              ${topProductos.length > 0 ? Number(topProductos[0].ventas || 0).toLocaleString('es-AR') : '0'} en ventas
+            </p>
+          </CardContent>
+        </Card>
+        </div>
+      </div>
+
       {/* Gráficos */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2 animate-in fade-in-0 duration-700 delay-500">
         <LineChartComponent
           title="Ventas por Período"
           description={`Ventas agrupadas por ${filtros.agrupacion}`}
@@ -310,7 +401,7 @@ export function ReporteVentasContent({
           dataKey="periodo"
           formatValue="currency"
           lines={[
-            { key: 'ventas', name: 'Ventas', color: '#2d6a4f' },
+            { key: 'ventas', name: 'Ventas', color: '#1a4d2e' },
             { key: 'ticketPromedio', name: 'Ticket Promedio', color: '#8b2635' },
           ]}
           showLegend
@@ -322,11 +413,11 @@ export function ReporteVentasContent({
           data={ventasPorZonaData}
           dataKey="zona"
           formatValue="currency"
-          bars={[{ key: 'ventas', name: 'Ventas', color: '#2d6a4f' }]}
+          bars={[{ key: 'ventas', name: 'Ventas', color: '#1a4d2e' }]}
         />
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2 animate-in fade-in-0 duration-700 delay-700">
         <PieChartComponent
           title="Ventas por Método de Pago"
           description="Distribución de recaudación por método de pago"
@@ -341,7 +432,7 @@ export function ReporteVentasContent({
           dataKey="nombre"
           formatValue="currency"
           orientation="horizontal"
-          bars={[{ key: 'ventas', name: 'Ventas', color: '#2d6a4f' }]}
+          bars={[{ key: 'ventas', name: 'Ventas', color: '#1a4d2e' }]}
           height={400}
         />
       </div>

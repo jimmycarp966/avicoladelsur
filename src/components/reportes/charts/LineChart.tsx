@@ -49,7 +49,7 @@ export function LineChartComponent({
   formatValue = 'currency',
   height = 300,
   showLegend = false,
-  lines = [{ key: 'ventas', name: 'Ventas', color: '#2d6a4f' }],
+  lines = [{ key: 'ventas', name: 'Ventas', color: '#1a4d2e' }],
 }: LineChartProps) {
   const formatTooltipValue = (value: number) => {
     if (formatValue === 'currency') return formatCurrency(value)
@@ -83,12 +83,15 @@ export function LineChartComponent({
             content={({ active, payload, label }) => {
               if (active && payload && payload.length) {
                 return (
-                  <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
-                    <p className="font-medium text-gray-900 mb-2">{label}</p>
+                  <div className="bg-white/95 backdrop-blur-sm p-4 border border-primary/20 rounded-xl shadow-2xl">
+                    <p className="font-semibold text-primary mb-3 text-center border-b border-primary/10 pb-2">{label}</p>
                     {payload.map((entry: any, index: number) => (
-                      <p key={index} style={{ color: entry.color }} className="text-sm">
-                        {`${entry.name}: ${formatTooltipValue(entry.value)}`}
-                      </p>
+                      <div key={index} className="flex items-center gap-2 mb-1">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
+                        <p className="text-sm font-medium" style={{ color: entry.color }}>
+                          {`${entry.name}: ${formatTooltipValue(entry.value)}`}
+                        </p>
+                      </div>
                     ))}
                   </div>
                 )

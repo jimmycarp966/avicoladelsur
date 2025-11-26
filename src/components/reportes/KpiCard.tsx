@@ -50,20 +50,27 @@ export function KpiCard({
   }
 
   return (
-    <Card className={cn('border-primary/10 hover:shadow-md transition-shadow', className)}>
-      <CardContent className="p-6">
+    <Card className={cn('relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-white via-white to-primary/5 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 group', className)}>
+      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary/60 to-primary" />
+      <div className="absolute top-4 right-4 w-12 h-12 bg-primary/5 rounded-full blur-lg group-hover:bg-primary/10 transition-colors" />
+      <CardContent className="p-6 relative z-10">
         <div className="flex items-start justify-between">
           <div className="flex-1">
-            <p className="text-sm font-medium text-muted-foreground mb-1">{title}</p>
-            <p className="text-2xl font-bold text-foreground">{formatValue()}</p>
+            <p className="text-sm font-semibold text-muted-foreground mb-2 group-hover:text-primary/70 transition-colors">{title}</p>
+            <p className="text-3xl font-bold text-foreground mb-2 group-hover:text-primary transition-colors">{formatValue()}</p>
             {description && (
-              <p className="text-xs text-muted-foreground mt-1">{description}</p>
+              <p className="text-sm text-muted-foreground group-hover:text-muted-foreground/80 transition-colors">{description}</p>
             )}
             {change !== undefined && (
-              <div className="flex items-center gap-1 mt-2">
-                <span className={cn('text-xs font-medium', getChangeColor())}>
-                  {change > 0 ? '↑' : change < 0 ? '↓' : '→'} {Math.abs(change).toFixed(1)}%
-                </span>
+              <div className="flex items-center gap-2 mt-3">
+                <div className={cn('px-2 py-1 rounded-full text-xs font-semibold flex items-center gap-1',
+                  change > 0 ? 'bg-success/15 text-success' :
+                  change < 0 ? 'bg-destructive/15 text-destructive' :
+                  'bg-muted/15 text-muted-foreground'
+                )}>
+                  <span>{change > 0 ? '↗' : change < 0 ? '↘' : '→'}</span>
+                  <span>{Math.abs(change).toFixed(1)}%</span>
+                </div>
                 {changeLabel && (
                   <span className="text-xs text-muted-foreground">vs {changeLabel}</span>
                 )}
@@ -71,8 +78,8 @@ export function KpiCard({
             )}
           </div>
           {Icon && (
-            <div className="ml-4 p-3 rounded-full bg-primary/10">
-              <Icon className={cn('h-5 w-5', getTrendColor())} />
+            <div className="ml-4 p-3 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 group-hover:from-primary/20 group-hover:to-primary/10 transition-all duration-300 group-hover:scale-110">
+              <Icon className={cn('h-6 w-6', getTrendColor())} />
             </div>
           )}
         </div>

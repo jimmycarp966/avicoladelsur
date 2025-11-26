@@ -26,12 +26,14 @@ export function ChartWrapper({
   action,
 }: ChartWrapperProps) {
   return (
-    <Card className={cn('border-primary/10', className)}>
-      <CardHeader>
+    <Card className={cn('relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-white via-white to-primary/3 hover:shadow-xl transition-all duration-300', className)}>
+      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary/60 to-secondary/60" />
+      <div className="absolute top-4 right-4 w-12 h-12 bg-primary/5 rounded-full blur-lg" />
+      <CardHeader className="relative z-10">
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle>{title}</CardTitle>
-            {description && <CardDescription>{description}</CardDescription>}
+            <CardTitle className="text-lg font-semibold text-primary">{title}</CardTitle>
+            {description && <CardDescription className="text-muted-foreground/80">{description}</CardDescription>}
           </div>
           {action && <div>{action}</div>}
         </div>
