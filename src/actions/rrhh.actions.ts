@@ -101,7 +101,7 @@ export async function crearEmpleado(
       }
     }
 
-    revalidatePath('/admin/rrhh/empleados')
+    revalidatePath('/rrhh/empleados')
     revalidatePath('/admin/dashboard')
 
     return {
@@ -211,8 +211,8 @@ export async function actualizarEmpleado(
       }
     }
 
-    revalidatePath('/admin/rrhh/empleados')
-    revalidatePath(`/admin/rrhh/empleados/${empleadoId}`)
+    revalidatePath('/rrhh/empleados')
+    revalidatePath(`/rrhh/empleados/${empleadoId}`)
 
     return {
       success: true,
@@ -272,7 +272,7 @@ export async function eliminarEmpleado(empleadoId: string): Promise<ApiResponse<
       }
     }
 
-    revalidatePath('/admin/rrhh/empleados')
+    revalidatePath('/rrhh/empleados')
 
     return {
       success: true,
@@ -334,7 +334,7 @@ export async function crearNovedad(
       }
     }
 
-    revalidatePath('/admin/rrhh/novedades')
+    revalidatePath('/rrhh/novedades')
 
     return {
       success: true,
@@ -382,8 +382,8 @@ export async function actualizarNovedad(
       }
     }
 
-    revalidatePath('/admin/rrhh/novedades')
-    revalidatePath(`/admin/rrhh/novedades/${novedadId}`)
+    revalidatePath('/rrhh/novedades')
+    revalidatePath(`/rrhh/novedades/${novedadId}`)
 
     return {
       success: true,
@@ -416,7 +416,7 @@ export async function eliminarNovedad(novedadId: string): Promise<ApiResponse<vo
       }
     }
 
-    revalidatePath('/admin/rrhh/novedades')
+    revalidatePath('/rrhh/novedades')
 
     return {
       success: true,
@@ -463,7 +463,7 @@ export async function marcarAsistencia(
       }
     }
 
-    revalidatePath('/admin/rrhh/asistencia')
+    revalidatePath('/rrhh/asistencia')
 
     return {
       success: true,
@@ -508,7 +508,7 @@ export async function actualizarAsistencia(
       }
     }
 
-    revalidatePath('/admin/rrhh/asistencia')
+    revalidatePath('/rrhh/asistencia')
 
     return {
       success: true,
@@ -592,7 +592,7 @@ export async function crearAdelanto(
       }
     }
 
-    revalidatePath('/admin/rrhh/adelantos')
+    revalidatePath('/rrhh/adelantos')
 
     return {
       success: true,
@@ -634,7 +634,7 @@ export async function aprobarAdelanto(
       }
     }
 
-    revalidatePath('/admin/rrhh/adelantos')
+    revalidatePath('/rrhh/adelantos')
 
     return {
       success: true,
@@ -666,7 +666,7 @@ export async function rechazarAdelanto(adelantoId: string): Promise<ApiResponse<
       }
     }
 
-    revalidatePath('/admin/rrhh/adelantos')
+    revalidatePath('/rrhh/adelantos')
 
     return {
       success: true,
@@ -716,7 +716,7 @@ export async function calcularLiquidacionMensual(
       }
     }
 
-    revalidatePath('/admin/rrhh/liquidaciones')
+    revalidatePath('/rrhh/liquidaciones')
 
     return {
       success: true,
@@ -764,7 +764,7 @@ export async function aprobarLiquidacion(liquidacionId: string): Promise<ApiResp
       }
     }
 
-    revalidatePath('/admin/rrhh/liquidaciones')
+    revalidatePath('/rrhh/liquidaciones')
 
     return {
       success: true,
@@ -802,7 +802,7 @@ export async function marcarLiquidacionPagada(liquidacionId: string): Promise<Ap
       }
     }
 
-    revalidatePath('/admin/rrhh/liquidaciones')
+    revalidatePath('/rrhh/liquidaciones')
 
     return {
       success: true,
@@ -854,7 +854,7 @@ export async function crearLicencia(
       }
     }
 
-    revalidatePath('/admin/rrhh/licencias')
+    revalidatePath('/rrhh/licencias')
 
     return {
       success: true,
@@ -902,7 +902,7 @@ export async function aprobarLicencia(licenciaId: string): Promise<ApiResponse<v
       }
     }
 
-    revalidatePath('/admin/rrhh/licencias')
+    revalidatePath('/rrhh/licencias')
 
     return {
       success: true,
@@ -959,7 +959,7 @@ export async function crearDescuento(
       }
     }
 
-    revalidatePath('/admin/rrhh/descuentos')
+    revalidatePath('/rrhh/descuentos')
 
     return {
       success: true,
@@ -1007,7 +1007,7 @@ export async function aprobarDescuento(descuentoId: string): Promise<ApiResponse
       }
     }
 
-    revalidatePath('/admin/rrhh/descuentos')
+    revalidatePath('/rrhh/descuentos')
 
     return {
       success: true,
@@ -1090,7 +1090,7 @@ export async function crearEvaluacion(
       }
     }
 
-    revalidatePath('/admin/rrhh/evaluaciones')
+    revalidatePath('/rrhh/evaluaciones')
 
     return {
       success: true,
@@ -1139,8 +1139,8 @@ export async function actualizarEvaluacion(
       }
     }
 
-    revalidatePath('/admin/rrhh/evaluaciones')
-    revalidatePath(`/admin/rrhh/evaluaciones/${evaluacionId}`)
+    revalidatePath('/rrhh/evaluaciones')
+    revalidatePath(`/rrhh/evaluaciones/${evaluacionId}`)
 
     return {
       success: true,
@@ -1180,7 +1180,7 @@ export async function enviarEvaluacion(evaluacionId: string): Promise<ApiRespons
       }
     }
 
-    revalidatePath('/admin/rrhh/evaluaciones')
+    revalidatePath('/rrhh/evaluaciones')
 
     return {
       success: true,
@@ -1226,7 +1226,7 @@ export async function crearSucursal(
       }
     }
 
-    revalidatePath('/admin/rrhh/sucursales')
+    revalidatePath('/rrhh/sucursales')
 
     return {
       success: true,
@@ -1270,8 +1270,8 @@ export async function actualizarSucursal(
       }
     }
 
-    revalidatePath('/admin/rrhh/sucursales')
-    revalidatePath(`/admin/rrhh/sucursales/${sucursalId}`)
+    revalidatePath('/rrhh/sucursales')
+    revalidatePath(`/rrhh/sucursales/${sucursalId}`)
 
     return {
       success: true,
@@ -1321,7 +1321,7 @@ export async function crearCategoriaEmpleado(
       }
     }
 
-    revalidatePath('/admin/rrhh/categorias')
+    revalidatePath('/rrhh/categorias')
 
     return {
       success: true,
@@ -1366,8 +1366,8 @@ export async function actualizarCategoriaEmpleado(
       }
     }
 
-    revalidatePath('/admin/rrhh/categorias')
-    revalidatePath(`/admin/rrhh/categorias/${categoriaId}`)
+    revalidatePath('/rrhh/categorias')
+    revalidatePath(`/rrhh/categorias/${categoriaId}`)
 
     return {
       success: true,

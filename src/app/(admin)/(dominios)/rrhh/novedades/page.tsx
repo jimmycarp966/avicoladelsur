@@ -56,7 +56,7 @@ export default async function NovedadesPage() {
           </p>
         </div>
         <Button asChild>
-          <Link href="/admin/rrhh/novedades/nueva">
+          <Link href="/rrhh/novedades/nueva">
             <Plus className="w-4 h-4 mr-2" />
             Nueva Novedad
           </Link>

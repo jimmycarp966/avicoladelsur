@@ -98,7 +98,7 @@ export function NuevaNovedadForm() {
           result.message || 'La novedad ha sido creada exitosamente',
           'Novedad creada'
         )
-        router.push('/admin/rrhh/novedades')
+        router.push('/rrhh/novedades')
       } else {
         showToast(
           'error',
@@ -136,7 +136,7 @@ export function NuevaNovedadForm() {
       {/* Botón volver */}
       <div className="mb-6">
         <Button variant="ghost" asChild className="mb-4">
-          <Link href="/admin/rrhh/novedades">
+          <Link href="/rrhh/novedades">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Volver a Novedades
           </Link>

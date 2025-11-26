@@ -42,7 +42,7 @@ export default async function EmpleadosPage() {
           </p>
         </div>
         <Button asChild>
-          <Link href="/admin/rrhh/empleados/nuevo">
+          <Link href="/rrhh/empleados/nuevo">
             <Plus className="w-4 h-4 mr-2" />
             Nuevo Empleado
           </Link>

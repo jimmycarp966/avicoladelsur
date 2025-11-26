@@ -67,7 +67,7 @@ export default async function AsistenciaPage() {
           </p>
         </div>
         <Button asChild>
-          <Link href="/admin/rrhh/asistencia/marcar">
+          <Link href="/rrhh/asistencia/marcar">
             <Plus className="w-4 h-4 mr-2" />
             Marcar Asistencia
           </Link>

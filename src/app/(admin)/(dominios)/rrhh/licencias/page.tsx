@@ -67,7 +67,7 @@ export default async function LicenciasPage() {
           </p>
         </div>
         <Button asChild>
-          <Link href="/admin/rrhh/licencias/nueva">
+          <Link href="/rrhh/licencias/nueva">
             <Plus className="w-4 h-4 mr-2" />
             Nueva Licencia
           </Link>

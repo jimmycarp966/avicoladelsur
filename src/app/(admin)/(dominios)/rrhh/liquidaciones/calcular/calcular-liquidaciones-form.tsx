@@ -105,7 +105,7 @@ export function CalcularLiquidacionesForm() {
           `Se calcularon ${successCount} liquidaciones exitosamente${errorCount > 0 ? ` (${errorCount} errores)` : ''}`,
           'Cálculo completado'
         )
-        router.push('/admin/rrhh/liquidaciones')
+        router.push('/rrhh/liquidaciones')
       } else {
         showToast(
           'error',
@@ -147,7 +147,7 @@ export function CalcularLiquidacionesForm() {
       {/* Botón volver */}
       <div className="mb-6">
         <Button variant="ghost" asChild className="mb-4">
-          <Link href="/admin/rrhh/liquidaciones">
+          <Link href="/rrhh/liquidaciones">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Volver a Liquidaciones
           </Link>

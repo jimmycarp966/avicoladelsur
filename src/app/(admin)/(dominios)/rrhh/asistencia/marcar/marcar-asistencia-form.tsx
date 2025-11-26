@@ -115,7 +115,7 @@ export function MarcarAsistenciaForm() {
           result.message || 'La asistencia ha sido registrada exitosamente',
           'Asistencia registrada'
         )
-        router.push('/admin/rrhh/asistencia')
+        router.push('/rrhh/asistencia')
       } else {
         showToast(
           'error',
@@ -150,7 +150,7 @@ export function MarcarAsistenciaForm() {
       {/* Botón volver */}
       <div className="mb-6">
         <Button variant="ghost" asChild className="mb-4">
-          <Link href="/admin/rrhh/asistencia">
+          <Link href="/rrhh/asistencia">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Volver a Asistencia
           </Link>

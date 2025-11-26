@@ -137,7 +137,7 @@ export function NuevaEvaluacionForm() {
           result.message || 'La evaluación ha sido creada exitosamente',
           'Evaluación creada'
         )
-        router.push('/admin/rrhh/evaluaciones')
+        router.push('/rrhh/evaluaciones')
       } else {
         showToast(
           'error',
@@ -181,7 +181,7 @@ export function NuevaEvaluacionForm() {
       {/* Botón volver */}
       <div className="mb-6">
         <Button variant="ghost" asChild className="mb-4">
-          <Link href="/admin/rrhh/evaluaciones">
+          <Link href="/rrhh/evaluaciones">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Volver a Evaluaciones
           </Link>

@@ -94,7 +94,7 @@ export function NuevoEmpleadoForm() {
           result.message || 'El empleado ha sido creado exitosamente',
           'Empleado creado'
         )
-        router.push('/admin/rrhh/empleados')
+        router.push('/rrhh/empleados')
       } else {
         showToast(
           'error',
@@ -119,7 +119,7 @@ export function NuevoEmpleadoForm() {
       {/* Botón volver */}
       <div className="mb-6">
         <Button variant="ghost" asChild className="mb-4">
-          <Link href="/admin/rrhh/empleados">
+          <Link href="/rrhh/empleados">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Volver a Empleados
           </Link>

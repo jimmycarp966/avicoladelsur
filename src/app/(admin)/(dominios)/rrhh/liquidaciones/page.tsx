@@ -45,13 +45,13 @@ export default async function LiquidacionesPage() {
         </div>
         <div className="flex gap-3">
           <Button variant="outline" asChild>
-            <Link href="/admin/rrhh/liquidaciones/calcular">
+            <Link href="/rrhh/liquidaciones/calcular">
               <Calculator className="w-4 h-4 mr-2" />
               Calcular Liquidaciones
             </Link>
           </Button>
           <Button variant="outline" asChild>
-            <Link href="/admin/rrhh/liquidaciones/reportes">
+            <Link href="/rrhh/liquidaciones/reportes">
               <FileText className="w-4 h-4 mr-2" />
               Reportes
             </Link>

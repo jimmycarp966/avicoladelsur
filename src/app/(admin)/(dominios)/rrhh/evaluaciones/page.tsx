@@ -55,13 +55,13 @@ export default async function EvaluacionesPage() {
         </div>
         <div className="flex gap-3">
           <Button variant="outline" asChild>
-            <Link href="/admin/rrhh/evaluaciones/reportes">
+            <Link href="/rrhh/evaluaciones/reportes">
               <TrendingUp className="w-4 h-4 mr-2" />
               Reportes
             </Link>
           </Button>
           <Button asChild>
-            <Link href="/admin/rrhh/evaluaciones/nueva">
+            <Link href="/rrhh/evaluaciones/nueva">
               <Plus className="w-4 h-4 mr-2" />
               Nueva Evaluación
             </Link>

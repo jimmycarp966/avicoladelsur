@@ -86,7 +86,7 @@ export function NuevaLicenciaForm() {
           result.message || 'La solicitud de licencia ha sido creada exitosamente',
           'Licencia creada'
         )
-        router.push('/admin/rrhh/licencias')
+        router.push('/rrhh/licencias')
       } else {
         showToast(
           'error',
@@ -121,7 +121,7 @@ export function NuevaLicenciaForm() {
       {/* Botón volver */}
       <div className="mb-6">
         <Button variant="ghost" asChild className="mb-4">
-          <Link href="/admin/rrhh/licencias">
+          <Link href="/rrhh/licencias">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Volver a Licencias
           </Link>
