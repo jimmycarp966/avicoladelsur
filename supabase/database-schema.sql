@@ -10,6 +10,18 @@ CREATE EXTENSION IF NOT EXISTS "postgis";
 -- TABLAS MAESTRAS
 -- ===========================================
 
+-- SUCURSALES
+CREATE TABLE IF NOT EXISTS sucursales (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    nombre VARCHAR(255) NOT NULL,
+    direccion TEXT,
+    telefono VARCHAR(20),
+    encargado_id UUID, -- referencia a empleado
+    activo BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- PRODUCTOS
 CREATE TABLE productos (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -71,6 +83,208 @@ CREATE TABLE usuarios (
     activo BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ===========================================
+-- DOMINIO: RRHH - RECURSOS HUMANOS
+-- ===========================================
+
+-- EMPLEADOS (extensión de usuarios)
+CREATE TABLE rrhh_empleados (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    usuario_id UUID REFERENCES usuarios(id) ON DELETE CASCADE,
+    sucursal_id UUID REFERENCES sucursales(id),
+    categoria_id UUID REFERENCES rrhh_categorias(id),
+    legajo VARCHAR(20) UNIQUE,
+    fecha_ingreso DATE NOT NULL,
+    fecha_nacimiento DATE,
+    dni VARCHAR(20),
+    cuil VARCHAR(20),
+    domicilio TEXT,
+    telefono_personal VARCHAR(20),
+    contacto_emergencia VARCHAR(255),
+    telefono_emergencia VARCHAR(20),
+    obra_social VARCHAR(255),
+    numero_afiliado VARCHAR(50),
+    banco VARCHAR(100),
+    cbu VARCHAR(50),
+    numero_cuenta VARCHAR(50),
+    sueldo_actual DECIMAL(10,2),
+    activo BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- CATEGORÍAS DE EMPLEADOS
+CREATE TABLE rrhh_categorias (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    nombre VARCHAR(100) NOT NULL,
+    descripcion TEXT,
+    sueldo_basico DECIMAL(10,2) NOT NULL,
+    adicional_cajero DECIMAL(10,2) DEFAULT 0,
+    adicional_produccion DECIMAL(10,2) DEFAULT 0,
+    activo BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- NOVEDADES RRHH
+CREATE TABLE rrhh_novedades (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    titulo VARCHAR(255) NOT NULL,
+    descripcion TEXT,
+    tipo VARCHAR(50) NOT NULL,
+    sucursal_id UUID REFERENCES sucursales(id),
+    categoria_id UUID REFERENCES rrhh_categorias(id),
+    fecha_publicacion DATE NOT NULL DEFAULT CURRENT_DATE,
+    fecha_expiracion DATE,
+    prioridad VARCHAR(20) DEFAULT 'normal',
+    activo BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_by UUID REFERENCES usuarios(id)
+);
+
+-- ASISTENCIA DIARIA
+CREATE TABLE rrhh_asistencia (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    empleado_id UUID NOT NULL REFERENCES rrhh_empleados(id),
+    fecha DATE NOT NULL,
+    hora_entrada TIMESTAMP WITH TIME ZONE,
+    hora_salida TIMESTAMP WITH TIME ZONE,
+    horas_trabajadas DECIMAL(5,2),
+    turno VARCHAR(20),
+    estado VARCHAR(20) DEFAULT 'presente',
+    observaciones TEXT,
+    retraso_minutos INTEGER DEFAULT 0,
+    falta_sin_aviso BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(empleado_id, fecha)
+);
+
+-- LICENCIAS Y DESCANSOS
+CREATE TABLE rrhh_licencias (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    empleado_id UUID NOT NULL REFERENCES rrhh_empleados(id),
+    tipo VARCHAR(50) NOT NULL,
+    fecha_inicio DATE NOT NULL,
+    fecha_fin DATE NOT NULL,
+    dias_total INTEGER NOT NULL,
+    aprobado BOOLEAN DEFAULT false,
+    aprobado_por UUID REFERENCES usuarios(id),
+    fecha_aprobacion DATE,
+    observaciones TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ADELANTOS
+CREATE TABLE rrhh_adelantos (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    empleado_id UUID NOT NULL REFERENCES rrhh_empleados(id),
+    tipo VARCHAR(20) NOT NULL,
+    monto DECIMAL(10,2),
+    producto_id UUID REFERENCES productos(id),
+    cantidad DECIMAL(10,2),
+    precio_unitario DECIMAL(10,2),
+    fecha_solicitud DATE NOT NULL DEFAULT CURRENT_DATE,
+    aprobado BOOLEAN DEFAULT false,
+    aprobado_por UUID REFERENCES usuarios(id),
+    fecha_aprobacion DATE,
+    porcentaje_sueldo DECIMAL(5,2),
+    observaciones TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- LIQUIDACIONES DE SUELDOS
+CREATE TABLE rrhh_liquidaciones (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    empleado_id UUID NOT NULL REFERENCES rrhh_empleados(id),
+    periodo_mes INTEGER NOT NULL,
+    periodo_anio INTEGER NOT NULL,
+    fecha_liquidacion DATE NOT NULL,
+    sueldo_basico DECIMAL(10,2) NOT NULL,
+    adicional_cajero DECIMAL(10,2) DEFAULT 0,
+    adicional_produccion DECIMAL(10,2) DEFAULT 0,
+    horas_trabajadas DECIMAL(5,2) DEFAULT 0,
+    turnos_trabajados INTEGER DEFAULT 0,
+    horas_extras DECIMAL(5,2) DEFAULT 0,
+    valor_hora_extra DECIMAL(10,2) DEFAULT 0,
+    kg_producidos DECIMAL(8,2) DEFAULT 0,
+    valor_kg DECIMAL(10,2) DEFAULT 0,
+    total_bruto DECIMAL(10,2) NOT NULL,
+    descuentos_total DECIMAL(10,2) DEFAULT 0,
+    adelantos_total DECIMAL(10,2) DEFAULT 0,
+    total_neto DECIMAL(10,2) NOT NULL,
+    estado VARCHAR(20) DEFAULT 'borrador',
+    aprobado_por UUID REFERENCES usuarios(id),
+    fecha_aprobacion DATE,
+    pagado BOOLEAN DEFAULT false,
+    fecha_pago DATE,
+    observaciones TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_by UUID REFERENCES usuarios(id),
+    UNIQUE(empleado_id, periodo_mes, periodo_anio)
+);
+
+-- DETALLE DE LIQUIDACIONES
+CREATE TABLE rrhh_liquidacion_detalles (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    liquidacion_id UUID NOT NULL REFERENCES rrhh_liquidaciones(id) ON DELETE CASCADE,
+    tipo VARCHAR(50) NOT NULL,
+    descripcion VARCHAR(255),
+    monto DECIMAL(10,2) NOT NULL,
+    referencia_id UUID,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- DESCUENTOS
+CREATE TABLE rrhh_descuentos (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    empleado_id UUID NOT NULL REFERENCES rrhh_empleados(id),
+    tipo VARCHAR(50) NOT NULL,
+    monto DECIMAL(10,2) NOT NULL,
+    fecha DATE NOT NULL DEFAULT CURRENT_DATE,
+    motivo TEXT NOT NULL,
+    observaciones TEXT,
+    aprobado BOOLEAN DEFAULT false,
+    aprobado_por UUID REFERENCES usuarios(id),
+    fecha_aprobacion DATE,
+    liquidacion_id UUID REFERENCES rrhh_liquidaciones(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- EVALUACIONES DE DESEMPEÑO
+CREATE TABLE rrhh_evaluaciones (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    empleado_id UUID NOT NULL REFERENCES rrhh_empleados(id),
+    sucursal_id UUID NOT NULL REFERENCES sucursales(id),
+    periodo_mes INTEGER NOT NULL,
+    periodo_anio INTEGER NOT NULL,
+    puntualidad INTEGER CHECK (puntualidad >= 1 AND puntualidad <= 5),
+    rendimiento INTEGER CHECK (rendimiento >= 1 AND rendimiento <= 5),
+    actitud INTEGER CHECK (actitud >= 1 AND actitud <= 5),
+    responsabilidad INTEGER CHECK (responsabilidad >= 1 AND responsabilidad <= 5),
+    trabajo_equipo INTEGER CHECK (trabajo_equipo >= 1 AND trabajo_equipo <= 5),
+    promedio DECIMAL(3,2) GENERATED ALWAYS AS (
+        (puntualidad + rendimiento + actitud + responsabilidad + trabajo_equipo)::DECIMAL / 5
+    ) STORED,
+    fortalezas TEXT,
+    areas_mejora TEXT,
+    objetivos TEXT,
+    comentarios TEXT,
+    evaluador_id UUID NOT NULL REFERENCES usuarios(id),
+    fecha_evaluacion DATE NOT NULL DEFAULT CURRENT_DATE,
+    estado VARCHAR(20) DEFAULT 'borrador',
+    notificado BOOLEAN DEFAULT false,
+    fecha_notificacion DATE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(empleado_id, periodo_mes, periodo_anio)
 );
 
 -- ===========================================
@@ -244,6 +458,32 @@ CREATE TABLE detalles_pedido (
     cantidad DECIMAL(10,3) NOT NULL,
     precio_unitario DECIMAL(10,2) NOT NULL,
     descuento DECIMAL(10,2) DEFAULT 0,
+    subtotal DECIMAL(10,2) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- FACTURAS (documentos internos ligados a pedidos)
+CREATE TABLE IF NOT EXISTS facturas (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    numero_factura VARCHAR(50) UNIQUE NOT NULL,
+    cliente_id UUID NOT NULL REFERENCES clientes(id),
+    pedido_id UUID NOT NULL REFERENCES pedidos(id),
+    fecha_emision TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    subtotal DECIMAL(10,2) NOT NULL,
+    descuento DECIMAL(10,2) DEFAULT 0,
+    total DECIMAL(10,2) NOT NULL,
+    estado VARCHAR(20) DEFAULT 'emitida', -- emitida, anulada
+    tipo VARCHAR(20) DEFAULT 'interna',   -- interna (sin AFIP por ahora)
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS factura_items (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    factura_id UUID NOT NULL REFERENCES facturas(id) ON DELETE CASCADE,
+    producto_id UUID NOT NULL REFERENCES productos(id),
+    cantidad DECIMAL(10,3) NOT NULL,
+    precio_unitario DECIMAL(10,2) NOT NULL,
     subtotal DECIMAL(10,2) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

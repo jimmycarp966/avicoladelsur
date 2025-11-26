@@ -6,6 +6,7 @@ export * from './plan-rutas.actions'
 export * from './tesoreria.actions'
 export * from './gastos.actions'
 export * from './presupuestos.actions'
+export * from './rrhh.actions'
 
 // Función helper para crear notificaciones
 export async function createNotification(data: {

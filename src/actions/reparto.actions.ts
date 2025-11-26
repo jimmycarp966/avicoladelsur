@@ -1396,3 +1396,92 @@ export async function generarRutaDiariaManual(
     }
   }
 }
+
+// Asignar un solo pedido a una ruta (desde Almacén) usando el plan semanal
+export async function asignarPedidoARutaDesdeAlmacen(
+  pedidoId: string
+): Promise<ApiResponse<{ rutaId: string }>> {
+  try {
+    const supabase = await createClient()
+
+    // Obtener pedido y validar estado
+    const { data: pedido, error: pedidoError } = await supabase
+      .from('pedidos')
+      .select('id, numero_pedido, estado')
+      .eq('id', pedidoId)
+      .single()
+
+    if (pedidoError || !pedido) {
+      return {
+        success: false,
+        error: 'Pedido no encontrado',
+      }
+    }
+
+    if (pedido.estado !== 'preparando') {
+      return {
+        success: false,
+        error: `Solo se pueden asignar a ruta pedidos en estado \"preparando\" (actual: ${pedido.estado})`,
+      }
+    }
+
+    // Asignar pedido a una ruta usando la función RPC
+    const { data: resultado, error: asignacionError } = await supabase.rpc(
+      'fn_asignar_pedido_a_ruta',
+      {
+        p_pedido_id: pedidoId,
+      }
+    )
+
+    if (asignacionError) {
+      console.error(
+        `Error asignando pedido ${pedido.numero_pedido} a ruta:`,
+        asignacionError
+      )
+      return {
+        success: false,
+        error: asignacionError.message || 'Error al asignar pedido a ruta',
+      }
+    }
+
+    if (!resultado?.success || !resultado?.ruta_id) {
+      return {
+        success: false,
+        error:
+          (resultado && (resultado as any).error) ||
+          'No se pudo asignar el pedido a una ruta planificada',
+      }
+    }
+
+    const rutaId = resultado.ruta_id as string
+
+    // Optimizar la ruta generada/actualizada
+    try {
+      await generateRutaOptimizada({
+        supabase,
+        rutaId,
+        usarGoogle: true,
+      })
+    } catch (optError) {
+      console.error(
+        `Error optimizando ruta ${rutaId} para pedido ${pedido.numero_pedido}:`,
+        optError
+      )
+    }
+
+    revalidatePath('/(admin)/(dominios)/reparto/rutas')
+    revalidatePath('/(admin)/(dominios)/almacen/pedidos')
+
+    return {
+      success: true,
+      data: { rutaId },
+      message: `Pedido ${pedido.numero_pedido} asignado a ruta exitosamente`,
+    }
+  } catch (error: any) {
+    console.error('Error en asignarPedidoARutaDesdeAlmacen:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al asignar pedido a ruta',
+    }
+  }
+}

@@ -2,7 +2,6 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import { getNowArgentina } from '@/lib/utils'
 import type {
   CrearPedidoParams,
   CrearPedidoBotParams,
@@ -200,7 +199,7 @@ export async function eliminarCliente(
       .from('clientes')
       .update({
         activo: false,
-        updated_at: getNowArgentina().toISOString(),
+        updated_at: new Date().toISOString(),
       })
       .eq('id', clienteId)
 
@@ -262,7 +261,7 @@ export async function actualizarCliente(
       .from('clientes')
       .update({
         ...updates,
-        updated_at: getNowArgentina().toISOString(),
+        updated_at: new Date().toISOString(),
       })
       .eq('id', clienteId)
 
@@ -471,8 +470,8 @@ export async function actualizarEstadoPedido(
       .from('pedidos')
       .update({
         estado,
-        updated_at: getNowArgentina().toISOString(),
-        ...(estado === 'entregado' && { fecha_entrega_real: getNowArgentina().toISOString() }),
+        updated_at: new Date().toISOString(),
+        ...(estado === 'entregado' && { fecha_entrega_real: new Date().toISOString() }),
       })
       .eq('id', pedidoId)
 
@@ -742,11 +741,11 @@ export async function actualizarEstadoReclamo(
 
     const updateData: any = {
       estado,
-      updated_at: getNowArgentina().toISOString(),
+      updated_at: new Date().toISOString(),
     }
 
     if (estado === 'resuelto' || estado === 'cerrado') {
-      updateData.fecha_resolucion = getNowArgentina().toISOString()
+      updateData.fecha_resolucion = new Date().toISOString()
       updateData.solucion = solucion
     }
 

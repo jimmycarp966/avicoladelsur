@@ -15,6 +15,7 @@ import {
   DollarSign,
   Settings,
   X,
+  UserCheck,
 } from 'lucide-react'
 import type { Usuario } from '@/types/domain.types'
 
@@ -77,6 +78,22 @@ const navigation = [
       { name: 'Cierres de Caja', href: '/tesoreria/cierre-caja' },
       { name: 'Tesoro', href: '/tesoreria/tesoro' },
       { name: 'Gastos', href: '/tesoreria/gastos' },
+    ],
+  },
+  {
+    name: 'RRHH',
+    href: '/rrhh',
+    icon: UserCheck,
+    roles: ['admin'],
+    children: [
+      { name: 'Empleados', href: '/rrhh/empleados' },
+      { name: 'Asistencia', href: '/rrhh/asistencia' },
+      { name: 'Liquidaciones', href: '/rrhh/liquidaciones' },
+      { name: 'Adelantos', href: '/rrhh/adelantos' },
+      { name: 'Licencias', href: '/rrhh/licencias' },
+      { name: 'Evaluaciones', href: '/rrhh/evaluaciones' },
+      { name: 'Novedades', href: '/rrhh/novedades' },
+      { name: 'Reportes', href: '/rrhh/reportes' },
     ],
   },
   {

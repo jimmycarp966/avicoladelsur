@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { PedidosTable } from '@/components/tables/PedidosTable'
 import { useNotificationStore } from '@/store/notificationStore'
 import { obtenerPedidos } from '@/actions/ventas.actions'
-import { generarRutaDiariaAutomatica } from '@/actions/reparto.actions'
+import { asignarPedidoARutaDesdeAlmacen, generarRutaDiariaAutomatica } from '@/actions/reparto.actions'
 import { PedidosFiltros } from './pedidos-filtros'
 import { GenerarRutaModal } from '@/components/reparto/GenerarRutaModal'
 import { Button } from '@/components/ui/button'
@@ -110,6 +110,28 @@ export function PedidosTableWrapper() {
     showToast('success', `Generando PDF del pedido ${pedido.numero_pedido}`)
   }
 
+  const handleRoute = async (pedido: Pedido) => {
+    try {
+      const result = await asignarPedidoARutaDesdeAlmacen(pedido.id)
+      if (result.success) {
+        showToast(
+          'success',
+          result.message || `Pedido ${pedido.numero_pedido} asignado a ruta`
+        )
+        await loadPedidos()
+        router.refresh()
+      } else {
+        showToast(
+          'error',
+          result.error || 'Error al asignar pedido a ruta. Verifica que exista un plan de ruta para la zona/turno.'
+        )
+      }
+    } catch (error: any) {
+      console.error('Error al asignar pedido a ruta:', error)
+      showToast('error', error.message || 'Error al asignar pedido a ruta')
+    }
+  }
+
   const handleGenerarRutaAutomatica = async () => {
     if (!fecha || !turno || turno === 'all') {
       showToast('error', 'Debes seleccionar una fecha y un turno específico')
@@ -192,6 +214,7 @@ export function PedidosTableWrapper() {
         onDelete={handleDelete}
         onDeliver={handleDeliver}
         onPrint={handlePrint}
+        onRoute={handleRoute}
       />
 
       <GenerarRutaModal

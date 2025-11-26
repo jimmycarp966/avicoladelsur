@@ -5,7 +5,7 @@ import { DataTable, SortableHeader, StatusBadge } from '@/components/ui/data-tab
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Edit, Trash2, Eye, Truck, FileText, Phone } from 'lucide-react'
+import { Edit, Trash2, Eye, Truck, FileText, Phone, Route } from 'lucide-react'
 import { formatDate, formatCurrency, cn } from '@/lib/utils'
 import type { Pedido } from '@/types/domain.types'
 
@@ -16,6 +16,7 @@ interface PedidosTableProps {
   onDelete?: (pedido: Pedido) => void
   onDeliver?: (pedido: Pedido) => void
   onPrint?: (pedido: Pedido) => void
+  onRoute?: (pedido: Pedido) => void
 }
 
 const getEstadoConfig = (estado: string) => {
@@ -30,7 +31,7 @@ const getEstadoConfig = (estado: string) => {
   return configs[estado as keyof typeof configs] || { label: estado, variant: 'outline' as const, color: 'bg-gray-100 text-gray-800' }
 }
 
-export function PedidosTable({ data, onView, onEdit, onDelete, onDeliver, onPrint }: PedidosTableProps) {
+export function PedidosTable({ data, onView, onEdit, onDelete, onDeliver, onPrint, onRoute }: PedidosTableProps) {
   const columns: ColumnDef<Pedido>[] = [
     {
       accessorKey: 'numero_pedido',
@@ -152,6 +153,17 @@ export function PedidosTable({ data, onView, onEdit, onDelete, onDeliver, onPrin
         >
           <Truck className="mr-2 h-4 w-4" />
           Marcar entregado
+        </Button>
+      )}
+      {onRoute && pedido.estado === 'preparando' && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onRoute(pedido)}
+          className="w-full justify-start"
+        >
+          <Route className="mr-2 h-4 w-4" />
+          Pasar a ruta
         </Button>
       )}
       {onPrint && (

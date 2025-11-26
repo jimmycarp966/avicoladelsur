@@ -1,11 +1,10 @@
-import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { ArrowLeft, Edit, User, Phone, Mail, MapPin, MessageCircle, ShoppingCart, DollarSign } from 'lucide-react'
+import { ArrowLeft, Edit, User, Phone, Mail, MapPin, MessageCircle, ShoppingCart, DollarSign, FileText } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 // import { getClienteById } from '@/actions/ventas.actions' // TODO: Implementar cuando esté disponible
 
@@ -258,38 +257,31 @@ export default async function ClienteDetallePage({ params }: ClienteDetallePageP
         </Card>
       </div>
 
-      {/* Últimos pedidos */}
+      {/* Historial de facturas (placeholder, se conectará a BD más adelante) */}
       <Card>
         <CardHeader>
-          <CardTitle>Últimos Pedidos</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Facturas del Cliente
+          </CardTitle>
           <CardDescription>
-            Historial reciente de pedidos del cliente
+            Aquí se listarán las facturas reales de este cliente cuando se conecte a la base de datos.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {/* Lista de pedidos recientes - datos de ejemplo */}
-            <div className="grid gap-3">
-              <div className="flex items-center justify-between p-3 border rounded-lg">
-                <div>
-                  <p className="font-medium">Pedido PED-2025-001</p>
-                  <p className="text-sm text-muted-foreground">{formatDate('2025-11-05T14:30:00Z')}</p>
-                </div>
-                <div className="text-right">
-                  <Badge variant="default">Entregado</Badge>
-                  <p className="text-sm font-medium mt-1">{formatCurrency(1250.00)}</p>
-                </div>
-              </div>
-              <div className="flex items-center justify-between p-3 border rounded-lg">
-                <div>
-                  <p className="font-medium">Pedido PED-2025-002</p>
-                  <p className="text-sm text-muted-foreground">{formatDate('2025-11-03T10:15:00Z')}</p>
-                </div>
-                <div className="text-right">
-                  <Badge variant="secondary">Enviado</Badge>
-                  <p className="text-sm font-medium mt-1">{formatCurrency(890.50)}</p>
-                </div>
-              </div>
+          <p className="text-sm text-muted-foreground mb-2">
+            Esta sección usará la tabla <code>facturas</code> filtrada por <code>cliente_id</code> para mostrar el historial completo.
+          </p>
+          <div className="flex items-center justify-between p-3 border rounded-lg">
+            <div>
+              <p className="font-medium">Factura FAC-20251202-0001</p>
+              <p className="text-sm text-muted-foreground">
+                {formatDate('2025-12-02T10:00:00Z')}
+              </p>
+            </div>
+            <div className="text-right">
+              <Badge variant="default">emitida</Badge>
+              <p className="text-sm font-medium mt-1">{formatCurrency(12345)}</p>
             </div>
           </div>
         </CardContent>

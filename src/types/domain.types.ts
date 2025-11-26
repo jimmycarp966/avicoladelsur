@@ -353,3 +353,256 @@ export interface NotificationItem {
   timestamp: string
   read: boolean
 }
+
+// ===========================================
+// RRHH - RECURSOS HUMANOS
+// ===========================================
+
+// Sucursal
+export interface Sucursal extends BaseEntity {
+  nombre: string
+  direccion?: string
+  telefono?: string
+  encargado_id?: string
+  activo: boolean
+  // Relaciones calculadas
+  encargado?: Empleado
+  empleados_count?: number
+}
+
+// Categoría de empleado
+export interface CategoriaEmpleado extends BaseEntity {
+  nombre: string
+  descripcion?: string
+  sueldo_basico: number
+  adicional_cajero: number
+  adicional_produccion: number
+  activo: boolean
+  // Relaciones calculadas
+  empleados_count?: number
+}
+
+// Empleado
+export interface Empleado extends BaseEntity {
+  usuario_id?: string
+  sucursal_id?: string
+  categoria_id?: string
+  legajo?: string
+  fecha_ingreso: string
+  fecha_nacimiento?: string
+  dni?: string
+  cuil?: string
+  domicilio?: string
+  telefono_personal?: string
+  contacto_emergencia?: string
+  telefono_emergencia?: string
+  obra_social?: string
+  numero_afiliado?: string
+  banco?: string
+  cbu?: string
+  numero_cuenta?: string
+  sueldo_actual?: number
+  activo: boolean
+  // Relaciones calculadas
+  usuario?: Usuario
+  sucursal?: Sucursal
+  categoria?: CategoriaEmpleado
+}
+
+// Novedades RRHH
+export interface NovedadRRHH extends BaseEntity {
+  titulo: string
+  descripcion?: string
+  tipo: 'general' | 'sucursal' | 'categoria'
+  sucursal_id?: string
+  categoria_id?: string
+  fecha_publicacion: string
+  fecha_expiracion?: string
+  prioridad: 'baja' | 'normal' | 'alta' | 'urgente'
+  activo: boolean
+  created_by?: string
+  // Relaciones calculadas
+  sucursal?: Sucursal
+  categoria?: CategoriaEmpleado
+  creador?: Usuario
+}
+
+// Asistencia
+export interface Asistencia extends BaseEntity {
+  empleado_id: string
+  fecha: string
+  hora_entrada?: string
+  hora_salida?: string
+  horas_trabajadas?: number
+  turno?: 'mañana' | 'tarde' | 'noche'
+  estado: 'presente' | 'ausente' | 'tarde' | 'licencia'
+  observaciones?: string
+  retraso_minutos: number
+  falta_sin_aviso: boolean
+  // Relaciones calculadas
+  empleado?: Empleado
+}
+
+// Licencias y descansos
+export interface Licencia extends BaseEntity {
+  empleado_id: string
+  tipo: 'vacaciones' | 'enfermedad' | 'maternidad' | 'estudio' | 'otro'
+  fecha_inicio: string
+  fecha_fin: string
+  dias_total: number
+  aprobado: boolean
+  aprobado_por?: string
+  fecha_aprobacion?: string
+  observaciones?: string
+  // Relaciones calculadas
+  empleado?: Empleado
+  aprobador?: Usuario
+}
+
+// Adelantos
+export interface Adelanto extends BaseEntity {
+  empleado_id: string
+  tipo: 'dinero' | 'producto'
+  monto?: number
+  producto_id?: string
+  cantidad?: number
+  precio_unitario?: number
+  fecha_solicitud: string
+  aprobado: boolean
+  aprobado_por?: string
+  fecha_aprobacion?: string
+  porcentaje_sueldo?: number
+  observaciones?: string
+  // Relaciones calculadas
+  empleado?: Empleado
+  producto?: Producto
+  aprobador?: Usuario
+}
+
+// Liquidaciones de sueldo
+export interface Liquidacion extends BaseEntity {
+  empleado_id: string
+  periodo_mes: number
+  periodo_anio: number
+  fecha_liquidacion: string
+  sueldo_basico: number
+  adicional_cajero: number
+  adicional_produccion: number
+  horas_trabajadas: number
+  turnos_trabajados: number
+  horas_extras: number
+  valor_hora_extra: number
+  kg_producidos: number
+  valor_kg: number
+  total_bruto: number
+  descuentos_total: number
+  adelantos_total: number
+  total_neto: number
+  estado: 'borrador' | 'calculada' | 'aprobada' | 'pagada'
+  aprobado_por?: string
+  fecha_aprobacion?: string
+  pagado: boolean
+  fecha_pago?: string
+  observaciones?: string
+  created_by?: string
+  // Relaciones calculadas
+  empleado?: Empleado
+  aprobador?: Usuario
+  creador?: Usuario
+  detalles?: LiquidacionDetalle[]
+}
+
+// Detalles de liquidación
+export interface LiquidacionDetalle extends BaseEntity {
+  liquidacion_id: string
+  tipo: string
+  descripcion?: string
+  monto: number
+  referencia_id?: string
+  // Relaciones calculadas
+  liquidacion?: Liquidacion
+}
+
+// Descuentos (distintos de adelantos)
+export interface Descuento extends BaseEntity {
+  empleado_id: string
+  tipo: 'multa' | 'daño_equipo' | 'otro'
+  monto: number
+  fecha: string
+  motivo: string
+  observaciones?: string
+  aprobado: boolean
+  aprobado_por?: string
+  fecha_aprobacion?: string
+  liquidacion_id?: string
+  // Relaciones calculadas
+  empleado?: Empleado
+  aprobador?: Usuario
+  liquidacion?: Liquidacion
+}
+
+// Evaluaciones de desempeño
+export interface Evaluacion extends BaseEntity {
+  empleado_id: string
+  sucursal_id: string
+  periodo_mes: number
+  periodo_anio: number
+  puntualidad?: number // 1-5
+  rendimiento?: number // 1-5
+  actitud?: number // 1-5
+  responsabilidad?: number // 1-5
+  trabajo_equipo?: number // 1-5
+  promedio?: number // calculado automáticamente
+  fortalezas?: string
+  areas_mejora?: string
+  objetivos?: string
+  comentarios?: string
+  evaluador_id: string
+  fecha_evaluacion: string
+  estado: 'borrador' | 'enviada' | 'completada'
+  notificado: boolean
+  fecha_notificacion?: string
+  // Relaciones calculadas
+  empleado?: Empleado
+  sucursal?: Sucursal
+  evaluador?: Usuario
+}
+
+// Tipos para estadísticas RRHH
+export interface EstadisticasRRHH {
+  empleados_activos: number
+  empleados_por_sucursal: Record<string, number>
+  asistencia_promedio: number
+  faltas_mes_actual: number
+  adelantos_pendientes: number
+  liquidaciones_pendientes: number
+  evaluaciones_pendientes: number
+}
+
+// Tipos para reportes RRHH
+export interface ReporteAsistencia {
+  empleado_id: string
+  empleado_nombre: string
+  fecha: string
+  estado: string
+  retraso_minutos: number
+  falta_sin_aviso: boolean
+}
+
+export interface ReporteLiquidacion {
+  empleado_id: string
+  empleado_nombre: string
+  periodo: string
+  total_bruto: number
+  total_neto: number
+  estado: string
+}
+
+export interface ReporteAdelantos {
+  empleado_id: string
+  empleado_nombre: string
+  tipo: string
+  monto: number
+  fecha_aprobacion: string
+  estado: string
+}

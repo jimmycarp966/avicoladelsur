@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { crearPresupuestoAction } from '@/actions/presupuestos.actions'
 import { crearReclamoBot, crearClienteDesdeBot } from '@/actions/ventas.actions'
-import { getNowArgentina } from '@/lib/utils'
 
 // Tipos para las llamadas de Botpress
 interface BotpressWebhookPayload {
@@ -668,8 +667,7 @@ const pendingConfirmations = new Map<string, {
 
 // Función auxiliar para verificar horario de atención
 function isHorarioAtencion(): { abierto: boolean; mensaje?: string } {
-  // Usar hora actual en timezone de Argentina (GMT-3)
-  const now = getNowArgentina()
+  const now = new Date()
   const hora = now.getHours()
   const dia = now.getDay() // 0 = Domingo, 6 = Sábado
   

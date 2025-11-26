@@ -62,3 +62,5 @@ BEGIN
     RAISE NOTICE 'Migración completada exitosamente. Total clientes: %, Clientes con código: %', total_clientes, clientes_con_codigo;
 END $$;
 
+
+

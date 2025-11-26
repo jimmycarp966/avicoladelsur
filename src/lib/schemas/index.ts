@@ -9,6 +9,7 @@ export * from './almacen.schema'
 export * from './reparto.schema'
 export * from './tesoreria.schema'
 export * from './presupuestos.schema'
+export * from './rrhh.schema'
 
 // Re-export de tipos
 export type {

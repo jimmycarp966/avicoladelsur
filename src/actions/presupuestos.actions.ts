@@ -229,6 +229,33 @@ export async function confirmarPresupuestoAction(formData: FormData) {
       return { success: false, message: result.error || 'Error en la conversión del presupuesto' }
     }
 
+    // Crear factura interna desde el pedido generado
+    if (result.pedido_id) {
+      try {
+        const { data: facturaResult, error: facturaError } = await supabase.rpc(
+          'fn_crear_factura_desde_pedido',
+          {
+            p_pedido_id: result.pedido_id,
+            p_user_id: user.id,
+          }
+        )
+
+        if (facturaError) {
+          console.error(
+            'Error creando factura desde pedido (presupuesto individual):',
+            facturaError
+          )
+        } else if (!facturaResult?.success) {
+          console.error(
+            'RPC fn_crear_factura_desde_pedido devolvió error:',
+            facturaResult?.error
+          )
+        }
+      } catch (factError) {
+        console.error('Excepción creando factura desde pedido:', factError)
+      }
+    }
+
     if (result.ruta_id) {
       try {
         await generateRutaOptimizada({
@@ -322,6 +349,33 @@ export async function confirmarPresupuestosAgrupadosAction(formData: FormData) {
 
     if (!result.success) {
       return { success: false, message: result.error || 'Error en la conversión de los presupuestos' }
+    }
+
+    // Crear factura interna desde el pedido consolidado
+    if (result.pedido_id) {
+      try {
+        const { data: facturaResult, error: facturaError } = await supabase.rpc(
+          'fn_crear_factura_desde_pedido',
+          {
+            p_pedido_id: result.pedido_id,
+            p_user_id: user.id,
+          }
+        )
+
+        if (facturaError) {
+          console.error(
+            'Error creando factura desde pedido (presupuestos agrupados):',
+            facturaError
+          )
+        } else if (!facturaResult?.success) {
+          console.error(
+            'RPC fn_crear_factura_desde_pedido devolvió error:',
+            facturaResult?.error
+          )
+        }
+      } catch (factError) {
+        console.error('Excepción creando factura desde pedido (agrupados):', factError)
+      }
     }
 
     if (result.ruta_id) {

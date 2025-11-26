@@ -99,13 +99,13 @@ export function PresupuestosDiaAcciones({
     setShowConfirmDialog(true)
   }
 
-  // Función para agrupar presupuestos por cliente, turno, zona y fecha
+  // Función para agrupar presupuestos por cliente, turno y zona
   const agruparPresupuestos = (presupuestos: Presupuesto[]) => {
     const grupos: Record<string, Presupuesto[]> = {}
 
     for (const presupuesto of presupuestos) {
       // Crear clave única para el grupo
-      const clave = `${presupuesto.cliente_id || 'sin-cliente'}-${presupuesto.turno || 'sin-turno'}-${presupuesto.zona_id || 'sin-zona'}-${presupuesto.fecha_entrega_estimada || 'sin-fecha'}`
+      const clave = `${presupuesto.cliente_id || 'sin-cliente'}-${presupuesto.turno || 'sin-turno'}-${presupuesto.zona_id || 'sin-zona'}`
 
       if (!grupos[clave]) {
         grupos[clave] = []
@@ -126,7 +126,7 @@ export function PresupuestosDiaAcciones({
         : presupuestos.filter((p) => p.id === presupuestoSeleccionado)
 
       if (modoMasivo) {
-        // Agrupar presupuestos por cliente/turno/zona/fecha
+        // Agrupar presupuestos por cliente/turno/zona
         const grupos = agruparPresupuestos(presupuestosAConvertir)
         let pedidosCreados = 0
         let errores = 0

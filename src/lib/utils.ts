@@ -66,6 +66,43 @@ export function formatDate(date: string | Date | null | undefined, formatString:
   }
 }
 
+export function formatTime(
+  time: string | Date | null | undefined,
+  formatString: string = 'HH:mm'
+) {
+  if (!time) {
+    return '-'
+  }
+
+  try {
+    const dateObj =
+      typeof time === 'string'
+        ? // Si viene sólo la hora (HH:mm o HH:mm:ss), crear una fecha ficticia
+          (time.length <= 8 && time.includes(':')
+            ? (() => {
+                const [hours, minutes, seconds = '0'] = time.split(':')
+                const d = getNowArgentina()
+                d.setHours(Number(hours), Number(minutes), Number(seconds), 0)
+                return d
+              })()
+            : parseISO(time))
+        : time
+
+    if (!dateObj || isNaN(dateObj.getTime())) {
+      return '-'
+    }
+
+    const dateInArgentina = toZonedTime(dateObj, TIMEZONE_ARGENTINA)
+    return formatTz(dateInArgentina, formatString, {
+      timeZone: TIMEZONE_ARGENTINA,
+      locale: es,
+    })
+  } catch (error) {
+    console.error('Error formatting time:', error)
+    return '-'
+  }
+}
+
 export function formatRelativeDate(date: string | Date | null | undefined) {
   if (!date) {
     return '-'
