@@ -132,12 +132,17 @@ export async function middleware(request: NextRequest) {
     '/rrhh',
   ]
 
+  const tesoreriaRoutes = [
+    '/tesoreria',
+  ]
+
   // Verificar permisos según rol
   const isAdminRoute = adminRoutes.some(route => pathname.startsWith(route))
   const isSellerRoute = sellerRoutes.some(route => pathname.startsWith(route))
   const isWarehouseRoute = warehouseRoutes.some(route => pathname.startsWith(route))
   const isDeliveryRoute = deliveryRoutes.some(route => pathname.startsWith(route))
   const isRrhhRoute = rrhhRoutes.some(route => pathname.startsWith(route))
+  const isTesoreriaRoute = tesoreriaRoutes.some(route => pathname.startsWith(route))
 
   // Rutas de repartidor (PWA móvil)
   const isDriverRoute = pathname.startsWith('/repartidor')
@@ -147,7 +152,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/unauthorized', request.url))
   }
 
-  if (isSellerRoute && !['admin', 'vendedor'].includes(userRole)) {
+  if (isSellerRoute && !['admin', 'vendedor', 'sucursal'].includes(userRole)) {
     return NextResponse.redirect(new URL('/unauthorized', request.url))
   }
 
@@ -162,6 +167,11 @@ export async function middleware(request: NextRequest) {
 
   if (isRrhhRoute && userRole !== 'admin') {
     // Solo admin puede acceder a RRHH
+    return NextResponse.redirect(new URL('/unauthorized', request.url))
+  }
+
+  if (isTesoreriaRoute && !['admin', 'tesorero'].includes(userRole)) {
+    // Admin y tesorero pueden acceder a tesorería
     return NextResponse.redirect(new URL('/unauthorized', request.url))
   }
 

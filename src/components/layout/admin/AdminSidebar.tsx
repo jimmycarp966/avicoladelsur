@@ -48,7 +48,7 @@ const navigation = [
     name: 'Ventas',
     href: '/ventas',
     icon: ShoppingCart,
-    roles: ['admin', 'vendedor'],
+    roles: ['admin', 'vendedor', 'sucursal'],
     children: [
       { name: 'Presupuestos', href: '/ventas/presupuestos' },
       { name: 'Clientes', href: '/ventas/clientes' },
@@ -70,7 +70,7 @@ const navigation = [
     name: 'Tesorería',
     href: '/tesoreria',
     icon: DollarSign,
-    roles: ['admin'],
+    roles: ['admin', 'tesorero'],
     children: [
       { name: 'Cajas', href: '/tesoreria/cajas' },
       { name: 'Movimientos', href: '/tesoreria/movimientos' },

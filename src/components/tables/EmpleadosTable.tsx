@@ -38,8 +38,9 @@ export function EmpleadosTable({ empleados, onView, onEdit, onDelete, onCall, on
       ),
       cell: ({ row }) => {
         const empleado = row.original
-        const nombre = empleado.usuario?.nombre || ''
-        const apellido = empleado.usuario?.apellido || ''
+        // Usar nombre/apellido de usuario si existe, sino usar campos directos de empleado
+        const nombre = empleado.usuario?.nombre || empleado.nombre || ''
+        const apellido = empleado.usuario?.apellido || empleado.apellido || ''
         const nombreCompleto = `${nombre} ${apellido}`.trim()
         const email = empleado.usuario?.email || ''
 
@@ -47,7 +48,7 @@ export function EmpleadosTable({ empleados, onView, onEdit, onDelete, onCall, on
           <div className="flex items-center gap-3">
             <Avatar className="h-8 w-8">
               <AvatarFallback className="text-xs bg-blue-100 text-blue-700">
-                {nombreCompleto.charAt(0).toUpperCase()}
+                {nombreCompleto.charAt(0).toUpperCase() || '?'}
               </AvatarFallback>
             </Avatar>
             <div>

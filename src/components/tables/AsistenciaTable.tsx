@@ -57,8 +57,9 @@ export function AsistenciaTable({ asistencia, onEdit }: AsistenciaTableProps) {
       ),
       cell: ({ row }) => {
         const empleado = row.original.empleado
-        const nombre = empleado?.usuario?.nombre || ''
-        const apellido = empleado?.usuario?.apellido || ''
+        // Usar nombre/apellido de usuario si existe, sino usar campos directos de empleado
+        const nombre = empleado?.usuario?.nombre || empleado?.nombre || ''
+        const apellido = empleado?.usuario?.apellido || empleado?.apellido || ''
         const legajo = empleado?.legajo || ''
         const nombreCompleto = `${nombre} ${apellido}`.trim()
 

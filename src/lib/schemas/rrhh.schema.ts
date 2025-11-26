@@ -87,6 +87,16 @@ export const empleadoSchema = z.object({
       message: 'El legajo solo puede contener letras mayúsculas, números, guiones y guiones bajos',
     }),
 
+  nombre: z
+    .string()
+    .max(255, 'El nombre debe tener máximo 255 caracteres')
+    .optional(),
+
+  apellido: z
+    .string()
+    .max(255, 'El apellido debe tener máximo 255 caracteres')
+    .optional(),
+
   fecha_ingreso: z
     .string()
     .refine((val) => !isNaN(Date.parse(val)), {
@@ -173,6 +183,16 @@ export const empleadoSchema = z.object({
   sueldo_actual: z
     .number()
     .min(0, 'El sueldo debe ser mayor o igual a 0')
+    .optional(),
+
+  valor_jornal_presentismo: z
+    .number()
+    .min(0, 'El valor jornal debe ser mayor o igual a 0')
+    .optional(),
+
+  valor_hora: z
+    .number()
+    .min(0, 'El valor hora debe ser mayor o igual a 0')
     .optional(),
 
   activo: z.boolean().default(true)

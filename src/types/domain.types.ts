@@ -388,6 +388,8 @@ export interface Empleado extends BaseEntity {
   sucursal_id?: string
   categoria_id?: string
   legajo?: string
+  nombre?: string
+  apellido?: string
   fecha_ingreso: string
   fecha_nacimiento?: string
   dni?: string
@@ -402,6 +404,8 @@ export interface Empleado extends BaseEntity {
   cbu?: string
   numero_cuenta?: string
   sueldo_actual?: number
+  valor_jornal_presentismo?: number
+  valor_hora?: number
   activo: boolean
   // Relaciones calculadas
   usuario?: Usuario
