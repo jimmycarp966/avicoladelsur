@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { registrarRetiroTesoroAction, registrarDepositoBancarioAction } from '@/actions/tesoreria.actions'
 import { registrarGasto } from '@/actions/gastos.actions'
 import { toast } from 'sonner'
+import { getTodayArgentina } from '@/lib/utils'
 
 interface TesoroFormProps {
   categorias: Array<{ id: string; nombre: string }>
@@ -29,7 +30,7 @@ export function TesoroForm({ categorias }: TesoroFormProps) {
   
   // Estados para gasto
   const [categoriaId, setCategoriaId] = useState('')
-  const [fechaGasto, setFechaGasto] = useState(new Date().toISOString().split('T')[0])
+  const [fechaGasto, setFechaGasto] = useState(getTodayArgentina())
   const [metodoPagoGasto, setMetodoPagoGasto] = useState<'efectivo' | 'transferencia' | 'qr' | 'tarjeta'>('transferencia')
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -83,7 +84,7 @@ export function TesoroForm({ categorias }: TesoroFormProps) {
           setMonto('')
           setDescripcion('')
           setCategoriaId('')
-          setFechaGasto(new Date().toISOString().split('T')[0])
+          setFechaGasto(getTodayArgentina())
           router.refresh()
         } else {
           toast.error(result.error || 'Error al registrar gasto')

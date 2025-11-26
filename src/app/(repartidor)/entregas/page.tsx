@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { createClient } from '@/lib/supabase/server'
 import { RepartoSkeleton } from './reparto-skeleton'
 import { obtenerRutasPorVehiculoAction } from '@/actions/reparto.actions'
+import { getTodayArgentina } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,7 +42,7 @@ async function RepartoContent({ searchParams }: { searchParams: { fecha?: string
   }
 
   // Filtros
-  const fechaFiltro = searchParams.fecha || new Date().toISOString().split('T')[0]
+  const fechaFiltro = searchParams.fecha || getTodayArgentina()
   const turnoFiltro = searchParams.turno || undefined
 
   // Obtener rutas del vehículo del repartidor

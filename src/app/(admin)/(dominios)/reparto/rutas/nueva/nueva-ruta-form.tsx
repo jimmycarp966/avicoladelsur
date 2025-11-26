@@ -12,6 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import { crearRuta } from '@/actions/reparto.actions'
 import { toast } from 'sonner'
+import { getTodayArgentina } from '@/lib/utils'
 
 interface NuevaRutaFormProps {
   vehiculos: Array<{ id: string; patente: string; marca?: string; modelo?: string; capacidad_kg: number }>
@@ -34,7 +35,7 @@ export function NuevaRutaForm({ vehiculos, repartidores, zonas, pedidos }: Nueva
   const [loading, setLoading] = useState(false)
   const [vehiculoId, setVehiculoId] = useState('')
   const [repartidorId, setRepartidorId] = useState('')
-  const [fechaRuta, setFechaRuta] = useState(new Date().toISOString().split('T')[0])
+  const [fechaRuta, setFechaRuta] = useState(getTodayArgentina())
   const [turno, setTurno] = useState<'mañana' | 'tarde' | ''>('')
   const [zonaId, setZonaId] = useState('')
   const [pedidosSeleccionados, setPedidosSeleccionados] = useState<Set<string>>(new Set())

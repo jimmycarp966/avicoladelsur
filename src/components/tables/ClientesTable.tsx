@@ -21,6 +21,15 @@ interface ClientesTableProps {
 export function ClientesTable({ data, onView, onEdit, onDelete, onCall, onWhatsApp }: ClientesTableProps) {
   const columns: ColumnDef<Cliente>[] = [
     {
+      accessorKey: 'codigo',
+      header: ({ column }) => (
+        <SortableHeader column={column}>Código</SortableHeader>
+      ),
+      cell: ({ row }) => (
+        <div className="font-semibold text-primary text-base">{row.getValue('codigo')}</div>
+      ),
+    },
+    {
       accessorKey: 'nombre',
       header: ({ column }) => (
         <SortableHeader column={column}>Cliente</SortableHeader>
@@ -193,7 +202,7 @@ export function ClientesTable({ data, onView, onEdit, onDelete, onCall, onWhatsA
       columns={columns}
       data={data}
       searchKey="nombre"
-      searchPlaceholder="Buscar por nombre, teléfono..."
+      searchPlaceholder="Buscar por código, nombre, teléfono..."
       actions={actions}
       enableRowSelection={true}
       enableColumnVisibility={true}

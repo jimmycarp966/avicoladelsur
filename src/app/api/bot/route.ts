@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { crearPresupuestoAction } from '@/actions/presupuestos.actions'
 import { crearReclamoBot, crearClienteDesdeBot } from '@/actions/ventas.actions'
+import { getNowArgentina } from '@/lib/utils'
 
 // Tipos para las llamadas de Botpress
 interface BotpressWebhookPayload {
@@ -30,13 +31,32 @@ async function findClienteByPhone(phone: string) {
 
   const { data: cliente, error } = await supabase
     .from('clientes')
-    .select('id, nombre, telefono, whatsapp')
+    .select('id, codigo, nombre, telefono, whatsapp')
     .or(`telefono.ilike.%${normalizedPhone}%,whatsapp.ilike.%${normalizedPhone}%`)
     .eq('activo', true)
     .single()
 
   if (error && error.code !== 'PGRST116') {
     console.error('Error finding cliente:', error)
+    return null
+  }
+
+  return cliente
+}
+
+// Función auxiliar para encontrar cliente por código
+async function findClienteByCode(code: string) {
+  const supabase = await createClient()
+
+  const { data: cliente, error } = await supabase
+    .from('clientes')
+    .select('id, codigo, nombre, telefono, whatsapp')
+    .eq('codigo', code.toUpperCase())
+    .eq('activo', true)
+    .single()
+
+  if (error && error.code !== 'PGRST116') {
+    console.error('Error finding cliente by code:', error)
     return null
   }
 
@@ -648,7 +668,8 @@ const pendingConfirmations = new Map<string, {
 
 // Función auxiliar para verificar horario de atención
 function isHorarioAtencion(): { abierto: boolean; mensaje?: string } {
-  const now = new Date()
+  // Usar hora actual en timezone de Argentina (GMT-3)
+  const now = getNowArgentina()
   const hora = now.getHours()
   const dia = now.getDay() // 0 = Domingo, 6 = Sábado
   

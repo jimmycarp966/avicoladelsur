@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
 import { createClient } from '@/lib/supabase/server'
+import { getNowArgentina } from '@/lib/utils'
 
 const planRutaSchema = z.object({
   zonaId: z.string().uuid('Zona inválida'),
@@ -44,7 +45,7 @@ export async function crearPlanRutaAction(formData: FormData) {
   if (data.semanaInicio) {
     semanaInicio = new Date(data.semanaInicio)
   } else {
-    semanaInicio = calcularInicioSemana(new Date())
+    semanaInicio = calcularInicioSemana(getNowArgentina())
   }
   semanaInicio = calcularInicioSemana(semanaInicio) // Asegurar que sea lunes
 

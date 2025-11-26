@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label'
 import { Loader2, Save, Plus, Trash2, Search, X } from 'lucide-react'
 import { crearPresupuestoAction } from '@/actions/presupuestos.actions'
 import { useNotificationStore } from '@/store/notificationStore'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, getTodayArgentina } from '@/lib/utils'
 import { useDebounce } from '@/lib/hooks/useDebounce'
 import { ProductoItemRow } from './producto-item-row'
 
@@ -33,7 +33,7 @@ const crearPresupuestoSchema = z.object({
 type CrearPresupuestoFormData = z.infer<typeof crearPresupuestoSchema>
 
 interface PresupuestoFormProps {
-  clientes: Array<{ id: string; nombre: string; telefono?: string; zona_entrega?: string }>
+  clientes: Array<{ id: string; nombre: string; telefono?: string; zona_entrega?: string; codigo?: string }>
   productos: Array<{ id: string; codigo: string; nombre: string; precio_venta: number; unidad_medida: string; categoria?: string }>
   zonas: Array<{ id: string; nombre: string }>
 }
@@ -57,7 +57,7 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
   } = useForm<CrearPresupuestoFormData>({
     resolver: zodResolver(crearPresupuestoSchema),
     defaultValues: {
-      fecha_entrega_estimada: new Date().toISOString().split('T')[0], // Fecha de hoy por defecto
+      fecha_entrega_estimada: getTodayArgentina(), // Fecha de hoy por defecto
       observaciones: '',
       items: [{ producto_id: '', cantidad_solicitada: 1, precio_unit_est: 0 }],
     },
@@ -234,6 +234,7 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
                     return filtered.length > 0 ? (
                       filtered.map((cliente) => (
                         <SelectItem key={cliente.id} value={cliente.id}>
+                          {cliente.codigo && `[${cliente.codigo}] `}
                           {cliente.nombre} {cliente.telefono && `- ${cliente.telefono}`}
                           {cliente.zona_entrega && ` (${cliente.zona_entrega})`}
                         </SelectItem>

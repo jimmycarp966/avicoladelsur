@@ -12,6 +12,7 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion'
 import { createClient } from '@/lib/supabase/server'
+import { getTodayArgentina } from '@/lib/utils'
 import { PresupuestosDiaSkeleton } from './presupuestos-dia-skeleton'
 import { PresupuestosDiaFiltros } from './presupuestos-dia-filtros'
 import { PresupuestosDiaAcciones, PresupuestoIndividualAccion } from '@/components/almacen/PresupuestosDiaAcciones'
@@ -44,7 +45,7 @@ async function PresupuestosDiaContent({
     `
 
   // Obtener parámetros de filtro
-  const fecha = searchParams?.fecha || new Date().toISOString().split('T')[0]
+  const fecha = searchParams?.fecha || getTodayArgentina()
   const zonaId = searchParams?.zona_id
   const turno = searchParams?.turno
 

@@ -12,6 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import { actualizarRuta } from '@/actions/reparto.actions'
 import { toast } from 'sonner'
+import { getTodayArgentina } from '@/lib/utils'
 
 interface EditarRutaFormProps {
   ruta: any
@@ -43,7 +44,7 @@ export function EditarRutaForm({
   const [loading, setLoading] = useState(false)
   const [vehiculoId, setVehiculoId] = useState(ruta.vehiculo_id || '')
   const [repartidorId, setRepartidorId] = useState(ruta.repartidor_id || '')
-  const [fechaRuta, setFechaRuta] = useState(ruta.fecha_ruta ? ruta.fecha_ruta.split('T')[0] : new Date().toISOString().split('T')[0])
+  const [fechaRuta, setFechaRuta] = useState(ruta.fecha_ruta ? ruta.fecha_ruta.split('T')[0] : getTodayArgentina())
   const [turno, setTurno] = useState<'mañana' | 'tarde' | ''>((ruta.turno as 'mañana' | 'tarde') || '')
   const [zonaId, setZonaId] = useState(ruta.zona_id || '')
   const [pedidosSeleccionados, setPedidosSeleccionados] = useState<Set<string>>(new Set(pedidosAsignados))

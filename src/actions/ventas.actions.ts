@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { getNowArgentina } from '@/lib/utils'
 import type {
   CrearPedidoParams,
   CrearPedidoBotParams,
@@ -15,6 +16,7 @@ import type {
 // Crear cliente
 export async function crearCliente(
   clienteData: {
+    codigo: string
     nombre: string
     telefono?: string
     whatsapp?: string
@@ -28,6 +30,20 @@ export async function crearCliente(
 ): Promise<ApiResponse<{ clienteId: string }>> {
   try {
     const supabase = await createClient()
+
+    // Validar unicidad del código
+    const { data: existingCliente, error: checkError } = await supabase
+      .from('clientes')
+      .select('id')
+      .eq('codigo', clienteData.codigo)
+      .single()
+
+    if (existingCliente) {
+      return {
+        success: false,
+        error: 'El código ya está en uso por otro cliente',
+      }
+    }
 
     const { data, error } = await supabase
       .from('clientes')
@@ -90,10 +106,35 @@ export async function crearClienteDesdeBot(
       ? `${clienteData.nombre} ${clienteData.apellido}`
       : clienteData.nombre
 
+    // Generar código automático basado en timestamp y nombre
+    // Formato: CLI-YYYYMMDDHHMMSS o usar un contador
+    const timestamp = Date.now().toString().slice(-10)
+    const codigoBase = nombreCompleto
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '')
+      .slice(0, 10)
+    const codigoAuto = `CLI-${codigoBase}-${timestamp}`.slice(0, 50)
+
+    // Verificar que el código no exista, si existe, agregar número
+    let codigoFinal = codigoAuto
+    let contador = 1
+    while (true) {
+      const { data: existing } = await supabase
+        .from('clientes')
+        .select('id')
+        .eq('codigo', codigoFinal)
+        .single()
+      
+      if (!existing) break
+      codigoFinal = `${codigoAuto.slice(0, 45)}-${contador}`.slice(0, 50)
+      contador++
+    }
+
     // Obtener zona_id de la localidad
     const { data: cliente, error } = await supabase
       .from('clientes')
       .insert({
+        codigo: codigoFinal,
         nombre: nombreCompleto,
         telefono: clienteData.telefono || clienteData.whatsapp,
         whatsapp: clienteData.whatsapp,
@@ -159,7 +200,7 @@ export async function eliminarCliente(
       .from('clientes')
       .update({
         activo: false,
-        updated_at: new Date().toISOString(),
+        updated_at: getNowArgentina().toISOString(),
       })
       .eq('id', clienteId)
 
@@ -184,6 +225,7 @@ export async function eliminarCliente(
 export async function actualizarCliente(
   clienteId: string,
   updates: Partial<{
+    codigo?: string
     nombre: string
     telefono?: string
     whatsapp?: string
@@ -199,11 +241,28 @@ export async function actualizarCliente(
   try {
     const supabase = await createClient()
 
+    // Si se está actualizando el código, validar unicidad
+    if (updates.codigo) {
+      const { data: existingCliente, error: checkError } = await supabase
+        .from('clientes')
+        .select('id')
+        .eq('codigo', updates.codigo)
+        .neq('id', clienteId)
+        .single()
+
+      if (existingCliente) {
+        return {
+          success: false,
+          error: 'El código ya está en uso por otro cliente',
+        }
+      }
+    }
+
     const { error } = await supabase
       .from('clientes')
       .update({
         ...updates,
-        updated_at: new Date().toISOString(),
+        updated_at: getNowArgentina().toISOString(),
       })
       .eq('id', clienteId)
 
@@ -243,7 +302,7 @@ export async function obtenerClientes(
       .order('created_at', { ascending: false })
 
     if (filtros?.search) {
-      query = query.or(`nombre.ilike.%${filtros.search}%,telefono.ilike.%${filtros.search}%`)
+      query = query.or(`codigo.ilike.%${filtros.search}%,nombre.ilike.%${filtros.search}%,telefono.ilike.%${filtros.search}%`)
     }
 
     if (filtros?.zona_entrega) {
@@ -412,8 +471,8 @@ export async function actualizarEstadoPedido(
       .from('pedidos')
       .update({
         estado,
-        updated_at: new Date().toISOString(),
-        ...(estado === 'entregado' && { fecha_entrega_real: new Date().toISOString() }),
+        updated_at: getNowArgentina().toISOString(),
+        ...(estado === 'entregado' && { fecha_entrega_real: getNowArgentina().toISOString() }),
       })
       .eq('id', pedidoId)
 
@@ -683,11 +742,11 @@ export async function actualizarEstadoReclamo(
 
     const updateData: any = {
       estado,
-      updated_at: new Date().toISOString(),
+      updated_at: getNowArgentina().toISOString(),
     }
 
     if (estado === 'resuelto' || estado === 'cerrado') {
-      updateData.fecha_resolucion = new Date().toISOString()
+      updateData.fecha_resolucion = getNowArgentina().toISOString()
       updateData.solucion = solucion
     }
 

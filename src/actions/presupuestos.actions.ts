@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { createNotification } from './index'
 import { generateRutaOptimizada } from '@/lib/services/ruta-optimizer'
 import { confirmarPresupuestosAgrupadosSchema } from '@/lib/schemas/presupuestos.schema'
+import { getNowArgentina } from '@/lib/utils'
 
 // Schemas de validación
 const crearPresupuestoSchema = z.object({
@@ -159,7 +160,7 @@ export async function reservarStockAction(formData: FormData) {
       .from('presupuestos')
       .update({
         estado: result.errores.length === 0 ? 'pendiente' : 'pendiente',
-        updated_at: new Date().toISOString()
+        updated_at: getNowArgentina().toISOString()
       })
       .eq('id', data.presupuesto_id)
 
@@ -632,7 +633,7 @@ export async function recalcularPresupuestoAction(presupuestoId: string) {
         .update({
           precio_unit_est: precioActual,
           subtotal_est: subtotalEst,
-          updated_at: new Date().toISOString(),
+          updated_at: getNowArgentina().toISOString(),
         })
         .eq('id', item.id)
 
@@ -644,7 +645,7 @@ export async function recalcularPresupuestoAction(presupuestoId: string) {
       .from('presupuestos')
       .update({
         total_estimado: totalEstimado,
-        updated_at: new Date().toISOString(),
+        updated_at: getNowArgentina().toISOString(),
       })
       .eq('id', presupuestoId)
 
@@ -704,7 +705,7 @@ export async function actualizarPresupuestoAction(formData: FormData) {
 
     // Actualizar presupuesto
     const updateData: any = {
-      updated_at: new Date().toISOString(),
+          updated_at: getNowArgentina().toISOString(),
     }
 
     if (observaciones !== null) {
@@ -776,7 +777,7 @@ export async function enviarPresupuestoAlmacenAction(presupuestoId: string) {
       .update({
         estado: 'en_almacen',
         usuario_almacen: user.id,
-        updated_at: new Date().toISOString()
+        updated_at: getNowArgentina().toISOString()
       })
       .eq('id', presupuestoId)
       .eq('estado', 'pendiente')
@@ -967,7 +968,7 @@ export async function recalcularRecargosAction(presupuestoId: string) {
       .from('presupuestos')
       .update({
         recargo_total: recargoTotal,
-        updated_at: new Date().toISOString()
+        updated_at: getNowArgentina().toISOString()
       })
       .eq('id', presupuestoId)
 

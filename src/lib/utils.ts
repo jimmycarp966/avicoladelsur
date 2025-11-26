@@ -1,13 +1,48 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
-import { format, formatDistanceToNow, parseISO } from 'date-fns'
+import { format, formatDistanceToNow, formatDistance, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { toZonedTime, format as formatTz } from 'date-fns-tz'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+// ===========================================
+// UTILIDADES DE TIMEZONE GMT-3 (Argentina)
+// ===========================================
+
+const TIMEZONE_ARGENTINA = 'America/Argentina/Buenos_Aires'
+
+/**
+ * Obtiene la fecha/hora actual en timezone de Argentina (GMT-3)
+ * @returns Date con la fecha/hora actual en Argentina
+ */
+export function getNowArgentina(): Date {
+  const now = new Date()
+  // Convertir la hora actual a timezone de Argentina
+  return toZonedTime(now, TIMEZONE_ARGENTINA)
+}
+
+/**
+ * Obtiene la fecha de hoy en timezone de Argentina (GMT-3)
+ * @returns string en formato YYYY-MM-DD
+ */
+export function getTodayArgentina(): string {
+  const today = getNowArgentina()
+  const year = today.getFullYear()
+  const month = String(today.getMonth() + 1).padStart(2, '0')
+  const day = String(today.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 // Utilidades de formato de fecha
+/**
+ * Formatea una fecha mostrándola en timezone de Argentina (GMT-3)
+ * @param date - Fecha a formatear (string ISO, Date, null o undefined)
+ * @param formatString - Formato deseado (por defecto 'dd/MM/yyyy')
+ * @returns Fecha formateada en timezone de Argentina
+ */
 export function formatDate(date: string | Date | null | undefined, formatString: string = 'dd/MM/yyyy') {
   if (!date) {
     return '-'
@@ -18,7 +53,13 @@ export function formatDate(date: string | Date | null | undefined, formatString:
     if (!dateObj || isNaN(dateObj.getTime())) {
       return '-'
     }
-    return format(dateObj, formatString, { locale: es })
+    
+    // Convertir a timezone de Argentina antes de formatear
+    const dateInArgentina = toZonedTime(dateObj, TIMEZONE_ARGENTINA)
+    return formatTz(dateInArgentina, formatString, { 
+      timeZone: TIMEZONE_ARGENTINA,
+      locale: es 
+    })
   } catch (error) {
     console.error('Error formatting date:', error)
     return '-'
@@ -35,7 +76,13 @@ export function formatRelativeDate(date: string | Date | null | undefined) {
     if (!dateObj || isNaN(dateObj.getTime())) {
       return '-'
     }
-    return formatDistanceToNow(dateObj, { addSuffix: true, locale: es })
+    // Convertir a timezone de Argentina para cálculos relativos
+    const dateInArgentina = toZonedTime(dateObj, TIMEZONE_ARGENTINA)
+    const nowInArgentina = getNowArgentina()
+    return formatDistance(dateInArgentina, nowInArgentina, { 
+      addSuffix: true, 
+      locale: es
+    })
   } catch (error) {
     console.error('Error formatting relative date:', error)
     return '-'

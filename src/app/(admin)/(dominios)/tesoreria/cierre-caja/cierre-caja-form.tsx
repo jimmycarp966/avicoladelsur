@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { crearCierreCajaAction } from '@/actions/tesoreria.actions'
 import { toast } from 'sonner'
+import { getTodayArgentina } from '@/lib/utils'
 
 interface CierreCajaFormProps {
   cajas: Array<{ id: string; nombre: string; moneda: string }>
@@ -19,7 +20,7 @@ export function CierreCajaForm({ cajas }: CierreCajaFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [cajaId, setCajaId] = useState('')
-  const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0])
+  const [fecha, setFecha] = useState(getTodayArgentina())
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

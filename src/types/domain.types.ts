@@ -33,6 +33,7 @@ export interface Producto extends BaseEntity {
 
 // Cliente
 export interface Cliente extends BaseEntity {
+  codigo: string
   nombre: string
   telefono?: string
   whatsapp?: string

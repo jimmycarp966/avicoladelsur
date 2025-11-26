@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getTodayArgentina } from '@/lib/utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest) {
     
     // Obtener query params
     const searchParams = request.nextUrl.searchParams
-    const fecha = searchParams.get('fecha') || new Date().toISOString().split('T')[0]
+    const fecha = searchParams.get('fecha') || getTodayArgentina()
     const zonaId = searchParams.get('zona_id') || null
     
     // Llamar RPC

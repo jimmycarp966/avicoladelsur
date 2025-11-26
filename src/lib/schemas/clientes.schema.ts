@@ -2,6 +2,12 @@ import { z } from 'zod'
 
 // Esquema para crear/editar clientes
 export const clienteSchema = z.object({
+  codigo: z
+    .string()
+    .min(1, 'El código es requerido')
+    .max(50, 'El código debe tener máximo 50 caracteres')
+    .regex(/^[A-Z0-9-_]+$/, 'El código solo puede contener letras mayúsculas, números, guiones y guiones bajos'),
+
   nombre: z
     .string()
     .min(1, 'El nombre es requerido')

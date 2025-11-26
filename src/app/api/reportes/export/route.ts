@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { exportReportSchema } from '@/lib/schemas/tesoreria.schema'
 import PDFDocument from 'pdfkit'
+import { getTodayArgentina } from '@/lib/utils'
 
 function toCsv(headers: string[], rows: Array<Record<string, any>>) {
   const escape = (value: any) => {
@@ -223,7 +224,7 @@ export async function POST(request: Request) {
         // Reporte de kg por ruta y ventas del día
         const fecha = parsed.data.filtros?.fecha 
           ? new Date(parsed.data.filtros.fecha as string).toISOString().split('T')[0]
-          : new Date().toISOString().split('T')[0]
+          : getTodayArgentina()
 
         headers = [
           'numero_ruta',

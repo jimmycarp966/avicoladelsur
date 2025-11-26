@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
+import { getNowArgentina, getTodayArgentina } from '@/lib/utils'
 
 // Schemas de validación
 const crearCierreCajaSchema = z.object({
@@ -312,7 +313,7 @@ export async function cerrarCierreCajaAction(formData: FormData) {
         gastos: data.gastos,
         retiro_tesoro: data.retiro_tesoro,
         estado: 'cerrado',
-        updated_at: new Date().toISOString(),
+        updated_at: getNowArgentina().toISOString(),
       })
       .eq('id', data.cierre_id)
 
@@ -598,7 +599,7 @@ export async function obtenerResumenTesoreria() {
       .select('id, nombre, saldo_actual, moneda')
 
     // Obtener movimientos del día
-    const hoy = new Date().toISOString().split('T')[0]
+    const hoy = getTodayArgentina()
     const { data: movimientosHoy } = await supabase
       .from('tesoreria_movimientos')
       .select('tipo, monto')
@@ -671,7 +672,7 @@ export async function registrarPagoPedido(data: {
       .from('pedidos')
       .update({
         pago_estado: 'pagado',
-        updated_at: new Date().toISOString(),
+        updated_at: getNowArgentina().toISOString(),
       })
       .eq('id', data.pedido_id)
 
@@ -842,7 +843,7 @@ export async function validarRutaAction(formData: FormData) {
             .from('cuentas_corrientes')
             .update({
               saldo: nuevoSaldo,
-              updated_at: new Date().toISOString(),
+              updated_at: getNowArgentina().toISOString(),
             })
             .eq('id', cuentaId)
 
@@ -868,7 +869,7 @@ export async function validarRutaAction(formData: FormData) {
             .from('clientes')
             .update({
               bloqueado_por_deuda: debeBloquear,
-              updated_at: new Date().toISOString(),
+              updated_at: getNowArgentina().toISOString(),
             })
             .eq('id', pedido.cliente_id)
 
@@ -883,10 +884,10 @@ export async function validarRutaAction(formData: FormData) {
       .update({
         validada_por_tesorero: true,
         tesorero_validador_id: user.id,
-        fecha_validacion: new Date().toISOString(),
+        fecha_validacion: getNowArgentina().toISOString(),
         recaudacion_total_validada: monto_fisico_recibido || ruta.recaudacion_total_registrada,
         observaciones_validacion: observaciones,
-        updated_at: new Date().toISOString(),
+        updated_at: getNowArgentina().toISOString(),
       })
       .eq('id', ruta_id)
 

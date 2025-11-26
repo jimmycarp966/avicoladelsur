@@ -18,6 +18,7 @@ import { useNotificationStore } from '@/store/notificationStore'
 interface ClienteFormProps {
   cliente?: {
     id: string
+    codigo: string
     nombre: string
     telefono?: string
     whatsapp?: string
@@ -47,6 +48,7 @@ export function ClienteForm({ cliente, onSuccess }: ClienteFormProps) {
   } = useForm<ClienteFormData>({
     resolver: zodResolver(clienteSchema),
     defaultValues: cliente ? {
+      codigo: cliente.codigo || '',
       nombre: cliente.nombre,
       telefono: cliente.telefono || '',
       whatsapp: cliente.whatsapp || '',
@@ -58,6 +60,7 @@ export function ClienteForm({ cliente, onSuccess }: ClienteFormProps) {
       limite_credito: cliente.limite_credito,
       activo: cliente.activo,
     } : {
+      codigo: '',
       nombre: '',
       telefono: '',
       whatsapp: '',
@@ -113,6 +116,23 @@ export function ClienteForm({ cliente, onSuccess }: ClienteFormProps) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="codigo">Código *</Label>
+            <Input
+              id="codigo"
+              placeholder="Ej: 115, CLI-001"
+              {...register('codigo')}
+              disabled={isLoading}
+              className="uppercase"
+            />
+            {errors.codigo && (
+              <p className="text-sm text-destructive">{errors.codigo.message}</p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Código único del cliente (números o letras mayúsculas)
+            </p>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="nombre">Nombre *</Label>
             <Input

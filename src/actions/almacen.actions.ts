@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { useNotificationStore } from '@/store/notificationStore'
+import { getNowArgentina } from '@/lib/utils'
 import type {
   IngresarMercaderiaParams,
   MovimientoStockParams,
@@ -73,7 +74,7 @@ export async function actualizarLote(
       .from('lotes')
       .update({
         ...updates,
-        updated_at: new Date().toISOString(),
+        updated_at: getNowArgentina().toISOString(),
       })
       .eq('id', loteId)
 
@@ -227,7 +228,7 @@ export async function ajustarStock(
       .from('lotes')
       .update({
         cantidad_disponible: nuevaCantidad,
-        updated_at: new Date().toISOString(),
+        updated_at: getNowArgentina().toISOString(),
       })
       .eq('id', params.lote_id)
 
@@ -701,7 +702,7 @@ export async function actualizarProducto(
         unidad_medida: data.unidad_medida,
         stock_minimo: data.stock_minimo,
         activo: data.activo ?? true,
-        updated_at: new Date().toISOString(),
+        updated_at: getNowArgentina().toISOString(),
       })
       .eq('id', productoId)
 
@@ -749,7 +750,7 @@ export async function eliminarProducto(
       .from('productos')
       .update({
         activo: false,
-        updated_at: new Date().toISOString(),
+        updated_at: getNowArgentina().toISOString(),
       })
       .eq('id', productoId)
 

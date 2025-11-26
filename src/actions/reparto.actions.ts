@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { generateRutaOptimizada } from '@/lib/services/ruta-optimizer'
+import { getNowArgentina, getTodayArgentina } from '@/lib/utils'
 import type {
   CrearVehiculoParams,
   ChecklistVehiculoParams,
@@ -66,7 +67,7 @@ export async function registrarChecklistVehiculo(
       .insert({
         ...params,
         usuario_id: user.id,
-        fecha_check: new Date().toISOString().split('T')[0], // Fecha actual
+        fecha_check: getTodayArgentina(), // Fecha actual
         aprobado: true, // Por defecto aprobado, se puede cambiar según lógica
       })
       .select()
@@ -220,7 +221,7 @@ export async function actualizarRuta(
 
     // Preparar datos de actualización
     const updateData: any = {
-      updated_at: new Date().toISOString(),
+      updated_at: getNowArgentina().toISOString(),
     }
 
     if (params.vehiculo_id) updateData.vehiculo_id = params.vehiculo_id
@@ -371,7 +372,7 @@ export async function iniciarRuta(
       .from('rutas_reparto')
       .update({
         estado: 'en_curso',
-        updated_at: new Date().toISOString(),
+        updated_at: getNowArgentina().toISOString(),
       })
       .eq('id', rutaId)
 
@@ -432,7 +433,7 @@ export async function finalizarRuta(
     const updateData: any = {
       estado: 'completada',
       tiempo_real_min: tiempoRealMin,
-      updated_at: new Date().toISOString(),
+      updated_at: getNowArgentina().toISOString(),
     }
 
     if (checklistFinId) {
@@ -627,11 +628,11 @@ export async function actualizarEstadoEntrega(
 
     const updateData: any = {
       estado_entrega: estado,
-      updated_at: new Date().toISOString(),
+      updated_at: getNowArgentina().toISOString(),
     }
 
     if (estado === 'entregado') {
-      updateData.fecha_hora_entrega = new Date().toISOString()
+      updateData.fecha_hora_entrega = getNowArgentina().toISOString()
     }
 
     const { error } = await supabase
@@ -859,7 +860,7 @@ export async function crearMantenimientoVehiculo(
       .insert({
         vehiculo_id: vehiculoId,
         usuario_id: user.id,
-        fecha_check: data.fecha || new Date().toISOString().split('T')[0],
+        fecha_check: data.fecha || getTodayArgentina(),
         kilometraje: data.kilometraje || null,
         observaciones: data.observaciones || data.descripcion || null,
         aprobado: true,
@@ -873,7 +874,7 @@ export async function crearMantenimientoVehiculo(
     await supabase
       .from('vehiculos')
       .update({
-        updated_at: new Date().toISOString(),
+        updated_at: getNowArgentina().toISOString(),
       })
       .eq('id', vehiculoId)
 
@@ -973,7 +974,7 @@ export async function cancelarRuta(rutaId: string): Promise<ApiResponse> {
       .from('rutas_reparto')
       .update({
         estado: 'cancelada',
-        updated_at: new Date().toISOString(),
+        updated_at: getNowArgentina().toISOString(),
       })
       .eq('id', rutaId)
 
@@ -1069,7 +1070,7 @@ export async function actualizarVehiculo(
     }
 
     const updateData: any = {
-      updated_at: new Date().toISOString(),
+      updated_at: getNowArgentina().toISOString(),
     }
 
     if (params.patente) updateData.patente = params.patente

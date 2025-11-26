@@ -11,6 +11,7 @@ import { GenerarRutaModal } from '@/components/reparto/GenerarRutaModal'
 import { Button } from '@/components/ui/button'
 import { Truck, Loader2 } from 'lucide-react'
 import type { Pedido } from '@/types/domain.types'
+import { getTodayArgentina } from '@/lib/utils'
 
 export function PedidosTableWrapper() {
   const router = useRouter()
@@ -22,7 +23,7 @@ export function PedidosTableWrapper() {
   const [isGenerandoAutomatica, setIsGenerandoAutomatica] = useState(false)
 
   // Obtener filtros de la URL
-  const fecha = searchParams.get('fecha') || new Date().toISOString().split('T')[0]
+  const fecha = searchParams.get('fecha') || getTodayArgentina()
   const turno = searchParams.get('turno')
 
   // Cargar pedidos desde la base de datos

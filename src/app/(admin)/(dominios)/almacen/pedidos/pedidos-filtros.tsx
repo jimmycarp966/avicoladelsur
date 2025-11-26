@@ -7,12 +7,13 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Calendar, Clock, Filter } from 'lucide-react'
+import { getTodayArgentina } from '@/lib/utils'
 
 export function PedidosFiltros() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const fecha = searchParams.get('fecha') || new Date().toISOString().split('T')[0]
+  const fecha = searchParams.get('fecha') || getTodayArgentina()
   const turno = searchParams.get('turno') || 'all'
 
   const handleFilterChange = (key: string, value: string) => {

@@ -13,6 +13,8 @@ import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, Loader2, Save, Plus, Trash2, Search } from 'lucide-react'
 import Link from 'next/link'
 import { crearPedidoSchema } from '@/lib/schemas/pedidos.schema'
+import { useNotificationStore } from '@/store/notificationStore'
+import { formatCurrency, getTodayArgentina } from '@/lib/utils'
 
 type CrearPedidoFormData = {
   cliente_id: string
@@ -25,8 +27,6 @@ type CrearPedidoFormData = {
   descuento: number
   observaciones?: string
 }
-import { useNotificationStore } from '@/store/notificationStore'
-import { formatCurrency } from '@/lib/utils'
 
 
 interface PedidoFormProps {
@@ -262,6 +262,7 @@ export function PedidoForm({ pedido, onSuccess }: PedidoFormProps) {
                 <SelectContent>
                   {clientes.map((cliente) => (
                     <SelectItem key={cliente.id} value={cliente.id}>
+                      {cliente.codigo && `[${cliente.codigo}] `}
                       {cliente.nombre} - Zona: {cliente.zona_entrega}
                     </SelectItem>
                   ))}
@@ -278,7 +279,7 @@ export function PedidoForm({ pedido, onSuccess }: PedidoFormProps) {
                 type="date"
                 {...register('fecha_entrega_estimada')}
                 disabled={isLoading}
-                min={new Date().toISOString().split('T')[0]}
+                min={getTodayArgentina()}
               />
               {errors.fecha_entrega_estimada && (
                 <p className="text-sm text-destructive">{errors.fecha_entrega_estimada.message}</p>
