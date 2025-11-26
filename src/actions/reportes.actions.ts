@@ -657,15 +657,22 @@ export async function generarPDFPedido(pedidoId: string): Promise<ApiResponse<Bu
       // Cliente
       doc.fontSize(14).text('Cliente:', { underline: true })
       doc.fontSize(12)
-      doc.text(`Nombre: ${pedido.clientes?.nombre || 'N/A'}`)
-      doc.text(`Teléfono: ${pedido.clientes?.telefono || 'N/A'}`)
-      doc.text(`Zona: ${pedido.clientes?.zona_entrega || 'N/A'}`)
+      const clientesData = pedido.clientes as any
+      const clienteNombre = Array.isArray(clientesData) ? clientesData[0]?.nombre : clientesData?.nombre
+      const clienteTelefono = Array.isArray(clientesData) ? clientesData[0]?.telefono : clientesData?.telefono
+      const clienteZona = Array.isArray(clientesData) ? clientesData[0]?.zona_entrega : clientesData?.zona_entrega
+      doc.text(`Nombre: ${clienteNombre || 'N/A'}`)
+      doc.text(`Teléfono: ${clienteTelefono || 'N/A'}`)
+      doc.text(`Zona: ${clienteZona || 'N/A'}`)
       doc.moveDown()
 
       // Vendedor
       doc.fontSize(14).text('Vendedor:', { underline: true })
       doc.fontSize(12)
-      doc.text(`${pedido.usuarios?.nombre || ''} ${pedido.usuarios?.apellido || ''}`)
+      const usuariosData = pedido.usuarios as any
+      const usuarioNombre = Array.isArray(usuariosData) ? usuariosData[0]?.nombre : usuariosData?.nombre
+      const usuarioApellido = Array.isArray(usuariosData) ? usuariosData[0]?.apellido : usuariosData?.apellido
+      doc.text(`${usuarioNombre || ''} ${usuarioApellido || ''}`)
       doc.moveDown()
 
       // Productos

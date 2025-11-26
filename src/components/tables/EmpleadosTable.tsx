@@ -80,7 +80,7 @@ export function EmpleadosTable({ empleados, onView, onEdit, onDelete, onCall, on
     {
       accessorKey: 'categoria.nombre',
       header: ({ column }) => (
-        <SortableHeader column={column}>Categoría</SortableHeader>
+        <SortableHeader column={column}>Puesto</SortableHeader>
       ),
       cell: ({ row }) => {
         const categoria = row.original.categoria

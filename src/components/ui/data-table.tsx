@@ -67,6 +67,10 @@ export function DataTable<TData, TValue>({
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
   const [rowSelection, setRowSelection] = React.useState({})
   const [globalFilter, setGlobalFilter] = React.useState('')
+  const [pagination, setPagination] = React.useState({
+    pageIndex: 0,
+    pageSize: pageSize,
+  })
 
   // Add row selection column if enabled
   const tableColumns = React.useMemo(() => {
@@ -170,6 +174,7 @@ export function DataTable<TData, TValue>({
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     onGlobalFilterChange: setGlobalFilter,
+    onPaginationChange: enablePagination ? setPagination : undefined,
     globalFilterFn: 'includesString',
     state: {
       sorting,
@@ -177,12 +182,7 @@ export function DataTable<TData, TValue>({
       columnVisibility,
       rowSelection,
       globalFilter,
-      ...(enablePagination && {
-        pagination: {
-          pageIndex: 0,
-          pageSize,
-        },
-      }),
+      ...(enablePagination && { pagination }),
     },
   })
 

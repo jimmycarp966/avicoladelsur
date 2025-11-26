@@ -133,6 +133,8 @@ export type Database = {
           sucursal_id: string | null;
           categoria_id: string | null;
           legajo: string | null;
+          nombre: string | null;
+          apellido: string | null;
           fecha_ingreso: string;
           fecha_nacimiento: string | null;
           dni: string | null;
@@ -147,6 +149,8 @@ export type Database = {
           cbu: string | null;
           numero_cuenta: string | null;
           sueldo_actual: number | null;
+          valor_jornal_presentismo: number | null;
+          valor_hora: number | null;
           activo: boolean;
           created_at: string;
           updated_at: string;
@@ -157,6 +161,8 @@ export type Database = {
           sucursal_id?: string | null;
           categoria_id?: string | null;
           legajo?: string | null;
+          nombre?: string | null;
+          apellido?: string | null;
           fecha_ingreso: string;
           fecha_nacimiento?: string | null;
           dni?: string | null;
@@ -171,6 +177,8 @@ export type Database = {
           cbu?: string | null;
           numero_cuenta?: string | null;
           sueldo_actual?: number | null;
+          valor_jornal_presentismo?: number | null;
+          valor_hora?: number | null;
           activo?: boolean;
           created_at?: string;
           updated_at?: string;
@@ -181,6 +189,8 @@ export type Database = {
           sucursal_id?: string | null;
           categoria_id?: string | null;
           legajo?: string | null;
+          nombre?: string | null;
+          apellido?: string | null;
           fecha_ingreso?: string;
           fecha_nacimiento?: string | null;
           dni?: string | null;
@@ -195,6 +205,8 @@ export type Database = {
           cbu?: string | null;
           numero_cuenta?: string | null;
           sueldo_actual?: number | null;
+          valor_jornal_presentismo?: number | null;
+          valor_hora?: number | null;
           activo?: boolean;
           created_at?: string;
           updated_at?: string;
