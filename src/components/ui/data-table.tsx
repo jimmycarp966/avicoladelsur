@@ -341,6 +341,7 @@ export function StatusBadge({
 }) {
   const statusConfig = {
     pendiente: { label: 'Pendiente', variant: 'secondary' as const },
+    aprobado: { label: 'Aprobado', variant: 'default' as const },
     confirmado: { label: 'Confirmado', variant: 'default' as const },
     preparando: { label: 'Preparando', variant: 'default' as const },
     enviado: { label: 'Enviado', variant: 'default' as const },
