@@ -146,7 +146,7 @@ export function ClienteForm({ cliente, onSuccess }: ClienteFormProps) {
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="tipo_cliente">Tipo de Cliente *</Label>
               <select
@@ -202,7 +202,7 @@ export function ClienteForm({ cliente, onSuccess }: ClienteFormProps) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="telefono">Teléfono</Label>
               <Input
@@ -296,15 +296,15 @@ export function ClienteForm({ cliente, onSuccess }: ClienteFormProps) {
       </Card>
 
       {/* Acciones */}
-      <div className="flex items-center justify-between sticky bottom-4 bg-background/95 backdrop-blur-sm p-4 rounded-lg border border-primary/10 shadow-lg">
-        <Button type="button" variant="outline" asChild disabled={isLoading} className="hover:bg-primary/5 hover:text-primary hover:border-primary/30">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sticky bottom-4 bg-background/95 backdrop-blur-sm p-4 rounded-lg border border-primary/10 shadow-lg">
+        <Button type="button" variant="outline" asChild disabled={isLoading} className="hover:bg-primary/5 hover:text-primary hover:border-primary/30 w-full sm:w-auto order-2 sm:order-1">
           <Link href="/ventas/clientes">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Volver
           </Link>
         </Button>
 
-        <Button type="submit" disabled={isLoading} className="bg-primary hover:bg-primary/90 shadow-sm">
+        <Button type="submit" disabled={isLoading} className="bg-primary hover:bg-primary/90 shadow-sm w-full sm:w-auto order-1 sm:order-2">
           {isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

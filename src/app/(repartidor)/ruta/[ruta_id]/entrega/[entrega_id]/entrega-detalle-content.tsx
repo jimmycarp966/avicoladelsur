@@ -263,7 +263,7 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
       </Card>
 
       {/* Acciones principales */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">

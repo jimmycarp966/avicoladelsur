@@ -50,7 +50,7 @@ export default async function AdminDashboard() {
       </div>
 
       {/* Métricas principales */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="border-t-[4px] border-t-primary hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
             <CardTitle className="text-base font-semibold text-foreground">Productos</CardTitle>
@@ -113,7 +113,7 @@ export default async function AdminDashboard() {
       </div>
 
       {/* Gráficos */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-7">
         <div className="col-span-4">
           <VentasMensualesChart />
         </div>
@@ -122,7 +122,7 @@ export default async function AdminDashboard() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         <div>
           <EntregasPorDiaChart />
         </div>

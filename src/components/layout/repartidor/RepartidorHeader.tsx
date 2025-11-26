@@ -51,17 +51,18 @@ export function RepartidorHeader({ user }: RepartidorHeaderProps) {
     <header className="sticky top-0 z-40 bg-gradient-header border-b border-gray-200 px-4 py-3">
       <div className="flex items-center justify-between">
         {/* Logo y título */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
           <Logo size="md" variant="icon" />
-          <div>
+          <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-semibold text-gray-900">Repartidor</h1>
-              <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 text-xs font-medium" suppressHydrationWarning>
+              <h1 className="text-base sm:text-lg font-semibold text-gray-900 truncate">Repartidor</h1>
+              <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 text-xs font-medium shrink-0" suppressHydrationWarning>
                 <div className="w-1.5 h-1.5 bg-primary rounded-full mr-1 animate-pulse" suppressHydrationWarning></div>
-                Activo
+                <span className="hidden sm:inline">Activo</span>
+                <span className="sm:hidden">On</span>
               </Badge>
             </div>
-            <p className="text-xs text-gray-500">Avícola del Sur</p>
+            <p className="text-xs text-gray-500 truncate">Avícola del Sur</p>
           </div>
         </div>
 

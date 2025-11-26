@@ -186,7 +186,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
             </div>
           )}
 
-          <div className="h-[600px] w-full rounded-lg overflow-hidden border">
+          <div className="h-[400px] sm:h-[500px] lg:h-[600px] w-full rounded-lg overflow-hidden border">
             <MapContainer
               center={center}
               zoom={13}

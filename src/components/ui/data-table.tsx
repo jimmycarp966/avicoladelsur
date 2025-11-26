@@ -189,16 +189,16 @@ export function DataTable<TData, TValue>({
   return (
     <div className="w-full">
       {/* Search and filters */}
-      <div className="flex items-center justify-between py-4">
-        <div className="flex items-center space-x-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-4">
+        <div className="flex items-center space-x-2 w-full sm:w-auto">
           {searchKey && (
-            <div className="relative">
+            <div className="relative flex-1 sm:flex-initial">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder={searchPlaceholder}
                 value={globalFilter ?? ''}
                 onChange={(event) => setGlobalFilter(event.target.value)}
-                className="pl-8 max-w-sm"
+                className="pl-8 w-full sm:max-w-sm"
               />
             </div>
           )}
@@ -207,7 +207,7 @@ export function DataTable<TData, TValue>({
         {enableColumnVisibility && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="ml-auto">
+              <Button variant="outline" className="w-full sm:w-auto">
                 Columnas <ChevronDown className="ml-2 h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -232,67 +232,155 @@ export function DataTable<TData, TValue>({
         )}
       </div>
 
-      {/* Table */}
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => {
-                  return (
-                    <TableHead key={header.id}>
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
-                    </TableHead>
-                  )
-                })}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
+      {/* Table - Responsive */}
+      <div className="rounded-md border overflow-hidden">
+        {/* Vista móvil - Cards */}
+        <div className="md:hidden">
+          {table.getRowModel().rows?.length ? (
+            <div className="divide-y divide-border">
+              {table.getRowModel().rows.map((row) => (
+                <div
                   key={row.id}
-                  data-state={row.getIsSelected() && 'selected'}
-                  className={onRowClick ? 'cursor-pointer hover:bg-muted/50' : ''}
+                  className={`p-4 space-y-3 ${onRowClick ? 'cursor-pointer hover:bg-muted/50' : ''}`}
                   onClick={() => onRowClick?.(row.original)}
                 >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
+                  {row.getVisibleCells().map((cell, index) => {
+                    const header = table.getHeaderGroups()[0]?.headers[index]
+                    if (!header || cell.column.id === 'select' || cell.column.id === 'actions') return null
+
+                    return (
+                      <div key={cell.id} className="flex justify-between items-start">
+                        <span className="text-sm font-medium text-muted-foreground min-w-0 flex-shrink-0 mr-2">
+                          {header.column.columnDef.header as string}:
+                        </span>
+                        <div className="text-sm text-foreground flex-1 text-right">
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </div>
+                      </div>
+                    )
+                  })}
+                  {/* Acciones en móvil */}
+                  {actions && (
+                    <div className="flex justify-end pt-2 border-t border-border/50">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <span className="sr-only">Abrir menú</span>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              const rowData = row.original as any
+                              let idToCopy = rowData.id
+
+                              if (!idToCopy) {
+                                const idFields = Object.keys(rowData).filter(key => key.endsWith('_id'))
+                                if (idFields.length > 0) {
+                                  idToCopy = rowData[idFields[0]]
+                                }
+                              }
+
+                              if (!idToCopy) {
+                                const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+                                for (const value of Object.values(rowData)) {
+                                  if (typeof value === 'string' && uuidPattern.test(value)) {
+                                    idToCopy = value
+                                    break
+                                  }
+                                }
+                              }
+
+                              if (!idToCopy) {
+                                idToCopy = Object.values(rowData)[0] || 'N/A'
+                              }
+
+                              navigator.clipboard.writeText(String(idToCopy))
+                            }}
+                          >
+                            Copiar ID
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          {actions(row.original)}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-8 text-center text-muted-foreground">
+              No se encontraron resultados.
+            </div>
+          )}
+        </div>
+
+        {/* Vista desktop - Table */}
+        <div className="hidden md:block overflow-x-auto">
+          <Table>
+            <TableHeader>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => {
+                    return (
+                      <TableHead key={header.id}>
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(
+                              header.column.columnDef.header,
+                              header.getContext()
+                            )}
+                      </TableHead>
+                    )
+                  })}
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={tableColumns.length} className="h-24 text-center">
-                  No se encontraron resultados.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {table.getRowModel().rows?.length ? (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow
+                    key={row.id}
+                    data-state={row.getIsSelected() && 'selected'}
+                    className={onRowClick ? 'cursor-pointer hover:bg-muted/50' : ''}
+                    onClick={() => onRowClick?.(row.original)}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id}>
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={tableColumns.length} className="h-24 text-center">
+                    No se encontraron resultados.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
 
       {/* Pagination */}
       {enablePagination && (
-        <div className="flex items-center justify-end space-x-2 py-4">
-          <div className="flex-1 text-sm text-muted-foreground">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-4">
+          <div className="text-sm text-muted-foreground order-2 sm:order-1">
             {table.getFilteredSelectedRowModel().rows.length} de{' '}
             {table.getFilteredRowModel().rows.length} fila(s) seleccionada(s).
           </div>
-          <div className="space-x-2">
+          <div className="flex items-center justify-center space-x-2 order-1 sm:order-2">
             <Button
               variant="outline"
               size="sm"
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}
+              className="flex-1 sm:flex-initial"
             >
               Anterior
             </Button>
@@ -301,6 +389,7 @@ export function DataTable<TData, TValue>({
               size="sm"
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}
+              className="flex-1 sm:flex-initial"
             >
               Siguiente
             </Button>
