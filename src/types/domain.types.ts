@@ -48,6 +48,7 @@ export interface Cliente extends BaseEntity {
   tipo_cliente: string
   limite_credito: number
   activo: boolean
+  listas_precios?: ClienteListaPrecio[]
 }
 
 // Vehículo
@@ -96,6 +97,7 @@ export interface Pedido extends BaseEntity {
   metodos_pago?: any
   recargo_total?: number
   presupuesto_id?: string
+  lista_precio_id?: string
 }
 
 // Detalle de Pedido
@@ -212,6 +214,7 @@ export interface Presupuesto extends BaseEntity {
   turno?: 'mañana' | 'tarde'
   metodos_pago?: any
   recargo_total?: number
+  lista_precio_id?: string
 }
 
 // Presupuesto Item
@@ -609,4 +612,38 @@ export interface ReporteAdelantos {
   monto: number
   fecha_aprobacion: string
   estado: string
+}
+
+// Lista de Precios
+export interface ListaPrecio extends BaseEntity {
+  codigo: string
+  nombre: string
+  tipo: 'minorista' | 'mayorista' | 'distribuidor' | 'personalizada'
+  activa: boolean
+  margen_ganancia?: number // Porcentaje de margen (ej: 30 = 30%)
+  fecha_vigencia_desde?: string
+  fecha_vigencia_hasta?: string
+}
+
+// Precio de Producto en Lista
+export interface PrecioProducto extends BaseEntity {
+  lista_precio_id: string
+  producto_id: string
+  precio: number
+  fecha_desde?: string
+  fecha_hasta?: string
+  activo: boolean
+  producto?: Producto
+  lista_precio?: ListaPrecio
+}
+
+// Asignación de Lista a Cliente
+export interface ClienteListaPrecio extends BaseEntity {
+  cliente_id: string
+  lista_precio_id: string
+  es_automatica: boolean
+  prioridad: number
+  activa: boolean
+  lista_precio?: ListaPrecio
+  cliente?: Cliente
 }

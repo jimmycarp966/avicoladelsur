@@ -160,44 +160,18 @@ export async function obtenerVentasPorZona(
       vendedorId: filtros.vendedorId,
     })
 
-    const { data, error } = await supabase
-      .from('pedidos')
-      .select(
-        `
-        total,
-        clientes!inner(zona_entrega, id)
-      `
-      )
-      .gte('fecha_pedido', `${validated.fechaDesde}T00:00:00`)
-      .lte('fecha_pedido', `${validated.fechaHasta}T23:59:59`)
-      .eq('estado', 'entregado')
-      .order('total', { ascending: false })
+    // Usar función RPC en lugar de consulta directa
+    const { data, error } = await supabase.rpc('fn_ventas_por_zona', {
+      fecha_inicio: validated.fechaDesde,
+      fecha_fin: validated.fechaHasta,
+      vendedor_id: validated.vendedorId,
+    })
 
     if (error) throw error
 
-    // Agrupar por zona
-    const agrupado = (data || []).reduce((acc: any, pedido: any) => {
-      const zonaNombre = pedido.clientes?.zona_entrega || 'Sin zona'
-      if (!acc[zonaNombre]) {
-        acc[zonaNombre] = {
-          zona: zonaNombre,
-          ventas: 0,
-          transacciones: 0,
-        }
-      }
-      acc[zonaNombre].ventas += Number(pedido.total || 0)
-      acc[zonaNombre].transacciones += 1
-      return acc
-    }, {})
-
-    const resultado = Object.values(agrupado).map((item: any) => ({
-      ...item,
-      ticketPromedio: item.transacciones > 0 ? item.ventas / item.transacciones : 0,
-    }))
-
     return {
       success: true,
-      data: resultado,
+      data: data || [],
     }
   } catch (error: any) {
     console.error('Error al obtener ventas por zona:', error)
@@ -264,51 +238,19 @@ export async function obtenerTopVendedores(
       zonaId: filtros.zonaId,
     })
 
-    const { data, error } = await supabase
-      .from('pedidos')
-      .select(
-        `
-        total,
-        usuario_vendedor,
-        usuarios!inner(id, nombre, apellido)
-      `
-      )
-      .gte('fecha_pedido', `${validated.fechaDesde}T00:00:00`)
-      .lte('fecha_pedido', `${validated.fechaHasta}T23:59:59`)
-      .eq('estado', 'entregado')
-      .not('usuario_vendedor', 'is', null)
+    // Usar función RPC en lugar de consulta directa
+    const { data, error } = await supabase.rpc('fn_top_vendedores', {
+      fecha_inicio: validated.fechaDesde,
+      fecha_fin: validated.fechaHasta,
+      limite: limite,
+      zona_nombre: null, // TODO: obtener zona_nombre desde zona_id si es necesario
+    })
 
     if (error) throw error
 
-    // Agrupar por vendedor
-    const agrupado = (data || []).reduce((acc: any, pedido: any) => {
-      const vendedorId = pedido.usuario_vendedor
-      const vendedorNombre = `${pedido.usuarios?.nombre || ''} ${pedido.usuarios?.apellido || ''}`.trim()
-      
-      if (!acc[vendedorId]) {
-        acc[vendedorId] = {
-          vendedor_id: vendedorId,
-          vendedor_nombre: vendedorNombre,
-          ventas: 0,
-          transacciones: 0,
-        }
-      }
-      acc[vendedorId].ventas += Number(pedido.total || 0)
-      acc[vendedorId].transacciones += 1
-      return acc
-    }, {})
-
-    const resultado = Object.values(agrupado)
-      .map((item: any) => ({
-        ...item,
-        ticketPromedio: item.transacciones > 0 ? item.ventas / item.transacciones : 0,
-      }))
-      .sort((a: any, b: any) => b.ventas - a.ventas)
-      .slice(0, limite)
-
     return {
       success: true,
-      data: resultado,
+      data: data || [],
     }
   } catch (error: any) {
     console.error('Error al obtener top vendedores:', error)
@@ -333,39 +275,17 @@ export async function obtenerVentasPorMetodoPago(
       fechaHasta: filtros.fechaHasta,
     })
 
-    const { data, error } = await supabase
-      .from('tesoreria_movimientos')
-      .select('monto, metodo_pago')
-      .gte('created_at', `${validated.fechaDesde}T00:00:00`)
-      .lte('created_at', `${validated.fechaHasta}T23:59:59`)
-      .eq('tipo', 'ingreso')
-      .eq('origen_tipo', 'pedido')
+    // Usar función RPC en lugar de consulta directa
+    const { data, error } = await supabase.rpc('fn_ventas_por_metodo_pago', {
+      fecha_inicio: validated.fechaDesde,
+      fecha_fin: validated.fechaHasta,
+    })
 
     if (error) throw error
 
-    // Agrupar por método de pago
-    const agrupado = (data || []).reduce((acc: any, movimiento: any) => {
-      const metodo = movimiento.metodo_pago || 'efectivo'
-      if (!acc[metodo]) {
-        acc[metodo] = {
-          metodo_pago: metodo,
-          monto: 0,
-          transacciones: 0,
-        }
-      }
-      acc[metodo].monto += Number(movimiento.monto || 0)
-      acc[metodo].transacciones += 1
-      return acc
-    }, {})
-
-    const resultado = Object.values(agrupado).map((item: any) => ({
-      ...item,
-      porcentaje: 0, // Se calculará en el frontend con el total
-    }))
-
     return {
       success: true,
-      data: resultado,
+      data: data || [],
     }
   } catch (error: any) {
     console.error('Error al obtener ventas por método de pago:', error)
@@ -424,53 +344,22 @@ export async function obtenerClientesNuevosVsRecurrentes(
       fechaHasta: filtros.fechaHasta,
     })
 
-    // Obtener todos los pedidos del período
-    const { data: pedidos, error: pedidosError } = await supabase
-      .from('pedidos')
-      .select('cliente_id, fecha_pedido')
-      .gte('fecha_pedido', `${validated.fechaDesde}T00:00:00`)
-      .lte('fecha_pedido', `${validated.fechaHasta}T23:59:59`)
-      .eq('estado', 'entregado')
-
-    if (pedidosError) throw pedidosError
-
-    // Obtener pedidos anteriores para determinar si son nuevos
-    const fechaInicio = new Date(validated.fechaDesde)
-    const fechaInicioAnterior = subDays(fechaInicio, 1)
-
-    const { data: pedidosAnteriores } = await supabase
-      .from('pedidos')
-      .select('cliente_id')
-      .lt('fecha_pedido', validated.fechaDesde)
-
-    const clientesAnteriores = new Set(
-      (pedidosAnteriores || []).map((p: any) => p.cliente_id)
-    )
-
-    // Clasificar clientes
-    const clientesEnPeriodo = new Set(
-      (pedidos || []).map((p: any) => p.cliente_id)
-    )
-
-    let nuevos = 0
-    let recurrentes = 0
-
-    clientesEnPeriodo.forEach((clienteId) => {
-      if (clientesAnteriores.has(clienteId)) {
-        recurrentes++
-      } else {
-        nuevos++
-      }
+    // Usar función RPC en lugar de múltiples consultas
+    const { data, error } = await supabase.rpc('fn_clientes_nuevos_vs_recurrentes', {
+      fecha_inicio: validated.fechaDesde,
+      fecha_fin: validated.fechaHasta,
     })
+
+    if (error) throw error
 
     return {
       success: true,
-      data: {
-        nuevos,
-        recurrentes,
-        total: nuevos + recurrentes,
-        porcentajeNuevos: clientesEnPeriodo.size > 0 ? (nuevos / clientesEnPeriodo.size) * 100 : 0,
-        porcentajeRecurrentes: clientesEnPeriodo.size > 0 ? (recurrentes / clientesEnPeriodo.size) * 100 : 0,
+      data: data || {
+        nuevos: 0,
+        recurrentes: 0,
+        total: 0,
+        porcentajeNuevos: 0,
+        porcentajeRecurrentes: 0,
       },
     }
   } catch (error: any) {

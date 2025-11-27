@@ -424,6 +424,51 @@ CREATE TABLE checklists_calidad (
 );
 
 -- ===========================================
+-- DOMINIO: LISTAS DE PRECIOS
+-- ===========================================
+
+-- LISTAS DE PRECIOS
+CREATE TABLE IF NOT EXISTS listas_precios (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    codigo VARCHAR(50) UNIQUE NOT NULL,
+    nombre VARCHAR(255) NOT NULL,
+    tipo VARCHAR(50) NOT NULL CHECK (tipo IN ('minorista', 'mayorista', 'distribuidor', 'personalizada')),
+    activa BOOLEAN DEFAULT true,
+    margen_ganancia DECIMAL(5,2), -- Porcentaje de margen (ej: 30.00 = 30%)
+    fecha_vigencia_desde DATE,
+    fecha_vigencia_hasta DATE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- PRECIOS POR PRODUCTO Y LISTA
+CREATE TABLE IF NOT EXISTS precios_productos (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    lista_precio_id UUID NOT NULL REFERENCES listas_precios(id) ON DELETE CASCADE,
+    producto_id UUID NOT NULL REFERENCES productos(id) ON DELETE CASCADE,
+    precio DECIMAL(10,2) NOT NULL,
+    fecha_desde DATE,
+    fecha_hasta DATE,
+    activo BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(lista_precio_id, producto_id, fecha_desde)
+);
+
+-- ASIGNACIÓN DE LISTAS A CLIENTES (muchos a muchos)
+CREATE TABLE IF NOT EXISTS clientes_listas_precios (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    cliente_id UUID NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
+    lista_precio_id UUID NOT NULL REFERENCES listas_precios(id) ON DELETE CASCADE,
+    es_automatica BOOLEAN DEFAULT false,
+    prioridad INTEGER DEFAULT 1,
+    activa BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(cliente_id, lista_precio_id)
+);
+
+-- ===========================================
 -- DOMINIO: VENTAS (CRM)
 -- ===========================================
 
@@ -445,6 +490,7 @@ CREATE TABLE pedidos (
     observaciones TEXT,
     pago_estado VARCHAR(20) DEFAULT 'pendiente',
     caja_movimiento_id UUID REFERENCES tesoreria_movimientos(id),
+    lista_precio_id UUID REFERENCES listas_precios(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

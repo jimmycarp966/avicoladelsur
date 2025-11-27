@@ -13,16 +13,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label'
 import { Loader2, Save, Plus, Trash2, Search, X } from 'lucide-react'
 import { crearPresupuestoAction } from '@/actions/presupuestos.actions'
+import { obtenerListasClienteAction, obtenerPrecioProductoAction } from '@/actions/listas-precios.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 import { formatCurrency } from '@/lib/utils'
 import { useDebounce } from '@/lib/hooks/useDebounce'
 import { ProductoItemRow } from './producto-item-row'
+import { useEffect } from 'react'
 
 const crearPresupuestoSchema = z.object({
   cliente_id: z.string().uuid('Debes seleccionar un cliente'),
   zona_id: z.string().uuid().optional(),
   fecha_entrega_estimada: z.string().optional(),
   observaciones: z.string().optional(),
+  lista_precio_id: z.string().uuid().optional(),
   items: z.array(z.object({
     producto_id: z.string().uuid('Debes seleccionar un producto'),
     cantidad_solicitada: z.number().positive('La cantidad debe ser mayor a 0'),
@@ -46,6 +49,8 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
   const [productoDropdownOpen, setProductoDropdownOpen] = useState<{ [key: number]: boolean }>({})
   const [clienteSearch, setClienteSearch] = useState('')
   const [clienteDropdownOpen, setClienteDropdownOpen] = useState(false)
+  const [listasCliente, setListasCliente] = useState<Array<{ id: string; lista_precio: { id: string; nombre: string; codigo: string } }>>([])
+  const [cargandoListas, setCargandoListas] = useState(false)
 
   const {
     register,
@@ -87,13 +92,63 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
     return clientes.find(c => c.id === watchedCliente)
   }, [clientes, watchedCliente])
 
-  // Memoizar handleProductoChange
-  const handleProductoChange = useCallback((index: number, productoId: string) => {
-    const producto = productos.find(p => p.id === productoId)
-    if (producto) {
-      setValue(`items.${index}.precio_unit_est`, producto.precio_venta)
+  // Cargar listas del cliente cuando se selecciona un cliente
+  useEffect(() => {
+    const cargarListas = async () => {
+      if (!watchedCliente) {
+        setListasCliente([])
+        return
+      }
+
+      setCargandoListas(true)
+      const result = await obtenerListasClienteAction(watchedCliente)
+      if (result.success && result.data) {
+        setListasCliente(result.data as any)
+      }
+      setCargandoListas(false)
     }
-  }, [productos, setValue])
+
+    cargarListas()
+  }, [watchedCliente])
+
+  // Actualizar precios cuando cambia la lista de precios
+  const watchedListaPrecio = useWatch({ control, name: 'lista_precio_id' })
+  
+  useEffect(() => {
+    const actualizarPrecios = async () => {
+      if (!watchedListaPrecio || !watchedItems) return
+
+      for (let i = 0; i < watchedItems.length; i++) {
+        const item = watchedItems[i]
+        if (item.producto_id) {
+          const precioResult = await obtenerPrecioProductoAction(watchedListaPrecio, item.producto_id)
+          if (precioResult.success && precioResult.data) {
+            setValue(`items.${i}.precio_unit_est`, precioResult.data.precio)
+          }
+        }
+      }
+    }
+
+    actualizarPrecios()
+  }, [watchedListaPrecio, setValue])
+
+  // Memoizar handleProductoChange
+  const handleProductoChange = useCallback(async (index: number, productoId: string) => {
+    const producto = productos.find(p => p.id === productoId)
+    if (!producto) return
+
+    // Si hay lista de precios seleccionada, usar precio de la lista
+    if (watchedListaPrecio) {
+      const precioResult = await obtenerPrecioProductoAction(watchedListaPrecio, productoId)
+      if (precioResult.success && precioResult.data) {
+        setValue(`items.${index}.precio_unit_est`, precioResult.data.precio)
+        return
+      }
+    }
+
+    // Fallback a precio_venta del producto
+    setValue(`items.${index}.precio_unit_est`, producto.precio_venta)
+  }, [productos, setValue, watchedListaPrecio])
 
   // Memoizar función para filtrar productos
   const getFilteredProductos = useCallback((index: number, searchTerm: string) => {
@@ -142,6 +197,9 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
       }
       if (data.observaciones) {
         formData.append('observaciones', data.observaciones)
+      }
+      if (data.lista_precio_id) {
+        formData.append('lista_precio_id', data.lista_precio_id)
       }
       formData.append('items', JSON.stringify(data.items))
 
@@ -282,6 +340,41 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
                   {...register('fecha_entrega_estimada')}
                 />
               </div>
+            </div>
+          )}
+
+          {clienteSeleccionado && (
+            <div>
+              <Label htmlFor="lista_precio_id">Lista de Precios</Label>
+              <Select
+                value={watch('lista_precio_id') || ''}
+                onValueChange={(value) => {
+                  setValue('lista_precio_id', value)
+                }}
+                disabled={cargandoListas || listasCliente.length === 0}
+              >
+                <SelectTrigger id="lista_precio_id">
+                  <SelectValue placeholder={
+                    cargandoListas 
+                      ? 'Cargando listas...' 
+                      : listasCliente.length === 0 
+                        ? 'Cliente sin listas asignadas (usará precio base)' 
+                        : 'Selecciona una lista de precios'
+                  } />
+                </SelectTrigger>
+                <SelectContent>
+                  {listasCliente.map((item) => (
+                    <SelectItem key={item.lista_precio.id} value={item.lista_precio.id}>
+                      {item.lista_precio.codigo} - {item.lista_precio.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {listasCliente.length > 0 && watch('lista_precio_id') && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Los precios se actualizarán automáticamente según la lista seleccionada
+                </p>
+              )}
             </div>
           )}
         </CardContent>

@@ -77,7 +77,11 @@ export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores
   // Efecto para asignar automáticamente la unidad de medida cuando se selecciona un producto
   useEffect(() => {
     if (productoId && productoSeleccionado) {
+      // Asignar siempre la unidad de medida del producto (no permitir cambios)
       setUnidadMedida(productoSeleccionado.unidad_medida)
+    } else if (!productoId) {
+      // Si no hay producto seleccionado, resetear a kg
+      setUnidadMedida('kg')
     }
   }, [productoId, productoSeleccionado])
 
@@ -125,7 +129,7 @@ export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores
         setBusquedaProducto('')
         setFiltroCategoria('')
         setFiltroProveedor('')
-        setUnidadMedida('kg')
+        setUnidadMedida('kg') // Se reseteará automáticamente con el useEffect
         router.refresh()
       } else {
         toast.error(result.message || 'Error al registrar recepción')
@@ -163,64 +167,91 @@ export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores
 
           <TabsContent value="ingreso" className="space-y-4 mt-4">
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Filtros de búsqueda */}
-              <div className="grid gap-4 md:grid-cols-3 p-4 bg-muted/50 rounded-lg border">
-                <div className="space-y-2">
-                  <Label htmlFor="busqueda-producto">Buscar Producto</Label>
-                  <div className="relative">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="busqueda-producto"
-                      placeholder="Nombre o código..."
-                      value={busquedaProducto}
-                      onChange={(e) => setBusquedaProducto(e.target.value)}
-                      className="pl-8"
-                    />
-                    {busquedaProducto && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-1 top-1 h-6 w-6 p-0"
-                        onClick={() => setBusquedaProducto('')}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    )}
+              {/* Filtros de búsqueda mejorados */}
+              <div className="p-4 bg-muted/50 rounded-lg border space-y-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Search className="h-4 w-4 text-muted-foreground" />
+                  <Label className="text-sm font-semibold">Filtros de Búsqueda</Label>
+                </div>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="busqueda-producto">Buscar por Nombre o Código</Label>
+                    <div className="relative">
+                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="busqueda-producto"
+                        placeholder="Nombre o código..."
+                        value={busquedaProducto}
+                        onChange={(e) => setBusquedaProducto(e.target.value)}
+                        className="pl-8"
+                      />
+                      {busquedaProducto && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-1 top-1 h-6 w-6 p-0"
+                          onClick={() => setBusquedaProducto('')}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="filtro-categoria">Filtrar por Categoría</Label>
+                    <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
+                      <SelectTrigger id="filtro-categoria">
+                        <SelectValue placeholder="Todas las categorías" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Todas las categorías</SelectItem>
+                        {categorias.map(cat => (
+                          <SelectItem key={cat} value={cat}>
+                            {cat}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="filtro-proveedor">Filtrar por Proveedor</Label>
+                    <Select value={filtroProveedor} onValueChange={setFiltroProveedor}>
+                      <SelectTrigger id="filtro-proveedor">
+                        <SelectValue placeholder="Todos los proveedores" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Todos los proveedores</SelectItem>
+                        {proveedores.map(prov => (
+                          <SelectItem key={prov} value={prov}>
+                            {prov}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="filtro-categoria">Categoría</Label>
-                  <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
-                    <SelectTrigger id="filtro-categoria">
-                      <SelectValue placeholder="Todas las categorías" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">Todas las categorías</SelectItem>
-                      {categorias.map(cat => (
-                        <SelectItem key={cat} value={cat}>
-                          {cat}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="filtro-proveedor">Proveedor</Label>
-                  <Select value={filtroProveedor} onValueChange={setFiltroProveedor}>
-                    <SelectTrigger id="filtro-proveedor">
-                      <SelectValue placeholder="Todos los proveedores" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">Todos los proveedores</SelectItem>
-                      {proveedores.map(prov => (
-                        <SelectItem key={prov} value={prov}>
-                          {prov}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {(busquedaProducto || filtroCategoria || filtroProveedor) && (
+                  <div className="flex items-center gap-2 pt-2 border-t">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setBusquedaProducto('')
+                        setFiltroCategoria('')
+                        setFiltroProveedor('')
+                      }}
+                      className="text-xs"
+                    >
+                      <X className="h-3 w-3 mr-1" />
+                      Limpiar filtros
+                    </Button>
+                    <span className="text-xs text-muted-foreground">
+                      {productosFiltrados.length} producto{productosFiltrados.length !== 1 ? 's' : ''} encontrado{productosFiltrados.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
@@ -230,11 +261,9 @@ export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores
                     value={productoId} 
                     onValueChange={(value) => {
                       setProductoId(value)
-                      // Asignar automáticamente la unidad de medida
-                      const producto = productos.find(p => p.id === value)
-                      if (producto) {
-                        setUnidadMedida(producto.unidad_medida)
-                      }
+                      // Limpiar lote cuando cambia el producto
+                      setLoteId('')
+                      // La unidad de medida se asignará automáticamente vía useEffect
                     }} 
                     required
                   >
@@ -247,11 +276,14 @@ export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores
                           <SelectItem key={producto.id} value={producto.id}>
                             {producto.nombre} ({producto.codigo})
                             {producto.categoria && ` - ${producto.categoria}`}
+                            {producto.unidad_medida && ` [${producto.unidad_medida}]`}
                           </SelectItem>
                         ))
                       ) : (
                         <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                          No se encontraron productos
+                          {busquedaProducto || filtroCategoria || filtroProveedor 
+                            ? 'No se encontraron productos con los filtros aplicados'
+                            : 'No hay productos disponibles'}
                         </div>
                       )}
                     </SelectContent>
@@ -304,9 +336,21 @@ export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="unidad-ingreso">Unidad de Medida *</Label>
-                  <Select value={unidadMedida} onValueChange={setUnidadMedida} required>
-                    <SelectTrigger id="unidad-ingreso">
+                  <Label htmlFor="unidad-ingreso">
+                    Unidad de Medida *
+                    {productoSeleccionado && (
+                      <span className="ml-2 text-xs font-normal text-muted-foreground">
+                        (asignada automáticamente)
+                      </span>
+                    )}
+                  </Label>
+                  <Select 
+                    value={unidadMedida || unidadMedidaProducto} 
+                    onValueChange={setUnidadMedida} 
+                    required
+                    disabled={!!productoSeleccionado}
+                  >
+                    <SelectTrigger id="unidad-ingreso" className={productoSeleccionado ? "bg-muted" : ""}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -319,8 +363,8 @@ export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores
                     </SelectContent>
                   </Select>
                   {productoSeleccionado && (
-                    <p className="text-xs text-muted-foreground">
-                      Unidad por defecto del producto: {productoSeleccionado.unidad_medida}
+                    <p className="text-xs text-primary font-medium flex items-center gap-1">
+                      ✓ Unidad del producto: <span className="font-semibold">{productoSeleccionado.unidad_medida}</span>
                     </p>
                   )}
                 </div>
@@ -350,64 +394,91 @@ export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores
 
           <TabsContent value="egreso" className="space-y-4 mt-4">
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Filtros de búsqueda */}
-              <div className="grid gap-4 md:grid-cols-3 p-4 bg-muted/50 rounded-lg border">
-                <div className="space-y-2">
-                  <Label htmlFor="busqueda-producto-egreso">Buscar Producto</Label>
-                  <div className="relative">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="busqueda-producto-egreso"
-                      placeholder="Nombre o código..."
-                      value={busquedaProducto}
-                      onChange={(e) => setBusquedaProducto(e.target.value)}
-                      className="pl-8"
-                    />
-                    {busquedaProducto && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-1 top-1 h-6 w-6 p-0"
-                        onClick={() => setBusquedaProducto('')}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    )}
+              {/* Filtros de búsqueda mejorados */}
+              <div className="p-4 bg-muted/50 rounded-lg border space-y-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Search className="h-4 w-4 text-muted-foreground" />
+                  <Label className="text-sm font-semibold">Filtros de Búsqueda</Label>
+                </div>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="busqueda-producto-egreso">Buscar por Nombre o Código</Label>
+                    <div className="relative">
+                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="busqueda-producto-egreso"
+                        placeholder="Nombre o código..."
+                        value={busquedaProducto}
+                        onChange={(e) => setBusquedaProducto(e.target.value)}
+                        className="pl-8"
+                      />
+                      {busquedaProducto && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-1 top-1 h-6 w-6 p-0"
+                          onClick={() => setBusquedaProducto('')}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="filtro-categoria-egreso">Filtrar por Categoría</Label>
+                    <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
+                      <SelectTrigger id="filtro-categoria-egreso">
+                        <SelectValue placeholder="Todas las categorías" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Todas las categorías</SelectItem>
+                        {categorias.map(cat => (
+                          <SelectItem key={cat} value={cat}>
+                            {cat}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="filtro-proveedor-egreso">Filtrar por Proveedor</Label>
+                    <Select value={filtroProveedor} onValueChange={setFiltroProveedor}>
+                      <SelectTrigger id="filtro-proveedor-egreso">
+                        <SelectValue placeholder="Todos los proveedores" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Todos los proveedores</SelectItem>
+                        {proveedores.map(prov => (
+                          <SelectItem key={prov} value={prov}>
+                            {prov}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="filtro-categoria-egreso">Categoría</Label>
-                  <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
-                    <SelectTrigger id="filtro-categoria-egreso">
-                      <SelectValue placeholder="Todas las categorías" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">Todas las categorías</SelectItem>
-                      {categorias.map(cat => (
-                        <SelectItem key={cat} value={cat}>
-                          {cat}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="filtro-proveedor-egreso">Proveedor</Label>
-                  <Select value={filtroProveedor} onValueChange={setFiltroProveedor}>
-                    <SelectTrigger id="filtro-proveedor-egreso">
-                      <SelectValue placeholder="Todos los proveedores" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">Todos los proveedores</SelectItem>
-                      {proveedores.map(prov => (
-                        <SelectItem key={prov} value={prov}>
-                          {prov}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {(busquedaProducto || filtroCategoria || filtroProveedor) && (
+                  <div className="flex items-center gap-2 pt-2 border-t">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setBusquedaProducto('')
+                        setFiltroCategoria('')
+                        setFiltroProveedor('')
+                      }}
+                      className="text-xs"
+                    >
+                      <X className="h-3 w-3 mr-1" />
+                      Limpiar filtros
+                    </Button>
+                    <span className="text-xs text-muted-foreground">
+                      {productosFiltrados.length} producto{productosFiltrados.length !== 1 ? 's' : ''} encontrado{productosFiltrados.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -416,11 +487,7 @@ export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores
                   value={productoId} 
                   onValueChange={(value) => {
                     setProductoId(value)
-                    // Asignar automáticamente la unidad de medida
-                    const producto = productos.find(p => p.id === value)
-                    if (producto) {
-                      setUnidadMedida(producto.unidad_medida)
-                    }
+                    // La unidad de medida se asignará automáticamente vía useEffect
                   }} 
                   required
                 >
@@ -433,11 +500,14 @@ export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores
                         <SelectItem key={producto.id} value={producto.id}>
                           {producto.nombre} ({producto.codigo})
                           {producto.categoria && ` - ${producto.categoria}`}
+                          {producto.unidad_medida && ` [${producto.unidad_medida}]`}
                         </SelectItem>
                       ))
                     ) : (
                       <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                        No se encontraron productos
+                        {busquedaProducto || filtroCategoria || filtroProveedor 
+                          ? 'No se encontraron productos con los filtros aplicados'
+                          : 'No hay productos disponibles'}
                       </div>
                     )}
                   </SelectContent>
@@ -460,9 +530,21 @@ export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="unidad-egreso">Unidad de Medida *</Label>
-                  <Select value={unidadMedida} onValueChange={setUnidadMedida} required>
-                    <SelectTrigger id="unidad-egreso">
+                  <Label htmlFor="unidad-egreso">
+                    Unidad de Medida *
+                    {productoSeleccionado && (
+                      <span className="ml-2 text-xs font-normal text-muted-foreground">
+                        (asignada automáticamente)
+                      </span>
+                    )}
+                  </Label>
+                  <Select 
+                    value={unidadMedida || unidadMedidaProducto} 
+                    onValueChange={setUnidadMedida} 
+                    required
+                    disabled={!!productoSeleccionado}
+                  >
+                    <SelectTrigger id="unidad-egreso" className={productoSeleccionado ? "bg-muted" : ""}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -475,8 +557,8 @@ export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores
                     </SelectContent>
                   </Select>
                   {productoSeleccionado && (
-                    <p className="text-xs text-muted-foreground">
-                      Unidad por defecto del producto: {productoSeleccionado.unidad_medida}
+                    <p className="text-xs text-primary font-medium flex items-center gap-1">
+                      ✓ Unidad del producto: <span className="font-semibold">{productoSeleccionado.unidad_medida}</span>
                     </p>
                   )}
                 </div>

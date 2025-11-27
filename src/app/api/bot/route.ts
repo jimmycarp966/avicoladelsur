@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { crearPresupuestoAction } from '@/actions/presupuestos.actions'
 import { crearReclamoBot, crearClienteDesdeBot } from '@/actions/ventas.actions'
+import { obtenerListasClienteAction, obtenerPrecioProductoAction } from '@/actions/listas-precios.actions'
 
 // Tipos para las llamadas de Botpress
 interface BotpressWebhookPayload {
@@ -156,7 +157,7 @@ function limpiarEstadosExpirados() {
 // Función auxiliar para obtener localidades activas
 async function obtenerLocalidadesActivas() {
   const supabase = await createClient()
-  
+
   const { data, error } = await supabase.rpc('fn_obtener_localidades_activas')
 
   if (error) {
@@ -174,7 +175,7 @@ function iniciarRegistroCliente(phoneNumber: string, productos: Array<{ codigo: 
     productos_pendientes: productos,
     timestamp: Date.now()
   })
-  
+
   return `👋 *¡Bienvenido a Avícola del Sur!*
 
 No encontramos tu número registrado. Para crear tu presupuesto necesitamos algunos datos.
@@ -188,7 +189,7 @@ Ejemplo: *Juan Pérez*`
 // Función para procesar respuesta del flujo de registro
 async function procesarRegistroCliente(phoneNumber: string, mensaje: string): Promise<string | null> {
   limpiarEstadosExpirados()
-  
+
   const estado = registroClientesPendientes.get(phoneNumber)
   if (!estado) return null
 
@@ -232,14 +233,14 @@ Ejemplo: *Av. Corrientes 1234*`
 
       // Obtener localidades
       const localidades = await obtenerLocalidadesActivas()
-      
+
       if (localidades.length === 0) {
         registroClientesPendientes.delete(phoneNumber)
         return '❌ No hay localidades disponibles en este momento. Por favor contacta con ventas.'
       }
 
       // Guardar localidades en el estado para validación posterior
-      ;(estado as any).localidades = localidades
+      ; (estado as any).localidades = localidades
 
       let mensajeLocalidades = `✅ Dirección registrada: *${estado.direccion}*
 
@@ -302,8 +303,28 @@ Sin embargo, no se pudieron procesar los productos de tu pedido. Por favor inten
       }
 
       const formData = new FormData()
+      // Obtener lista automática del cliente
+      let listaPrecioId: string | undefined
+      const listasResult = await obtenerListasClienteAction(clienteId)
+      if (listasResult.success && listasResult.data && Array.isArray(listasResult.data) && listasResult.data.length > 0) {
+        listaPrecioId = listasResult.data[0].lista_precio_id
+
+        // Actualizar precios usando la lista
+        if (listaPrecioId) {
+          for (let i = 0; i < items.length; i++) {
+            const precioResult = await obtenerPrecioProductoAction(listaPrecioId, items[i].producto_id)
+            if (precioResult.success && precioResult.data) {
+              items[i].precio_unit_est = precioResult.data.precio
+            }
+          }
+        }
+      }
+
       formData.append('cliente_id', clienteId)
       formData.append('observaciones', 'Presupuesto desde WhatsApp - Cliente nuevo')
+      if (listaPrecioId) {
+        formData.append('lista_precio_id', listaPrecioId)
+      }
       formData.append('items', JSON.stringify(items))
 
       const presupuestoResult = await crearPresupuestoAction(formData)
@@ -317,12 +338,12 @@ Sin embargo, no se pudieron procesar los productos de tu pedido. Por favor inten
         const productosDetalle = await Promise.all(
           estado.productos_pendientes.map(async (prod) => {
             const producto = await findProductoByCode(prod.codigo)
-            return producto 
+            return producto
               ? `${prod.cantidad} ${producto.unidad_medida} - ${producto.nombre}`
               : `${prod.cantidad} - ${prod.codigo}`
           })
         )
-        
+
         const detalleProductos = productosDetalle.length <= 3
           ? productosDetalle.map((detalle, idx) => `   ${idx + 1}. ${detalle}`).join('\n')
           : `${productosDetalle.length} productos diferentes`
@@ -415,8 +436,28 @@ async function handleBotpressWebhook(payload: BotpressWebhookPayload): Promise<B
 
         // Crear presupuesto
         const formData = new FormData()
+        // Obtener lista automática del cliente
+        let listaPrecioId: string | undefined
+        const listasResult = await obtenerListasClienteAction(cliente.id)
+        if (listasResult.success && listasResult.data && Array.isArray(listasResult.data) && listasResult.data.length > 0) {
+          listaPrecioId = listasResult.data[0].lista_precio_id
+
+          // Actualizar precios usando la lista
+          if (listaPrecioId) {
+            for (let i = 0; i < items.length; i++) {
+              const precioResult = await obtenerPrecioProductoAction(listaPrecioId, items[i].producto_id)
+              if (precioResult.success && precioResult.data) {
+                items[i].precio_unitario = precioResult.data.precio
+              }
+            }
+          }
+        }
+
         formData.append('cliente_id', cliente.id)
         formData.append('observaciones', parameters.observaciones || 'Presupuesto creado desde WhatsApp')
+        if (listaPrecioId) {
+          formData.append('lista_precio_id', listaPrecioId)
+        }
         formData.append('items', JSON.stringify(items.map(item => ({
           producto_id: item.producto_id,
           cantidad_solicitada: item.cantidad,
@@ -670,21 +711,21 @@ function isHorarioAtencion(): { abierto: boolean; mensaje?: string } {
   const now = new Date()
   const hora = now.getHours()
   const dia = now.getDay() // 0 = Domingo, 6 = Sábado
-  
+
   // Lunes a Viernes: 8am - 6pm
   if (dia >= 1 && dia <= 5) {
     if (hora >= 8 && hora < 18) {
       return { abierto: true }
     }
   }
-  
+
   // Sábado: 8am - 1pm
   if (dia === 6) {
     if (hora >= 8 && hora < 13) {
       return { abierto: true }
     }
   }
-  
+
   // Fuera de horario
   return {
     abierto: false,
@@ -715,10 +756,10 @@ function getBaseUrl(): string {
 async function handleTwilioWebhook(formData: FormData) {
   const body = formData.get('Body')?.toString().trim() || ''
   const from = formData.get('From')?.toString() || ''
-  
+
   // Extraer el número de teléfono (Twilio envía: whatsapp:+1234567890)
   const phoneNumber = from.replace('whatsapp:', '')
-  
+
   console.log('Mensaje de Twilio recibido:', { from: phoneNumber, body })
 
   // Buscar cliente para personalizar mensajes
@@ -729,7 +770,7 @@ async function handleTwilioWebhook(formData: FormData) {
 
   try {
     const bodyLower = body.toLowerCase()
-    
+
     // Verificar si hay un registro en proceso (antes de cualquier otro comando)
     const registroEnProceso = registroClientesPendientes.get(phoneNumber)
     if (registroEnProceso) {
@@ -757,7 +798,7 @@ async function handleTwilioWebhook(formData: FormData) {
         }
       }
     }
-    
+
     // Verificar horario de atención (excepto para consultas)
     const horario = isHorarioAtencion()
     if (!horario.abierto && !bodyLower.includes('estado') && !bodyLower.includes('consulta')) {
@@ -788,7 +829,7 @@ async function handleTwilioWebhook(formData: FormData) {
       // Consultar productos directamente con stock disponible desde la vista
       // Mostrar TODOS los productos activos, incluso sin stock
       const supabase = await createClient()
-      
+
       const { data: productos, error } = await supabase
         .from('productos_con_stock')
         .select(`
@@ -807,9 +848,9 @@ async function handleTwilioWebhook(formData: FormData) {
         responseMessage = 'No hay productos disponibles en este momento.'
       } else {
         const categorias = [...new Set(productos.map(p => p.categoria || 'Otros'))]
-        
+
         responseMessage = `📦 *Catálogo de Productos*\n\n`
-        
+
         categorias.forEach(categoria => {
           responseMessage += `*${categoria}:*\n`
           productos
@@ -825,7 +866,7 @@ async function handleTwilioWebhook(formData: FormData) {
               }
             })
         })
-        
+
         responseMessage += `\n💬 Para ordenar responde:\n*[CODIGO] [CANTIDAD]*\nEj: POLLO001 5`
       }
     }
@@ -849,7 +890,7 @@ Para ver los productos disponibles, escribe *1* o *productos*`
     // Confirmación de pedido
     else if (bodyLower === 'si' || bodyLower === 'sí' || bodyLower === 'confirmar' || bodyLower === 'confirmo') {
       const pending = pendingConfirmations.get(phoneNumber)
-      
+
       if (!pending) {
         responseMessage = 'No tienes ningún presupuesto pendiente de confirmación.\n\nEscribe el código y cantidad para crear un presupuesto.'
       } else {
@@ -865,7 +906,7 @@ Para ver los productos disponibles, escribe *1* o *productos*`
             // Procesar todos los productos
             const items = []
             let totalGeneral = 0
-            
+
             for (const prod of pending.productos) {
               const producto = await findProductoByCode(prod.codigo)
               if (producto) {
@@ -878,10 +919,31 @@ Para ver los productos disponibles, escribe *1* o *productos*`
               }
             }
 
+            // Obtener lista automática del cliente (primera lista asignada)
+            let listaPrecioId: string | undefined
+            const listasResult = await obtenerListasClienteAction(cliente.id)
+            if (listasResult.success && listasResult.data && Array.isArray(listasResult.data) && listasResult.data.length > 0) {
+              const primeraListaPrecioId = listasResult.data[0].lista_precio_id
+              if (primeraListaPrecioId) {
+                listaPrecioId = primeraListaPrecioId
+
+                // Actualizar precios usando la lista de precios
+                for (let i = 0; i < items.length; i++) {
+                  const precioResult = await obtenerPrecioProductoAction(primeraListaPrecioId, items[i].producto_id)
+                  if (precioResult.success && precioResult.data) {
+                    items[i].precio_unitario = precioResult.data.precio
+                  }
+                }
+              }
+            }
+
             // Crear presupuesto
             const formData = new FormData()
             formData.append('cliente_id', cliente.id)
             formData.append('observaciones', 'Presupuesto desde WhatsApp')
+            if (listaPrecioId) {
+              formData.append('lista_precio_id', listaPrecioId)
+            }
             formData.append('items', JSON.stringify(items.map(item => ({
               producto_id: item.producto_id,
               cantidad_solicitada: item.cantidad,
@@ -904,17 +966,17 @@ Para ver los productos disponibles, escribe *1* o *productos*`
               })
 
               const baseUrl = getBaseUrl()
-              
+
               // Obtener nombres de productos para el detalle
               const productosDetalle = await Promise.all(
                 pending.productos.map(async (prod) => {
                   const producto = await findProductoByCode(prod.codigo)
-                  return producto 
+                  return producto
                     ? `${prod.cantidad} ${producto.unidad_medida} - ${producto.nombre}`
                     : `${prod.cantidad} - ${prod.codigo}`
                 })
               )
-              
+
               const detalleProductos = productosDetalle.length <= 3
                 ? productosDetalle.map((detalle, idx) => `   ${idx + 1}. ${detalle}`).join('\n')
                 : `${productosDetalle.length} productos diferentes`
@@ -938,7 +1000,7 @@ ${detalleProductos}
    3. Coordinaremos la entrega en tu zona
 
 💬 Escribe *menu* para volver al inicio o *estado ${numeroPresupuesto}* para consultar el estado.`
-              
+
               pendingConfirmations.delete(phoneNumber)
             } else {
               responseMessage = `❌ Error al crear presupuesto: ${result.message}`
@@ -960,13 +1022,13 @@ ${detalleProductos}
     // Formato: POLLO001 5, HUEVO001 2, POLLO003 3
     // O también: POLLO001 5\nHUEVO001 2\nPOLLO003 3
     else if (true) {
-        // Detectar si hay múltiples productos (por comas o líneas separadas)
-        const lines = body.split('\n').map(l => l.trim()).filter(l => l.length > 0)
-        const hasCommas = body.includes(',')
-        const validLines = lines.filter(line => line.match(/^[A-Z]{3,10}\d{3,4}\s+\d+(?:\.\d+)?$/i))
-        const multipleLines = validLines.length > 1
-        
-        if (hasCommas || multipleLines) {
+      // Detectar si hay múltiples productos (por comas o líneas separadas)
+      const lines = body.split('\n').map(l => l.trim()).filter(l => l.length > 0)
+      const hasCommas = body.includes(',')
+      const validLines = lines.filter(line => line.match(/^[A-Z]{3,10}\d{3,4}\s+\d+(?:\.\d+)?$/i))
+      const multipleLines = validLines.length > 1
+
+      if (hasCommas || multipleLines) {
         // Dividir por comas o por saltos de línea
         let items: string[] = []
         if (hasCommas) {
@@ -975,7 +1037,7 @@ ${detalleProductos}
           // Usar las líneas válidas detectadas
           items = validLines
         }
-        
+
         const productos = []
         let totalPreview = 0
         let hayError = false
@@ -987,25 +1049,25 @@ ${detalleProductos}
           if (match) {
             const codigo = match[1].toUpperCase()
             const cantidad = parseFloat(match[2])
-            
+
             const producto = await findProductoByCode(codigo)
             if (!producto) {
               hayError = true
               errorMsg = `Producto ${codigo} no encontrado`
               break
             }
-            
+
             // Verificar stock disponible consultando productos con stock
             const supabase = await createClient()
             const { data: productoConStock } = await supabase
               .from('productos_con_stock')
               .select('stock_disponible')
-            .eq('id', producto.id)
-            .single()
-          
-          const stockDisponible = productoConStock ? Number(productoConStock?.stock_disponible) || 0 : 0
+              .eq('id', producto.id)
+              .single()
 
-          if (stockDisponible <= 0) {
+            const stockDisponible = productoConStock ? Number(productoConStock?.stock_disponible) || 0 : 0
+
+            if (stockDisponible <= 0) {
               hayError = true
               errorMsg = `Sin stock disponible de ${producto.nombre}`
               break
@@ -1014,7 +1076,7 @@ ${detalleProductos}
               errorMsg = `Stock insuficiente de ${producto.nombre} (disponible: ${Math.floor(stockDisponible)})`
               break
             }
-            
+
             productos.push({
               codigo,
               cantidad,
@@ -1058,7 +1120,7 @@ POLLO003 3*`
             responseMessage += `¿Confirmas este pedido?\n\nResponde *SÍ* para confirmar o *NO* para cancelar.`
           }
         }
-        }
+      }
     }
     // Comando: Pedido simple con confirmación (solo si es una sola línea)
     // Si hay múltiples líneas con formato de pedido, se procesará como pedido múltiple arriba
@@ -1083,7 +1145,7 @@ POLLO003 3*`
             .select('stock_disponible')
             .eq('id', producto!.id)
             .single()
-          
+
           const stockDisponible = productoConStock?.stock_disponible ? Number(productoConStock?.stock_disponible) : 0
 
           if (stockDisponible <= 0) {
@@ -1135,7 +1197,7 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
       // Consultar productos directamente con stock disponible desde la vista
       // Mostrar TODOS los productos activos, incluso sin stock
       const supabase = await createClient()
-      
+
       const { data: productos, error } = await supabase
         .from('productos_con_stock')
         .select(`
@@ -1157,9 +1219,9 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
         responseMessage = 'No hay productos disponibles en este momento.'
       } else {
         const categorias = [...new Set(productos!.map(p => p.categoria || 'Otros'))]
-        
+
         responseMessage = `📦 *Catálogo de Productos*\n\n`
-        
+
         categorias.forEach(categoria => {
           responseMessage += `*${categoria}:*\n`
           productos!
@@ -1175,7 +1237,7 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
               }
             })
         })
-        
+
         responseMessage += `\n💬 Para ordenar escribe:\n*[CODIGO] [CANTIDAD]*\nEj: POLLO001 5`
       }
     }
@@ -1223,11 +1285,11 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
                 .select('stock_disponible')
                 .eq('id', producto!.id)
                 .single()
-              
+
               const stockDisponible = productoConStock?.stock_disponible ? Number(productoConStock?.stock_disponible) : 0
 
-          if (stockDisponible < cantidad) {
-            responseMessage = `❌ *Stock insuficiente*
+              if (stockDisponible < cantidad) {
+                responseMessage = `❌ *Stock insuficiente*
 
 📦 *Producto:* ${producto!.nombre}
 📊 *Solicitado:* ${cantidad} ${producto!.unidad_medida}
@@ -1240,13 +1302,43 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
               } else {
                 // Crear presupuesto
                 const formData = new FormData()
-                formData.append('cliente_id', cliente!.id)
-                formData.append('observaciones', 'Presupuesto creado desde WhatsApp')
-                formData.append('items', JSON.stringify([{
-                  producto_id: producto!.id,
-                  cantidad_solicitada: cantidad,
-                  precio_unit_est: producto!.precio_venta
-                }]))
+                // Obtener lista automática del cliente
+                let precioFinal = producto!.precio_venta
+                const listasResult = await obtenerListasClienteAction(cliente!.id)
+                if (listasResult.success && listasResult.data && Array.isArray(listasResult.data) && listasResult.data.length > 0) {
+                  const primeraListaPrecioId = listasResult.data[0]?.lista_precio_id
+                  if (primeraListaPrecioId) {
+                    const precioResult = await obtenerPrecioProductoAction(primeraListaPrecioId, producto!.id)
+                    if (precioResult.success && precioResult.data) {
+                      precioFinal = precioResult.data.precio
+                    }
+
+                    formData.append('cliente_id', cliente!.id)
+                    formData.append('observaciones', 'Presupuesto creado desde WhatsApp')
+                    formData.append('lista_precio_id', primeraListaPrecioId)
+                    formData.append('items', JSON.stringify([{
+                      producto_id: producto!.id,
+                      cantidad_solicitada: cantidad,
+                      precio_unit_est: precioFinal
+                    }]))
+                  } else {
+                    formData.append('cliente_id', cliente!.id)
+                    formData.append('observaciones', 'Presupuesto creado desde WhatsApp')
+                    formData.append('items', JSON.stringify([{
+                      producto_id: producto!.id,
+                      cantidad_solicitada: cantidad,
+                      precio_unit_est: precioFinal
+                    }]))
+                  }
+                } else {
+                  formData.append('cliente_id', cliente!.id)
+                  formData.append('observaciones', 'Presupuesto creado desde WhatsApp')
+                  formData.append('items', JSON.stringify([{
+                    producto_id: producto!.id,
+                    cantidad_solicitada: cantidad,
+                    precio_unit_est: precioFinal
+                  }]))
+                }
 
                 const result = await crearPresupuestoAction(formData)
 
@@ -1285,11 +1377,11 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
     else if (bodyLower.includes('estado') || body === '3' || bodyLower === 'opcion 3') {
       // Buscar si escribió el número de pedido
       const match = body.match(/PED-[\w-]+/i)
-      
+
       if (match) {
         const numeroPedido = match![0].toUpperCase()
         const pedido = await getPedidoStatus(numeroPedido)
-        
+
         if (!pedido) {
           responseMessage = `❌ Pedido *${numeroPedido}* no encontrado.\n\nVerifica el número e intenta de nuevo.`
         } else {
@@ -1301,7 +1393,7 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
             entregado: '🎉',
             cancelado: '❌'
           }
-          
+
           const estadosTexto: Record<string, string> = {
             pendiente: 'Pendiente de confirmación',
             confirmado: 'Confirmado',
@@ -1310,10 +1402,10 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
             entregado: 'Entregado',
             cancelado: 'Cancelado'
           }
-          
+
           const emoji = estadosEmoji[pedido!.estado] || '📋'
           const estadoTexto = estadosTexto[pedido!.estado] || pedido!.estado
-          
+
           responseMessage = `${emoji} *Estado de Pedido*
 
 📋 Número: *${pedido!.numero_pedido}*
@@ -1324,7 +1416,7 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
           if (pedido!.fecha_entrega_estimada) {
             responseMessage += `\n🚚 Entrega estimada: ${new Date(pedido!.fecha_entrega_estimada).toLocaleDateString('es-AR')}`
           }
-          
+
           if (pedido!.fecha_entrega_real) {
             responseMessage += `\n✅ Entregado: ${new Date(pedido!.fecha_entrega_real).toLocaleDateString('es-AR')}`
           }
@@ -1409,13 +1501,13 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
 export async function POST(request: NextRequest) {
   try {
     const contentType = request.headers.get('content-type') || ''
-    
+
     // Detectar si es una petición de Twilio (form-urlencoded)
     if (contentType.includes('application/x-www-form-urlencoded')) {
       const formData = await request.formData()
       return handleTwilioWebhook(formData)
     }
-    
+
     // Si es JSON, asumimos que es de Botpress
     const authHeader = request.headers.get('authorization')
     const expectedToken = process.env.BOTPRESS_WEBHOOK_TOKEN

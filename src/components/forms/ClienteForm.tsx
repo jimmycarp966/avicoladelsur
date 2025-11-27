@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -10,10 +10,18 @@ import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { ArrowLeft, Loader2, Save, MapPin } from 'lucide-react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
+import { ArrowLeft, Loader2, Save, MapPin, X, Plus, Tag } from 'lucide-react'
 import Link from 'next/link'
 import { clienteSchema, type ClienteFormData } from '@/lib/schemas/clientes.schema'
 import { useNotificationStore } from '@/store/notificationStore'
+import { 
+  obtenerListasClienteAction, 
+  obtenerListasPreciosAction,
+  asignarListaClienteAction,
+  desasignarListaClienteAction 
+} from '@/actions/listas-precios.actions'
 
 interface ClienteFormProps {
   cliente?: {
@@ -38,6 +46,15 @@ export function ClienteForm({ cliente, onSuccess }: ClienteFormProps) {
   const { showToast } = useNotificationStore()
   const [isLoading, setIsLoading] = useState(false)
   const isEditing = !!cliente
+  const [listasAsignadas, setListasAsignadas] = useState<Array<{ 
+    id: string
+    lista_precio: { id: string; nombre: string; codigo: string; tipo: string }
+    es_automatica: boolean
+    prioridad: number
+  }>>([])
+  const [listasDisponibles, setListasDisponibles] = useState<Array<{ id: string; nombre: string; codigo: string }>>([])
+  const [cargandoListas, setCargandoListas] = useState(false)
+  const [listaSeleccionada, setListaSeleccionada] = useState('')
 
   const {
     register,
@@ -75,6 +92,76 @@ export function ClienteForm({ cliente, onSuccess }: ClienteFormProps) {
 
   const activo = watch('activo')
   const tipoCliente = watch('tipo_cliente')
+
+  // Cargar listas asignadas cuando se edita un cliente
+  useEffect(() => {
+    const cargarListas = async () => {
+      if (!isEditing || !cliente?.id) return
+
+      setCargandoListas(true)
+      const [asignadasResult, disponiblesResult] = await Promise.all([
+        obtenerListasClienteAction(cliente.id),
+        obtenerListasPreciosAction({ activa: true })
+      ])
+
+      if (asignadasResult.success && asignadasResult.data) {
+        setListasAsignadas(asignadasResult.data as any)
+      }
+
+      if (disponiblesResult.success && disponiblesResult.data) {
+        setListasDisponibles(disponiblesResult.data as any)
+      }
+
+      setCargandoListas(false)
+    }
+
+    cargarListas()
+  }, [isEditing, cliente?.id])
+
+  const handleAsignarLista = async () => {
+    if (!cliente?.id || !listaSeleccionada) return
+
+    const result = await asignarListaClienteAction(cliente.id, listaSeleccionada)
+    if (result.success) {
+      showToast('success', 'Lista asignada exitosamente')
+      setListaSeleccionada('')
+      // Recargar listas
+      const asignadasResult = await obtenerListasClienteAction(cliente.id)
+      if (asignadasResult.success && asignadasResult.data) {
+        setListasAsignadas(asignadasResult.data as any)
+      }
+    } else {
+      showToast('error', result.message || 'Error al asignar lista')
+    }
+  }
+
+  const handleDesasignarLista = async (listaPrecioId: string, esAutomatica: boolean) => {
+    if (!cliente?.id) return
+
+    if (esAutomatica) {
+      showToast('error', 'No se puede desasignar una lista automática')
+      return
+    }
+
+    if (!confirm('¿Estás seguro de desasignar esta lista?')) return
+
+    const result = await desasignarListaClienteAction(cliente.id, listaPrecioId)
+    if (result.success) {
+      showToast('success', 'Lista desasignada exitosamente')
+      // Recargar listas
+      const asignadasResult = await obtenerListasClienteAction(cliente.id)
+      if (asignadasResult.success && asignadasResult.data) {
+        setListasAsignadas(asignadasResult.data as any)
+      }
+    } else {
+      showToast('error', result.message || 'Error al desasignar lista')
+    }
+  }
+
+  // Filtrar listas disponibles (excluir las ya asignadas)
+  const listasParaAsignar = listasDisponibles.filter(
+    lista => !listasAsignadas.some(asignada => asignada.lista_precio.id === lista.id)
+  )
 
   const onSubmit = async (data: ClienteFormData) => {
     try {
@@ -294,6 +381,111 @@ export function ClienteForm({ cliente, onSuccess }: ClienteFormProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Listas de Precios (solo al editar) */}
+      {isEditing && cliente && (
+        <Card className="border-l-[3px] border-l-accent">
+          <CardHeader>
+            <CardTitle className="text-accent flex items-center gap-2">
+              <Tag className="h-5 w-5" />
+              Listas de Precios Asignadas
+            </CardTitle>
+            <CardDescription>
+              Gestiona las listas de precios asignadas a este cliente (máximo 2)
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {cargandoListas ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <>
+                {/* Listas asignadas */}
+                <div className="space-y-2">
+                  {listasAsignadas.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-4 text-center">
+                      No hay listas asignadas. Se asignará automáticamente según el tipo de cliente.
+                    </p>
+                  ) : (
+                    listasAsignadas.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center justify-between p-3 border rounded-lg bg-background"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">
+                                {item.lista_precio.codigo} - {item.lista_precio.nombre}
+                              </span>
+                              {item.es_automatica && (
+                                <Badge variant="secondary" className="text-xs">
+                                  Automática
+                                </Badge>
+                              )}
+                              <Badge variant="outline" className="text-xs">
+                                Prioridad {item.prioridad}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              Tipo: {item.lista_precio.tipo}
+                            </p>
+                          </div>
+                        </div>
+                        {!item.es_automatica && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDesasignarLista(item.lista_precio.id, item.es_automatica)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Asignar nueva lista */}
+                {listasAsignadas.length < 2 && listasParaAsignar.length > 0 && (
+                  <div className="flex gap-2 pt-2 border-t">
+                    <Select value={listaSeleccionada} onValueChange={setListaSeleccionada}>
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Seleccionar lista para asignar" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {listasParaAsignar.map((lista) => (
+                          <SelectItem key={lista.id} value={lista.id}>
+                            {lista.codigo} - {lista.nombre}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleAsignarLista}
+                      disabled={!listaSeleccionada}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Asignar
+                    </Button>
+                  </div>
+                )}
+
+                {listasAsignadas.length >= 2 && (
+                  <p className="text-sm text-muted-foreground py-2">
+                    El cliente ya tiene 2 listas asignadas (máximo permitido)
+                  </p>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Acciones */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sticky bottom-4 bg-background/95 backdrop-blur-sm p-4 rounded-lg border border-primary/10 shadow-lg">

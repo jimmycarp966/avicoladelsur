@@ -13,6 +13,7 @@
 - 💰 **Tesorería Completa**: Cuentas corrientes, cajas, cierres automáticos
 - 📊 **Reportes Avanzados**: CSV/PDF con business intelligence
 - 🔐 **RLS Completo**: Seguridad por roles (admin, vendedor, repartidor, almacenista)
+- 💵 **Sistema de Listas de Precios**: Listas por tipo de cliente (minorista, mayorista, distribuidor) con margen de ganancia automático
 
 ## 🚀 Inicio Rápido
 
@@ -77,10 +78,11 @@
 
 ### Dominios de Negocio
 1. **Almacén (WMS)**: Control de stock, lotes, picking
-2. **Ventas (CRM)**: Clientes, pedidos, cotizaciones, reclamos
+2. **Ventas (CRM)**: Clientes, pedidos, cotizaciones, reclamos, listas de precios
 3. **Reparto (TMS)**: Vehículos, rutas, entregas, GPS
-4. **RRHH**: Gestión de empleados, asistencia, liquidaciones, adelantos, evaluaciones
+4. **RRHH**: Gestión completa de empleados, asistencia, liquidaciones, adelantos y evaluaciones
 5. **Chatbot**: Toma de pedidos y consultas vía WhatsApp
+6. **Tesorería**: Gestión de cajas, movimientos, validación de rutas y reportes financieros
 
 ## 📁 Estructura del Proyecto
 
@@ -96,7 +98,8 @@ src/
 │   │   │   │   └── rutas/         # Gestión de rutas
 │   │   │   ├── tesoreria/       # Cajas, movimientos, cierres
 │   │   │   ├── rrhh/            # Recursos Humanos (empleados, asistencia, liquidaciones, adelantos)
-│   │   │   └── ventas/          # Presupuestos, pedidos, clientes
+│   │   │   └── ventas/          # Presupuestos, pedidos, clientes, listas de precios
+│   │   │       └── listas-precios/  # Gestión de listas de precios y precios por producto
 │   │   └── dashboard/           # Dashboard principal
 │   ├── (repartidor)/            # ⭐ PWA móvil completa
 │   │   ├── entregas/           # Lista de entregas
@@ -197,7 +200,7 @@ scripts/                         # Scripts de automatización
 - **Validación de cobros**: Repartidores registran pagos durante ruta, tesorero valida antes de acreditar en caja
 - **Reportes CSV/PDF**: Business intelligence completa
 
-### 👥 **RRHH (Recursos Humanos)**
+### 👥 **RRHH (Recursos Humanos) - COMPLETO**
 - **Gestión de empleados**: CRUD completo con datos personales, laborales y bancarios
 - **Control de asistencia**: Registro diario con reglas críticas (1 falta sin aviso = pérdida presentismo + jornal)
 - **Liquidaciones automáticas**: Cálculo mensual con horas extras, producción y descuentos
@@ -206,6 +209,15 @@ scripts/                         # Scripts de automatización
 - **Evaluaciones de desempeño**: Sistema por sucursal con 5 criterios (escala 1-5)
 - **Novedades internas**: Comunicación segmentada (general, sucursal, categoría)
 - **Reportes avanzados**: 6 tipos de reportes exportables (Excel/CSV)
+
+### 💵 **Sistema de Listas de Precios**
+- **Listas base**: Minorista, Mayorista, Distribuidor (asignación automática por tipo_cliente)
+- **Asignación dual**: Cada cliente puede tener hasta 2 listas (1 automática + 1 manual)
+- **Margen de ganancia**: Configuración por lista para cálculo automático desde precio_costo
+- **Precios manuales**: Gestión individual de precios por producto en cada lista
+- **Selección en presupuestos**: Vendedor elige qué lista usar al crear presupuestos
+- **Bot integrado**: Usa automáticamente la primera lista asignada del cliente
+- **Herencia en pedidos**: Los pedidos heredan la lista del presupuesto
 
 ### 🔐 **Seguridad y Roles**
 - **4 roles definidos**: admin, vendedor, repartidor, almacenista
@@ -474,7 +486,7 @@ SELECT * FROM fn_registrar_cobro_reparto(
 
 **Ver la guía completa en [`TESTING.md`](./TESTING.md) para pruebas detalladas de cada módulo.**
 
-## 💰 Tesorería y Gastos (Hito Intermedio)
+## 💰 Tesorería y Gastos - COMPLETO
 
 El hito intermedio incorpora la capa financiera básica y el sistema de validación de cobros:
 
@@ -594,6 +606,9 @@ El esquema completo de la base de datos se encuentra en `supabase/database-schem
 - `fn_crear_pago_pedido()`: Registra pagos de pedidos y actualiza cuentas corrientes
 - `fn_validar_entrega()`: Valida entregas con firma digital
 - `crear_notificacion()`: Crea notificaciones en el sistema para los admins
+- `fn_obtener_precio_producto()`: Obtiene precio de producto desde lista específica (con margen o precio manual, fallback a precio_venta)
+- `fn_asignar_lista_automatica_cliente()`: Asigna lista automáticamente según tipo_cliente del cliente
+- `fn_validar_listas_cliente()`: Valida que un cliente no tenga más de 2 listas activas
 
 ## 🔐 Autenticación y Roles
 

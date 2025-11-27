@@ -14,6 +14,7 @@ const crearPresupuestoSchema = z.object({
   zona_id: z.string().uuid().optional(),
   fecha_entrega_estimada: z.string().optional(),
   observaciones: z.string().optional(),
+  lista_precio_id: z.string().uuid().optional(),
   items: z.array(z.object({
     producto_id: z.string().uuid(),
     cantidad_solicitada: z.number().positive(),
@@ -64,6 +65,7 @@ export async function crearPresupuestoAction(formData: FormData) {
       zona_id: rawData.zona_id || undefined,
       fecha_entrega_estimada: rawData.fecha_entrega_estimada || undefined,
       observaciones: rawData.observaciones || undefined,
+      lista_precio_id: rawData.lista_precio_id || undefined,
       items: JSON.parse(rawData.items as string),
     })
 
@@ -92,10 +94,16 @@ export async function crearPresupuestoAction(formData: FormData) {
       return { success: false, message: result.error || 'Error en la creación del presupuesto' }
     }
 
-    // Asignar usuario vendedor
+    // Asignar usuario vendedor y lista de precios
+    const updateData: { usuario_vendedor: string; lista_precio_id?: string } = {
+      usuario_vendedor: user.id,
+    }
+    if (data.lista_precio_id) {
+      updateData.lista_precio_id = data.lista_precio_id
+    }
     await supabase
       .from('presupuestos')
-      .update({ usuario_vendedor: user.id })
+      .update(updateData)
       .eq('id', result.presupuesto_id)
 
     // Crear notificación para admin
@@ -554,22 +562,27 @@ export async function obtenerPresupuestoAction(presupuestoId: string) {
   try {
     const supabase = await createClient()
 
-    // Primero obtener el presupuesto básico
-    console.log('Buscando presupuesto con ID:', presupuestoId)
+    // OPTIMIZADO: Una sola query con todos los joins en lugar de 7 queries separadas
     const { data: presupuestoData, error: presupuestoError } = await supabase
       .from('presupuestos')
-      .select('*')
+      .select(`
+        *,
+        cliente:clientes(*),
+        zona:zonas(nombre),
+        usuario_vendedor_obj:usuarios!presupuestos_usuario_vendedor_fkey(nombre),
+        usuario_almacen_obj:usuarios!presupuestos_usuario_almacen_fkey(nombre),
+        usuario_repartidor_obj:usuarios!presupuestos_usuario_repartidor_fkey(nombre),
+        pedido_convertido:pedidos(numero_pedido),
+        items:presupuesto_items(
+          *,
+          producto:productos(*),
+          lote_reservado:lotes(*)
+        )
+      `)
       .eq('id', presupuestoId)
       .single()
 
-    console.log('Resultado query presupuesto:', { 
-      hasData: !!presupuestoData, 
-      hasError: !!presupuestoError,
-      error: presupuestoError 
-    })
-
     if (presupuestoError) {
-      console.error('Error obteniendo presupuesto:', presupuestoError)
       // Si el error es "no encontrado", dar mensaje más claro
       if (presupuestoError.code === 'PGRST116' || presupuestoError.message?.includes('No rows')) {
         return { 
@@ -586,48 +599,30 @@ export async function obtenerPresupuestoAction(presupuestoId: string) {
     }
 
     if (!presupuestoData) {
-      console.error('Presupuesto no encontrado (data es null):', presupuestoId)
       return { 
         success: false, 
         message: `Presupuesto con ID ${presupuestoId} no encontrado`
       }
     }
 
-    // Obtener relaciones por separado para evitar conflictos
-    const [clienteResult, zonaResult, vendedorResult, almacenResult, repartidorResult, pedidoResult, itemsResult] = await Promise.all([
-      presupuestoData.cliente_id ? supabase.from('clientes').select('*').eq('id', presupuestoData.cliente_id).single() : Promise.resolve({ data: null, error: null }),
-      presupuestoData.zona_id ? supabase.from('zonas').select('nombre').eq('id', presupuestoData.zona_id).single() : Promise.resolve({ data: null, error: null }),
-      presupuestoData.usuario_vendedor ? supabase.from('usuarios').select('nombre').eq('id', presupuestoData.usuario_vendedor).single() : Promise.resolve({ data: null, error: null }),
-      presupuestoData.usuario_almacen ? supabase.from('usuarios').select('nombre').eq('id', presupuestoData.usuario_almacen).single() : Promise.resolve({ data: null, error: null }),
-      presupuestoData.usuario_repartidor ? supabase.from('usuarios').select('nombre').eq('id', presupuestoData.usuario_repartidor).single() : Promise.resolve({ data: null, error: null }),
-      presupuestoData.pedido_convertido_id ? supabase.from('pedidos').select('numero_pedido').eq('id', presupuestoData.pedido_convertido_id).single() : Promise.resolve({ data: null, error: null }),
-      supabase.from('presupuesto_items')
-        .select(`
-          *,
-          producto:productos(*),
-          lote_reservado:lotes(*)
-        `)
-        .eq('presupuesto_id', presupuestoId)
-    ])
-
-    // Obtener reservas de stock
+    // Obtener reservas de stock (query separada porque no hay relación directa)
     const { data: reservasData } = await supabase
       .from('stock_reservations')
-      .select('cantidad, expires_at, estado')
+      .select('cantidad, expires_at, estado, producto_id')
       .eq('presupuesto_id', presupuestoId)
 
-    // Construir objeto de respuesta con todas las relaciones
+    // Construir objeto de respuesta con reservas agrupadas por producto
+    const reservasPorProducto = (reservasData || []).reduce((acc: any, r: any) => {
+      if (!acc[r.producto_id]) acc[r.producto_id] = []
+      acc[r.producto_id].push(r)
+      return acc
+    }, {})
+
     const data = {
       ...presupuestoData,
-      cliente: clienteResult.data,
-      zona: zonaResult.data,
-      usuario_vendedor_obj: vendedorResult.data,
-      usuario_almacen_obj: almacenResult.data,
-      usuario_repartidor_obj: repartidorResult.data,
-      pedido_convertido: pedidoResult.data,
-      items: (itemsResult.data || []).map((item: any) => ({
+      items: (presupuestoData.items || []).map((item: any) => ({
         ...item,
-        reservas: reservasData?.filter((r: any) => r.producto_id === item.producto_id) || []
+        reservas: reservasPorProducto[item.producto_id] || []
       }))
     }
 
@@ -678,7 +673,19 @@ export async function recalcularPresupuestoAction(presupuestoId: string) {
 
     // Recalcular cada item con precios actuales
     for (const item of presupuesto.items || []) {
-      const precioActual = item.producto?.precio_venta || 0
+      let precioActual = item.producto?.precio_venta || 0
+
+      // Si el presupuesto tiene lista de precios, usar precio de la lista
+      if (presupuesto.lista_precio_id) {
+        const { data: precioLista } = await supabase.rpc('fn_obtener_precio_producto', {
+          p_lista_precio_id: presupuesto.lista_precio_id,
+          p_producto_id: item.producto_id,
+        })
+        if (precioLista && precioLista > 0) {
+          precioActual = precioLista
+        }
+      }
+
       const subtotalEst = item.cantidad_solicitada * precioActual
 
       // Actualizar item

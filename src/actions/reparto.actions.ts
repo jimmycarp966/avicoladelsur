@@ -98,8 +98,15 @@ export async function crearRuta(
   try {
     const supabase = await createClient()
 
-    // Generar número de ruta único
-    const numeroRuta = `RUT-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`
+    // Obtener número de ruta secuencial desde la base de datos
+    const { data: numeroRutaData, error: numeroError } = await supabase
+      .rpc('obtener_siguiente_numero_ruta')
+
+    if (numeroError || !numeroRutaData) {
+      throw new Error('Error al generar número de ruta: ' + (numeroError?.message || 'Desconocido'))
+    }
+
+    const numeroRuta = numeroRutaData as string
 
     // Obtener repartidor
     const { data: repartidor, error: repartidorError } = await supabase

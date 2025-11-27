@@ -2,9 +2,9 @@
 
 ## 📋 TL;DR (Resumen Ejecutivo)
 
-Sistema ERP modular completo para Avícola del Sur que unifica Almacén (WMS), Ventas (CRM), Reparto (TMS) y Tesorería en una única fuente de verdad con Supabase. Incluye bot de WhatsApp automatizado para pedidos, PWA móvil para repartidores con GPS tracking, planificación semanal de rutas, optimización automática con Google Directions + fallback local, y arquitectura server-side con Next.js 15, React 19, TypeScript y Server Actions. Implementa FIFO automático, RLS completo, validaciones atómicas y trazabilidad total desde ingreso hasta entrega.
+Sistema ERP modular completo para Avícola del Sur que unifica Almacén (WMS), Ventas (CRM), Reparto (TMS) y Tesorería en una única fuente de verdad con Supabase. Incluye bot de WhatsApp automatizado para pedidos, PWA móvil para repartidores con GPS tracking, planificación semanal de rutas, optimización automática con Google Directions + fallback local, sistema de listas de precios con margen de ganancia automático, y arquitectura server-side con Next.js 15, React 19, TypeScript y Server Actions. Implementa FIFO automático, RLS completo, validaciones atómicas y trazabilidad total desde ingreso hasta entrega.
 
-**Estado actual**: ✅ **COMPLETO Y FUNCIONAL** - Flujo end-to-end Presupuestos → Pedidos → Rutas Planificadas → Almacén → Reparto → Tesorería funcionando automáticamente. Sistema listo para producción con plan semanal de rutas implementado.
+**Estado actual**: ✅ **COMPLETO Y FUNCIONAL** - Sistema integral con todos los módulos activos: Ventas, Reparto, Almacén, Tesorería y RRHH. Flujo end-to-end automatizado y en producción.
 
 ## 🛠️ Tecnologías Principales
 
@@ -95,10 +95,11 @@ supabase/                         # Scripts SQL y migraciones
 - **Picking**: Optimización de preparación de pedidos
 
 ### 💰 **Ventas (CRM)**: Gestión de Clientes y Pedidos
-- **Clientes**: Con zonas entrega, límites crédito, bloqueo automático
+- **Clientes**: Con zonas entrega, límites crédito, bloqueo automático, listas de precios asignadas
 - **Pedidos**: Desde web/bot, con estados completos y referencias pago
 - **Cotizaciones**: Conversión automática a pedidos aprobados
 - **Reclamos**: Seguimiento con estados y asignación
+- **Listas de Precios**: Sistema completo con listas base (minorista, mayorista, distribuidor), asignación automática por tipo_cliente, margen de ganancia configurable, precios manuales por producto, selección en presupuestos
 
 ### 🚛 **Reparto (TMS)**: Logística y Entregas
 - **Planificación Semanal**: Rutas fijas por zona/día/turno/vehículo con capacidad definida
@@ -154,6 +155,17 @@ supabase/                         # Scripts SQL y migraciones
 - **Asignación automática**: Pedidos se asignan a rutas planificadas según zona/turno/día
 - **Validación capacidad**: Peso final del pedido ≤ capacidad del vehículo planificada
 - **RPC integrada**: `fn_asignar_pedido_a_ruta()` busca planes y valida restricciones
+
+### 💵 **Sistema de Listas de Precios**: Gestión de Precios por Cliente
+- **Tablas nuevas**: `listas_precios`, `precios_productos`, `clientes_listas_precios`
+- **Listas base**: MINORISTA, MAYORISTA, DISTRIBUIDOR (asignación automática por tipo_cliente)
+- **Asignación dual**: Cada cliente puede tener hasta 2 listas activas (1 automática + 1 manual)
+- **Margen de ganancia**: Campo `margen_ganancia` en listas para cálculo automático desde `precio_costo`
+- **Precios manuales**: Gestión individual de precios por producto en cada lista
+- **Selección en presupuestos**: Vendedor elige qué lista usar al crear presupuestos
+- **Bot integrado**: Usa automáticamente la primera lista asignada del cliente
+- **RPC funciones**: `fn_obtener_precio_producto()`, `fn_asignar_lista_automatica_cliente()`, `fn_validar_listas_cliente()`
+- **UI completa**: `/ventas/listas-precios` para CRUD de listas y gestión de precios por producto
 
 ---
 

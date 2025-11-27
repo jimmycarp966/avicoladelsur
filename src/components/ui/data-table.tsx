@@ -251,7 +251,7 @@ export function DataTable<TData, TValue>({
                     return (
                       <div key={cell.id} className="flex justify-between items-start">
                         <span className="text-sm font-medium text-muted-foreground min-w-0 flex-shrink-0 mr-2">
-                          {header.column.columnDef.header as string}:
+                          {flexRender(header.column.columnDef.header, header.getContext())}:
                         </span>
                         <div className="text-sm text-foreground flex-1 text-right">
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
