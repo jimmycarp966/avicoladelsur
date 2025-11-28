@@ -1,8 +1,10 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Logo } from '@/components/ui/logo'
+import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { colors } from '@/lib/config'
 import {
@@ -18,12 +20,22 @@ import {
   UserCheck,
   Tag,
   Receipt,
+  Building2,
 } from 'lucide-react'
 import type { Usuario } from '@/types/domain.types'
 
 interface AdminSidebarProps {
   onClose?: () => void
   user: Usuario | null
+}
+
+// Función para obtener badges dinámicos - versión cliente
+function getBadges(): {[key: string]: number} {
+  // Por ahora retornamos valores por defecto
+  // En producción, esto debería venir de una API route
+  return {
+    sucursales_alerts: 3 // Valor hardcodeado para demo
+  }
 }
 
 const navigation = [
@@ -82,6 +94,18 @@ const navigation = [
       { name: 'Cierres de Caja', href: '/tesoreria/cierre-caja' },
       { name: 'Tesoro', href: '/tesoreria/tesoro' },
       { name: 'Gastos', href: '/tesoreria/gastos' },
+      { name: 'Por Sucursal', href: '/tesoreria/sucursales' },
+    ],
+  },
+  {
+    name: 'Sucursales',
+    href: '/sucursales',
+    icon: Building2,
+    roles: ['admin'],
+    badge: 'sucursales_alerts',
+    children: [
+      { name: 'Gestión de Sucursales', href: '/sucursales' },
+      { name: 'Reportes', href: '/reportes/sucursales' },
     ],
   },
   {
@@ -118,11 +142,13 @@ interface NavigationItemProps {
   pathname: string
   user: Usuario | null
   onClose?: () => void
+  badges: {[key: string]: number}
 }
 
-function NavigationItem({ item, pathname, user, onClose }: NavigationItemProps) {
+function NavigationItem({ item, pathname, user, onClose, badges }: NavigationItemProps) {
   const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
   const canAccess = hasAccess(user, item.roles)
+  const badgeCount = item.badge ? badges[item.badge] || 0 : 0
 
   if (!canAccess) return null
 
@@ -148,7 +174,15 @@ function NavigationItem({ item, pathname, user, onClose }: NavigationItemProps) 
             isActive ? 'text-[#2F7058]' : 'text-white/80 group-hover:text-white'
           )}
         />
-        <span className={cn(isActive && 'font-semibold')}>{item.name}</span>
+        <span className={cn(isActive && 'font-semibold', 'flex-1')}>{item.name}</span>
+        {badgeCount > 0 && (
+          <Badge
+            variant="destructive"
+            className="ml-2 h-5 px-1.5 text-xs bg-red-500 hover:bg-red-600"
+          >
+            {badgeCount > 99 ? '99+' : badgeCount}
+          </Badge>
+        )}
       </Link>
 
       {/* Submenú */}
@@ -184,6 +218,11 @@ function NavigationItem({ item, pathname, user, onClose }: NavigationItemProps) 
 
 export function AdminSidebar({ onClose, user }: AdminSidebarProps) {
   const pathname = usePathname()
+  const [badges, setBadges] = useState<{[key: string]: number}>({})
+
+  useEffect(() => {
+    setBadges(getBadges())
+  }, [])
 
   return (
     <div className="relative flex grow flex-col overflow-y-auto bg-gradient-sidebar">
@@ -217,6 +256,7 @@ export function AdminSidebar({ onClose, user }: AdminSidebarProps) {
                     pathname={pathname}
                     user={user}
                     onClose={onClose}
+                    badges={badges}
                   />
                 </li>
               ))}

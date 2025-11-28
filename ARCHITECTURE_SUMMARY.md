@@ -2,9 +2,9 @@
 
 ## 📋 TL;DR (Resumen Ejecutivo)
 
-Sistema ERP modular completo para Avícola del Sur que unifica Almacén (WMS), Ventas (CRM), Reparto (TMS) y Tesorería en una única fuente de verdad con Supabase. Incluye bot de WhatsApp automatizado para pedidos, PWA móvil para repartidores con GPS tracking, planificación semanal de rutas, optimización automática con Google Directions + fallback local, sistema de listas de precios con margen de ganancia automático, y arquitectura server-side con Next.js 15, React 19, TypeScript y Server Actions. Implementa FIFO automático, RLS completo, validaciones atómicas y trazabilidad total desde ingreso hasta entrega.
+Sistema ERP modular completo para Avícola del Sur que unifica Almacén (WMS), Ventas (CRM), Reparto (TMS), Tesorería y Sucursales en una única fuente de verdad con Supabase. Incluye bot de WhatsApp automatizado para pedidos, PWA móvil para repartidores con GPS tracking, planificación semanal de rutas, optimización automática con Google Directions + fallback local, sistema de listas de precios con margen de ganancia automático, gestión multi-sucursal con inventario distribuido y alertas de stock automático, y arquitectura server-side con Next.js 15, React 19, TypeScript y Server Actions. Implementa FIFO automático, RLS completo, validaciones atómicas y trazabilidad total desde ingreso hasta entrega.
 
-**Estado actual**: ✅ **COMPLETO Y FUNCIONAL** - Sistema integral con todos los módulos activos: Ventas, Reparto, Almacén, Tesorería y RRHH. Flujo end-to-end automatizado y en producción.
+**Estado actual**: ✅ **COMPLETO Y FUNCIONAL** - Sistema integral con todos los módulos activos: Ventas, Reparto, Almacén, Tesorería, RRHH y Sucursales. Flujo end-to-end automatizado y en producción.
 
 ## 🛠️ Tecnologías Principales
 
@@ -140,6 +140,17 @@ supabase/                         # Scripts SQL y migraciones
 - **Novedades**: Comunicación interna segmentada (general, sucursal, categoría)
 - **Reportes**: 6 tipos de reportes exportables (Excel/CSV)
 - **Rutas**: `/rrhh/empleados`, `/rrhh/asistencia`, `/rrhh/liquidaciones`, `/rrhh/adelantos`, `/rrhh/licencias`, `/rrhh/evaluaciones`, `/rrhh/novedades`, `/rrhh/reportes`
+
+### 🏢 **Sucursales**: Gestión Multi-Sucursal
+- **Sucursales**: CRUD completo con configuración individual (umbrales stock, cajas)
+- **Inventario Distribuido**: Control de stock por sucursal con catálogo central compartido
+- **Alertas Automáticas**: Sistema de alertas de stock bajo configurable por sucursal
+- **Tesorería por Sucursal**: Cajas independientes con movimientos automáticos
+- **Transferencias**: Solicitudes de envío entre sucursales con trazabilidad
+- **Reportes Consolidados**: Vista unificada admin + vistas específicas por sucursal
+- **RLS Estricto**: Usuarios ven solo datos de su sucursal asignada
+- **Dashboard Sucursal**: Métricas específicas, inventario, ventas y alertas en tiempo real
+- **Rutas**: `/sucursales` (admin), `/sucursal/dashboard`, `/sucursal/alerts`, `/sucursal/inventario`, `/sucursal/ventas`, `/sucursal/tesoreria`, `/sucursal/reportes`
 
 ### 🤖 **Bot WhatsApp**: Automatización de Ventas
 - **Sin Botpress**: Procesamiento directo en Next.js (más rápido/simple)
@@ -300,6 +311,15 @@ supabase/                         # Scripts SQL y migraciones
   ├── Tesoro
   └── Gastos
 
+🏢 Sucursales
+  ├── Gestión de Sucursales
+  ├── Dashboard Sucursal
+  ├── Alertas de Stock
+  ├── Inventario
+  ├── Ventas
+  ├── Tesorería
+  └── Reportes
+
 👥 RRHH
   ├── Empleados
   ├── Asistencia
@@ -318,6 +338,18 @@ supabase/                         # Scripts SQL y migraciones
 2. **Errores en Listas de Precios**: Políticas RLS simplificadas y compatibilidad Next.js 15
 3. **Navegación incompleta**: Agregados módulos faltantes al sidebar
 4. **Google Maps no funcionaba**: Implementado sistema completo de selección de ubicaciones con Maps JavaScript API
+
+### **Módulo de Sucursales Completo (28/11/2025)**
+- ✅ **Tablas nuevas**: `sucursales`, `sucursal_settings`, `alertas_stock`
+- ✅ **RLS completo**: Políticas por sucursal_id en todas las tablas críticas
+- ✅ **Server Actions**: 8 actions completas para gestión de sucursales
+- ✅ **API Routes**: 3 endpoints REST para evaluación de stock y transferencias
+- ✅ **UI completa**: Dashboard admin + dashboard sucursal con métricas en tiempo real
+- ✅ **Alertas automáticas**: Sistema de bajo stock con job/cron integrado
+- ✅ **Componente Avisos**: Reutilizable en RRHH y Sucursales
+- ✅ **Tesorería integrada**: Movimientos automáticos por sucursal
+- ✅ **Scripts de testing**: Demo completo + tests HTTP + evaluación automática
+- ✅ **Nueva migración**: `20251128_modulo_sucursales.sql` con funciones RPC
 
 ---
 

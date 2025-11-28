@@ -81,9 +81,10 @@
 1. **Almacén (WMS)**: Control de stock, lotes, picking
 2. **Ventas (CRM)**: Clientes, pedidos, cotizaciones, reclamos, listas de precios
 3. **Reparto (TMS)**: Vehículos, rutas, entregas, GPS
-4. **RRHH**: Gestión completa de empleados, asistencia, liquidaciones, adelantos y evaluaciones
-5. **Chatbot**: Toma de pedidos y consultas vía WhatsApp
-6. **Tesorería**: Gestión de cajas, movimientos, validación de rutas y reportes financieros
+4. **Sucursales**: Gestión multi-sucursal con inventario distribuido, alertas de stock y tesorería independiente
+5. **RRHH**: Gestión completa de empleados, asistencia, liquidaciones, adelantos y evaluaciones
+6. **Chatbot**: Toma de pedidos y consultas vía WhatsApp
+7. **Tesorería**: Gestión de cajas, movimientos, validación de rutas y reportes financieros
 
 ## 📁 Estructura del Proyecto
 

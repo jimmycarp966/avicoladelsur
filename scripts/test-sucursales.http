@@ -1,0 +1,94 @@
+# Tests del Módulo de Sucursales - Avícola del Sur ERP
+# Ejecutar con REST Client extension en VS Code
+
+@baseUrl = http://localhost:3000
+
+### 1. Verificar servicio disponible
+GET {{baseUrl}}/
+
+### 2. Crear nueva sucursal
+POST {{baseUrl}}/api/sucursales
+Content-Type: application/json
+
+{
+  "nombre": "Sucursal Test Centro",
+  "direccion": "Plaza Principal 456, Ciudad Centro",
+  "telefono": "381-555-0200",
+  "active": true
+}
+
+### 3. Configurar umbral de stock bajo
+POST {{baseUrl}}/api/sucursales/settings
+Content-Type: application/json
+
+{
+  "sucursalId": "SUCURSAL_ID_AQUI",
+  "lowStockThresholdDefault": 5
+}
+
+### 4. Ejecutar evaluación de stock bajo
+POST {{baseUrl}}/api/sucursales/low-stock-run
+Content-Type: application/json
+
+{}
+
+### 5. Obtener alertas de sucursal específica
+GET {{baseUrl}}/api/sucursales/SUCURSAL_ID_AQUI/alerts
+
+### 6. Crear alerta manual
+POST {{baseUrl}}/api/sucursales/SUCURSAL_ID_AQUI/alerts
+Content-Type: application/json
+
+{
+  "productoId": "PRODUCTO_ID_AQUI",
+  "cantidadActual": 2,
+  "umbral": 5
+}
+
+### 7. Solicitar transferencia
+POST {{baseUrl}}/api/sucursales/SUCURSAL_ID_AQUI/transfer-request
+Content-Type: application/json
+
+{
+  "productoId": "PRODUCTO_ID_AQUI",
+  "cantidadSolicitada": 15,
+  "motivo": "Reposición urgente por demanda alta"
+}
+
+### 8. Ver solicitudes de transferencia
+GET {{baseUrl}}/api/sucursales/SUCURSAL_ID_AQUI/transfer-request
+
+### 9. Obtener lista de sucursales (admin)
+GET {{baseUrl}}/api/sucursales
+
+### 10. Obtener inventario de sucursal
+GET {{baseUrl}}/api/sucursales/SUCURSAL_ID_AQUI/inventario
+
+### 11. Ejecutar evaluación desde script Node.js
+# node scripts/evaluar-stock-sucursales.js
+
+### 12. Ejecutar demo completo
+# ./scripts/demo-sucursales.sh
+
+### 13. URLs para testing manual en navegador
+
+# Dashboard admin sucursales
+# {{baseUrl}}/sucursales
+
+# Dashboard sucursal (requiere login de sucursal)
+# {{baseUrl}}/sucursal/dashboard
+
+# Alertas de sucursal
+# {{baseUrl}}/sucursal/alerts
+
+# Inventario de sucursal
+# {{baseUrl}}/sucursal/inventario
+
+# Ventas de sucursal
+# {{baseUrl}}/sucursal/ventas
+
+# Tesorería de sucursal
+# {{baseUrl}}/sucursal/tesoreria
+
+# Reportes de sucursal
+# {{baseUrl}}/sucursal/reportes
