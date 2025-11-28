@@ -1,8 +1,8 @@
 import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
-import { NuevoClienteForm } from '@/app/(admin)/(dominios)/ventas/clientes/nuevo/cliente-form'
+import { obtenerClientePorId } from '@/actions/ventas.actions'
+import { EditarClienteForm } from './editar-cliente-form'
 import { ClienteFormSkeleton } from '@/app/(admin)/(dominios)/ventas/clientes/nuevo/cliente-form-skeleton'
-// import { getClienteById } from '@/actions/ventas.actions' // TODO: Implementar cuando esté disponible
 
 interface EditarClientePageProps {
   params: {
@@ -21,23 +21,27 @@ export default async function EditarClientePage({ params }: EditarClientePagePro
   const { id } = await params
   const clienteId = id
 
-  // En producción, esto sería una llamada real a la base de datos
-  // const cliente = await getClienteById(clienteId)
-  // if (!cliente) notFound()
+  // Cargar datos reales del cliente
+  const clienteResult = await obtenerClientePorId(clienteId)
 
-  // Datos de ejemplo para desarrollo
-  const clienteEjemplo = {
-    id: clienteId,
-    nombre: 'Supermercado Central',
-    telefono: '+5491123456789',
-    whatsapp: '+5491123456789',
-    email: 'contacto@supercentral.com',
-    direccion: 'Av. Principal 123, Ciudad',
-    zona_entrega: 'Centro',
-    coordenadas: { lat: -34.6118, lng: -58.3965 },
-    tipo_cliente: 'mayorista',
-    limite_credito: 50000.00,
-    activo: true,
+  if (!clienteResult.success || !clienteResult.data) {
+    notFound()
+  }
+
+  // Mapear solo los campos necesarios para el formulario
+  const cliente = {
+    id: clienteResult.data.id,
+    codigo: clienteResult.data.codigo,
+    nombre: clienteResult.data.nombre,
+    telefono: clienteResult.data.telefono,
+    whatsapp: clienteResult.data.whatsapp,
+    email: clienteResult.data.email,
+    direccion: clienteResult.data.direccion,
+    zona_entrega: clienteResult.data.zona_entrega,
+    coordenadas: clienteResult.data.coordenadas,
+    tipo_cliente: clienteResult.data.tipo_cliente,
+    limite_credito: clienteResult.data.limite_credito || 0,
+    activo: clienteResult.data.activo,
   }
 
   return (
@@ -51,7 +55,7 @@ export default async function EditarClientePage({ params }: EditarClientePagePro
       </div>
 
       <Suspense fallback={<ClienteFormSkeleton />}>
-        <NuevoClienteForm />
+        <EditarClienteForm cliente={cliente} />
       </Suspense>
     </div>
   )

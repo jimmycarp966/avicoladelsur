@@ -23,6 +23,8 @@ interface ListaPrecio {
   nombre: string
   tipo: 'minorista' | 'mayorista' | 'distribuidor' | 'personalizada'
   activa: boolean
+  margen_ganancia?: number
+  vigencia_activa?: boolean
   fecha_vigencia_desde?: string
   fecha_vigencia_hasta?: string
 }
@@ -62,6 +64,7 @@ export function ListasPreciosTable({ listas }: ListasPreciosTableProps) {
             <TableHead>Nombre</TableHead>
             <TableHead>Tipo</TableHead>
             <TableHead>Estado</TableHead>
+            <TableHead>Margen</TableHead>
             <TableHead>Vigencia</TableHead>
             <TableHead className="text-right">Acciones</TableHead>
           </TableRow>
@@ -82,14 +85,27 @@ export function ListasPreciosTable({ listas }: ListasPreciosTableProps) {
                 </Badge>
               </TableCell>
               <TableCell>
-                {lista.fecha_vigencia_desde || lista.fecha_vigencia_hasta ? (
-                  <span className="text-sm">
-                    {lista.fecha_vigencia_desde && new Date(lista.fecha_vigencia_desde).toLocaleDateString()}
-                    {lista.fecha_vigencia_desde && lista.fecha_vigencia_hasta && ' - '}
-                    {lista.fecha_vigencia_hasta && new Date(lista.fecha_vigencia_hasta).toLocaleDateString()}
+                {lista.margen_ganancia !== null && lista.margen_ganancia !== undefined ? (
+                  <span className="text-sm font-medium">
+                    {lista.margen_ganancia.toFixed(2)}%
                   </span>
                 ) : (
-                  <span className="text-sm text-muted-foreground">Sin restricción</span>
+                  <span className="text-sm text-muted-foreground">-</span>
+                )}
+              </TableCell>
+              <TableCell>
+                {lista.vigencia_activa ? (
+                  lista.fecha_vigencia_desde || lista.fecha_vigencia_hasta ? (
+                    <span className="text-sm">
+                      {lista.fecha_vigencia_desde && new Date(lista.fecha_vigencia_desde).toLocaleDateString()}
+                      {lista.fecha_vigencia_desde && lista.fecha_vigencia_hasta && ' - '}
+                      {lista.fecha_vigencia_hasta && new Date(lista.fecha_vigencia_hasta).toLocaleDateString()}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">Vigencia activada sin fechas</span>
+                  )
+                ) : (
+                  <span className="text-sm text-muted-foreground">Siempre vigente</span>
                 )}
               </TableCell>
               <TableCell className="text-right">

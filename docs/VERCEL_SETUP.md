@@ -69,9 +69,9 @@ vercel env ls
 curl -X POST https://tu-dominio.vercel.app/api/integrations/google/directions \
   -H "Content-Type: application/json" \
   -d '{
-    "origin": {"lat": -34.6037, "lng": -58.3816},
-    "destination": {"lat": -34.6118, "lng": -58.3960},
-    "waypoints": [{"lat": -34.6097, "lng": -58.3926}],
+    "origin": {"lat": -27.1671, "lng": -65.4995},
+    "destination": {"lat": -27.1856, "lng": -65.4923},
+    "waypoints": [{"lat": -27.1758, "lng": -65.4959}],
     "optimize": true
   }'
 ```

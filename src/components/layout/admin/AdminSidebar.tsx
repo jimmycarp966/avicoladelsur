@@ -16,6 +16,8 @@ import {
   Settings,
   X,
   UserCheck,
+  Tag,
+  Receipt,
 } from 'lucide-react'
 import type { Usuario } from '@/types/domain.types'
 
@@ -52,6 +54,8 @@ const navigation = [
     children: [
       { name: 'Presupuestos', href: '/ventas/presupuestos' },
       { name: 'Clientes', href: '/ventas/clientes' },
+      { name: 'Listas de Precios', href: '/ventas/listas-precios' },
+      { name: 'Facturas', href: '/ventas/facturas' },
     ],
   },
   {

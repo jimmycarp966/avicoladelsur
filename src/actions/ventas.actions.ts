@@ -44,12 +44,24 @@ export async function crearCliente(
       }
     }
 
+    // Preparar datos para insertar
+    const { coordenadas, ...restData } = clienteData
+    
+    // Si hay coordenadas, usar función SQL para convertir a POINT
+    let insertData: any = {
+      ...restData,
+      activo: true,
+    }
+    
+    if (coordenadas) {
+      const { lat, lng } = coordenadas
+      // Usar formato GeoJSON que Supabase acepta para PostGIS
+      insertData.coordenadas = `SRID=4326;POINT(${lng} ${lat})`
+    }
+
     const { data, error } = await supabase
       .from('clientes')
-      .insert({
-        ...clienteData,
-        activo: true,
-      })
+      .insert(insertData)
       .select()
       .single()
 
@@ -257,12 +269,27 @@ export async function actualizarCliente(
       }
     }
 
+    // Preparar datos para actualizar
+    const { coordenadas, ...restUpdates } = updates
+    
+    let updateData: any = {
+      ...restUpdates,
+      updated_at: new Date().toISOString(),
+    }
+    
+    // Si hay coordenadas, convertir a formato PostGIS
+    if (coordenadas) {
+      const { lat, lng } = coordenadas
+      // Usar formato EWKT (Extended Well-Known Text) que PostGIS acepta
+      updateData.coordenadas = `SRID=4326;POINT(${lng} ${lat})`
+    } else if (coordenadas === null) {
+      // Si se envía null explícitamente, eliminar coordenadas
+      updateData.coordenadas = null
+    }
+
     const { error } = await supabase
       .from('clientes')
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', clienteId)
 
     if (error) throw error
@@ -293,38 +320,70 @@ export async function obtenerClientes(
   }
 ): Promise<ApiResponse> {
   try {
+    console.log('[obtenerClientes] Filtros recibidos:', filtros)
     const supabase = await createClient()
 
+    // Primero obtenemos todos los datos, luego ordenamos numéricamente en memoria
     let query = supabase
       .from('clientes')
       .select('*', { count: 'exact' })
-      .order('created_at', { ascending: false })
+
+    console.log('[obtenerClientes] Query base creada')
 
     if (filtros?.search) {
+      console.log('[obtenerClientes] Aplicando filtro de búsqueda:', filtros.search)
       query = query.or(`codigo.ilike.%${filtros.search}%,nombre.ilike.%${filtros.search}%,telefono.ilike.%${filtros.search}%`)
     }
 
     if (filtros?.zona_entrega) {
+      console.log('[obtenerClientes] Aplicando filtro de zona:', filtros.zona_entrega)
       query = query.eq('zona_entrega', filtros.zona_entrega)
     }
 
     if (filtros?.activo !== undefined) {
+      console.log('[obtenerClientes] Aplicando filtro de activo:', filtros.activo)
       query = query.eq('activo', filtros.activo)
     }
 
     if (filtros?.page && filtros?.limit) {
       const from = (filtros.page - 1) * filtros.limit
       const to = from + filtros.limit - 1
+      console.log('[obtenerClientes] Aplicando paginación:', { from, to, page: filtros.page, limit: filtros.limit })
       query = query.range(from, to)
+    } else {
+      console.log('[obtenerClientes] Sin paginación aplicada')
     }
 
+    console.log('[obtenerClientes] Ejecutando query...')
     const { data, error, count } = await query
+
+    console.log('[obtenerClientes] Resultado:', {
+      success: !error,
+      dataLength: data?.length || 0,
+      count: count,
+      error: error?.message
+    })
 
     if (error) throw error
 
+    // Ordenar numéricamente por código antes de aplicar filtros de paginación
+    const dataOrdenado = data?.sort((a, b) => {
+      const numA = parseInt(a.codigo) || 0
+      const numB = parseInt(b.codigo) || 0
+      return numA - numB
+    }) || []
+
+    // Aplicar paginación después del ordenamiento
+    let dataFinal = dataOrdenado
+    if (filtros?.page && filtros?.limit) {
+      const from = (filtros.page - 1) * filtros.limit
+      const to = from + filtros.limit
+      dataFinal = dataOrdenado.slice(from, to)
+    }
+
     return {
       success: true,
-      data: data,
+      data: dataFinal,
       pagination: filtros?.page && filtros?.limit ? {
         page: filtros.page,
         limit: filtros.limit,
@@ -337,6 +396,194 @@ export async function obtenerClientes(
     return {
       success: false,
       error: error.message || 'Error al obtener clientes',
+    }
+  }
+}
+
+// Obtener cliente por ID con estadísticas
+export async function obtenerClientePorId(
+  clienteId: string
+): Promise<ApiResponse<any>> {
+  try {
+    const supabase = await createClient()
+
+    // Verificar permisos (admin o vendedor)
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, error: 'Usuario no autenticado' }
+    }
+
+    const { data: usuario } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (!usuario || !['admin', 'vendedor'].includes(usuario.rol)) {
+      return { success: false, error: 'No tienes permisos para ver clientes' }
+    }
+
+    // Obtener cliente
+    const { data: cliente, error: clienteError } = await supabase
+      .from('clientes')
+      .select('*')
+      .eq('id', clienteId)
+      .single()
+
+    if (clienteError || !cliente) {
+      return { success: false, error: 'Cliente no encontrado' }
+    }
+
+    // Calcular estadísticas de pedidos en paralelo
+    const [
+      { data: pedidosEntregados, count: countEntregados },
+      { data: pedidosPendientes, count: countPendientes },
+      { count: countTotalPedidos },
+      { data: cuentaCorriente },
+      { data: listasResult }
+    ] = await Promise.all([
+      // Pedidos entregados (para total_compras y promedio)
+      supabase
+        .from('pedidos')
+        .select('total, fecha_pedido', { count: 'exact' })
+        .eq('cliente_id', clienteId)
+        .eq('estado', 'entregado'),
+      
+      // Pedidos pendientes
+      supabase
+        .from('pedidos')
+        .select('id', { count: 'exact' })
+        .eq('cliente_id', clienteId)
+        .not('estado', 'eq', 'entregado')
+        .not('estado', 'eq', 'cancelado'),
+      
+      // Total de pedidos (solo count)
+      supabase
+        .from('pedidos')
+        .select('*', { count: 'exact', head: true })
+        .eq('cliente_id', clienteId),
+      
+      // Cuenta corriente
+      supabase
+        .from('cuentas_corrientes')
+        .select('saldo, limite_credito')
+        .eq('cliente_id', clienteId)
+        .single(),
+      
+      // Listas de precios (usando la función existente)
+      supabase
+        .from('clientes_listas_precios')
+        .select(`
+          *,
+          lista_precio:listas_precios(*)
+        `)
+        .eq('cliente_id', clienteId)
+        .eq('activa', true)
+        .order('prioridad', { ascending: true })
+    ])
+
+    // Calcular estadísticas
+    const totalPedidos = countTotalPedidos || 0
+    const totalCompras = pedidosEntregados?.reduce((sum, p) => sum + (Number(p.total) || 0), 0) || 0
+    const pedidosEntregadosCount = countEntregados || 0
+    const promedioCompra = pedidosEntregadosCount > 0 ? totalCompras / pedidosEntregadosCount : 0
+    const pedidosPendientesCount = countPendientes || 0
+    
+    // Último pedido (fecha más reciente de pedidos entregados)
+    let ultimoPedido: string | null = null
+    if (pedidosEntregados && pedidosEntregados.length > 0) {
+      const fechas = pedidosEntregados
+        .map(p => p.fecha_pedido)
+        .filter(Boolean)
+        .sort()
+        .reverse()
+      ultimoPedido = fechas[0] || null
+    }
+
+    // Parsear coordenadas desde formato PostGIS
+    let coordenadas: { lat: number; lng: number } | undefined
+    if (cliente.coordenadas) {
+      try {
+        // Supabase puede devolver geometrías PostGIS de diferentes formas
+        let coords: any = null
+        
+        if (typeof cliente.coordenadas === 'string') {
+          // Si viene como WKT: "POINT(lng lat)" o "SRID=4326;POINT(lng lat)"
+          const match = cliente.coordenadas.match(/POINT\(([\d.-]+)\s+([\d.-]+)\)/)
+          if (match) {
+            coords = {
+              lng: parseFloat(match[1]),
+              lat: parseFloat(match[2])
+            }
+          } else {
+            // Intentar parsear como JSON
+            try {
+              coords = JSON.parse(cliente.coordenadas)
+            } catch (e) {
+              // Ignorar
+            }
+          }
+        } else if (cliente.coordenadas && typeof cliente.coordenadas === 'object') {
+          // Si viene como objeto con propiedades lat/lng
+          if ('lat' in cliente.coordenadas && 'lng' in cliente.coordenadas) {
+            coords = cliente.coordenadas
+          } else if ('coordinates' in cliente.coordenadas && Array.isArray(cliente.coordenadas.coordinates)) {
+            // Formato GeoJSON: [lng, lat]
+            coords = {
+              lng: cliente.coordenadas.coordinates[0],
+              lat: cliente.coordenadas.coordinates[1]
+            }
+          }
+        }
+        
+        if (coords && typeof coords.lat === 'number' && typeof coords.lng === 'number') {
+          coordenadas = { lat: coords.lat, lng: coords.lng }
+        }
+      } catch (e) {
+        console.warn('Error parseando coordenadas:', e)
+      }
+    }
+
+    // Filtrar listas válidas (vigencia)
+    const hoy = new Date().toISOString().split('T')[0]
+    const listasValidas = listasResult?.filter((asignacion: any) => {
+      const lista = asignacion.lista_precio
+      if (!lista?.activa) return false
+      if (!lista.vigencia_activa) return true
+      const desdeValida = !lista.fecha_vigencia_desde || lista.fecha_vigencia_desde <= hoy
+      const hastaValida = !lista.fecha_vigencia_hasta || lista.fecha_vigencia_hasta >= hoy
+      return desdeValida && hastaValida
+    }) || []
+
+    // Construir respuesta
+    const clienteData = {
+      ...cliente,
+      coordenadas,
+      total_pedidos: totalPedidos,
+      total_compras: totalCompras,
+      promedio_compra: promedioCompra,
+      pedidos_pendientes: pedidosPendientesCount,
+      ultimo_pedido: ultimoPedido,
+      fecha_registro: cliente.created_at,
+      cuenta_corriente: cuentaCorriente ? {
+        saldo: cuentaCorriente.saldo || 0,
+        limite_credito: cuentaCorriente.limite_credito || cliente.limite_credito || 0
+      } : {
+        saldo: 0,
+        limite_credito: cliente.limite_credito || 0
+      },
+      listas_precios: listasValidas
+    }
+
+    return {
+      success: true,
+      data: clienteData
+    }
+  } catch (error: any) {
+    console.error('Error al obtener cliente por ID:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al obtener cliente',
     }
   }
 }

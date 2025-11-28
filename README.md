@@ -14,6 +14,7 @@
 - 📊 **Reportes Avanzados**: CSV/PDF con business intelligence
 - 🔐 **RLS Completo**: Seguridad por roles (admin, vendedor, repartidor, almacenista)
 - 💵 **Sistema de Listas de Precios**: Listas por tipo de cliente (minorista, mayorista, distribuidor) con margen de ganancia automático
+- 🧭 **Navegación Completa**: Sidebar organizado por módulos con acceso directo a todas las funcionalidades
 
 ## 🚀 Inicio Rápido
 
@@ -65,7 +66,7 @@
 - **Estado**: Zustand (solo estado global: sesión, notificaciones)
 - **Formularios**: React Hook Form + Zod validation
 - **Tablas**: TanStack Table (paginación, filtros, sorting)
-- **Mapas**: Leaflet + OpenStreetMap (GPS tracking)
+- **Mapas**: Google Maps JavaScript API (selección de ubicaciones, monitor GPS, visualización de rutas)
 - **Chatbot**: Twilio WhatsApp (procesamiento directo)
 - **PDF**: pdfkit + Supabase Storage
 - **GPS**: Navigator API + polling cada 5s
@@ -116,7 +117,8 @@ src/
 │   └── [otros].actions.ts      # Módulos específicos
 ├── components/                  # Componentes React reutilizables
 │   ├── reparto/                # ⭐ Monitor GPS y GPS tracker
-│   │   ├── MonitorMap.tsx     # Mapa Leaflet admin
+│   │   ├── MonitorMap.tsx     # Mapa Google Maps admin (tiempo real)
+│   │   ├── RutaMap.tsx        # Mapa Google Maps para visualización de rutas
 │   │   └── GpsTracker.tsx     # GPS tracking PWA
 │   ├── tables/                 # Tablas con TanStack
 │   ├── forms/                  # Formularios con validación
@@ -176,12 +178,13 @@ scripts/                         # Scripts de automatización
 - **Fallback local**: Nearest Neighbor + 2-opt cuando Google falla
 - **Polylines**: Visualización de rutas optimizadas en mapas
 - **Re-optimización**: Automática al agregar nuevos pedidos
-- **Monitor admin**: Mapa Leaflet con tracking en tiempo real
+- **Monitor admin**: Mapa Google Maps con tracking en tiempo real
 
 ### 📍 **GPS Tracking y Alertas**
 - **Polling inteligente**: Cada 5s durante rutas activas
 - **Alertas automáticas**: Desvío (>200m), cliente saltado (<100m)
-- **Monitor en tiempo real**: `/reparto/monitor` con mapa Leaflet
+- **Monitor en tiempo real**: `/reparto/monitor` con mapa Google Maps
+- **Visualización de rutas**: Mapas Google Maps con polilíneas optimizadas e historial GPS
 - **Historial completo**: Rutas_planificadas con orden visita y tiempos
 - **Trazabilidad total**: Desde ubicación hasta entrega confirmada
 
@@ -214,6 +217,7 @@ scripts/                         # Scripts de automatización
 - **Listas base**: Minorista, Mayorista, Distribuidor (asignación automática por tipo_cliente)
 - **Asignación dual**: Cada cliente puede tener hasta 2 listas (1 automática + 1 manual)
 - **Margen de ganancia**: Configuración por lista para cálculo automático desde precio_costo
+- **Vigencia opcional**: Por defecto las listas están siempre vigentes. Se puede activar validación por fechas (`vigencia_activa`)
 - **Precios manuales**: Gestión individual de precios por producto en cada lista
 - **Selección en presupuestos**: Vendedor elige qué lista usar al crear presupuestos
 - **Bot integrado**: Usa automáticamente la primera lista asignada del cliente
@@ -712,6 +716,32 @@ El sistema está diseñado con una identidad visual moderna y profesional basada
 - **Reparto**: Tasa de entregas exitosas, tiempo de ruta
 - **Cliente**: Satisfacción, tiempo de respuesta
 
+## 🗺️ Selección de Ubicaciones con Google Maps
+
+### Estado: ✅ IMPLEMENTADO
+
+Sistema integrado de selección de ubicaciones para clientes usando Google Maps JavaScript API.
+
+**Características principales:**
+- 🗺️ **Selector Interactivo**: Mapa interactivo en formularios de creación/edición de clientes
+- 📍 **Autocompletado**: Búsqueda inteligente de direcciones con Places API
+- 📌 **Ubicación por Clic**: Selección directa en el mapa o arrastrando marcador
+- 🔄 **Geocoding Inverso**: Conversión automática de coordenadas a dirección
+- 📍 **Ubicación por Defecto**: Centrado en Monteros, Tucumán (región de operación)
+- ⚡ **Fallback Inteligente**: Campo de texto manual si Google Maps no está disponible
+- 🔧 **Diagnóstico Avanzado**: Páginas de debugging (`/diagnostico-google-maps`, `/prueba-mapa`)
+
+### Configuración
+
+**Variables de entorno requeridas:**
+```env
+# Google Maps API Key (requerida para selección de ubicaciones)
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=tu-api-key-aqui
+```
+
+**Cómo obtener la API Key:**
+Ver la guía completa en [`docs/GOOGLE_MAPS_SETUP.md`](./docs/GOOGLE_MAPS_SETUP.md)
+
 ## 🗺️ Rutas Optimizadas y Tracking GPS
 
 ### Estado: ✅ IMPLEMENTADO
@@ -723,7 +753,7 @@ Sistema completo de optimización de rutas y tracking en tiempo real integrado a
 - 🗂️ **Plan Semanal**: Las rutas (zona + día + turno + vehículo + repartidor) se cargan en `/reparto/planificacion`
 - 📍 **Tracking GPS**: Envío automático de ubicaciones cada 5 segundos desde PWA del repartidor
 - 🚨 **Alertas Automáticas**: Desvío de ruta (>200m) y cliente saltado (<100m sin entregar)
-- 📊 **Monitor Admin**: Visualización en tiempo real de vehículos, rutas y alertas en mapa Leaflet
+- 📊 **Monitor Admin**: Visualización en tiempo real de vehículos, rutas y alertas en mapa Google Maps
 - 🔄 **Polling Inteligente**: Actualización automática cada 5 segundos en monitor admin
 - 🕕 **Turnos Automáticos**: Pedidos confirmados antes de las 05:00 → turno mañana del mismo día; entre 05:00-15:00 → turno tarde del mismo día; después de las 15:00 → turno mañana del día siguiente
 - 🚚 **Asignación a Rutas Planificadas**: Cada pedido facturado se ubica en la ruta diaria definida (fecha + zona + turno). Si no hay plan para esa combinación se bloquea la conversión.
@@ -771,8 +801,9 @@ Ver la guía completa en [`docs/GOOGLE_MAPS_SETUP.md`](./docs/GOOGLE_MAPS_SETUP.
 ### Páginas y Componentes
 
 **Admin:**
-- `/reparto/monitor` - Monitor en tiempo real con mapa Leaflet
-- Visualiza vehículos activos, rutas planificadas y alertas
+- `/reparto/monitor` - Monitor en tiempo real con mapa Google Maps
+- Visualiza vehículos activos (marcadores verdes), rutas planificadas (polilíneas verdes) y alertas (marcadores rojos)
+- Actualización automática cada 5 segundos
 - `/reparto/planificacion` - Define el plan semanal (zona + día + turno + vehículo + repartidor)
 - Controla qué rutas existen cada día y su capacidad disponible (vehículos base: Fiat Fiorino 600 kg, Toyota Hilux 1500 kg, Ford F-4000 4000 kg)
 
@@ -854,6 +885,65 @@ GOOGLE_MAPS_API_KEY=your-google-maps-api-key
 # Botpress (Opcional - solo si usas NLU avanzado)
 BOTPRESS_WEBHOOK_URL=https://your-botpress-webhook
 ```
+
+## 🔧 **Actualizaciones Recientes**
+
+### **Migración de Leaflet a Google Maps en Repartos (Diciembre 2025)**
+- ✅ **MonitorMap.tsx migrado**: Reemplazado Leaflet por Google Maps JavaScript API
+- ✅ **RutaMap.tsx migrado**: Visualización de rutas ahora usa Google Maps con mejor calidad
+- ✅ **Funcionalidades mantenidas**: Marcadores personalizados, polilíneas, InfoWindows, polling cada 5s
+- ✅ **Iconos personalizados**: SVG inline para vehículos (verde), alertas (rojo), números de orden
+- ✅ **Mejor calidad visual**: Mapas satelitales, Street View, mejor precisión de calles
+- ✅ **Consistencia**: Mismo proveedor de mapas en toda la aplicación (Google Maps)
+- ✅ **Corrección GpsTracker.tsx**: Bug corregido en envío de ubicaciones (uso de ref para posición actual)
+- ✅ **Manejo de errores mejorado**: Verificaciones robustas de carga de Google Maps API
+
+### **Vigencia Opcional en Listas de Precios (07/12/2025)**
+- ✅ **Nuevo campo `vigencia_activa`**: Las listas pueden tener validación de vigencia opcional
+- ✅ **Comportamiento por defecto**: Listas están siempre vigentes (sin validar fechas)
+- ✅ **Validación condicional**: Si `vigencia_activa = true`, valida fechas `fecha_vigencia_desde` y `fecha_vigencia_hasta`
+- ✅ **UI actualizada**: Checkbox en formularios para activar/desactivar validación de vigencia
+- ✅ **Funciones SQL actualizadas**: `fn_asignar_lista_automatica_cliente()` ahora valida vigencia solo si está activada
+- ✅ **Migraciones**: `20251207_agregar_vigencia_activa_listas_precios.sql` y `20251207_actualizar_fn_asignar_lista_automatica_vigencia.sql`
+
+### **Navegación del Sidebar Completada (03/12/2025)**
+- ✅ **Agregado**: "Listas de Precios" al menú Ventas con ícono 🏷️
+- ✅ **Agregado**: "Facturas" al menú Ventas con ícono 📄
+- ✅ **Navegación completa**: Todos los módulos principales ahora accesibles desde el sidebar
+
+### **Correcciones Técnicas Implementadas (03/12/2025)**
+- ✅ **Políticas RLS Simplificadas**: Resueltos errores de permisos en consultas de listas de precios
+- ✅ **Compatibilidad Next.js 15**: Actualizadas páginas dinámicas para usar `await params`
+- ✅ **Validación de UUID**: Agregada validación robusta de IDs antes de consultas
+- ✅ **Manejo de Errores Mejorado**: Logging detallado para diagnóstico de problemas
+
+### **Estructura de Navegación Completa**
+```
+🏠 Dashboard
+📦 Almacén
+  ├── Productos, Lotes, Presupuestos del Día, Pedidos, Recepción
+
+🛒 Ventas
+  ├── Presupuestos, Clientes, Listas de Precios, Facturas
+
+🚚 Reparto
+  ├── Planificación semanal, Rutas, Monitor GPS, Vehículos
+
+💰 Tesorería
+  ├── Cajas, Movimientos, Validar rutas, Cierres, Tesoro, Gastos
+
+👥 RRHH
+  ├── Empleados, Asistencia, Liquidaciones, Adelantos, Licencias, Evaluaciones, Novedades, Reportes
+
+📊 Reportes
+```
+
+### **Problemas Resueltos**
+1. **Búsqueda de clientes por código**: Campo faltante agregado a consultas
+2. **Errores en Listas de Precios**: Políticas RLS y compatibilidad Next.js corregidas
+3. **Navegación incompleta**: Módulos faltantes agregados al sidebar
+
+---
 
 ## 🤝 Contribución
 

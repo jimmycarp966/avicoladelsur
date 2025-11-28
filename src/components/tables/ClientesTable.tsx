@@ -16,9 +16,26 @@ interface ClientesTableProps {
   onDelete?: (cliente: Cliente) => void
   onCall?: (cliente: Cliente) => void
   onWhatsApp?: (cliente: Cliente) => void
+  onPaginationChange?: (pagination: { pageIndex: number; pageSize: number }) => void
+  onSearchChange?: (search: string) => void
+  serverPagination?: {
+    pageIndex: number
+    pageSize: number
+    totalCount?: number
+  }
 }
 
-export function ClientesTable({ data, onView, onEdit, onDelete, onCall, onWhatsApp }: ClientesTableProps) {
+export function ClientesTable({
+  data,
+  onView,
+  onEdit,
+  onDelete,
+  onCall,
+  onWhatsApp,
+  onPaginationChange,
+  onSearchChange,
+  serverPagination
+}: ClientesTableProps) {
   const columns: ColumnDef<Cliente>[] = [
     {
       accessorKey: 'codigo',
@@ -201,13 +218,16 @@ export function ClientesTable({ data, onView, onEdit, onDelete, onCall, onWhatsA
     <DataTable
       columns={columns}
       data={data}
-      searchKey="nombre"
+      searchKey={serverPagination ? undefined : "nombre"} // Deshabilitar búsqueda del lado cliente cuando hay server-side
       searchPlaceholder="Buscar por código, nombre, teléfono..."
       actions={actions}
       enableRowSelection={true}
       enableColumnVisibility={true}
       enablePagination={true}
       pageSize={15}
+      onPaginationChange={onPaginationChange}
+      onSearchChange={onSearchChange}
+      serverPagination={serverPagination}
     />
   )
 }

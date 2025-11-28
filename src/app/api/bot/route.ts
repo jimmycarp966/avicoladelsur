@@ -1309,8 +1309,8 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
                   const primeraListaPrecioId = listasResult.data[0]?.lista_precio_id
                   if (primeraListaPrecioId) {
                     const precioResult = await obtenerPrecioProductoAction(primeraListaPrecioId, producto!.id)
-                    if (precioResult.success && precioResult.data) {
-                      precioFinal = precioResult.data.precio
+                    if (precioResult.success && precioResult.data?.precio != null) {
+                      precioFinal = precioResult.data!.precio
                     }
 
                     formData.append('cliente_id', cliente!.id)

@@ -164,10 +164,11 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
   const getFilteredClientes = useCallback((searchTerm: string) => {
     const term = searchTerm.toLowerCase()
     if (!term) return clientes
-    return clientes.filter(c => 
+    return clientes.filter(c =>
       c.nombre.toLowerCase().includes(term) ||
       (c.telefono && c.telefono.includes(term)) ||
-      (c.zona_entrega && c.zona_entrega.toLowerCase().includes(term))
+      (c.zona_entrega && c.zona_entrega.toLowerCase().includes(term)) ||
+      (c.codigo && c.codigo.toLowerCase().includes(term))
     )
   }, [clientes])
 
@@ -254,14 +255,14 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
               }}
             >
               <SelectTrigger id="cliente_id" className={errors.cliente_id ? 'border-red-500' : ''}>
-                <SelectValue placeholder="Buscar por nombre, teléfono o zona..." />
+                <SelectValue placeholder="Buscar por código, nombre, teléfono o zona..." />
               </SelectTrigger>
               <SelectContent className="max-h-[300px]">
                 <div className="sticky top-0 bg-background p-2 border-b">
                   <div className="relative">
                     <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Buscar cliente..."
+                      placeholder="Buscar por código, nombre..."
                       value={clienteSearch}
                       onChange={(e) => {
                         setClienteSearch(e.target.value)

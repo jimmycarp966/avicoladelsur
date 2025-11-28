@@ -40,7 +40,27 @@ export async function obtenerListasPreciosAction(filtros?: {
       return { success: false, message: 'Error al obtener listas de precios' }
     }
 
-    return { success: true, data }
+    // Filtrar por vigencia si está activada
+    const hoy = new Date().toISOString().split('T')[0]
+    const listasValidas = data?.filter((lista) => {
+      // Si la lista no está activa, no incluirlo si se filtró por activa=true
+      if (filtros?.activa === true && !lista.activa) {
+        return false
+      }
+      
+      // Si vigencia_activa está desactivada o es false, la lista está siempre vigente
+      if (!lista.vigencia_activa) {
+        return true
+      }
+
+      // Si vigencia_activa está activada, validar fechas
+      const desdeValida = !lista.fecha_vigencia_desde || lista.fecha_vigencia_desde <= hoy
+      const hastaValida = !lista.fecha_vigencia_hasta || lista.fecha_vigencia_hasta >= hoy
+      
+      return desdeValida && hastaValida
+    }) || []
+
+    return { success: true, data: listasValidas }
   } catch (error) {
     console.error('Error en obtenerListasPreciosAction:', error)
     return { success: false, message: 'Error interno del servidor' }
@@ -52,6 +72,27 @@ export async function obtenerListaPrecioAction(listaPrecioId: string): Promise<A
   try {
     const supabase = await createClient()
 
+    // Verificar permisos del usuario primero
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      console.error('Error de autenticación:', userError)
+      return { success: false, message: 'Usuario no autenticado' }
+    }
+
+    // Verificar rol del usuario
+    const { data: usuario, error: rolError } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (rolError || !usuario) {
+      console.error('Error obteniendo rol del usuario:', rolError)
+      return { success: false, message: 'Error obteniendo información del usuario' }
+    }
+
+    console.log('Usuario actual:', { id: user.id, rol: usuario.rol })
+
     const { data, error } = await supabase
       .from('listas_precios')
       .select('*')
@@ -60,7 +101,10 @@ export async function obtenerListaPrecioAction(listaPrecioId: string): Promise<A
 
     if (error) {
       console.error('Error obteniendo lista de precios:', error)
-      return { success: false, message: 'Error al obtener lista de precios' }
+      console.error('Código de error:', error.code)
+      console.error('Mensaje de error:', error.message)
+      console.error('Detalles del error:', error.details)
+      return { success: false, message: `Error al obtener lista de precios: ${error.message || 'Error desconocido'}` }
     }
 
     return { success: true, data }
@@ -98,6 +142,7 @@ export async function crearListaPrecioAction(formData: FormData): Promise<ApiRes
       nombre: rawData.nombre,
       tipo: rawData.tipo,
       activa: rawData.activa === 'true',
+      vigencia_activa: rawData.vigencia_activa === 'true',
       fecha_vigencia_desde: rawData.fecha_vigencia_desde || undefined,
       fecha_vigencia_hasta: rawData.fecha_vigencia_hasta || undefined,
     })
@@ -155,6 +200,7 @@ export async function actualizarListaPrecioAction(
       nombre: rawData.nombre,
       tipo: rawData.tipo,
       activa: rawData.activa === 'true',
+      vigencia_activa: rawData.vigencia_activa === 'true',
       margen_ganancia: rawData.margen_ganancia ? parseFloat(rawData.margen_ganancia as string) : undefined,
       fecha_vigencia_desde: rawData.fecha_vigencia_desde || undefined,
       fecha_vigencia_hasta: rawData.fecha_vigencia_hasta || undefined,
@@ -202,7 +248,29 @@ export async function obtenerListasClienteAction(clienteId: string): Promise<Api
       return { success: false, message: 'Error al obtener listas del cliente' }
     }
 
-    return { success: true, data }
+    // Filtrar listas que no están vigentes (si tienen vigencia activada)
+    const hoy = new Date().toISOString().split('T')[0]
+    const listasValidas = data?.filter((asignacion) => {
+      const lista = asignacion.lista_precio
+      
+      // Si la lista no está activa, no incluirla
+      if (!lista?.activa) {
+        return false
+      }
+      
+      // Si vigencia_activa está desactivada o es false, la lista está siempre vigente
+      if (!lista.vigencia_activa) {
+        return true
+      }
+
+      // Si vigencia_activa está activada, validar fechas
+      const desdeValida = !lista.fecha_vigencia_desde || lista.fecha_vigencia_desde <= hoy
+      const hastaValida = !lista.fecha_vigencia_hasta || lista.fecha_vigencia_hasta >= hoy
+      
+      return desdeValida && hastaValida
+    }) || []
+
+    return { success: true, data: listasValidas }
   } catch (error) {
     console.error('Error en obtenerListasClienteAction:', error)
     return { success: false, message: 'Error interno del servidor' }
@@ -385,6 +453,27 @@ export async function obtenerPreciosListaAction(listaPrecioId: string): Promise<
   try {
     const supabase = await createClient()
 
+    // Verificar permisos del usuario primero
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      console.error('Error de autenticación:', userError)
+      return { success: false, message: 'Usuario no autenticado' }
+    }
+
+    // Verificar rol del usuario
+    const { data: usuario, error: rolError } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (rolError || !usuario) {
+      console.error('Error obteniendo rol del usuario:', rolError)
+      return { success: false, message: 'Error obteniendo información del usuario' }
+    }
+
+    console.log('Usuario actual para precios:', { id: user.id, rol: usuario.rol })
+
     const { data, error } = await supabase
       .from('precios_productos')
       .select(`
@@ -397,13 +486,81 @@ export async function obtenerPreciosListaAction(listaPrecioId: string): Promise<
 
     if (error) {
       console.error('Error obteniendo precios de lista:', error)
-      return { success: false, message: 'Error al obtener precios' }
+      console.error('Código de error:', error.code)
+      console.error('Mensaje de error:', error.message)
+      console.error('Detalles del error:', error.details)
+      return { success: false, message: `Error al obtener precios: ${error.message || 'Error desconocido'}` }
     }
 
     return { success: true, data }
   } catch (error) {
     console.error('Error en obtenerPreciosListaAction:', error)
     return { success: false, message: 'Error interno del servidor' }
+  }
+}
+
+// Función de diagnóstico para verificar estado de las tablas
+// Función de diagnóstico para verificar estado de las tablas
+export async function diagnosticarListasPreciosAction(): Promise<ApiResponse> {
+  try {
+    const supabase = await createClient()
+
+    // Verificar autenticación
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, message: 'Usuario no autenticado', data: { userError } }
+    }
+
+    // Verificar rol
+    const { data: usuario, error: rolError } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (rolError || !usuario) {
+      return { success: false, message: 'Error obteniendo rol', data: { rolError } }
+    }
+
+    const diagnostico = {
+      usuario: { id: user.id, rol: usuario.rol },
+      tablas: {} as any,
+      politicas: {} as any
+    }
+
+    // Verificar tablas existen
+    try {
+      const { data: listas, error: listasError } = await supabase
+        .from('listas_precios')
+        .select('count', { count: 'exact', head: true })
+
+      diagnostico.tablas.listas_precios = {
+        existe: !listasError,
+        error: listasError,
+        count: listas?.length || 0
+      }
+    } catch (error) {
+      diagnostico.tablas.listas_precios = { existe: false, error }
+    }
+
+    try {
+      const { data: precios, error: preciosError } = await supabase
+        .from('precios_productos')
+        .select('count', { count: 'exact', head: true })
+
+      diagnostico.tablas.precios_productos = {
+        existe: !preciosError,
+        error: preciosError,
+        count: precios?.length || 0
+      }
+    } catch (error) {
+      diagnostico.tablas.precios_productos = { existe: false, error }
+    }
+
+    return { success: true, data: diagnostico }
+  } catch (error) {
+    console.error('Error en diagnóstico:', error)
+    return { success: false, message: 'Error en diagnóstico', data: { error } }
   }
 }
 

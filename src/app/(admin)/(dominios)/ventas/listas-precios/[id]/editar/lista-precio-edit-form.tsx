@@ -23,6 +23,7 @@ interface ListaPrecioEditFormProps {
     tipo: string
     activa: boolean
     margen_ganancia?: number
+    vigencia_activa?: boolean
     fecha_vigencia_desde?: string
     fecha_vigencia_hasta?: string
   }
@@ -47,6 +48,7 @@ export function ListaPrecioEditForm({ lista }: ListaPrecioEditFormProps) {
       tipo: lista.tipo as any,
       activa: lista.activa ?? true,
       margen_ganancia: lista.margen_ganancia || undefined,
+      vigencia_activa: (lista.vigencia_activa ?? false) as boolean,
       fecha_vigencia_desde: lista.fecha_vigencia_desde || undefined,
       fecha_vigencia_hasta: lista.fecha_vigencia_hasta || undefined,
     },
@@ -54,6 +56,7 @@ export function ListaPrecioEditForm({ lista }: ListaPrecioEditFormProps) {
 
   const tipo = watch('tipo')
   const activa = watch('activa')
+  const vigenciaActiva = watch('vigencia_activa')
 
   const onSubmit = async (data: ListaPrecioInput) => {
     try {
@@ -64,6 +67,7 @@ export function ListaPrecioEditForm({ lista }: ListaPrecioEditFormProps) {
       formData.append('nombre', data.nombre)
       formData.append('tipo', data.tipo)
       formData.append('activa', data.activa.toString())
+      formData.append('vigencia_activa', (data.vigencia_activa ?? false).toString())
       if (data.margen_ganancia !== undefined && data.margen_ganancia !== null) {
         formData.append('margen_ganancia', data.margen_ganancia.toString())
       }
@@ -172,27 +176,44 @@ export function ListaPrecioEditForm({ lista }: ListaPrecioEditFormProps) {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="fecha_vigencia_desde">Vigencia Desde</Label>
-              <Input
-                id="fecha_vigencia_desde"
-                type="date"
-                {...register('fecha_vigencia_desde')}
-                disabled={isLoading}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="fecha_vigencia_hasta">Vigencia Hasta</Label>
-              <Input
-                id="fecha_vigencia_hasta"
-                type="date"
-                {...register('fecha_vigencia_hasta')}
-                disabled={isLoading}
-              />
-            </div>
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="vigencia_activa"
+              checked={vigenciaActiva ?? false}
+              onChange={(e) => setValue('vigencia_activa', e.target.checked)}
+              disabled={isLoading}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            <Label htmlFor="vigencia_activa">Validar vigencia por fechas</Label>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Si está activado, la lista solo será válida entre las fechas especificadas. Si está desactivado, la lista estará vigente desde que se modifica hasta que se actualice (sin validar fechas).
+          </p>
+
+          {vigenciaActiva && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="fecha_vigencia_desde">Vigencia Desde</Label>
+                <Input
+                  id="fecha_vigencia_desde"
+                  type="date"
+                  {...register('fecha_vigencia_desde')}
+                  disabled={isLoading}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="fecha_vigencia_hasta">Vigencia Hasta</Label>
+                <Input
+                  id="fecha_vigencia_hasta"
+                  type="date"
+                  {...register('fecha_vigencia_hasta')}
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
+          )}
 
           <div className="flex items-center space-x-2">
             <input

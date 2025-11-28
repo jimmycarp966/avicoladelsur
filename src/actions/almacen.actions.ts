@@ -876,3 +876,81 @@ export async function obtenerProductos(): Promise<ApiResponse<any[]>> {
     }
   }
 }
+
+export async function buscarProductosPorCodigos(
+  codigos: string[]
+): Promise<ApiResponse<any[]>> {
+  try {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+      .from('productos')
+      .select('*')
+      .in('codigo', codigos)
+      .order('codigo', { ascending: true })
+
+    if (error) throw error
+
+    return {
+      success: true,
+      data: data || [],
+    }
+  } catch (error: any) {
+    console.error('Error al buscar productos por códigos:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al buscar productos',
+    }
+  }
+}
+
+export async function actualizarCategoriaProductos(
+  codigos: string[],
+  categoria: string
+): Promise<ApiResponse<{ actualizados: number }>> {
+  try {
+    const supabase = await createClient()
+
+    // Verificar permisos (admin o almacenista)
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, error: 'Usuario no autenticado' }
+    }
+
+    const { data: usuario } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (!usuario || !['admin', 'almacenista'].includes(usuario.rol)) {
+      return { success: false, error: 'No tienes permisos para actualizar productos' }
+    }
+
+    // Actualizar categoría de todos los productos con esos códigos
+    const { data, error } = await supabase
+      .from('productos')
+      .update({
+        categoria: categoria,
+        updated_at: getNowArgentina().toISOString(),
+      })
+      .in('codigo', codigos)
+      .select('id, codigo, nombre')
+
+    if (error) throw error
+
+    revalidatePath('/(admin)/(dominios)/almacen/productos')
+
+    return {
+      success: true,
+      message: `Categoría actualizada para ${data?.length || 0} productos`,
+      data: { actualizados: data?.length || 0 },
+    }
+  } catch (error: any) {
+    console.error('Error al actualizar categoría de productos:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al actualizar categoría de productos',
+    }
+  }
+}

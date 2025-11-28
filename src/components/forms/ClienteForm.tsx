@@ -12,7 +12,8 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Loader2, Save, MapPin, X, Plus, Tag } from 'lucide-react'
+import { ArrowLeft, Loader2, Save, X, Plus, Tag } from 'lucide-react'
+import { GoogleMapSelector } from '@/components/ui/google-map-selector'
 import Link from 'next/link'
 import { clienteSchema, type ClienteFormData } from '@/lib/schemas/clientes.schema'
 import { useNotificationStore } from '@/store/notificationStore'
@@ -338,24 +339,10 @@ export function ClienteForm({ cliente, onSuccess }: ClienteFormProps) {
         <CardHeader>
           <CardTitle className="text-info">Dirección y Zona de Entrega</CardTitle>
           <CardDescription>
-            Ubicación del cliente para entregas
+            Ubicación del cliente para entregas y optimización de rutas
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="direccion">Dirección</Label>
-            <Textarea
-              id="direccion"
-              placeholder="Dirección completa del cliente"
-              rows={3}
-              {...register('direccion')}
-              disabled={isLoading}
-            />
-            {errors.direccion && (
-              <p className="text-sm text-destructive">{errors.direccion.message}</p>
-            )}
-          </div>
-
           <div className="space-y-2">
             <Label htmlFor="zona_entrega">Zona de Entrega</Label>
             <Input
@@ -369,14 +356,31 @@ export function ClienteForm({ cliente, onSuccess }: ClienteFormProps) {
             )}
           </div>
 
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
-              <MapPin className="h-4 w-4" />
-              <span>Coordenadas GPS (opcional)</span>
-            </div>
-            <p className="text-xs text-gray-500">
-              Las coordenadas se pueden agregar automáticamente desde la dirección
-              o se pueden ingresar manualmente para mayor precisión en las rutas.
+          {/* Mapa de Google Maps */}
+          <GoogleMapSelector
+            coordenadas={watch('coordenadas') || null}
+            onCoordenadasChange={(coords) => setValue('coordenadas', coords || undefined)}
+            direccion={watch('direccion') || ''}
+            onDireccionChange={(direccion) => setValue('direccion', direccion)}
+            placeholder="Buscar dirección del cliente..."
+          />
+
+          {/* Campo de dirección (solo lectura, actualizado por el mapa) */}
+          <div className="space-y-2">
+            <Label htmlFor="direccion">Dirección Completa</Label>
+            <Textarea
+              id="direccion"
+              placeholder="La dirección se actualizará automáticamente al seleccionar una ubicación en el mapa"
+              rows={2}
+              {...register('direccion')}
+              disabled={isLoading}
+              className="resize-none"
+            />
+            {errors.direccion && (
+              <p className="text-sm text-destructive">{errors.direccion.message}</p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Puedes editar manualmente la dirección si es necesario, o usar el mapa para autocompletar.
             </p>
           </div>
         </CardContent>

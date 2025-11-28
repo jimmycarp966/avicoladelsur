@@ -21,6 +21,7 @@ export function ClientesTableWrapper() {
     try {
       setIsLoading(true)
       const result = await obtenerClientes()
+
       if (result.success && result.data) {
         setClientes(Array.isArray(result.data) ? result.data : [])
       } else {

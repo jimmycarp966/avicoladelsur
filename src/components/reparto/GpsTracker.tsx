@@ -26,6 +26,7 @@ export default function GpsTracker({ repartidorId, vehiculoId, rutaId }: GpsTrac
   const [lastSent, setLastSent] = useState<Date | null>(null)
   const watchIdRef = useRef<number | null>(null)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const currentPositionRef = useRef<{ lat: number; lng: number } | null>(null)
 
   // Solicitar permisos de ubicación
   const startTracking = async () => {
@@ -48,8 +49,10 @@ export default function GpsTracker({ repartidorId, vehiculoId, rutaId }: GpsTrac
       // Obtener posición inicial
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          setPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude })
-          sendLocation(pos.coords.latitude, pos.coords.longitude)
+          const currentPos = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+          setPosition(currentPos)
+          currentPositionRef.current = currentPos
+          sendLocation(currentPos.lat, currentPos.lng)
         },
         (err) => {
           setError(`Error al obtener ubicación: ${err.message}`)
@@ -65,7 +68,9 @@ export default function GpsTracker({ repartidorId, vehiculoId, rutaId }: GpsTrac
       // Iniciar watchPosition para actualizaciones continuas
       watchIdRef.current = navigator.geolocation.watchPosition(
         (pos) => {
-          setPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+          const currentPos = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+          setPosition(currentPos)
+          currentPositionRef.current = currentPos
         },
         (err) => {
           console.error('Error en watchPosition:', err)
@@ -78,10 +83,10 @@ export default function GpsTracker({ repartidorId, vehiculoId, rutaId }: GpsTrac
         }
       )
 
-      // Enviar ubicación cada 5 segundos
+      // Enviar ubicación cada 5 segundos usando la ref para evitar problemas de closure
       intervalRef.current = setInterval(() => {
-        if (position) {
-          sendLocation(position.lat, position.lng)
+        if (currentPositionRef.current) {
+          sendLocation(currentPositionRef.current.lat, currentPositionRef.current.lng)
         }
       }, 5000)
     } catch (err: any) {
@@ -101,6 +106,7 @@ export default function GpsTracker({ repartidorId, vehiculoId, rutaId }: GpsTrac
       intervalRef.current = null
     }
     setIsTracking(false)
+    currentPositionRef.current = null
   }
 
   // Enviar ubicación al servidor

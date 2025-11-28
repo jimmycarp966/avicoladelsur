@@ -122,9 +122,9 @@ echo "-------------------------------------------"
 print_warning "Simulando 5 ubicaciones GPS cada 5 segundos..."
 echo ""
 
-# Coordenadas de ejemplo (Buenos Aires)
-LAT_BASE=-34.6037
-LNG_BASE=-58.3816
+# Coordenadas de ejemplo (Monteros, Tucumán)
+LAT_BASE=-27.1671
+LNG_BASE=-65.4995
 
 for i in {1..5}; do
     LAT=$(echo "$LAT_BASE + ($i * 0.001)" | bc)

@@ -15,7 +15,12 @@ export const metadata = {
 
 async function ListaPrecioDetalleContent({ listaId }: { listaId: string }) {
   const supabase = await createClient()
-  
+
+  // Validar que el ID sea un UUID válido
+  if (!listaId || listaId === 'undefined' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(listaId)) {
+    return <div>ID de lista de precios inválido</div>
+  }
+
   // Verificar permisos (solo admin)
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
@@ -138,14 +143,16 @@ async function ListaPrecioDetalleContent({ listaId }: { listaId: string }) {
   )
 }
 
-export default function ListaPrecioDetallePage({ params }: { params: { id: string } }) {
+export default async function ListaPrecioDetallePage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = await params
+
   return (
     <Suspense fallback={
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     }>
-      <ListaPrecioDetalleContent listaId={params.id} />
+      <ListaPrecioDetalleContent listaId={resolvedParams.id} />
     </Suspense>
   )
 }

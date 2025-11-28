@@ -1,35 +1,13 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import dynamic from 'next/dynamic'
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import { AlertCircle, Loader2, MapPin, Navigation } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
-  LatLngTuple,
   buildGoogleMapsDirectionsUrl,
   normalizeCoordinates,
   parsePolyline,
 } from '@/lib/utils/rutas'
-
-const MapContainer = dynamic(
-  () => import('react-leaflet').then(mod => mod.MapContainer),
-  { ssr: false },
-)
-const TileLayer = dynamic(
-  () => import('react-leaflet').then(mod => mod.TileLayer),
-  { ssr: false },
-)
-const Marker = dynamic(
-  () => import('react-leaflet').then(mod => mod.Marker),
-  { ssr: false },
-)
-const Polyline = dynamic(
-  () => import('react-leaflet').then(mod => mod.Polyline),
-  { ssr: false },
-)
-const Popup = dynamic(() => import('react-leaflet').then(mod => mod.Popup), {
-  ssr: false,
-})
 
 type Entrega = {
   id: string
@@ -85,6 +63,20 @@ type UltimaUbicacionResponse = {
   error?: string
 }
 
+declare global {
+  interface Window {
+    google: any
+  }
+}
+
+// Tipos para Google Maps (usando any ya que se carga dinámicamente)
+type GoogleMap = any
+type GoogleMarker = any
+type GooglePolyline = any
+type GoogleInfoWindow = any
+type GoogleLatLng = any
+type GoogleLatLngBounds = any
+
 export default function RutaMap({
   rutaId,
   entregas,
@@ -93,8 +85,14 @@ export default function RutaMap({
   vehiculoId,
   className,
 }: RutaMapProps) {
-  const [polylinePoints, setPolylinePoints] = useState<LatLngTuple[]>([])
-  const [historialPoints, setHistorialPoints] = useState<LatLngTuple[]>([])
+  const mapRef = useRef<HTMLDivElement>(null)
+  const mapInstanceRef = useRef<GoogleMap | null>(null)
+  const markersRef = useRef<Map<string, GoogleMarker>>(new Map())
+  const polylinesRef = useRef<Map<string, GooglePolyline>>(new Map())
+  const infoWindowsRef = useRef<Map<string, GoogleInfoWindow>>(new Map())
+  
+  const [polylinePoints, setPolylinePoints] = useState<Array<[number, number]>>([])
+  const [historialPoints, setHistorialPoints] = useState<Array<[number, number]>>([])
   const [ordenVisita, setOrdenVisita] = useState<
     Array<{
       detalle_ruta_id: string
@@ -106,6 +104,7 @@ export default function RutaMap({
   >([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [mapsLoaded, setMapsLoaded] = useState(false)
   const [gpsPosition, setGpsPosition] = useState<{
     lat: number
     lng: number
@@ -236,71 +235,370 @@ export default function RutaMap({
       .filter((marker): marker is NonNullable<typeof marker> => Boolean(marker))
   }, [entregas, ordenVisitaLookup])
 
-  const mapCenter: LatLngTuple = useMemo(() => {
+  const mapCenter = useMemo(() => {
     if (gpsPosition) {
-      return [gpsPosition.lat, gpsPosition.lng]
+      return { lat: gpsPosition.lat, lng: gpsPosition.lng }
     }
     if (markers.length > 0) {
-      return [markers[0].coords.lat, markers[0].coords.lng]
+      return { lat: markers[0].coords.lat, lng: markers[0].coords.lng }
     }
     if (polylinePoints.length > 0) {
-      return polylinePoints[0]
+      return { lat: polylinePoints[0][0], lng: polylinePoints[0][1] }
     }
-    return [-34.603722, -58.381592] // Buenos Aires
+    return { lat: -27.1671, lng: -65.4995 } // Monteros, Tucumán
   }, [gpsPosition, markers, polylinePoints])
 
-  const renderMarkerPopup = (marker: (typeof markers)[number]) => (
-    <div className="space-y-1 min-w-[180px]">
-      <p className="text-sm font-semibold">
-        {marker.pedido?.cliente?.nombre || 'Cliente'}
-      </p>
-      <p className="text-xs text-muted-foreground flex items-center gap-1">
-        <MapPin className="h-3 w-3" />
-        {marker.pedido?.cliente?.direccion || 'Dirección no disponible'}
-      </p>
-      {marker.pedido?.numero_pedido && (
-        <p className="text-xs text-muted-foreground">
-          Pedido: {marker.pedido.numero_pedido}
-        </p>
-      )}
-      <Button
-        variant="secondary"
-        size="sm"
-        className="w-full mt-2"
-        asChild
-      >
-        <a
-          href={buildGoogleMapsDirectionsUrl(
-            marker.coords.lat,
-            marker.coords.lng,
-          )}
-          target="_blank"
-          rel="noreferrer"
-        >
-          <Navigation className="mr-2 h-4 w-4" />
-          Abrir en Google Maps
-        </a>
-      </Button>
-    </div>
-  )
+  // Crear icono personalizado con número de orden
+  const createOrderIcon = useCallback((order: number | undefined): any => {
+    if (!window.google || !window.google.maps || !window.google.maps.Size || !window.google.maps.Point) return undefined
+    const label = order ?? '?'
+    
+    return {
+      url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
+          <circle cx="14" cy="14" r="14" fill="#2d6a4f" stroke="#fff" stroke-width="2"/>
+          <text x="14" y="18" font-family="Arial, sans-serif" font-size="12" font-weight="600" fill="#fff" text-anchor="middle">${label}</text>
+        </svg>
+      `),
+      scaledSize: new window.google.maps.Size(28, 28),
+      anchor: new window.google.maps.Point(14, 28)
+    }
+  }, [])
 
-  if (typeof window === 'undefined') {
-    return null
-  }
+  // Crear icono para GPS actual
+  const createGpsIcon = useCallback((): any => {
+    if (!window.google || !window.google.maps || !window.google.maps.Size || !window.google.maps.Point) return undefined
+    
+    return {
+      url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#0ea5e9">
+          <circle cx="12" cy="12" r="12" fill="#0ea5e9" stroke="#fff" stroke-width="2"/>
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-13c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zm0 8c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3z" fill="#fff"/>
+        </svg>
+      `),
+      scaledSize: new window.google.maps.Size(24, 24),
+      anchor: new window.google.maps.Point(12, 24)
+    }
+  }, [])
+
+  // Convertir puntos a LatLng de Google Maps
+  const convertToLatLngArray = useCallback((points: Array<[number, number]>): GoogleLatLng[] => {
+    if (!window.google || !window.google.maps || !window.google.maps.LatLng) return []
+    return points.map(([lat, lng]) => new window.google.maps.LatLng(lat, lng))
+  }, [])
+
+  // Inicializar mapa
+  const initializeMap = useCallback(() => {
+    if (!window.google || !window.google.maps || !window.google.maps.Map || !mapRef.current || mapInstanceRef.current) {
+      return
+    }
+
+    try {
+      mapInstanceRef.current = new window.google.maps.Map(mapRef.current, {
+        center: mapCenter,
+        zoom: 13,
+        mapTypeControl: true,
+        streetViewControl: false,
+        fullscreenControl: true,
+        zoomControl: true,
+      })
+
+      console.log('[RutaMap] Mapa inicializado correctamente')
+    } catch (err) {
+      console.error('[RutaMap] Error inicializando mapa:', err)
+      setError('Error al inicializar el mapa')
+    }
+  }, [mapCenter])
+
+  // Actualizar elementos del mapa
+  const updateMapElements = useCallback(() => {
+    if (!mapInstanceRef.current || !window.google || !window.google.maps || !window.google.maps.Marker || !window.google.maps.Polyline || !window.google.maps.InfoWindow || !window.google.maps.LatLng || !window.google.maps.LatLngBounds) return
+
+    // Limpiar elementos anteriores
+    markersRef.current.forEach(marker => marker.setMap(null))
+    polylinesRef.current.forEach(polyline => polyline.setMap(null))
+    infoWindowsRef.current.forEach(infoWindow => infoWindow.close())
+    
+    markersRef.current.clear()
+    polylinesRef.current.clear()
+    infoWindowsRef.current.clear()
+
+    const bounds = new window.google.maps.LatLngBounds()
+    let hasPoints = false
+
+    // Agregar polilínea de ruta optimizada (verde)
+    if (polylinePoints.length > 0) {
+      const path = convertToLatLngArray(polylinePoints)
+      path.forEach(point => bounds.extend(point))
+      hasPoints = true
+
+      const polyline = new window.google.maps.Polyline({
+        path,
+        geodesic: true,
+        strokeColor: '#2d6a4f',
+        strokeOpacity: 0.8,
+        strokeWeight: 4,
+        map: mapInstanceRef.current
+      })
+
+      polylinesRef.current.set('ruta-optimizada', polyline)
+    }
+
+    // Agregar polilínea de historial GPS (azul, punteada)
+    if (historialPoints.length > 1) {
+      const path = convertToLatLngArray(historialPoints)
+      path.forEach(point => bounds.extend(point))
+      hasPoints = true
+
+      // Crear línea punteada usando símbolos repetidos
+      const polyline = new window.google.maps.Polyline({
+        path,
+        geodesic: true,
+        strokeColor: '#0ea5e9',
+        strokeOpacity: 0.6,
+        strokeWeight: 3,
+        icons: [{
+          icon: {
+            path: 'M 0,-1 0,1',
+            strokeOpacity: 1,
+            strokeWeight: 2,
+            scale: 4
+          },
+          offset: '0%',
+          repeat: '10px'
+        }],
+        map: mapInstanceRef.current
+      })
+
+      polylinesRef.current.set('historial-gps', polyline)
+    }
+
+    // Agregar marcadores de entregas
+    markers.forEach(marker => {
+      const position = new window.google.maps.LatLng(marker.coords.lat, marker.coords.lng)
+      bounds.extend(position)
+      hasPoints = true
+
+      const googleMarker = new window.google.maps.Marker({
+        position,
+        map: mapInstanceRef.current,
+        icon: createOrderIcon(marker.order),
+        title: `Orden ${marker.order}: ${marker.pedido?.cliente?.nombre || 'Cliente'}`
+      })
+
+      const infoWindow = new window.google.maps.InfoWindow({
+        content: `
+          <div style="padding: 8px; min-width: 180px;">
+            <p style="font-weight: 600; font-size: 14px; margin: 0 0 8px 0;">
+              ${marker.pedido?.cliente?.nombre || 'Cliente'}
+            </p>
+            <p style="font-size: 12px; color: #666; margin: 0 0 4px 0; display: flex; align-items: center; gap: 4px;">
+              📍 ${marker.pedido?.cliente?.direccion || 'Dirección no disponible'}
+            </p>
+            ${marker.pedido?.numero_pedido ? `
+              <p style="font-size: 12px; color: #666; margin: 0 0 8px 0;">
+                Pedido: ${marker.pedido.numero_pedido}
+              </p>
+            ` : ''}
+            <a 
+              href="${buildGoogleMapsDirectionsUrl(marker.coords.lat, marker.coords.lng)}"
+              target="_blank"
+              rel="noreferrer"
+              style="
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                padding: 6px 12px;
+                background: #f3f4f6;
+                border: 1px solid #d1d5db;
+                border-radius: 6px;
+                text-decoration: none;
+                color: #374151;
+                font-size: 12px;
+                font-weight: 500;
+                transition: background 0.2s;
+              "
+              onmouseover="this.style.background='#e5e7eb'"
+              onmouseout="this.style.background='#f3f4f6'"
+            >
+              🧭 Abrir en Google Maps
+            </a>
+          </div>
+        `
+      })
+
+      googleMarker.addListener('click', () => {
+        infoWindowsRef.current.forEach(iw => iw.close())
+        infoWindow.open(mapInstanceRef.current, googleMarker)
+      })
+
+      markersRef.current.set(`entrega-${marker.id}`, googleMarker)
+      infoWindowsRef.current.set(`entrega-${marker.id}`, infoWindow)
+    })
+
+    // Agregar marcador de GPS actual
+    if (gpsPosition && showGpsTracking) {
+      const position = new window.google.maps.LatLng(gpsPosition.lat, gpsPosition.lng)
+      bounds.extend(position)
+      hasPoints = true
+
+      const gpsMarker = new window.google.maps.Marker({
+        position,
+        map: mapInstanceRef.current,
+        icon: createGpsIcon(),
+        title: 'Ubicación actual del repartidor'
+      })
+
+      const infoWindow = new window.google.maps.InfoWindow({
+        content: `
+          <div style="padding: 8px; min-width: 150px;">
+            <p style="font-weight: 600; font-size: 14px; margin: 0 0 4px 0; display: flex; align-items: center; gap: 6px;">
+              🧭 Ubicación actual
+            </p>
+            <p style="font-size: 12px; color: #666; margin: 0;">
+              ${gpsPosition.created_at
+                ? new Date(gpsPosition.created_at).toLocaleTimeString('es-AR', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
+                : 'Hace instantes'}
+            </p>
+          </div>
+        `
+      })
+
+      gpsMarker.addListener('click', () => {
+        infoWindowsRef.current.forEach(iw => iw.close())
+        infoWindow.open(mapInstanceRef.current, gpsMarker)
+      })
+
+      markersRef.current.set('gps-actual', gpsMarker)
+      infoWindowsRef.current.set('gps-actual', infoWindow)
+    }
+
+    // Ajustar vista para mostrar todos los puntos
+    if (hasPoints && mapInstanceRef.current) {
+      mapInstanceRef.current.fitBounds(bounds)
+      // Asegurar un zoom mínimo
+      const listener = window.google.maps.event.addListener(mapInstanceRef.current, 'bounds_changed', () => {
+        if (mapInstanceRef.current && mapInstanceRef.current.getZoom() && mapInstanceRef.current.getZoom()! > 15) {
+          mapInstanceRef.current.setZoom(15)
+        }
+        window.google.maps.event.removeListener(listener)
+      })
+    }
+  }, [polylinePoints, historialPoints, markers, gpsPosition, showGpsTracking, convertToLatLngArray, createOrderIcon, createGpsIcon])
+
+  // Efecto para inicializar mapa cuando Google Maps está disponible
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout
+    let retryCount = 0
+    const maxRetries = 30
+
+    const checkGoogleMaps = () => {
+      if (
+        window.google && 
+        window.google.maps && 
+        window.google.maps.Map &&
+        window.google.maps.Marker &&
+        window.google.maps.Polyline &&
+        window.google.maps.InfoWindow &&
+        window.google.maps.LatLng &&
+        window.google.maps.LatLngBounds
+      ) {
+        if (!mapsLoaded) {
+          setMapsLoaded(true)
+          // Pequeño delay para asegurar que todo esté listo
+          setTimeout(() => {
+            initializeMap()
+          }, 100)
+        }
+        return true
+      }
+      return false
+    }
+
+    const checkGoogleMapsLoop = () => {
+      if (checkGoogleMaps()) return
+
+      if (retryCount < maxRetries) {
+        retryCount++
+        timeoutId = setTimeout(checkGoogleMapsLoop, 500)
+      } else {
+        console.error('[RutaMap] Google Maps API failed to load')
+        setError('Google Maps no se pudo cargar')
+        setLoading(false)
+      }
+    }
+
+    const handleGoogleMapsLoaded = () => {
+      if (!mapsLoaded) {
+        // Pequeño delay para asegurar que todo esté listo
+        setTimeout(() => {
+          if (
+            window.google && 
+            window.google.maps && 
+            window.google.maps.Map &&
+            window.google.maps.Marker &&
+            window.google.maps.Polyline &&
+            window.google.maps.InfoWindow &&
+            window.google.maps.LatLng &&
+            window.google.maps.LatLngBounds
+          ) {
+            setMapsLoaded(true)
+            initializeMap()
+          }
+        }, 100)
+      }
+    }
+
+    window.addEventListener('google-maps-loaded', handleGoogleMapsLoaded)
+
+    const initialDelay = setTimeout(() => {
+      if (!window.google) {
+        setError('Google Maps script no se cargó')
+        setLoading(false)
+        return
+      }
+      checkGoogleMapsLoop()
+    }, 1000)
+
+    return () => {
+      clearTimeout(initialDelay)
+      if (timeoutId) clearTimeout(timeoutId)
+      window.removeEventListener('google-maps-loaded', handleGoogleMapsLoaded)
+    }
+  }, [initializeMap, mapsLoaded])
+
+  // Actualizar elementos del mapa cuando cambian los datos
+  useEffect(() => {
+    if (mapInstanceRef.current && mapsLoaded) {
+      updateMapElements()
+    }
+  }, [updateMapElements, mapsLoaded])
+
+  // Limpiar al desmontar
+  useEffect(() => {
+    return () => {
+      markersRef.current.forEach(marker => marker.setMap(null))
+      polylinesRef.current.forEach(polyline => polyline.setMap(null))
+      infoWindowsRef.current.forEach(infoWindow => infoWindow.close())
+    }
+  }, [])
 
   return (
     <div className={className}>
       <div className="h-[500px] w-full rounded-lg overflow-hidden border relative">
-        {loading && (
+        {(!mapsLoaded || loading) && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/70 backdrop-blur-sm">
             <div className="flex flex-col items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-5 w-5 animate-spin" />
-              Cargando mapa...
+              {!mapsLoaded ? 'Cargando Google Maps...' : 'Cargando mapa...'}
             </div>
           </div>
         )}
 
-        {error && !loading && (
+        {error && !loading && mapsLoaded && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-destructive/10 text-destructive p-4 text-center">
             <AlertCircle className="h-6 w-6 mb-2" />
             <p className="font-medium">{error}</p>
@@ -313,69 +611,7 @@ export default function RutaMap({
           </div>
         )}
 
-        <MapContainer
-          center={mapCenter}
-          zoom={13}
-          style={{ height: '100%', width: '100%' }}
-        >
-          <TileLayer
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          />
-
-          {polylinePoints.length > 0 && (
-            <Polyline
-              positions={polylinePoints}
-              color="#2d6a4f"
-              weight={4}
-              opacity={0.8}
-            />
-          )}
-
-          {historialPoints.length > 1 && (
-            <Polyline
-              positions={historialPoints}
-              color="#0ea5e9"
-              dashArray="6 6"
-              weight={3}
-              opacity={0.6}
-            />
-          )}
-
-          {markers.map(marker => (
-            <Marker
-              key={marker.id}
-              position={[marker.coords.lat, marker.coords.lng]}
-              icon={createOrderIcon(marker.order)}
-            >
-              <Popup>{renderMarkerPopup(marker)}</Popup>
-            </Marker>
-          ))}
-
-          {gpsPosition && showGpsTracking && (
-            <Marker
-              position={[gpsPosition.lat, gpsPosition.lng]}
-              icon={createGpsIcon()}
-            >
-              <Popup>
-                <div className="text-sm">
-                  <p className="font-semibold flex items-center gap-1">
-                    <Navigation className="h-3.5 w-3.5" />
-                    Ubicación actual
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {gpsPosition.created_at
-                      ? new Date(gpsPosition.created_at).toLocaleTimeString('es-AR', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })
-                      : 'Hace instantes'}
-                  </p>
-                </div>
-              </Popup>
-            </Marker>
-          )}
-        </MapContainer>
+        <div ref={mapRef} style={{ height: '100%', width: '100%' }} />
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
@@ -412,88 +648,3 @@ export default function RutaMap({
     </div>
   )
 }
-
-type LeafletModule = typeof import('leaflet')
-let L: LeafletModule | null = null
-
-const ensureLeafletLoaded = async () => {
-  if (typeof window === 'undefined' || L) {
-    return
-  }
-
-  const Leaflet = await import('leaflet')
-  L = Leaflet
-
-  if (Leaflet.Icon?.Default) {
-    delete (Leaflet.Icon.Default.prototype as any)._getIconUrl
-    Leaflet.Icon.Default.mergeOptions({
-      iconRetinaUrl:
-        'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-      iconUrl:
-        'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-      shadowUrl:
-        'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-    })
-  }
-}
-
-void ensureLeafletLoaded()
-
-function createOrderIcon(order: number | undefined) {
-  if (!L) return undefined
-  const label = order ?? '?'
-  return L.divIcon({
-    className: '',
-    html: `
-      <div style="
-        background:#2d6a4f;
-        color:#fff;
-        border-radius:9999px;
-        width:28px;
-        height:28px;
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        font-size:12px;
-        font-weight:600;
-        border:2px solid #fff;
-        box-shadow:0 4px 10px rgba(0,0,0,0.2);
-      ">
-        ${label}
-      </div>
-    `,
-    iconSize: [28, 28],
-    iconAnchor: [14, 28],
-    popupAnchor: [0, -28],
-  })
-}
-
-function createGpsIcon() {
-  if (!L) return undefined
-  return L.divIcon({
-    className: '',
-    html: `
-      <div style="
-        background:#0ea5e9;
-        color:#fff;
-        border-radius:9999px;
-        width:24px;
-        height:24px;
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        border:2px solid #fff;
-        box-shadow:0 4px 10px rgba(14,165,233,0.45);
-      ">
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 11h2m7-8v2m7 6h2m-9 7v2m-6.364-3.636l1.414-1.414m8.486 0 1.414 1.414m0-8.486-1.414 1.414m-8.486 0-1.414-1.414M12 8a4 4 0 104 4 4 4 0 00-4-4z"/>
-        </svg>
-      </div>
-    `,
-    iconSize: [24, 24],
-    iconAnchor: [12, 24],
-    popupAnchor: [0, -24],
-  })
-}
-
-

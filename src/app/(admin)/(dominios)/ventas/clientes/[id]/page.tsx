@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { ArrowLeft, Edit, User, Phone, Mail, MapPin, MessageCircle, ShoppingCart, DollarSign, FileText } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
-// import { getClienteById } from '@/actions/ventas.actions' // TODO: Implementar cuando esté disponible
+import { obtenerClientePorId } from '@/actions/ventas.actions'
 
 interface ClienteDetallePageProps {
   params: {
@@ -25,32 +25,14 @@ export default async function ClienteDetallePage({ params }: ClienteDetallePageP
   const { id } = await params
   const clienteId = id
 
-  // En producción, esto sería una llamada real a la base de datos
-  // const cliente = await getClienteById(clienteId)
-  // if (!cliente) notFound()
+  // Obtener cliente real de la base de datos
+  const result = await obtenerClientePorId(clienteId)
 
-  // Datos de ejemplo para desarrollo
-  const clienteEjemplo = {
-    id: clienteId,
-    nombre: 'Supermercado Central',
-    telefono: '+5491123456789',
-    whatsapp: '+5491123456789',
-    email: 'contacto@supercentral.com',
-    direccion: 'Av. Principal 123, Ciudad de Buenos Aires, Argentina',
-    zona_entrega: 'Centro',
-    coordenadas: { lat: -34.6118, lng: -58.3965 },
-    tipo_cliente: 'mayorista',
-    limite_credito: 50000.00,
-    activo: true,
-    fecha_registro: '2024-01-15T10:00:00Z',
-    ultimo_pedido: '2025-11-05T14:30:00Z',
-    total_pedidos: 45,
-    total_compras: 125000.00,
-    pedidos_pendientes: 2,
-    promedio_compra: 2777.78,
+  if (!result.success || !result.data) {
+    notFound()
   }
 
-  const cliente = clienteEjemplo
+  const cliente = result.data
 
   return (
     <div className="space-y-6">
@@ -69,12 +51,14 @@ export default async function ClienteDetallePage({ params }: ClienteDetallePageP
           </div>
         </div>
         <div className="flex space-x-2">
-          <Button variant="outline" asChild>
-            <Link href={`tel:${cliente.telefono}`}>
-              <Phone className="mr-2 h-4 w-4" />
-              Llamar
-            </Link>
-          </Button>
+          {cliente.telefono && (
+            <Button variant="outline" asChild>
+              <Link href={`tel:${cliente.telefono}`}>
+                <Phone className="mr-2 h-4 w-4" />
+                Llamar
+              </Link>
+            </Button>
+          )}
           {cliente.whatsapp && (
             <Button variant="outline" asChild className="text-green-600 hover:text-green-700">
               <a
@@ -101,8 +85,10 @@ export default async function ClienteDetallePage({ params }: ClienteDetallePageP
         <Badge variant={cliente.activo ? "default" : "secondary"}>
           {cliente.activo ? "Activo" : "Inactivo"}
         </Badge>
-        <Badge variant="outline" className="capitalize">{cliente.tipo_cliente}</Badge>
-        <Badge variant="outline">{cliente.zona_entrega}</Badge>
+        <Badge variant="outline" className="capitalize">{cliente.tipo_cliente || 'N/A'}</Badge>
+        {cliente.zona_entrega && (
+          <Badge variant="outline">{cliente.zona_entrega}</Badge>
+        )}
       </div>
 
       {/* Información principal */}
@@ -120,13 +106,15 @@ export default async function ClienteDetallePage({ params }: ClienteDetallePageP
               <label className="text-sm font-medium text-muted-foreground">Nombre</label>
               <p className="text-sm">{cliente.nombre}</p>
             </div>
-            <div>
-              <label className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-                <Phone className="h-3 w-3" />
-                Teléfono
-              </label>
-              <p className="text-sm">{cliente.telefono}</p>
-            </div>
+            {cliente.telefono && (
+              <div>
+                <label className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                  <Phone className="h-3 w-3" />
+                  Teléfono
+                </label>
+                <p className="text-sm">{cliente.telefono}</p>
+              </div>
+            )}
             {cliente.whatsapp && (
               <div>
                 <label className="text-sm font-medium text-muted-foreground flex items-center gap-1 text-green-600">
@@ -136,13 +124,15 @@ export default async function ClienteDetallePage({ params }: ClienteDetallePageP
                 <p className="text-sm text-green-600">{cliente.whatsapp}</p>
               </div>
             )}
-            <div>
-              <label className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-                <Mail className="h-3 w-3" />
-                Email
-              </label>
-              <p className="text-sm">{cliente.email}</p>
-            </div>
+            {cliente.email && (
+              <div>
+                <label className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                  <Mail className="h-3 w-3" />
+                  Email
+                </label>
+                <p className="text-sm">{cliente.email}</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -155,14 +145,18 @@ export default async function ClienteDetallePage({ params }: ClienteDetallePageP
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div>
-              <label className="text-sm font-medium text-muted-foreground">Dirección</label>
-              <p className="text-sm">{cliente.direccion}</p>
+            {cliente.direccion && (
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Dirección</label>
+                <p className="text-sm">{cliente.direccion}</p>
             </div>
-            <div>
-              <label className="text-sm font-medium text-muted-foreground">Zona de Entrega</label>
-              <p className="text-sm">{cliente.zona_entrega}</p>
-            </div>
+            )}
+            {cliente.zona_entrega && (
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Zona de Entrega</label>
+                <p className="text-sm">{cliente.zona_entrega}</p>
+              </div>
+            )}
             {cliente.coordenadas && (
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Coordenadas GPS</label>
@@ -190,13 +184,24 @@ export default async function ClienteDetallePage({ params }: ClienteDetallePageP
             <div>
               <label className="text-sm font-medium text-muted-foreground">Límite de Crédito</label>
               <p className="text-lg font-semibold text-blue-600">
-                {formatCurrency(cliente.limite_credito)}
+                {formatCurrency(cliente.cuenta_corriente?.limite_credito || cliente.limite_credito || 0)}
               </p>
             </div>
+            {cliente.cuenta_corriente && (
+              <>
+                <Separator />
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Saldo Actual</label>
+                  <p className={`text-lg font-semibold ${cliente.cuenta_corriente.saldo < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                    {formatCurrency(cliente.cuenta_corriente.saldo || 0)}
+                  </p>
+                </div>
+              </>
+            )}
             <Separator />
             <div>
               <label className="text-sm font-medium text-muted-foreground">Fecha de Registro</label>
-              <p className="text-sm">{formatDate(cliente.fecha_registro)}</p>
+              <p className="text-sm">{cliente.fecha_registro ? formatDate(cliente.fecha_registro) : 'N/A'}</p>
             </div>
           </CardContent>
         </Card>
@@ -210,7 +215,7 @@ export default async function ClienteDetallePage({ params }: ClienteDetallePageP
             <ShoppingCart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{cliente.total_pedidos}</div>
+            <div className="text-2xl font-bold">{cliente.total_pedidos || 0}</div>
             <p className="text-xs text-muted-foreground">
               Desde el registro
             </p>
@@ -223,7 +228,7 @@ export default async function ClienteDetallePage({ params }: ClienteDetallePageP
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(cliente.total_compras)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(cliente.total_compras || 0)}</div>
             <p className="text-xs text-muted-foreground">
               Valor total de compras
             </p>
@@ -236,7 +241,7 @@ export default async function ClienteDetallePage({ params }: ClienteDetallePageP
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(cliente.promedio_compra)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(cliente.promedio_compra || 0)}</div>
             <p className="text-xs text-muted-foreground">
               Valor promedio por pedido
             </p>
@@ -249,7 +254,7 @@ export default async function ClienteDetallePage({ params }: ClienteDetallePageP
             <ShoppingCart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{cliente.pedidos_pendientes}</div>
+            <div className="text-2xl font-bold text-orange-600">{cliente.pedidos_pendientes || 0}</div>
             <p className="text-xs text-muted-foreground">
               Requieren atención
             </p>

@@ -435,6 +435,7 @@ CREATE TABLE IF NOT EXISTS listas_precios (
     tipo VARCHAR(50) NOT NULL CHECK (tipo IN ('minorista', 'mayorista', 'distribuidor', 'personalizada')),
     activa BOOLEAN DEFAULT true,
     margen_ganancia DECIMAL(5,2), -- Porcentaje de margen (ej: 30.00 = 30%)
+    vigencia_activa BOOLEAN DEFAULT false, -- Si true, valida fechas de vigencia. Si false, lista siempre vigente
     fecha_vigencia_desde DATE,
     fecha_vigencia_hasta DATE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

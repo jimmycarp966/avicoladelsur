@@ -621,6 +621,7 @@ export interface ListaPrecio extends BaseEntity {
   tipo: 'minorista' | 'mayorista' | 'distribuidor' | 'personalizada'
   activa: boolean
   margen_ganancia?: number // Porcentaje de margen (ej: 30 = 30%)
+  vigencia_activa?: boolean // Si true, valida fechas de vigencia. Si false, lista siempre vigente
   fecha_vigencia_desde?: string
   fecha_vigencia_hasta?: string
 }

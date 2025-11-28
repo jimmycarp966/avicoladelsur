@@ -48,6 +48,15 @@ interface DataTableProps<TData, TValue> {
   enablePagination?: boolean
   pageSize?: number
   actions?: (row: TData) => React.ReactNode
+  // Server-side pagination callbacks
+  onPaginationChange?: (pagination: { pageIndex: number; pageSize: number }) => void
+  onSearchChange?: (search: string) => void
+  // Server-side pagination state
+  serverPagination?: {
+    pageIndex: number
+    pageSize: number
+    totalCount?: number
+  }
 }
 
 export function DataTable<TData, TValue>({
@@ -61,6 +70,9 @@ export function DataTable<TData, TValue>({
   enablePagination = true,
   pageSize = 10,
   actions,
+  onPaginationChange,
+  onSearchChange,
+  serverPagination,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
@@ -68,9 +80,26 @@ export function DataTable<TData, TValue>({
   const [rowSelection, setRowSelection] = React.useState({})
   const [globalFilter, setGlobalFilter] = React.useState('')
   const [pagination, setPagination] = React.useState({
-    pageIndex: 0,
-    pageSize: pageSize,
+    pageIndex: serverPagination?.pageIndex ?? 0,
+    pageSize: serverPagination?.pageSize ?? pageSize,
   })
+
+  // Update pagination when serverPagination changes
+  React.useEffect(() => {
+    if (serverPagination) {
+      const newPagination = {
+        pageIndex: serverPagination.pageIndex,
+        pageSize: serverPagination.pageSize,
+      }
+      // Only update if different to avoid unnecessary re-renders
+      setPagination(prev => {
+        if (prev.pageIndex !== newPagination.pageIndex || prev.pageSize !== newPagination.pageSize) {
+          return newPagination
+        }
+        return prev
+      })
+    }
+  }, [serverPagination?.pageIndex, serverPagination?.pageSize])
 
   // Add row selection column if enabled
   const tableColumns = React.useMemo(() => {
@@ -168,14 +197,28 @@ export function DataTable<TData, TValue>({
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: enablePagination ? getPaginationRowModel() : undefined,
+    getPaginationRowModel: enablePagination && !serverPagination ? getPaginationRowModel() : undefined,
     getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
+    getFilteredRowModel: serverPagination ? undefined : getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
-    onGlobalFilterChange: setGlobalFilter,
-    onPaginationChange: enablePagination ? setPagination : undefined,
+    onGlobalFilterChange: serverPagination ? (updater) => {
+      const newFilter = typeof updater === 'function' ? updater(globalFilter) : updater
+      // Only update and call callback if filter actually changed
+      if (newFilter !== globalFilter) {
+        setGlobalFilter(newFilter)
+        onSearchChange?.(newFilter)
+      }
+    } : setGlobalFilter,
+    onPaginationChange: enablePagination ? (updater) => {
+      const newPagination = typeof updater === 'function' ? updater(pagination) : updater
+      setPagination(newPagination)
+      onPaginationChange?.(newPagination)
+    } : undefined,
     globalFilterFn: 'includesString',
+    // Server-side pagination configuration
+    manualPagination: !!serverPagination,
+    rowCount: serverPagination?.totalCount,
     state: {
       sorting,
       columnFilters,

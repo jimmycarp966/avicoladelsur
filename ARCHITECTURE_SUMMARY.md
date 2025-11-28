@@ -14,6 +14,7 @@ Sistema ERP modular completo para Avícola del Sur que unifica Almacén (WMS), V
 - **Estado**: Zustand (solo estado global: sesión, notificaciones)
 - **Formularios**: React Hook Form + Zod validation
 - **Tablas**: TanStack Table (paginación, filtros, sorting)
+- **Mapas**: Google Maps JavaScript API (ubicaciones clientes) + Leaflet + OpenStreetMap (GPS tracking)
 - **Chatbot**: Twilio WhatsApp (sin Botpress - implementación directa)
 - **PDF/Reportes**: pdfkit + Supabase Storage
 - **Calidad**: ESLint + Prettier + TypeScript strict
@@ -101,6 +102,14 @@ supabase/                         # Scripts SQL y migraciones
 - **Reclamos**: Seguimiento con estados y asignación
 - **Listas de Precios**: Sistema completo con listas base (minorista, mayorista, distribuidor), asignación automática por tipo_cliente, margen de ganancia configurable, precios manuales por producto, selección en presupuestos
 
+### 🗺️ **Google Maps Integration**: Selección de Ubicaciones
+- **Maps JavaScript API**: Selector interactivo en formularios de clientes
+- **Places API**: Autocompletado inteligente de direcciones
+- **Geocoding**: Conversión coordenadas ↔ direcciones
+- **Ubicación por Defecto**: Monteros, Tucumán (zona de operación)
+- **Fallback Inteligente**: Campo manual si API falla
+- **Diagnóstico Avanzado**: Páginas de debugging para troubleshooting
+
 ### 🚛 **Reparto (TMS)**: Logística y Entregas
 - **Planificación Semanal**: Rutas fijas por zona/día/turno/vehículo con capacidad definida
 - **Vehículos Base**: Fiorino (600kg), Hilux (1500kg), F-4000 (4000kg) precargados
@@ -161,10 +170,11 @@ supabase/                         # Scripts SQL y migraciones
 - **Listas base**: MINORISTA, MAYORISTA, DISTRIBUIDOR (asignación automática por tipo_cliente)
 - **Asignación dual**: Cada cliente puede tener hasta 2 listas activas (1 automática + 1 manual)
 - **Margen de ganancia**: Campo `margen_ganancia` en listas para cálculo automático desde `precio_costo`
+- **Vigencia opcional**: Campo `vigencia_activa` (default: false). Si está activado, valida fechas de vigencia. Si está desactivado, la lista está siempre vigente desde que se modifica hasta que se actualice
 - **Precios manuales**: Gestión individual de precios por producto en cada lista
 - **Selección en presupuestos**: Vendedor elige qué lista usar al crear presupuestos
 - **Bot integrado**: Usa automáticamente la primera lista asignada del cliente
-- **RPC funciones**: `fn_obtener_precio_producto()`, `fn_asignar_lista_automatica_cliente()`, `fn_validar_listas_cliente()`
+- **RPC funciones**: `fn_obtener_precio_producto()`, `fn_asignar_lista_automatica_cliente()` (actualizada para validar vigencia), `fn_validar_listas_cliente()`
 - **UI completa**: `/ventas/listas-precios` para CRUD de listas y gestión de precios por producto
 
 ---
@@ -235,4 +245,80 @@ supabase/                         # Scripts SQL y migraciones
 
 ---
 
-*Resumen actualizado el 27/11/2025 - Sistema de validación de cobros y horarios de corte actualizados implementados*
+## 🔧 **Actualizaciones Recientes**
+
+### **Vigencia Opcional en Listas de Precios (07/12/2025)**
+- ✅ **Campo `vigencia_activa`**: Nuevo campo BOOLEAN en tabla `listas_precios` (default: false)
+- ✅ **Comportamiento por defecto**: Listas están siempre vigentes (sin validar fechas)
+- ✅ **Validación condicional**: Si `vigencia_activa = true`, valida `fecha_vigencia_desde` y `fecha_vigencia_hasta`
+- ✅ **UI actualizada**: Checkbox en formularios de crear/editar para activar/desactivar validación
+- ✅ **Funciones SQL actualizadas**: `fn_asignar_lista_automatica_cliente()` valida vigencia solo si está activada
+- ✅ **Actions actualizadas**: `obtenerListasPreciosAction()` y `obtenerListasClienteAction()` filtran por vigencia condicionalmente
+- ✅ **Migraciones**: 
+  - `20251207_agregar_vigencia_activa_listas_precios.sql` (agrega campo)
+  - `20251207_actualizar_fn_asignar_lista_automatica_vigencia.sql` (actualiza función RPC)
+
+### **Navegación del Sidebar Actualizada (03/12/2025)**
+- ✅ **Agregado**: "Listas de Precios" al menú Ventas (`/ventas/listas-precios`)
+- ✅ **Agregado**: "Facturas" al menú Ventas (`/ventas/facturas`)
+- ✅ **Íconos**: Tag (🏷️) para Listas de Precios, Receipt (📄) para Facturas
+
+### **Correcciones Técnicas - Listas de Precios (03/12/2025)**
+- ✅ **Políticas RLS Simplificadas**: Eliminadas políticas complejas que causaban errores de permisos
+- ✅ **Nueva migración**: `20251203_fix_rls_listas_precios.sql` con políticas simplificadas
+- ✅ **Compatibilidad Next.js 15**: Actualizadas páginas dinámicas para usar `await params`
+- ✅ **Validación de UUID**: Agregada validación de IDs antes de consultas a BD
+- ✅ **Manejo de Errores Mejorado**: Logging detallado para diagnóstico de problemas
+
+### **Estructura de Navegación Completa**
+```
+🏠 Dashboard
+📦 Almacén
+  ├── Productos
+  ├── Lotes
+  ├── Presupuestos del Día
+  ├── Pedidos
+  └── Recepción
+
+🛒 Ventas
+  ├── Presupuestos
+  ├── Clientes
+  ├── Listas de Precios ✅
+  └── Facturas ✅
+
+🚚 Reparto
+  ├── Planificación semanal
+  ├── Rutas
+  ├── Monitor GPS
+  └── Vehículos
+
+💰 Tesorería
+  ├── Cajas
+  ├── Movimientos
+  ├── Validar rutas
+  ├── Cierres de Caja
+  ├── Tesoro
+  └── Gastos
+
+👥 RRHH
+  ├── Empleados
+  ├── Asistencia
+  ├── Liquidaciones
+  ├── Adelantos
+  ├── Licencias
+  ├── Evaluaciones
+  ├── Novedades
+  └── Reportes
+
+📊 Reportes
+```
+
+### **Problemas Resueltos**
+1. **Error de búsqueda de clientes**: Agregado campo `codigo` faltante en consulta de clientes
+2. **Errores en Listas de Precios**: Políticas RLS simplificadas y compatibilidad Next.js 15
+3. **Navegación incompleta**: Agregados módulos faltantes al sidebar
+4. **Google Maps no funcionaba**: Implementado sistema completo de selección de ubicaciones con Maps JavaScript API
+
+---
+
+*Resumen actualizado el 28/11/2025 - Google Maps implementado para selección de ubicaciones de clientes*

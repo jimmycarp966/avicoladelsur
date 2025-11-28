@@ -4,11 +4,12 @@ import { z } from 'zod'
 export const listaPrecioSchema = z.object({
   codigo: z.string().min(1, 'El código es requerido').max(50, 'El código no puede exceder 50 caracteres'),
   nombre: z.string().min(1, 'El nombre es requerido').max(255, 'El nombre no puede exceder 255 caracteres'),
-  tipo: z.enum(['minorista', 'mayorista', 'distribuidor', 'personalizada'], {
-    errorMap: () => ({ message: 'Tipo de lista inválido' })
+  tipo: z.enum(['minorista', 'mayorista', 'distribuidor', 'personalizada']).refine((val) => ['minorista', 'mayorista', 'distribuidor', 'personalizada'].includes(val), {
+    message: 'Tipo de lista inválido'
   }),
   activa: z.boolean(),
   margen_ganancia: z.number().min(0, 'El margen no puede ser negativo').max(1000, 'El margen no puede exceder 1000%').optional().nullable(),
+  vigencia_activa: z.boolean(),
   fecha_vigencia_desde: z.string().optional().nullable(),
   fecha_vigencia_hasta: z.string().optional().nullable(),
 })

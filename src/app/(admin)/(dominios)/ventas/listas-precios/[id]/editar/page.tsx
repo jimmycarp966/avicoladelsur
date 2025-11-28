@@ -8,9 +8,15 @@ export const metadata = {
   description: 'Editar lista de precios',
 }
 
-export default async function EditarListaPrecioPage({ params }: { params: { id: string } }) {
+export default async function EditarListaPrecioPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = await params
   const supabase = await createClient()
-  
+
+  // Validar que el ID sea un UUID válido
+  if (!resolvedParams.id || resolvedParams.id === 'undefined' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(resolvedParams.id)) {
+    notFound()
+  }
+
   // Verificar permisos (solo admin)
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
@@ -27,7 +33,7 @@ export default async function EditarListaPrecioPage({ params }: { params: { id: 
     return <div>No tienes permisos para ver esta página</div>
   }
 
-  const result = await obtenerListaPrecioAction(params.id)
+  const result = await obtenerListaPrecioAction(resolvedParams.id)
 
   if (!result.success || !result.data) {
     notFound()

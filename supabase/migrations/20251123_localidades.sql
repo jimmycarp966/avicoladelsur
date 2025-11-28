@@ -79,3 +79,6 @@ COMMENT ON FUNCTION fn_obtener_localidades_activas() IS 'Retorna todas las local
 
 
 
+
+
+

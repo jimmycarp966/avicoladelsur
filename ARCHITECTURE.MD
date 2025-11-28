@@ -23,7 +23,7 @@
 2. **App Repartidor**: PWA móvil completa con GPS tracking, entregas, cobros y firma digital
 3. **Bot Vendedor**: Automatización completa de pedidos vía WhatsApp con reserva stock
 4. **Planificación Semanal**: Gestión de rutas fijas por zona/día/turno/vehículo
-5. **Monitor GPS**: Tiempo real con alertas automáticas y mapa Leaflet
+5. **Monitor GPS**: Tiempo real con alertas automáticas y mapa Google Maps
 
 ---
 
@@ -43,7 +43,7 @@
 | **Motor de Chatbot** | **Implementación Directa** | Procesamiento de comandos en Next.js |
 | **Backend Bot** | Next.js API Route | Endpoint `/api/bot/` con lógica completa |
 | **GPS Tracking** | Navigator API + Polling | Ubicación cada 5s con alertas automáticas |
-| **Mapas** | Leaflet + OpenStreetMap | Visualización GPS y rutas optimizadas |
+| **Mapas** | Google Maps JavaScript API | Visualización GPS, rutas optimizadas y monitor en tiempo real |
 | **Optimización Rutas** | Google Directions API | Rutas profesionales con fallback local |
 | **Storage** | Supabase Storage | Firmas digitales, comprobantes, adjuntos |
 | **Generación PDF** | pdfkit | Reportes profesionales con paginación |
@@ -100,7 +100,7 @@ PWA Repartidor → navigator.geolocation.watchPosition() → POST /api/reparto/u
     ↓
 Cada 5s → ubicaciones_repartidores → Alertas automáticas (>200m desvío)
     ↓
-GET /api/reparto/ubicaciones → Monitor Leaflet → Polylíneas + alertas
+GET /api/reparto/ubicaciones → Monitor Google Maps → Polylíneas + alertas
 ```
 
 ### Flujo F: Optimización de Rutas (Automática) ✅ NUEVO
@@ -174,7 +174,7 @@ Conciliación automática → Reportes CSV/PDF → Cierres de caja
 - **Optimización de Rutas**: Google Directions API + fallback local (Nearest Neighbor + 2-opt)
 - **GPS Tracking**: PWA con ubicación cada 5s durante reparto activo
 - **Alertas Automáticas**: Desvío (>200m) y cliente saltado (<100m sin entrega)
-- **Monitor Admin**: Mapa Leaflet en tiempo real con polylíneas y alertas
+- **Monitor Admin**: Mapa Google Maps en tiempo real con polylíneas y alertas
 - **PWA Móvil Completa**: Dashboard, entregas, cobros, firma digital, QR verificación
 - **Gestión de Vehículos**: Flota con mantenimientos y seguros
 - **Control de Repartidores**: Usuarios con roles específicos y vehículo asignado
@@ -1715,7 +1715,7 @@ CREATE POLICY "repartidor_rutas_propias" ON pedidos FOR SELECT USING (
 9. **GPS Tracking**: PWA con ubicación cada 5s + alertas automáticas ✅
 10. **Optimización de Rutas**: Google Directions + fallback local ✅
 11. **PWA Repartidor**: App móvil completa con entregas y cobros ✅
-12. **Monitor Admin**: Mapa Leaflet en tiempo real ✅
+12. **Monitor Admin**: Mapa Google Maps en tiempo real ✅
 13. **Asignación Automática**: Pedidos → rutas planificadas ✅
 14. **Turnos Automáticos**: Por hora de confirmación ✅
 
@@ -1732,7 +1732,7 @@ CREATE POLICY "repartidor_rutas_propias" ON pedidos FOR SELECT USING (
 - ✅ PWA con `navigator.geolocation.watchPosition()` cada 5s
 - ✅ Tabla `ubicaciones_repartidores` con coordenadas
 - ✅ Alertas automáticas: desvío (>200m), cliente saltado (<100m)
-- ✅ Monitor `/reparto/monitor` con mapa Leaflet
+- ✅ Monitor `/reparto/monitor` con mapa Google Maps
 - ✅ Polylíneas de rutas optimizadas en tiempo real
 
 #### **Optimización de Rutas**:
@@ -2147,7 +2147,7 @@ import Link from 'next/link'
 - **Framework**: Next.js 15 (App Router, Server Components)
 - **Backend**: Server Actions + Supabase (Postgres + RLS)
 - **Frontend**: React 19 + TypeScript + shadcn/ui
-- **GPS**: Navigator API + polling 5s + Leaflet
+- **GPS**: Navigator API + polling 5s + Google Maps JavaScript API
 - **APIs**: 7 endpoints implementados para rutas/GPS/tracking
 
 **Flujo Operativo**:
@@ -2158,13 +2158,33 @@ Optimización ruta (Google/local) → PWA GPS tracking → Entrega + cobro →
 Conciliación automática → Reportes CSV/PDF
 ```
 
-**Actualizado**: 15 de enero de 2025 - Sistema completo y funcional con listas de precios
+**Actualizado**: Diciembre 2025 - Sistema completo con migración a Google Maps y correcciones técnicas
 
 **Últimas actualizaciones:**
-- ✅ Sistema de Listas de Precios implementado (15/01/2025)
+
+- ✅ **Migración de Leaflet a Google Maps en Repartos (Diciembre 2025)**
+  - MonitorMap.tsx y RutaMap.tsx migrados a Google Maps JavaScript API
+  - Mejor calidad visual: mapas satelitales, Street View, mejor precisión
+  - Iconos personalizados SVG para vehículos, alertas y números de orden
+  - Funcionalidades mantenidas: polilíneas, InfoWindows, polling cada 5s
+  - Corrección de bug en GpsTracker.tsx (uso de ref para posición actual)
+  - Verificaciones robustas de carga de Google Maps API
+- ✅ **Sistema de Listas de Precios implementado (15/01/2025)**
   - Listas base (MINORISTA, MAYORISTA, DISTRIBUIDOR) con asignación automática
   - Margen de ganancia configurable por lista
   - Precios manuales y automáticos por producto
   - Integración completa con presupuestos, pedidos y bot WhatsApp
+
+- ✅ **Navegación del Sidebar completada (03/12/2025)**
+  - Agregado "Listas de Precios" al menú Ventas (🏷️)
+  - Agregado "Facturas" al menú Ventas (📄)
+  - Navegación completa para todos los módulos principales
+
+- ✅ **Correcciones técnicas implementadas (03/12/2025)**
+  - Políticas RLS simplificadas para resolver errores de permisos
+  - Compatibilidad Next.js 15: páginas dinámicas con `await params`
+  - Validación de UUID robusta antes de consultas a BD
+  - Manejo de errores mejorado con logging detallado
+  - Campo `codigo` agregado a consultas de clientes para búsqueda por código
 
 *Documento creado siguiendo las REGLAS MAESTRAS v7.0 - Arquitectura completa del Sistema ERP para Avícola del Sur*

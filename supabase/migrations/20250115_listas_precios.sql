@@ -353,28 +353,15 @@ ALTER TABLE precios_productos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE clientes_listas_precios ENABLE ROW LEVEL SECURITY;
 
 -- Políticas para listas_precios
--- Admins ven todas las listas
-CREATE POLICY "Admins pueden ver todas las listas"
+-- Usuarios autenticados con rol admin o vendedor ven las listas
+DROP POLICY IF EXISTS "Usuarios pueden ver listas" ON listas_precios;
+CREATE POLICY "Usuarios pueden ver listas"
 ON listas_precios FOR SELECT
 USING (
     EXISTS (
         SELECT 1 FROM usuarios
         WHERE id = auth.uid()
-        AND rol = 'admin'
-    )
-);
-
--- Vendedores ven listas activas
-DROP POLICY IF EXISTS "Vendedores pueden ver listas activas" ON listas_precios;
-CREATE POLICY "Vendedores pueden ver listas activas"
-ON listas_precios FOR SELECT
-USING (
-    activa = true AND (
-        EXISTS (
-            SELECT 1 FROM usuarios
-            WHERE id = auth.uid()
-            AND rol IN ('admin', 'vendedor')
-        )
+        AND rol IN ('admin', 'vendedor')
     )
 );
 
@@ -391,35 +378,15 @@ USING (
 );
 
 -- Políticas para precios_productos
--- Admins ven todos los precios
-DROP POLICY IF EXISTS "Admins pueden ver todos los precios" ON precios_productos;
-CREATE POLICY "Admins pueden ver todos los precios"
+-- Usuarios autenticados con rol admin o vendedor ven los precios
+DROP POLICY IF EXISTS "Usuarios pueden ver precios" ON precios_productos;
+CREATE POLICY "Usuarios pueden ver precios"
 ON precios_productos FOR SELECT
 USING (
     EXISTS (
         SELECT 1 FROM usuarios
         WHERE id = auth.uid()
-        AND rol = 'admin'
-    )
-);
-
--- Vendedores ven precios de listas activas
-DROP POLICY IF EXISTS "Vendedores pueden ver precios de listas activas" ON precios_productos;
-CREATE POLICY "Vendedores pueden ver precios de listas activas"
-ON precios_productos FOR SELECT
-USING (
-    activo = true AND (
-        EXISTS (
-            SELECT 1 FROM listas_precios lp
-            WHERE lp.id = precios_productos.lista_precio_id
-            AND lp.activa = true
-        ) AND (
-            EXISTS (
-                SELECT 1 FROM usuarios
-                WHERE id = auth.uid()
-                AND rol IN ('admin', 'vendedor')
-            )
-        )
+        AND rol IN ('admin', 'vendedor')
     )
 );
 
@@ -436,35 +403,15 @@ USING (
 );
 
 -- Políticas para clientes_listas_precios
--- Admins ven todas las asignaciones
-DROP POLICY IF EXISTS "Admins pueden ver todas las asignaciones" ON clientes_listas_precios;
-CREATE POLICY "Admins pueden ver todas las asignaciones"
+-- Usuarios autenticados con rol admin o vendedor ven las asignaciones
+DROP POLICY IF EXISTS "Usuarios pueden ver asignaciones" ON clientes_listas_precios;
+CREATE POLICY "Usuarios pueden ver asignaciones"
 ON clientes_listas_precios FOR SELECT
 USING (
     EXISTS (
         SELECT 1 FROM usuarios
         WHERE id = auth.uid()
-        AND rol = 'admin'
-    )
-);
-
--- Vendedores ven asignaciones de clientes activos
-DROP POLICY IF EXISTS "Vendedores pueden ver asignaciones de clientes" ON clientes_listas_precios;
-CREATE POLICY "Vendedores pueden ver asignaciones de clientes"
-ON clientes_listas_precios FOR SELECT
-USING (
-    activa = true AND (
-        EXISTS (
-            SELECT 1 FROM clientes c
-            WHERE c.id = clientes_listas_precios.cliente_id
-            AND c.activo = true
-        ) AND (
-            EXISTS (
-                SELECT 1 FROM usuarios
-                WHERE id = auth.uid()
-                AND rol IN ('admin', 'vendedor')
-            )
-        )
+        AND rol IN ('admin', 'vendedor')
     )
 );
 
