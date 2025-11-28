@@ -7,9 +7,10 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { AlertCircle, Truck, Loader2 } from 'lucide-react'
+import { AlertCircle, Truck, Loader2, RefreshCw, Pause, Play } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 
 interface UbicacionVehiculo {
   vehiculo_id: string
@@ -63,10 +64,12 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [mapsLoaded, setMapsLoaded] = useState(false)
+  const [isPollingPaused, setIsPollingPaused] = useState(false)
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // Cargar ubicaciones y alertas
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const params = new URLSearchParams()
       if (fecha) params.append('fecha', fecha)
@@ -146,6 +149,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
 
       setLoading(false)
       setError(null)
+      setLastUpdate(new Date())
     } catch (err: any) {
       console.error('[MonitorMap] Error al cargar datos del monitor:', err)
       // Solo mostrar error si es un error crítico, no si simplemente no hay datos
@@ -157,22 +161,82 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
       }
       setLoading(false)
     }
-  }
+  }, [zonaId, fecha])
 
-  // Polling cada 5 segundos
+  // Calcular intervalo de polling adaptativo
+  const getPollingInterval = useCallback(() => {
+    // Si no hay vehículos activos, polling más lento (60s)
+    if (ubicaciones.length === 0) {
+      return 60000 // 60 segundos
+    }
+    // Si hay 1-2 vehículos, polling moderado (15s)
+    if (ubicaciones.length <= 2) {
+      return 15000 // 15 segundos
+    }
+    // Si hay 3+ vehículos, polling más frecuente (10s)
+    return 10000 // 10 segundos
+  }, [ubicaciones.length])
+
+  // Polling optimizado con Page Visibility API y adaptativo
   useEffect(() => {
+    // Cargar datos iniciales
     fetchData()
 
-    intervalRef.current = setInterval(() => {
-      fetchData()
-    }, 5000)
+    let currentInterval = getPollingInterval()
+
+    const startPolling = () => {
+      // Limpiar intervalo anterior si existe
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+      }
+
+      currentInterval = getPollingInterval()
+      
+      intervalRef.current = setInterval(() => {
+        // Solo hacer polling si la pestaña está visible y no está pausado
+        if (!isPollingPaused && document.visibilityState === 'visible') {
+          fetchData()
+        }
+      }, currentInterval)
+    }
+
+    startPolling()
+
+    // Manejar cambios de visibilidad de la pestaña
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && !isPollingPaused) {
+        // Cuando vuelve a estar visible, actualizar inmediatamente y reiniciar polling
+        fetchData()
+        startPolling()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    // Reiniciar polling cuando cambia la cantidad de vehículos (ajustar intervalo)
+    const checkInterval = setInterval(() => {
+      const newInterval = getPollingInterval()
+      // Si el intervalo cambió, reiniciar polling
+      if (newInterval !== currentInterval) {
+        startPolling()
+      }
+    }, 5000) // Verificar cada 5 segundos si necesita ajustar
 
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
       }
+      if (checkInterval) {
+        clearInterval(checkInterval)
+      }
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [zonaId, fecha])
+  }, [zonaId, fecha, isPollingPaused, getPollingInterval, fetchData])
+
+  // Función para actualización manual
+  const handleManualRefresh = useCallback(() => {
+    fetchData()
+  }, [fetchData])
 
   // Parsear polyline simple (formato: "lat1,lng1;lat2,lng2;...")
   const parsePolyline = useCallback((polyline: string): GoogleLatLng[] => {
@@ -478,9 +542,58 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
               <Truck className="h-5 w-5" />
               Monitor de Reparto en Tiempo Real
             </CardTitle>
-            <Badge variant={loading ? 'secondary' : 'default'}>
-              {loading ? 'Cargando...' : `${ubicaciones.length} vehículos activos`}
-            </Badge>
+            <div className="flex items-center gap-2">
+              {lastUpdate && !loading && (
+                <Badge variant="outline" className="text-xs">
+                  Actualizado: {lastUpdate.toLocaleTimeString()}
+                </Badge>
+              )}
+              <Badge variant={loading ? 'secondary' : 'default'}>
+                {loading ? 'Cargando...' : `${ubicaciones.length} vehículos activos`}
+              </Badge>
+            </div>
+          </div>
+          <div className="flex items-center justify-between mt-3">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleManualRefresh}
+                disabled={loading}
+                className="h-8"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+                Actualizar ahora
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsPollingPaused(!isPollingPaused)}
+                className="h-8"
+              >
+                {isPollingPaused ? (
+                  <>
+                    <Play className="h-3.5 w-3.5 mr-1.5" />
+                    Reanudar
+                  </>
+                ) : (
+                  <>
+                    <Pause className="h-3.5 w-3.5 mr-1.5" />
+                    Pausar
+                  </>
+                )}
+              </Button>
+            </div>
+            {isPollingPaused && (
+              <Badge variant="secondary" className="text-xs">
+                Polling pausado
+              </Badge>
+            )}
+            {document.visibilityState === 'hidden' && !isPollingPaused && (
+              <Badge variant="secondary" className="text-xs">
+                Pestaña oculta - polling pausado
+              </Badge>
+            )}
           </div>
         </CardHeader>
         <CardContent>

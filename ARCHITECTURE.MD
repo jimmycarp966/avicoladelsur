@@ -101,6 +101,8 @@ PWA Repartidor → navigator.geolocation.watchPosition() → POST /api/reparto/u
 Cada 5s → ubicaciones_repartidores → Alertas automáticas (>200m desvío)
     ↓
 GET /api/reparto/ubicaciones → Monitor Google Maps → Polylíneas + alertas
+    ↓
+Polling optimizado adaptativo (10-60s según vehículos) + Page Visibility API
 ```
 
 ### Flujo F: Optimización de Rutas (Automática) ✅ NUEVO
@@ -1734,6 +1736,9 @@ CREATE POLICY "repartidor_rutas_propias" ON pedidos FOR SELECT USING (
 - ✅ Alertas automáticas: desvío (>200m), cliente saltado (<100m)
 - ✅ Monitor `/reparto/monitor` con mapa Google Maps
 - ✅ Polylíneas de rutas optimizadas en tiempo real
+- ✅ Polling optimizado adaptativo: 10s (3+ vehículos), 15s (1-2 vehículos), 60s (sin vehículos)
+- ✅ Pausa automática cuando pestaña no visible (Page Visibility API)
+- ✅ Actualización manual y control de pausa/reanudación
 
 #### **Optimización de Rutas**:
 - ✅ Google Directions API con `optimize:true`
@@ -2147,7 +2152,7 @@ import Link from 'next/link'
 - **Framework**: Next.js 15 (App Router, Server Components)
 - **Backend**: Server Actions + Supabase (Postgres + RLS)
 - **Frontend**: React 19 + TypeScript + shadcn/ui
-- **GPS**: Navigator API + polling 5s + Google Maps JavaScript API
+- **GPS**: Navigator API + polling 5s (repartidor) + polling optimizado adaptativo 10-60s (monitor) + Google Maps JavaScript API
 - **APIs**: 7 endpoints implementados para rutas/GPS/tracking
 
 **Flujo Operativo**:
@@ -2166,9 +2171,16 @@ Conciliación automática → Reportes CSV/PDF
   - MonitorMap.tsx y RutaMap.tsx migrados a Google Maps JavaScript API
   - Mejor calidad visual: mapas satelitales, Street View, mejor precisión
   - Iconos personalizados SVG para vehículos, alertas y números de orden
-  - Funcionalidades mantenidas: polilíneas, InfoWindows, polling cada 5s
+  - Funcionalidades mantenidas: polilíneas, InfoWindows
   - Corrección de bug en GpsTracker.tsx (uso de ref para posición actual)
   - Verificaciones robustas de carga de Google Maps API
+- ✅ **Optimización de Polling en Monitor GPS (Diciembre 2025)**
+  - Polling adaptativo según cantidad de vehículos: 10s (3+ vehículos), 15s (1-2 vehículos), 60s (sin vehículos)
+  - Pausa automática cuando la pestaña del navegador no está visible (Page Visibility API)
+  - Botón de actualización manual "Actualizar ahora" para refresco inmediato
+  - Control de pausa/reanudación manual del polling
+  - Indicador visual del estado del polling y última actualización
+  - Reducción estimada de requests: ~50-70% menos carga en el servidor
 - ✅ **Sistema de Listas de Precios implementado (15/01/2025)**
   - Listas base (MINORISTA, MAYORISTA, DISTRIBUIDOR) con asignación automática
   - Margen de ganancia configurable por lista

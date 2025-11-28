@@ -181,7 +181,7 @@ scripts/                         # Scripts de automatización
 - **Monitor admin**: Mapa Google Maps con tracking en tiempo real
 
 ### 📍 **GPS Tracking y Alertas**
-- **Polling inteligente**: Cada 5s durante rutas activas
+- **Polling inteligente optimizado**: Adaptativo (10-60s según vehículos), pausa automática cuando pestaña oculta, actualización manual disponible
 - **Alertas automáticas**: Desvío (>200m), cliente saltado (<100m)
 - **Monitor en tiempo real**: `/reparto/monitor` con mapa Google Maps
 - **Visualización de rutas**: Mapas Google Maps con polilíneas optimizadas e historial GPS
@@ -754,7 +754,12 @@ Sistema completo de optimización de rutas y tracking en tiempo real integrado a
 - 📍 **Tracking GPS**: Envío automático de ubicaciones cada 5 segundos desde PWA del repartidor
 - 🚨 **Alertas Automáticas**: Desvío de ruta (>200m) y cliente saltado (<100m sin entregar)
 - 📊 **Monitor Admin**: Visualización en tiempo real de vehículos, rutas y alertas en mapa Google Maps
-- 🔄 **Polling Inteligente**: Actualización automática cada 5 segundos en monitor admin
+- 🔄 **Polling Inteligente Optimizado**: 
+  - Polling adaptativo según cantidad de vehículos activos (10s con 3+ vehículos, 15s con 1-2, 60s sin vehículos)
+  - Pausa automática cuando la pestaña del navegador no está visible (Page Visibility API)
+  - Botón de actualización manual "Actualizar ahora"
+  - Control de pausa/reanudación manual
+  - Indicador visual del estado del polling y última actualización
 - 🕕 **Turnos Automáticos**: Pedidos confirmados antes de las 05:00 → turno mañana del mismo día; entre 05:00-15:00 → turno tarde del mismo día; después de las 15:00 → turno mañana del día siguiente
 - 🚚 **Asignación a Rutas Planificadas**: Cada pedido facturado se ubica en la ruta diaria definida (fecha + zona + turno). Si no hay plan para esa combinación se bloquea la conversión.
 
@@ -803,7 +808,9 @@ Ver la guía completa en [`docs/GOOGLE_MAPS_SETUP.md`](./docs/GOOGLE_MAPS_SETUP.
 **Admin:**
 - `/reparto/monitor` - Monitor en tiempo real con mapa Google Maps
 - Visualiza vehículos activos (marcadores verdes), rutas planificadas (polilíneas verdes) y alertas (marcadores rojos)
-- Actualización automática cada 5 segundos
+- Actualización automática optimizada (polling adaptativo: 10-60s según vehículos activos)
+- Pausa automática cuando la pestaña no está visible
+- Botón de actualización manual y control de pausa/reanudación
 - `/reparto/planificacion` - Define el plan semanal (zona + día + turno + vehículo + repartidor)
 - Controla qué rutas existen cada día y su capacidad disponible (vehículos base: Fiat Fiorino 600 kg, Toyota Hilux 1500 kg, Ford F-4000 4000 kg)
 
@@ -891,7 +898,7 @@ BOTPRESS_WEBHOOK_URL=https://your-botpress-webhook
 ### **Migración de Leaflet a Google Maps en Repartos (Diciembre 2025)**
 - ✅ **MonitorMap.tsx migrado**: Reemplazado Leaflet por Google Maps JavaScript API
 - ✅ **RutaMap.tsx migrado**: Visualización de rutas ahora usa Google Maps con mejor calidad
-- ✅ **Funcionalidades mantenidas**: Marcadores personalizados, polilíneas, InfoWindows, polling cada 5s
+- ✅ **Funcionalidades mantenidas**: Marcadores personalizados, polilíneas, InfoWindows, polling optimizado (adaptativo 10-60s)
 - ✅ **Iconos personalizados**: SVG inline para vehículos (verde), alertas (rojo), números de orden
 - ✅ **Mejor calidad visual**: Mapas satelitales, Street View, mejor precisión de calles
 - ✅ **Consistencia**: Mismo proveedor de mapas en toda la aplicación (Google Maps)
