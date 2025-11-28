@@ -1,6 +1,7 @@
 import { Suspense } from 'react'
 import { NuevoClienteForm } from './cliente-form'
 import { ClienteFormSkeleton } from './cliente-form-skeleton'
+import { createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,7 +10,15 @@ export const metadata = {
   description: 'Crear un nuevo cliente en el sistema',
 }
 
-export default function NuevoClientePage() {
+export default async function NuevoClientePage() {
+  // Obtener zonas activas
+  const supabase = await createClient()
+  const { data: zonas } = await supabase
+    .from('zonas')
+    .select('id, nombre')
+    .eq('activo', true)
+    .order('nombre')
+
   return (
     <div className="space-y-6">
       <div className="relative overflow-hidden rounded-lg bg-gradient-to-br from-primary/5 via-white to-secondary/5 p-6 shadow-sm border border-primary/10">
@@ -21,7 +30,7 @@ export default function NuevoClientePage() {
       </div>
 
       <Suspense fallback={<ClienteFormSkeleton />}>
-        <NuevoClienteForm />
+        <NuevoClienteForm zonas={zonas || []} />
       </Suspense>
     </div>
   )

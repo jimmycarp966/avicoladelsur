@@ -219,7 +219,7 @@ export function ClientesTable({
       columns={columns}
       data={data}
       searchKey={serverPagination ? undefined : "nombre"} // Deshabilitar búsqueda del lado cliente cuando hay server-side
-      searchPlaceholder="Buscar por código, nombre, teléfono..."
+      searchPlaceholder="Buscar por código, nombre, teléfono, WhatsApp, email..."
       actions={actions}
       enableRowSelection={true}
       enableColumnVisibility={true}

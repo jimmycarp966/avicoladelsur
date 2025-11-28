@@ -45,7 +45,8 @@ export const clienteSchema = z.object({
   zona_entrega: z
     .string()
     .max(100, 'La zona de entrega debe tener máximo 100 caracteres')
-    .optional(),
+    .optional()
+    .or(z.literal('')),
 
   coordenadas: z
     .object({

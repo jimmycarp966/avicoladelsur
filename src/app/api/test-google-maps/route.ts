@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     const data = await response.json()
 
     // Información adicional sobre la configuración
-    const scriptUrl = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,maps&loading=async`
+    const scriptUrl = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&v=3.55&loading=async`
 
     if (data.status === 'OK') {
       return NextResponse.json({
@@ -43,7 +43,7 @@ export async function GET(request: Request) {
           apiKeyPrefix: apiKey.substring(0, 10) + '...',
           testResponse: data.status,
           scriptUrl: scriptUrl,
-          configuredLibraries: 'places,maps',
+          configuredLibraries: 'places',
           recommendations: [
             'Si el mapa no carga en el navegador, verifica:',
             '1. Que la API key no tenga restricciones de dominio/IP',

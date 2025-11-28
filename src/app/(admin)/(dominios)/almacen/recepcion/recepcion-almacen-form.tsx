@@ -32,8 +32,8 @@ export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores
   
   // Filtros de búsqueda
   const [busquedaProducto, setBusquedaProducto] = useState('')
-  const [filtroCategoria, setFiltroCategoria] = useState<string>('')
-  const [filtroProveedor, setFiltroProveedor] = useState<string>('')
+  const [filtroCategoria, setFiltroCategoria] = useState<string>('all')
+  const [filtroProveedor, setFiltroProveedor] = useState<string>('all')
 
   // Filtrar productos por búsqueda, categoría y proveedor
   const productosFiltrados = useMemo(() => {
@@ -49,12 +49,12 @@ export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores
     }
 
     // Filtro por categoría
-    if (filtroCategoria) {
+    if (filtroCategoria && filtroCategoria !== 'all') {
       filtrados = filtrados.filter(p => p.categoria === filtroCategoria)
     }
 
     // Filtro por proveedor (a través de lotes)
-    if (filtroProveedor) {
+    if (filtroProveedor && filtroProveedor !== 'all') {
       const productosConProveedor = lotes
         .filter(l => l.proveedor === filtroProveedor)
         .map(l => l.producto_id)
@@ -200,12 +200,12 @@ export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="filtro-categoria">Filtrar por Categoría</Label>
-                    <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
+                    <Select value={filtroCategoria || 'all'} onValueChange={setFiltroCategoria}>
                       <SelectTrigger id="filtro-categoria">
                         <SelectValue placeholder="Todas las categorías" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todas las categorías</SelectItem>
+                        <SelectItem value="all">Todas las categorías</SelectItem>
                         {categorias.map(cat => (
                           <SelectItem key={cat} value={cat}>
                             {cat}
@@ -216,12 +216,12 @@ export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="filtro-proveedor">Filtrar por Proveedor</Label>
-                    <Select value={filtroProveedor} onValueChange={setFiltroProveedor}>
+                    <Select value={filtroProveedor || 'all'} onValueChange={setFiltroProveedor}>
                       <SelectTrigger id="filtro-proveedor">
                         <SelectValue placeholder="Todos los proveedores" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todos los proveedores</SelectItem>
+                        <SelectItem value="all">Todos los proveedores</SelectItem>
                         {proveedores.map(prov => (
                           <SelectItem key={prov} value={prov}>
                             {prov}
@@ -427,12 +427,12 @@ export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="filtro-categoria-egreso">Filtrar por Categoría</Label>
-                    <Select value={filtroCategoria} onValueChange={setFiltroCategoria}>
+                    <Select value={filtroCategoria || 'all'} onValueChange={setFiltroCategoria}>
                       <SelectTrigger id="filtro-categoria-egreso">
                         <SelectValue placeholder="Todas las categorías" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todas las categorías</SelectItem>
+                        <SelectItem value="all">Todas las categorías</SelectItem>
                         {categorias.map(cat => (
                           <SelectItem key={cat} value={cat}>
                             {cat}
@@ -443,12 +443,12 @@ export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="filtro-proveedor-egreso">Filtrar por Proveedor</Label>
-                    <Select value={filtroProveedor} onValueChange={setFiltroProveedor}>
+                    <Select value={filtroProveedor || 'all'} onValueChange={setFiltroProveedor}>
                       <SelectTrigger id="filtro-proveedor-egreso">
                         <SelectValue placeholder="Todos los proveedores" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todos los proveedores</SelectItem>
+                        <SelectItem value="all">Todos los proveedores</SelectItem>
                         {proveedores.map(prov => (
                           <SelectItem key={prov} value={prov}>
                             {prov}

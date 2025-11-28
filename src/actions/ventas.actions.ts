@@ -332,7 +332,23 @@ export async function obtenerClientes(
 
     if (filtros?.search) {
       console.log('[obtenerClientes] Aplicando filtro de búsqueda:', filtros.search)
-      query = query.or(`codigo.ilike.%${filtros.search}%,nombre.ilike.%${filtros.search}%,telefono.ilike.%${filtros.search}%`)
+
+      // Dividir la búsqueda en palabras individuales para búsqueda más flexible
+      const searchTerms = filtros.search.trim().split(/\s+/).filter(term => term.length > 0)
+
+      if (searchTerms.length > 0) {
+        // Crear condiciones OR para cada campo y cada término de búsqueda
+        const orConditions = searchTerms.flatMap(term => [
+          `codigo.ilike.%${term}%`,
+          `nombre.ilike.%${term}%`,
+          `telefono.ilike.%${term}%`,
+          `whatsapp.ilike.%${term}%`,
+          `email.ilike.%${term}%`
+        ])
+
+        // Combinar todas las condiciones con OR
+        query = query.or(orConditions.join(','))
+      }
     }
 
     if (filtros?.zona_entrega) {
@@ -1159,3 +1175,4 @@ export async function obtenerPedidoPorId(pedidoId: string): Promise<ApiResponse<
     }
   }
 }
+

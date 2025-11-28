@@ -2,6 +2,10 @@
 
 import { ClienteForm } from '@/components/forms/ClienteForm'
 
-export function NuevoClienteForm() {
-  return <ClienteForm onSuccess={() => window.location.href = '/ventas/clientes'} />
+interface NuevoClienteFormProps {
+  zonas: Array<{ id: string; nombre: string }>
+}
+
+export function NuevoClienteForm({ zonas }: NuevoClienteFormProps) {
+  return <ClienteForm zonas={zonas} onSuccess={() => window.location.href = '/ventas/clientes'} />
 }

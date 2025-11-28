@@ -14,8 +14,8 @@ export function GoogleMapsScript() {
 
   return (
     <Script
-      src={`https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,maps&loading=async`}
-      strategy="afterInteractive"
+      src={`https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&v=3.55&loading=async`}
+      strategy="beforeInteractive"
       onLoad={() => {
         console.log('✅ Google Maps API script loaded successfully')
         console.log('Available APIs:', {

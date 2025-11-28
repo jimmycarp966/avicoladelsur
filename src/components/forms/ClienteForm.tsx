@@ -17,11 +17,11 @@ import { GoogleMapSelector } from '@/components/ui/google-map-selector'
 import Link from 'next/link'
 import { clienteSchema, type ClienteFormData } from '@/lib/schemas/clientes.schema'
 import { useNotificationStore } from '@/store/notificationStore'
-import { 
-  obtenerListasClienteAction, 
+import {
+  obtenerListasClienteAction,
   obtenerListasPreciosAction,
   asignarListaClienteAction,
-  desasignarListaClienteAction 
+  desasignarListaClienteAction
 } from '@/actions/listas-precios.actions'
 
 interface ClienteFormProps {
@@ -39,10 +39,11 @@ interface ClienteFormProps {
     limite_credito: number
     activo: boolean
   }
+  zonas?: Array<{ id: string; nombre: string }>
   onSuccess?: () => void
 }
 
-export function ClienteForm({ cliente, onSuccess }: ClienteFormProps) {
+export function ClienteForm({ cliente, zonas = [], onSuccess }: ClienteFormProps) {
   const router = useRouter()
   const { showToast } = useNotificationStore()
   const [isLoading, setIsLoading] = useState(false)
@@ -345,15 +346,25 @@ export function ClienteForm({ cliente, onSuccess }: ClienteFormProps) {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="zona_entrega">Zona de Entrega</Label>
-            <Input
-              id="zona_entrega"
-              placeholder="Ej: Centro, Norte, Sur, etc."
-              {...register('zona_entrega')}
-              disabled={isLoading}
-            />
+            <Select value={watch('zona_entrega') || 'none'} onValueChange={(value) => setValue('zona_entrega', value === 'none' ? '' : value)}>
+              <SelectTrigger disabled={isLoading}>
+                <SelectValue placeholder="Seleccionar zona..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Sin zona asignada</SelectItem>
+                {zonas.map((zona) => (
+                  <SelectItem key={zona.id} value={zona.nombre}>
+                    {zona.nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {errors.zona_entrega && (
               <p className="text-sm text-destructive">{errors.zona_entrega.message}</p>
             )}
+            <p className="text-xs text-muted-foreground">
+              Selecciona la zona de entrega del cliente para optimización de rutas
+            </p>
           </div>
 
           {/* Mapa de Google Maps */}

@@ -18,15 +18,17 @@ interface EditarClienteFormProps {
     limite_credito: number
     activo: boolean
   }
+  zonas: Array<{ id: string; nombre: string }>
 }
 
-export function EditarClienteForm({ cliente }: EditarClienteFormProps) {
+export function EditarClienteForm({ cliente, zonas }: EditarClienteFormProps) {
   const router = useRouter()
-  
+
   return (
-    <ClienteForm 
-      cliente={cliente} 
-      onSuccess={() => router.push('/ventas/clientes')} 
+    <ClienteForm
+      cliente={cliente}
+      zonas={zonas}
+      onSuccess={() => router.push('/ventas/clientes')}
     />
   )
 }

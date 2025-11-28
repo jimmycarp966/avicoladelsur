@@ -120,8 +120,8 @@ export function ReportesRRHHForm() {
     mes: new Date().getMonth() + 1,
     anio: new Date().getFullYear(),
     sucursal_id: '',
-    empleado_id: '',
-    estado: '',
+    empleado_id: 'all',
+    estado: 'all',
     formato: 'excel' as 'excel' | 'pdf',
   })
 
@@ -157,10 +157,10 @@ export function ReportesRRHHForm() {
       if (selectedConfig?.fields.sucursal && formData.sucursal_id) {
         params.append('sucursal_id', formData.sucursal_id)
       }
-      if (selectedConfig?.fields.empleado && formData.empleado_id) {
+      if (selectedConfig?.fields.empleado && formData.empleado_id && formData.empleado_id !== 'all') {
         params.append('empleado_id', formData.empleado_id)
       }
-      if (selectedConfig?.fields.estado && formData.estado) {
+      if (selectedConfig?.fields.estado && formData.estado && formData.estado !== 'all') {
         params.append('estado', formData.estado)
       }
 
@@ -383,14 +383,14 @@ export function ReportesRRHHForm() {
                       <div className="space-y-2 md:col-span-2">
                         <Label htmlFor="empleado_id">Empleado (opcional)</Label>
                         <Select
-                          value={formData.empleado_id}
+                          value={formData.empleado_id || 'all'}
                           onValueChange={(value) => setFormData(prev => ({ ...prev, empleado_id: value }))}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Todos los empleados" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">Todos los empleados</SelectItem>
+                            <SelectItem value="all">Todos los empleados</SelectItem>
                             {/* Aquí se cargarían los empleados dinámicamente */}
                           </SelectContent>
                         </Select>
@@ -402,14 +402,14 @@ export function ReportesRRHHForm() {
                       <div className="space-y-2">
                         <Label htmlFor="estado">Estado</Label>
                         <Select
-                          value={formData.estado}
+                          value={formData.estado || 'all'}
                           onValueChange={(value) => setFormData(prev => ({ ...prev, estado: value }))}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Todos los estados" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">Todos los estados</SelectItem>
+                            <SelectItem value="all">Todos los estados</SelectItem>
                             {selectedReport === 'liquidaciones' && (
                               <>
                                 <SelectItem value="borrador">Borrador</SelectItem>

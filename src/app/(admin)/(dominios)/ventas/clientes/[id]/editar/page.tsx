@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { obtenerClientePorId } from '@/actions/ventas.actions'
 import { EditarClienteForm } from './editar-cliente-form'
 import { ClienteFormSkeleton } from '@/app/(admin)/(dominios)/ventas/clientes/nuevo/cliente-form-skeleton'
+import { createClient } from '@/lib/supabase/server'
 
 interface EditarClientePageProps {
   params: {
@@ -20,6 +21,14 @@ export const metadata = {
 export default async function EditarClientePage({ params }: EditarClientePageProps) {
   const { id } = await params
   const clienteId = id
+
+  // Obtener zonas activas
+  const supabase = await createClient()
+  const { data: zonas } = await supabase
+    .from('zonas')
+    .select('id, nombre')
+    .eq('activo', true)
+    .order('nombre')
 
   // Cargar datos reales del cliente
   const clienteResult = await obtenerClientePorId(clienteId)
@@ -55,7 +64,7 @@ export default async function EditarClientePage({ params }: EditarClientePagePro
       </div>
 
       <Suspense fallback={<ClienteFormSkeleton />}>
-        <EditarClienteForm cliente={cliente} />
+        <EditarClienteForm cliente={cliente} zonas={zonas || []} />
       </Suspense>
     </div>
   )
