@@ -4,13 +4,31 @@ import Script from 'next/script'
 export function GoogleMapsScript() {
   // Solo cargar el script si tenemos la API key
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+  const isDevelopment = process.env.NODE_ENV === 'development'
 
   if (!apiKey) {
-    console.warn('Google Maps API key not configured')
+    const errorMsg = isDevelopment
+      ? '⚠️ Google Maps API key not configured in .env.local'
+      : '⚠️ Google Maps API key not configured in Vercel environment variables'
+
+    console.error('❌ GOOGLE MAPS NOT LOADED:', errorMsg)
+    console.error('📝 To fix this:')
+    if (isDevelopment) {
+      console.error('   1. Create .env.local file in project root')
+      console.error('   2. Add: NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your-api-key')
+      console.error('   3. Restart dev server')
+    } else {
+      console.error('   1. Go to Vercel Dashboard → Your Project → Settings')
+      console.error('   2. Navigate to Environment Variables')
+      console.error('   3. Add: NEXT_PUBLIC_GOOGLE_MAPS_API_KEY = your-api-key')
+      console.error('   4. Redeploy the project')
+      console.error('   5. Ensure API key allows requests from your Vercel domain')
+    }
     return null
   }
 
-  console.log('Loading Google Maps script with API key:', apiKey.substring(0, 10) + '...')
+  console.log(`🗺️ Loading Google Maps script [${isDevelopment ? 'DEV' : 'PROD'}] with API key:`, apiKey.substring(0, 10) + '...')
+
 
   return (
     <Script
