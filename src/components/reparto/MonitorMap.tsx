@@ -358,7 +358,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
                 <span class="font-bold text-lg" style="color: ${ruta.color}">#${cliente.orden}</span>
                 <div>
                   <p class="font-bold text-sm">${cliente.cliente_nombre}</p>
-                  <p class="text-xs text-gray-500">${cliente.estado.toUpperCase()}</p>
+                  <p class="text-xs text-gray-500">${(cliente.estado || 'pendiente').toUpperCase()}</p>
                 </div>
               </div>
               <p class="text-xs mb-1">📍 ${cliente.direccion}</p>
