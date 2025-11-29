@@ -7,7 +7,7 @@ async function checkProducts() {
     const productCodes = ['55', '148', '149', '150', '151', '152', '153', '204', '205', '227', '471'];
 
     console.log('🔍 Buscando productos con códigos:', productCodes.join(', '));
-    console.log('---');
+    console.log('---')
 
     const { data: products, error } = await supabase
       .from('productos')

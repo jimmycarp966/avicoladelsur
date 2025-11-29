@@ -184,8 +184,12 @@ scripts/                         # Scripts de automatización
 ### 📍 **GPS Tracking y Alertas**
 - **Polling inteligente optimizado**: Adaptativo (10-60s según vehículos), pausa automática cuando pestaña oculta, actualización manual disponible
 - **Alertas automáticas**: Desvío (>200m), cliente saltado (<100m)
-- **Monitor en tiempo real**: `/reparto/monitor` con mapa Google Maps
-- **Visualización de rutas**: Mapas Google Maps con polilíneas optimizadas e historial GPS
+- **Monitor en tiempo real**: `/reparto/monitor` con mapa Google Maps mejorado
+- **Visualización Avanzada**: 
+  - 🎨 **Rutas por color**: Cada ruta con color distintivo (polyline + vehículo + clientes)
+  - 📍 **Marcadores de estado**: Clientes pendientes, entregados y con problemas
+  - 📊 **Panel lateral**: Estadísticas en tiempo real y progreso por ruta
+  - 🚚 **Info detallada**: Vehículos con animación y datos completos
 - **Historial completo**: Rutas_planificadas con orden visita y tiempos
 - **Trazabilidad total**: Desde ubicación hasta entrega confirmada
 

@@ -14,11 +14,30 @@ export default function GenerarRutasMockButton() {
   async function handleGenerarRutas() {
     setLoading(true)
     try {
+      // Primero limpiar datos mock anteriores
+      toast.info('Limpiando datos mock anteriores...')
+      const cleanRes = await fetch('/api/reparto/limpiar-mock', {
+        method: 'DELETE'
+      })
+
+      if (cleanRes.ok) {
+        const cleanData = await cleanRes.json()
+        if (cleanData.success) {
+          const totalEliminados = Object.values(cleanData.data as Record<string, number>).reduce((a: number, b: number) => a + b, 0)
+          toast.success(`${totalEliminados} registros anteriores eliminados`)
+        }
+      }
+
+      // Esperar un momento para que se procesen las eliminaciones
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      // Generar nuevas rutas mock
+      toast.info('Generando nuevas rutas mock...')
       const result = await crearRutasMockMonteros(2, 7)
-      
+
       if (result.success) {
         toast.success(result.message || 'Rutas mock generadas exitosamente')
-        
+
         // Esperar un momento antes de refrescar para que se completen las inserciones
         setTimeout(() => {
           router.refresh()
@@ -34,8 +53,8 @@ export default function GenerarRutasMockButton() {
   }
 
   return (
-    <Button 
-      onClick={handleGenerarRutas} 
+    <Button
+      onClick={handleGenerarRutas}
       disabled={loading}
       className="gap-2"
     >

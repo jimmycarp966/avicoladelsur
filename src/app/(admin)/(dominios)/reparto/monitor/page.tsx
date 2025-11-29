@@ -23,17 +23,9 @@ export default function MonitorRepartoPage() {
         <GenerarRutasMockButton />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Mapa de Monitoreo</CardTitle>
-          <CardDescription>
-            Si no ves rutas, haz clic en "Generar Rutas Mock" para crear datos de ejemplo en Monteros, Tucumán
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <MonitorMap />
-        </CardContent>
-      </Card>
+      <div className="h-[calc(100vh-140px)]">
+        <MonitorMap />
+      </div>
     </div>
   )
 }

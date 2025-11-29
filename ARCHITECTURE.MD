@@ -176,7 +176,11 @@ Conciliación automática → Reportes CSV/PDF → Cierres de caja
 - **Optimización de Rutas**: Google Directions API + fallback local (Nearest Neighbor + 2-opt)
 - **GPS Tracking**: PWA con ubicación cada 5s durante reparto activo
 - **Alertas Automáticas**: Desvío (>200m) y cliente saltado (<100m sin entrega)
-- **Monitor Admin**: Mapa Google Maps en tiempo real con polylíneas y alertas
+- **Monitor Admin**: Mapa Google Maps en tiempo real con:
+  - Rutas codificadas por color para fácil identificación
+  - Marcadores de clientes con estado (pendiente/entregado)
+  - Panel lateral con progreso y estadísticas
+  - Animaciones suaves de movimiento de vehículos
 - **PWA Móvil Completa**: Dashboard, entregas, cobros, firma digital, QR verificación
 - **Gestión de Vehículos**: Flota con mantenimientos y seguros
 - **Control de Repartidores**: Usuarios con roles específicos y vehículo asignado
