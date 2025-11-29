@@ -188,7 +188,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
                 ordenVisita: ordenVisita,
                 color: color,
                 progreso: { completadas, total },
-                estado: completadas === total ? 'completada' : 'en_curso' // Simplificado
+                estado: completadas === total ? 'completada' : 'en_curso'
               })
             }
           }
@@ -443,128 +443,126 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
       infoWindowsRef.current.set(`vehiculo-${ubicacion.vehiculo_id}`, infoWindow)
     })
 
-    // Ajustar vista si es la primera carga o si hay selección
-    if (hasPoints && !selectedRutaId) {
-      // Solo ajustar bounds si no hay una ruta seleccionada específicamente
-      // para evitar saltos molestos al refrescar
-      // mapInstanceRef.current.fitBounds(bounds)
+    // Ajustar vista si hay puntos
+    if (hasPoints && !mapInstanceRef.current.getBounds()?.equals(bounds)) {
+      mapInstanceRef.current.fitBounds(bounds)
     }
-
   }, [rutas, ubicaciones, selectedRutaId, createClientIcon, createTruckIcon])
 
-  // Efecto para cargar Google Maps
+  // Efecto para inicializar mapa
   useEffect(() => {
-    const checkGoogle = setInterval(() => {
-      if (window.google && window.google.maps) {
-        setMapsLoaded(true)
-        initializeMap()
-        clearInterval(checkGoogle)
-      }
-    }, 500)
-    return () => clearInterval(checkGoogle)
-  }, [initializeMap])
+    if (window.google && !mapsLoaded) {
+      initializeMap()
+      setMapsLoaded(true)
+    }
+  }, [initializeMap, mapsLoaded])
 
-  // Efecto para actualizar mapa cuando cambian datos
+  // Efecto para actualizar elementos
   useEffect(() => {
     if (mapsLoaded) {
       updateMapElements()
     }
   }, [mapsLoaded, updateMapElements])
 
-  // Efecto para centrar en ruta seleccionada
+  // Efecto para visibilidad de página
   useEffect(() => {
-    if (selectedRutaId && mapInstanceRef.current && rutas.has(selectedRutaId)) {
-      const ruta = rutas.get(selectedRutaId)
-      if (ruta && ruta.polyline && window.google) {
-        const path = window.google.maps.geometry.encoding.decodePath(ruta.polyline)
-        const bounds = new window.google.maps.LatLngBounds()
-        path.forEach((p: any) => bounds.extend(p))
-        mapInstanceRef.current.fitBounds(bounds)
-      }
+    const handleVisibilityChange = () => {
+      setIsPageHidden(document.hidden)
     }
-  }, [selectedRutaId, rutas])
-
-  const handleRutaClick = (rutaId: string) => {
-    setSelectedRutaId(rutaId === selectedRutaId ? undefined : rutaId)
-  }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [])
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4 h-[calc(100vh-140px)]">
-      {/* Sidebar - Desktop: Left, Mobile: Top (collapsible maybe, but for now stacked) */}
-      <div className="w-full lg:w-80 flex-shrink-0 h-48 lg:h-full">
-        <RutasSidebar
-          rutas={Array.from(rutas.values())}
-          onRutaClick={handleRutaClick}
-          selectedRutaId={selectedRutaId}
-        />
-      </div>
+    <div className="flex h-full w-full gap-4">
+      {/* Sidebar de Rutas */}
+      <RutasSidebar
+        rutas={Array.from(rutas.values())}
+        selectedRutaId={selectedRutaId}
+        onSelectRuta={setSelectedRutaId}
+        loading={loading}
+      />
 
-      {/* Map Container */}
+      {/* Mapa */}
       <div className="flex-1 relative rounded-xl overflow-hidden border shadow-sm">
-        {/* Header Flotante */}
-        <div className="absolute top-4 left-4 right-14 z-10 flex gap-2 overflow-x-auto pb-2 pointer-events-none">
-          <div className="pointer-events-auto flex gap-2">
-            <Card className="h-10 flex items-center px-3 shadow-lg bg-background/90 backdrop-blur">
-              <div className="flex items-center gap-2">
-                <Truck className="h-4 w-4 text-primary" />
-                <span className="font-bold text-sm">{ubicaciones.length}</span>
-                <span className="text-xs text-muted-foreground hidden sm:inline">vehículos</span>
-              </div>
-            </Card>
-
-            <Button
-              size="sm"
-              variant="secondary"
-              className="h-10 shadow-lg pointer-events-auto"
-              onClick={() => setIsPollingPaused(!isPollingPaused)}
-            >
-              {isPollingPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
-            </Button>
-
-            <Button
-              size="sm"
-              variant="secondary"
-              className="h-10 shadow-lg pointer-events-auto"
-              onClick={() => fetchData()}
-              disabled={loading}
-            >
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            </Button>
-          </div>
-        </div>
+        <div ref={mapRef} className="h-full w-full bg-gray-100" />
 
         {/* Loading Overlay */}
-        {(!mapsLoaded || (loading && ubicaciones.length === 0)) && (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-            <div className="flex flex-col items-center gap-3">
+        {loading && !rutas.size && (
+          <div className="absolute inset-0 bg-white/80 flex items-center justify-center z-50">
+            <div className="flex flex-col items-center gap-2">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="font-medium text-muted-foreground">
-                {!mapsLoaded ? 'Cargando Google Maps...' : 'Sincronizando flota...'}
-              </p>
+              <p className="text-sm text-gray-500">Cargando mapa...</p>
             </div>
           </div>
         )}
 
         {/* Error Overlay */}
         {error && (
-          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-20 max-w-md w-full px-4">
-            <div className="bg-destructive/10 border border-destructive/20 text-destructive p-4 rounded-lg shadow-lg backdrop-blur-md flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-semibold">Error de conexión</p>
-                <p className="text-sm opacity-90">{error}</p>
-                {googleMapsApiKeyMissing && (
-                  <p className="text-xs mt-2 bg-background/50 p-2 rounded">
-                    Falta configurar NEXT_PUBLIC_GOOGLE_MAPS_API_KEY en Vercel
-                  </p>
-                )}
-              </div>
+          <div className="absolute top-4 left-4 right-4 z-50">
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-2 shadow-lg">
+              <AlertCircle className="h-5 w-5" />
+              <p>{error}</p>
+              {googleMapsApiKeyMissing && (
+                <Button variant="outline" size="sm" className="ml-auto" onClick={() => window.location.reload()}>
+                  Reintentar
+                </Button>
+              )}
             </div>
           </div>
         )}
 
-        {/* Map Div */}
-        <div ref={mapRef} className="w-full h-full bg-muted/20" />
+        {/* Controls Overlay */}
+        <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
+          <Button
+            variant="secondary"
+            size="icon"
+            className="bg-white shadow-md hover:bg-gray-50"
+            onClick={() => setIsPollingPaused(!isPollingPaused)}
+            title={isPollingPaused ? "Reanudar actualización" : "Pausar actualización"}
+          >
+            {isPollingPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+          </Button>
+
+          <Button
+            variant="secondary"
+            size="icon"
+            className="bg-white shadow-md hover:bg-gray-50"
+            onClick={() => fetchData()}
+            title="Actualizar ahora"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
+
+        {/* Status Bar */}
+        <div className="absolute bottom-4 left-4 right-4 z-10">
+          <div className="bg-white/90 backdrop-blur shadow-lg rounded-lg p-2 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-4">
+              <span className="flex items-center gap-1">
+                <Truck className="h-3 w-3" />
+                {ubicaciones.length} Vehículos
+              </span>
+              <span className="flex items-center gap-1">
+                <Navigation className="h-3 w-3" />
+                {rutas.size} Rutas
+              </span>
+              {alertas.length > 0 && (
+                <span className="flex items-center gap-1 text-red-600 font-medium">
+                  <AlertCircle className="h-3 w-3" />
+                  {alertas.length} Alertas
+                </span>
+              )}
+            </div>
+            <div className="text-gray-500">
+              {isPollingPaused ? (
+                <span className="text-amber-600 font-medium">Pausado</span>
+              ) : (
+                <span>Actualizado: {lastUpdate ? lastUpdate.toLocaleTimeString() : '-'}</span>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )
