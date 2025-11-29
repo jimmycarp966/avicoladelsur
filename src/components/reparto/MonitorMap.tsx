@@ -66,6 +66,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
   const [mapsLoaded, setMapsLoaded] = useState(false)
   const [isPollingPaused, setIsPollingPaused] = useState(false)
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+  const [isPageHidden, setIsPageHidden] = useState(false)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // Cargar ubicaciones y alertas
@@ -111,8 +112,10 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
 
       if (ubicacionesData.success) {
         setUbicaciones(ubicacionesData.data || [])
+        console.log('[MonitorMap] Ubicaciones recibidas:', ubicacionesData.data?.length || 0)
       } else {
         setUbicaciones([])
+        console.warn('[MonitorMap] No se pudieron cargar ubicaciones:', ubicacionesData.error)
       }
 
       if (alertasData.success) {
@@ -127,6 +130,31 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
           ?.filter((u: UbicacionVehiculo) => u.ruta_activa_id)
           .map((u: UbicacionVehiculo) => u.ruta_activa_id)
       )
+      
+      console.log('[MonitorMap] Rutas activas desde ubicaciones:', rutasActivas.size)
+      
+      // Si no hay rutas activas desde ubicaciones, cargar rutas planificadas directamente
+      if (rutasActivas.size === 0) {
+        try {
+          const fechaParam = fecha || new Date().toISOString().split('T')[0]
+          const rutasRes = await fetch(`/api/reparto/rutas-activas?fecha=${fechaParam}${zonaId ? `&zona_id=${zonaId}` : ''}`)
+          if (rutasRes.ok) {
+            const rutasData = await rutasRes.json()
+            if (rutasData.success && rutasData.data && Array.isArray(rutasData.data)) {
+              rutasData.data.forEach((ruta: any) => {
+                if (ruta.id) {
+                  rutasActivas.add(ruta.id)
+                }
+              })
+              console.log('[MonitorMap] Rutas activas cargadas desde endpoint alternativo:', rutasActivas.size, rutasData.data)
+            }
+          } else {
+            console.warn('[MonitorMap] Error al cargar rutas activas:', rutasRes.status, rutasRes.statusText)
+          }
+        } catch (err) {
+          console.warn('[MonitorMap] Error al cargar rutas activas alternativas:', err)
+        }
+      }
 
       const rutasMap = new Map()
       for (const rutaId of rutasActivas) {
@@ -139,12 +167,19 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
                 polyline: rutaData.data.polyline,
                 ordenVisita: rutaData.data.ordenVisita || []
               })
+              console.log(`[MonitorMap] Ruta ${rutaId} cargada con polyline`)
+            } else {
+              console.warn(`[MonitorMap] Ruta ${rutaId} sin polyline:`, rutaData)
             }
+          } else {
+            console.warn(`[MonitorMap] Error al cargar ruta ${rutaId}:`, rutaRes.status)
           }
         } catch (err) {
-          console.error(`Error al cargar ruta ${rutaId}:`, err)
+          console.error(`[MonitorMap] Error al cargar ruta ${rutaId}:`, err)
         }
       }
+      
+      console.log('[MonitorMap] Total rutas con polyline:', rutasMap.size)
       setRutas(rutasMap)
 
       setLoading(false)
@@ -177,6 +212,22 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
     return 10000 // 10 segundos
   }, [ubicaciones.length])
 
+  // Rastrear estado de visibilidad de la página
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return
+
+    const handleVisibilityChange = () => {
+      setIsPageHidden(document.visibilityState === 'hidden')
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    setIsPageHidden(document.visibilityState === 'hidden')
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [])
+
   // Polling optimizado con Page Visibility API y adaptativo
   useEffect(() => {
     // Cargar datos iniciales
@@ -194,7 +245,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
       
       intervalRef.current = setInterval(() => {
         // Solo hacer polling si la pestaña está visible y no está pausado
-        if (!isPollingPaused && document.visibilityState === 'visible') {
+        if (!isPollingPaused && typeof document !== 'undefined' && document.visibilityState === 'visible') {
           fetchData()
         }
       }, currentInterval)
@@ -204,14 +255,16 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
 
     // Manejar cambios de visibilidad de la pestaña
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && !isPollingPaused) {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible' && !isPollingPaused) {
         // Cuando vuelve a estar visible, actualizar inmediatamente y reiniciar polling
         fetchData()
         startPolling()
       }
     }
 
-    document.addEventListener('visibilitychange', handleVisibilityChange)
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange)
+    }
 
     // Reiniciar polling cuando cambia la cantidad de vehículos (ajustar intervalo)
     const checkInterval = setInterval(() => {
@@ -589,7 +642,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
                 Polling pausado
               </Badge>
             )}
-            {document.visibilityState === 'hidden' && !isPollingPaused && (
+            {isPageHidden && !isPollingPaused && (
               <Badge variant="secondary" className="text-xs">
                 Pestaña oculta - polling pausado
               </Badge>

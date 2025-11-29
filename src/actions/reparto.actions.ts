@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { generateRutaOptimizada } from '@/lib/services/ruta-optimizer'
 import { getNowArgentina, getTodayArgentina } from '@/lib/utils'
+import { optimizeRouteLocal, generateSimplePolyline, haversineDistance } from '@/lib/rutas/local-optimizer'
+import { config } from '@/lib/config'
 import type {
   CrearVehiculoParams,
   ChecklistVehiculoParams,
@@ -1489,6 +1491,585 @@ export async function asignarPedidoARutaDesdeAlmacen(
     return {
       success: false,
       error: error.message || 'Error al asignar pedido a ruta',
+    }
+  }
+}
+
+// Crear rutas mock para Monteros, Tucumán
+export async function crearRutasMockMonteros(
+  cantidadRutas: number = 2,
+  clientesPorRuta: number = 7
+): Promise<ApiResponse<{ rutasCreadas: string[] }>> {
+  try {
+    const supabase = await createClient()
+
+    // Verificar que el usuario sea admin
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, error: 'Usuario no autenticado' }
+    }
+
+    const { data: usuario } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (!usuario || usuario.rol !== 'admin') {
+      return { success: false, error: 'Solo los administradores pueden crear rutas mock' }
+    }
+
+    // Crear o obtener vehículos mock
+    let { data: vehiculos } = await supabase
+      .from('vehiculos')
+      .select('id, patente')
+      .eq('activo', true)
+      .limit(cantidadRutas)
+
+    if (!vehiculos || vehiculos.length === 0) {
+      // Crear vehículo mock
+      const { data: vehiculoMock, error: vehiculoError } = await supabase
+        .from('vehiculos')
+        .insert({
+          patente: `MOCK-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+          marca: 'Toyota',
+          modelo: 'Hilux',
+          capacidad_kg: 1500,
+          tipo_vehiculo: 'camioneta',
+          seguro_vigente: true,
+          activo: true,
+        })
+        .select('id, patente')
+        .single()
+
+      if (vehiculoError || !vehiculoMock) {
+        return { success: false, error: 'Error al crear vehículo mock: ' + (vehiculoError?.message || 'Desconocido') }
+      }
+
+      vehiculos = [vehiculoMock]
+    }
+
+    // Crear o obtener repartidores mock
+    let { data: repartidores } = await supabase
+      .from('usuarios')
+      .select('id, nombre, apellido')
+      .eq('rol', 'repartidor')
+      .eq('activo', true)
+      .limit(cantidadRutas)
+
+    if (!repartidores || repartidores.length === 0) {
+      // Crear repartidor mock directamente en la tabla usuarios
+      // Nota: Este usuario no tendrá autenticación, solo se usa para datos mock
+      const nombresRepartidores = ['Carlos', 'Juan', 'Pedro', 'Luis', 'Miguel']
+      const apellidosRepartidores = ['García', 'Rodríguez', 'Martínez', 'López', 'González']
+      
+      const nombre = nombresRepartidores[Math.floor(Math.random() * nombresRepartidores.length)]
+      const apellido = apellidosRepartidores[Math.floor(Math.random() * apellidosRepartidores.length)]
+      const emailMock = `repartidor.mock.${Date.now()}@avicoladelsur.com`
+
+      const { data: repartidorMock, error: repartidorError } = await supabase
+        .from('usuarios')
+        .insert({
+          email: emailMock,
+          nombre,
+          apellido,
+          rol: 'repartidor',
+          vehiculo_asignado: vehiculos[0].id,
+          activo: true,
+        })
+        .select('id, nombre, apellido')
+        .single()
+
+      if (repartidorError || !repartidorMock) {
+        return { success: false, error: 'Error al crear repartidor mock: ' + (repartidorError?.message || 'Desconocido') }
+      }
+
+      repartidores = [repartidorMock]
+    }
+
+    // Crear o obtener zona de Monteros
+    let { data: zonas } = await supabase
+      .from('zonas')
+      .select('id, nombre')
+      .ilike('nombre', '%monteros%')
+      .eq('activo', true)
+      .limit(1)
+
+    let zonaId: string | null = null
+
+    if (zonas && zonas.length > 0) {
+      zonaId = zonas[0].id
+    } else {
+      // Crear zona mock de Monteros
+      const { data: zonaMock, error: zonaError } = await supabase
+        .from('zonas')
+        .insert({
+          nombre: 'Monteros Centro',
+          descripcion: 'Zona céntrica de Monteros, Tucumán (Mock)',
+          activo: true,
+        })
+        .select('id')
+        .single()
+
+      if (zonaError || !zonaMock) {
+        return { success: false, error: 'Error al crear zona mock: ' + (zonaError?.message || 'Desconocido') }
+      }
+
+      zonaId = zonaMock.id
+    }
+
+    const homeBase = config.rutas.homeBase
+    const fechaRuta = getTodayArgentina()
+    const rutasCreadas: string[] = []
+
+    // Generar coordenadas aleatorias en zona Monteros
+    // Rango: lat: -27.15 a -27.20, lng: -65.48 a -65.52
+    const generarCoordenadaAleatoria = () => {
+      const lat = -27.15 + Math.random() * 0.05 // -27.15 a -27.20
+      const lng = -65.48 + Math.random() * 0.04 // -65.48 a -65.52
+      return { lat: Number(lat.toFixed(6)), lng: Number(lng.toFixed(6)) }
+    }
+
+    // Crear clientes mock si no existen suficientes
+    const nombresClientes = [
+      'Carnicería El Buen Sabor', 'Pollos Don Juan', 'Aves Frescas SRL', 'Distribuidora San Miguel',
+      'Supermercado Central', 'Carnicería La Esquina', 'Pollos y Más', 'Distribuidora El Progreso',
+      'Carnicería Los Amigos', 'Aves Premium', 'Supermercado Norte', 'Distribuidora Sur',
+      'Carnicería El Rincón', 'Pollos Express', 'Aves del Valle', 'Distribuidora La Esperanza',
+      'Carnicería San Martín', 'Pollos Selectos', 'Aves Frescas Norte', 'Distribuidora Centro',
+      'Carnicería La Familia', 'Pollos Premium', 'Aves del Sur', 'Distribuidora El Sol',
+      'Carnicería Los Pinos', 'Pollos y Aves', 'Aves Selectas', 'Distribuidora La Paz'
+    ]
+
+    const totalClientesNecesarios = cantidadRutas * clientesPorRuta
+    const { data: clientesExistentes } = await supabase
+      .from('clientes')
+      .select('id, nombre')
+      .ilike('nombre', '%mock%')
+      .limit(totalClientesNecesarios)
+
+    const clientesIds: string[] = []
+
+    // Crear clientes mock faltantes
+    if (!clientesExistentes || clientesExistentes.length < totalClientesNecesarios) {
+      const clientesACrear = totalClientesNecesarios - (clientesExistentes?.length || 0)
+      
+      for (let i = 0; i < clientesACrear; i++) {
+        const nombre = nombresClientes[i % nombresClientes.length] + ` (Mock ${i + 1})`
+        const coords = generarCoordenadaAleatoria()
+        
+        const { data: cliente, error: clienteError } = await supabase
+          .from('clientes')
+          .insert({
+            codigo: `MOCK${String(i + 1).padStart(4, '0')}`,
+            nombre,
+            telefono: `3815${String(Math.floor(Math.random() * 1000000)).padStart(6, '0')}`,
+            direccion: `Calle ${Math.floor(Math.random() * 1000)} #${Math.floor(Math.random() * 1000)}`,
+            zona_entrega: 'Monteros',
+            coordenadas: `SRID=4326;POINT(${coords.lng} ${coords.lat})`,
+            tipo_cliente: 'minorista',
+            activo: true,
+          })
+          .select('id')
+          .single()
+
+        if (!clienteError && cliente) {
+          clientesIds.push(cliente.id)
+        }
+      }
+    }
+
+    // Agregar IDs de clientes existentes
+    if (clientesExistentes) {
+      clientesExistentes.forEach(c => clientesIds.push(c.id))
+    }
+
+    // Crear rutas mock
+    for (let rutaIndex = 0; rutaIndex < cantidadRutas; rutaIndex++) {
+      const vehiculo = vehiculos[rutaIndex % vehiculos.length]
+      const repartidor = repartidores[rutaIndex % repartidores.length]
+      
+      // Seleccionar clientes para esta ruta
+      const clientesRuta = clientesIds.slice(
+        rutaIndex * clientesPorRuta,
+        (rutaIndex + 1) * clientesPorRuta
+      )
+
+      if (clientesRuta.length === 0) {
+        continue
+      }
+
+      // Obtener coordenadas de los clientes
+      const { data: clientesData } = await supabase
+        .from('clientes')
+        .select('id, nombre, coordenadas')
+        .in('id', clientesRuta)
+
+      if (!clientesData || clientesData.length === 0) {
+        continue
+      }
+
+      // Convertir coordenadas PostGIS a {lat, lng}
+      const puntos: Array<{ lat: number; lng: number; id: string; nombre: string }> = []
+      for (const cliente of clientesData) {
+        if (cliente.coordenadas) {
+          let coords: { lat: number; lng: number } | null = null
+          
+          try {
+            // Supabase puede devolver geometrías PostGIS de diferentes formas
+            if (typeof cliente.coordenadas === 'string') {
+              // Si viene como WKT: "POINT(lng lat)" o "SRID=4326;POINT(lng lat)"
+              const match = cliente.coordenadas.match(/POINT\(([\d.-]+)\s+([\d.-]+)\)/)
+              if (match) {
+                coords = {
+                  lng: parseFloat(match[1]),
+                  lat: parseFloat(match[2])
+                }
+              } else {
+                // Intentar parsear como JSON
+                try {
+                  const parsed = JSON.parse(cliente.coordenadas)
+                  if (parsed && typeof parsed === 'object') {
+                    if ('lat' in parsed && 'lng' in parsed) {
+                      coords = { lat: parsed.lat, lng: parsed.lng }
+                    } else if ('coordinates' in parsed && Array.isArray(parsed.coordinates)) {
+                      // Formato GeoJSON: [lng, lat]
+                      coords = {
+                        lng: parsed.coordinates[0],
+                        lat: parsed.coordinates[1]
+                      }
+                    }
+                  }
+                } catch (e) {
+                  // Ignorar
+                }
+              }
+            } else if (cliente.coordenadas && typeof cliente.coordenadas === 'object') {
+              // Si viene como objeto con propiedades lat/lng
+              if ('lat' in cliente.coordenadas && 'lng' in cliente.coordenadas) {
+                coords = {
+                  lat: typeof cliente.coordenadas.lat === 'string' ? parseFloat(cliente.coordenadas.lat) : cliente.coordenadas.lat,
+                  lng: typeof cliente.coordenadas.lng === 'string' ? parseFloat(cliente.coordenadas.lng) : cliente.coordenadas.lng
+                }
+              } else if ('coordinates' in cliente.coordenadas && Array.isArray(cliente.coordenadas.coordinates)) {
+                // Formato GeoJSON: [lng, lat]
+                coords = {
+                  lng: cliente.coordenadas.coordinates[0],
+                  lat: cliente.coordenadas.coordinates[1]
+                }
+              }
+            }
+            
+            if (coords && !isNaN(coords.lat) && !isNaN(coords.lng) && Number.isFinite(coords.lat) && Number.isFinite(coords.lng)) {
+              puntos.push({ lat: coords.lat, lng: coords.lng, id: cliente.id, nombre: cliente.nombre })
+            }
+          } catch (e) {
+            console.warn('Error parseando coordenadas del cliente:', cliente.id, e)
+          }
+        }
+      }
+
+      if (puntos.length === 0) {
+        continue
+      }
+
+      // Optimizar ruta usando algoritmo local
+      const origin = { lat: homeBase.lat, lng: homeBase.lng, id: 'origin', nombre: homeBase.nombre }
+      const destination = config.rutas.returnToBase
+        ? { lat: homeBase.lat, lng: homeBase.lng, id: 'destination', nombre: homeBase.nombre }
+        : undefined
+
+      const waypoints = puntos.map(p => ({
+        lat: p.lat,
+        lng: p.lng,
+        id: p.id,
+        nombreCliente: p.nombre,
+        clienteId: p.id,
+      }))
+
+      const rutaOptimizada = optimizeRouteLocal(origin, waypoints, destination)
+
+      // Generar número de ruta
+      const { data: numeroRutaData } = await supabase.rpc('obtener_siguiente_numero_ruta')
+      const numeroRuta = numeroRutaData as string || `MOCK-${Date.now()}-${rutaIndex}`
+
+      // Crear ruta_reparto
+      const { data: ruta, error: rutaError } = await supabase
+        .from('rutas_reparto')
+        .insert({
+          numero_ruta: numeroRuta,
+          vehiculo_id: vehiculo.id,
+          repartidor_id: repartidor.id,
+          fecha_ruta: fechaRuta,
+          turno: rutaIndex % 2 === 0 ? 'mañana' : 'tarde',
+          zona_id: zonaId,
+          estado: 'en_curso',
+          distancia_estimada_km: rutaOptimizada.totalDistance,
+          tiempo_estimado_min: rutaOptimizada.estimatedDuration,
+        })
+        .select('id')
+        .single()
+
+      if (rutaError || !ruta) {
+        console.error('Error al crear ruta:', rutaError)
+        continue
+      }
+
+      // Crear pedidos mock para cada cliente
+      const pedidosIds: string[] = []
+      for (const cliente of clientesData) {
+        // Generar número de pedido
+        const numeroPedido = `PED-MOCK-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        const total = Math.floor(Math.random() * 50000) + 10000 // Entre $10,000 y $60,000
+        const subtotal = total
+        
+        // Crear pedido mock
+        const { data: pedido, error: pedidoError } = await supabase
+          .from('pedidos')
+          .insert({
+            numero_pedido: numeroPedido,
+            cliente_id: cliente.id,
+            fecha_pedido: fechaRuta,
+            estado: 'enviado',
+            turno: rutaIndex % 2 === 0 ? 'mañana' : 'tarde',
+            zona_id: zonaId,
+            subtotal,
+            total,
+            pago_estado: 'pendiente',
+          })
+          .select('id')
+          .single()
+
+        if (!pedidoError && pedido) {
+          pedidosIds.push(pedido.id)
+        } else {
+          console.error('Error al crear pedido mock:', pedidoError)
+        }
+      }
+
+      // Verificar que se crearon pedidos
+      if (pedidosIds.length === 0) {
+        console.error('No se pudieron crear pedidos mock para la ruta')
+        continue
+      }
+
+      // Crear detalles_ruta con orden optimizado
+      const ordenVisita: any[] = []
+      const puntosOrdenados = rutaOptimizada.orderedPoints.filter(p => p.clienteId)
+
+      for (let i = 0; i < puntosOrdenados.length && i < pedidosIds.length; i++) {
+        const punto = puntosOrdenados[i]
+        const clienteId = punto.clienteId || punto.id
+
+        // Buscar cliente y pedido correspondiente
+        const clienteIndex = clientesData.findIndex(c => c.id === clienteId)
+        if (clienteIndex === -1 || clienteIndex >= pedidosIds.length) continue
+
+        const cliente = clientesData[clienteIndex]
+        const pedidoId = pedidosIds[clienteIndex]
+
+        // Crear detalle_ruta
+        const { data: detalle, error: detalleError } = await supabase
+          .from('detalles_ruta')
+          .insert({
+            ruta_id: ruta.id,
+            pedido_id: pedidoId,
+            orden_entrega: i + 1,
+            coordenadas_entrega: cliente.coordenadas,
+            estado_entrega: 'pendiente',
+          })
+          .select('id')
+          .single()
+
+        if (!detalleError && detalle) {
+          // Extraer coordenadas para orden_visita usando la misma lógica de parseo
+          let coords: { lat: number; lng: number } | null = null
+          
+          if (cliente.coordenadas) {
+            try {
+              if (typeof cliente.coordenadas === 'string') {
+                const match = cliente.coordenadas.match(/POINT\(([\d.-]+)\s+([\d.-]+)\)/)
+                if (match) {
+                  coords = {
+                    lng: parseFloat(match[1]),
+                    lat: parseFloat(match[2])
+                  }
+                }
+              } else if (cliente.coordenadas && typeof cliente.coordenadas === 'object') {
+                if ('lat' in cliente.coordenadas && 'lng' in cliente.coordenadas) {
+                  coords = {
+                    lat: typeof cliente.coordenadas.lat === 'string' ? parseFloat(cliente.coordenadas.lat) : cliente.coordenadas.lat,
+                    lng: typeof cliente.coordenadas.lng === 'string' ? parseFloat(cliente.coordenadas.lng) : cliente.coordenadas.lng
+                  }
+                } else if ('coordinates' in cliente.coordenadas && Array.isArray(cliente.coordenadas.coordinates)) {
+                  coords = {
+                    lng: cliente.coordenadas.coordinates[0],
+                    lat: cliente.coordenadas.coordinates[1]
+                  }
+                }
+              }
+            } catch (e) {
+              console.warn('Error parseando coordenadas para orden_visita:', e)
+            }
+          }
+          
+          if (coords && !isNaN(coords.lat) && !isNaN(coords.lng)) {
+            ordenVisita.push({
+              detalle_ruta_id: detalle.id,
+              pedido_id: pedidoId,
+              cliente_id: clienteId,
+              cliente_nombre: cliente.nombre,
+              lat: coords.lat,
+              lng: coords.lng,
+              orden: i + 1,
+            })
+          }
+        }
+      }
+
+      // Generar polilínea simple
+      const polyline = generateSimplePolyline(rutaOptimizada.orderedPoints)
+
+      // Crear ruta_planificada
+      const { error: rutaPlanificadaError } = await supabase
+        .from('rutas_planificadas')
+        .insert({
+          ruta_reparto_id: ruta.id,
+          fecha: fechaRuta,
+          zona_id: zonaId,
+          vehiculo_id: vehiculo.id,
+          estado: 'en_curso',
+          orden_visita: ordenVisita,
+          polyline,
+          distancia_total_km: rutaOptimizada.totalDistance,
+          duracion_total_min: rutaOptimizada.estimatedDuration,
+          optimizada_por: 'local',
+        })
+
+      if (rutaPlanificadaError) {
+        console.error('Error al crear ruta planificada:', rutaPlanificadaError)
+      }
+
+      // Generar ubicaciones GPS simuladas
+      // IMPORTANTE: Usar fecha/hora actual para que aparezcan en el monitor
+      const ubicacionesGPS: Array<{ lat: number; lng: number; timestamp: Date }> = []
+      const puntosRuta = rutaOptimizada.orderedPoints
+      
+      // Usar hora actual como base, pero ajustar para que parezca que la ruta está en curso
+      const ahora = new Date()
+      const inicioTimestamp = new Date(ahora)
+      // Establecer hora de inicio hace 30 minutos para que parezca que la ruta ya está en curso
+      inicioTimestamp.setMinutes(ahora.getMinutes() - 30 - (rutaIndex * 10))
+      
+      // Generar puntos intermedios entre cada par de puntos de la ruta
+      let tiempoAcumulado = 0
+      for (let i = 0; i < puntosRuta.length - 1; i++) {
+        const puntoActual = puntosRuta[i]
+        const puntoSiguiente = puntosRuta[i + 1]
+
+        // Calcular distancia entre puntos
+        const distancia = haversineDistance(puntoActual, puntoSiguiente)
+        const numPuntosIntermedios = Math.max(1, Math.floor(distancia * 10)) // ~1 punto cada 100m
+
+        // Calcular tiempo del segmento (asumiendo velocidad promedio de 30 km/h)
+        const tiempoSegmento = (distancia / 30) * 3600 // segundos
+
+        // Generar puntos intermedios
+        for (let j = 0; j <= numPuntosIntermedios; j++) {
+          const factor = j / numPuntosIntermedios
+          const lat = puntoActual.lat + (puntoSiguiente.lat - puntoActual.lat) * factor
+          const lng = puntoActual.lng + (puntoSiguiente.lng - puntoActual.lng) * factor
+
+          // Calcular timestamp para este punto
+          const tiempoPunto = (tiempoSegmento / numPuntosIntermedios) * j
+          const timestamp = new Date(inicioTimestamp.getTime() + (tiempoAcumulado + tiempoPunto) * 1000)
+          
+          // Asegurar que el timestamp no sea futuro (máximo 5 minutos en el futuro)
+          const maxTimestamp = new Date(ahora.getTime() + 5 * 60 * 1000)
+          const timestampFinal = timestamp > maxTimestamp ? maxTimestamp : timestamp
+
+          ubicacionesGPS.push({
+            lat: Number(lat.toFixed(6)),
+            lng: Number(lng.toFixed(6)),
+            timestamp: timestampFinal,
+          })
+        }
+        
+        tiempoAcumulado += tiempoSegmento
+      }
+
+      // Insertar ubicaciones GPS (limitado a 100 por ruta para no sobrecargar)
+      const ubicacionesLimitadas = ubicacionesGPS.slice(0, 100)
+      
+      // Asegurar que todas las ubicaciones sean de hoy
+      const hoy = new Date()
+      hoy.setHours(0, 0, 0, 0)
+      const ubicacionesInsert = ubicacionesLimitadas.map(ubic => {
+        // Asegurar que el timestamp sea de hoy (mismo día)
+        const timestamp = new Date(ubic.timestamp)
+        timestamp.setFullYear(hoy.getFullYear(), hoy.getMonth(), hoy.getDate())
+        
+        return {
+          repartidor_id: repartidor.id,
+          vehiculo_id: vehiculo.id,
+          lat: ubic.lat,
+          lng: ubic.lng,
+          created_at: timestamp.toISOString(),
+        }
+      })
+
+      if (ubicacionesInsert.length > 0) {
+        const { error: ubicacionesError } = await supabase
+          .from('ubicaciones_repartidores')
+          .insert(ubicacionesInsert)
+
+        if (ubicacionesError) {
+          console.error('Error al insertar ubicaciones GPS:', ubicacionesError)
+        } else {
+          console.log(`✅ Insertadas ${ubicacionesInsert.length} ubicaciones GPS para ruta ${ruta.id}`)
+        }
+
+        // Actualizar vehiculos_estado con última ubicación
+        const ultimaUbicacion = ubicacionesLimitadas[ubicacionesLimitadas.length - 1]
+        const ultimoTimestamp = new Date(ultimaUbicacion.timestamp)
+        ultimoTimestamp.setFullYear(hoy.getFullYear(), hoy.getMonth(), hoy.getDate())
+        
+        const { error: estadoError } = await supabase
+          .from('vehiculos_estado')
+          .upsert({
+            vehiculo_id: vehiculo.id,
+            ultima_lat: ultimaUbicacion.lat,
+            ultima_lng: ultimaUbicacion.lng,
+            ultima_actualizacion: ultimoTimestamp.toISOString(),
+            ruta_activa_id: ruta.id,
+            updated_at: new Date().toISOString(),
+          })
+
+        if (estadoError) {
+          console.error('Error al actualizar vehiculos_estado:', estadoError)
+        } else {
+          console.log(`✅ Actualizado vehiculos_estado para vehículo ${vehiculo.id} con ruta_activa_id ${ruta.id}`)
+        }
+      } else {
+        console.warn(`⚠️ No se generaron ubicaciones GPS para la ruta ${ruta.id}`)
+      }
+
+      rutasCreadas.push(ruta.id)
+    }
+
+    revalidatePath('/(admin)/(dominios)/reparto/monitor')
+    revalidatePath('/(admin)/(dominios)/reparto/rutas')
+
+    return {
+      success: true,
+      data: { rutasCreadas },
+      message: `Se crearon ${rutasCreadas.length} rutas mock exitosamente`,
+    }
+  } catch (error: any) {
+    console.error('Error al crear rutas mock:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al crear rutas mock',
     }
   }
 }
