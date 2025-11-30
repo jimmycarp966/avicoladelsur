@@ -247,6 +247,16 @@ supabase/                         # Scripts SQL y migraciones
 
 ## 🔧 **Actualizaciones Recientes**
 
+### **Sistema de Generación de Datos Mock para Monitor GPS (Diciembre 2025)**
+- ✅ **Función `crearRutasMockMonteros()`**: Genera datos de prueba completos (rutas, clientes, vehículos, pedidos, ubicaciones GPS)
+- ✅ **Endpoints API**: 
+  - `POST /api/reparto/rutas-mock` - Genera rutas mock con parámetros configurables
+  - `DELETE /api/reparto/limpiar-mock` - Elimina todos los datos mock anteriores
+- ✅ **Optimización para Vercel Free**: Configurado con `maxDuration = 10` segundos, datos reducidos (20 ubicaciones GPS por ruta, puntos cada 500m)
+- ✅ **Logs Detallados**: Sistema completo de logging con tiempos de ejecución por sección para diagnóstico
+- ✅ **Componente UI**: `GenerarRutasMockButton` integrado en el monitor GPS para generación desde la interfaz
+- ✅ **Optimización Automática**: Aplica algoritmo local (Nearest Neighbor + 2-opt) a las rutas generadas
+
 ### **Vigencia Opcional en Listas de Precios (07/12/2025)**
 - ✅ **Campo `vigencia_activa`**: Nuevo campo BOOLEAN en tabla `listas_precios` (default: false)
 - ✅ **Comportamiento por defecto**: Listas están siempre vigentes (sin validar fechas)
