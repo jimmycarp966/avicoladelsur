@@ -53,6 +53,10 @@ FOR EACH ROW EXECUTE FUNCTION fn_recalcular_peso_presupuesto();
 -- Agregar validación de stock real
 -- ===========================================
 
+-- Eliminar versiones anteriores de la función con diferentes firmas
+DROP FUNCTION IF EXISTS fn_crear_presupuesto_desde_bot(UUID, JSONB, TEXT, UUID);
+DROP FUNCTION IF EXISTS fn_crear_presupuesto_desde_bot(UUID, JSONB, TEXT, UUID, DATE);
+
 CREATE OR REPLACE FUNCTION fn_crear_presupuesto_desde_bot(
     p_cliente_id UUID,
     p_items JSONB,
@@ -289,7 +293,7 @@ BEGIN
         PERFORM cron.schedule(
             'expirar-reservas-stock',
             '*/15 * * * *', -- Cada 15 minutos
-            $$SELECT fn_expirar_reservas()$$
+            'SELECT fn_expirar_reservas()'
         );
         RETURN 'Job de expiración de reservas configurado exitosamente (cada 15 minutos)';
     EXCEPTION
@@ -306,6 +310,10 @@ $$ LANGUAGE plpgsql;
 -- 6. MEJORAR FUNCIÓN DE CONVERSIÓN A PEDIDO
 -- Agregar manejo de items sin stock (conversión parcial)
 -- ===========================================
+
+-- Eliminar versión anterior de la función sin el parámetro p_permitir_parcial
+DROP FUNCTION IF EXISTS fn_convertir_presupuesto_a_pedido(UUID, UUID, UUID);
+DROP FUNCTION IF EXISTS fn_convertir_presupuesto_a_pedido(UUID, UUID, UUID, BOOLEAN);
 
 CREATE OR REPLACE FUNCTION fn_convertir_presupuesto_a_pedido(
     p_presupuesto_id UUID,
