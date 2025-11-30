@@ -7,6 +7,7 @@ import { createNotification } from './index'
 import { generateRutaOptimizada } from '@/lib/services/ruta-optimizer'
 import { confirmarPresupuestosAgrupadosSchema } from '@/lib/schemas/presupuestos.schema'
 import { getNowArgentina } from '@/lib/utils'
+import { enviarNotificacionWhatsApp } from '@/lib/services/notificaciones'
 
 // Schemas de validación
 const crearPresupuestoSchema = z.object({
@@ -114,6 +115,23 @@ export async function crearPresupuestoAction(formData: FormData) {
       usuario_id: null, // Para todos los admins
       metadata: { presupuesto_id: result.presupuesto_id }
     })
+
+    // Enviar notificación por WhatsApp al cliente
+    try {
+      await enviarNotificacionWhatsApp(
+        data.cliente_id,
+        'presupuesto_creado',
+        {
+          numero: result.numero_presupuesto,
+          total: result.total_estimado,
+          fecha_entrega: result.fecha_entrega_estimada || data.fecha_entrega_estimada,
+          turno: result.turno
+        }
+      )
+    } catch (notifError) {
+      console.error('Error enviando notificación WhatsApp:', notifError)
+      // No bloqueamos la operación si falla la notificación
+    }
 
     revalidatePath('/ventas/presupuestos')
 
@@ -288,6 +306,31 @@ export async function confirmarPresupuestoAction(formData: FormData) {
       }
     })
 
+    // Obtener datos del presupuesto para la notificación
+    const { data: presupuesto } = await supabase
+      .from('presupuestos')
+      .select('cliente_id, total_final, total_estimado, fecha_entrega_estimada, turno')
+      .eq('id', data.presupuesto_id)
+      .single()
+
+    // Enviar notificación por WhatsApp al cliente
+    if (presupuesto) {
+      try {
+        await enviarNotificacionWhatsApp(
+          presupuesto.cliente_id,
+          'pedido_confirmado',
+          {
+            numero: result.numero_pedido,
+            total: presupuesto.total_final || presupuesto.total_estimado,
+            fecha_entrega: presupuesto.fecha_entrega_estimada,
+            turno: presupuesto.turno
+          }
+        )
+      } catch (notifError) {
+        console.error('Error enviando notificación WhatsApp:', notifError)
+      }
+    }
+
     revalidatePath('/ventas/presupuestos')
     revalidatePath('/almacen/pedidos')
     revalidatePath('/tesoreria/cajas')
@@ -333,9 +376,9 @@ export async function confirmarPresupuestosAgrupadosAction(formData: FormData) {
     // Parsear y validar datos
     const rawData = Object.fromEntries(formData)
     const presupuestosIds = rawData.presupuestos_ids
-      ? (typeof rawData.presupuestos_ids === 'string' 
-          ? JSON.parse(rawData.presupuestos_ids) 
-          : rawData.presupuestos_ids)
+      ? (typeof rawData.presupuestos_ids === 'string'
+        ? JSON.parse(rawData.presupuestos_ids)
+        : rawData.presupuestos_ids)
       : []
 
     const data = confirmarPresupuestosAgrupadosSchema.parse({
@@ -542,8 +585,8 @@ export async function obtenerPresupuestosAction(filtros?: {
     if (error) {
       console.error('Error obteniendo presupuestos:', error)
       // Mostrar el error real para debugging
-      return { 
-        success: false, 
+      return {
+        success: false,
         message: `Error al obtener presupuestos: ${error.message || error.code || 'Error desconocido'}`,
         error: error
       }
@@ -585,22 +628,22 @@ export async function obtenerPresupuestoAction(presupuestoId: string) {
     if (presupuestoError) {
       // Si el error es "no encontrado", dar mensaje más claro
       if (presupuestoError.code === 'PGRST116' || presupuestoError.message?.includes('No rows')) {
-        return { 
-          success: false, 
+        return {
+          success: false,
           message: `Presupuesto con ID ${presupuestoId} no encontrado en la base de datos`,
           error: presupuestoError
         }
       }
-      return { 
-        success: false, 
+      return {
+        success: false,
         message: `Error al obtener presupuesto: ${presupuestoError.message || presupuestoError.code || 'Error desconocido'}`,
         error: presupuestoError
       }
     }
 
     if (!presupuestoData) {
-      return { 
-        success: false, 
+      return {
+        success: false,
         message: `Presupuesto con ID ${presupuestoId} no encontrado`
       }
     }
@@ -766,7 +809,7 @@ export async function actualizarPresupuestoAction(formData: FormData) {
 
     // Actualizar presupuesto
     const updateData: any = {
-          updated_at: getNowArgentina().toISOString(),
+      updated_at: getNowArgentina().toISOString(),
     }
 
     if (observaciones !== null) {
