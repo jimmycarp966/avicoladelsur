@@ -12,7 +12,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Logo } from '@/components/ui/logo'
-import { Menu, Bell, LogOut } from 'lucide-react'
+import { NotificationBell } from '@/components/layout/NotificationBell'
+import { Menu, LogOut } from 'lucide-react'
 import type { Usuario } from '@/types/domain.types'
 
 interface AdminHeaderProps {
@@ -57,13 +58,10 @@ export function AdminHeader({ user, onMenuClick, onLogout }: AdminHeaderProps) {
 
         {/* Panel derecho */}
         <div className="flex items-center gap-x-3">
-          {/* Notificaciones */}
-          <Button variant="ghost" size="sm" className="relative text-white hover:bg-white/10 h-9 w-9 p-0">
-            <Bell className="h-5 w-5" />
-            <span className="absolute -top-0.5 -right-0.5 h-5 w-5 rounded-full bg-[#CB3433] text-xs text-white flex items-center justify-center font-semibold shadow-lg">
-              3
-            </span>
-          </Button>
+          {/* Notificaciones con real-time */}
+          <div className="text-white [&_button]:text-white [&_button:hover]:bg-white/10">
+            <NotificationBell />
+          </div>
 
           {/* Menú de usuario */}
           <DropdownMenu modal={false}>
