@@ -1,10 +1,38 @@
--- Agregar tabla de notificaciones si no existe (de la migración anterior)
--- Esta migración actualiza la estructura de notificaciones para incluir todo lo necesario
+-- Asegurar que la extensión uuid-ossp existe
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Actualizar tabla notificaciones existente si ya fue creada
+-- Crear tabla notificaciones si no existe
+CREATE TABLE IF NOT EXISTS notificaciones (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    usuario_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    titulo TEXT NOT NULL,
+    mensaje TEXT NOT NULL,
+    tipo VARCHAR(50) DEFAULT 'info',
+    leida BOOLEAN DEFAULT false,
+    metadata JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Actualizar tabla notificaciones existente si ya fue creada (Defensivo)
 DO $$
 BEGIN
     -- Agregar columnas faltantes si no existen
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'notificaciones' AND column_name = 'usuario_id') THEN
+        ALTER TABLE notificaciones ADD COLUMN usuario_id UUID REFERENCES auth.users(id) ON DELETE CASCADE;
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'notificaciones' AND column_name = 'titulo') THEN
+        ALTER TABLE notificaciones ADD COLUMN titulo TEXT DEFAULT 'Notificación';
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'notificaciones' AND column_name = 'mensaje') THEN
+        ALTER TABLE notificaciones ADD COLUMN mensaje TEXT DEFAULT '';
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'notificaciones' AND column_name = 'tipo') THEN
+        ALTER TABLE notificaciones ADD COLUMN tipo VARCHAR(50) DEFAULT 'info';
+    END IF;
+
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'notificaciones' AND column_name = 'leida') THEN
         ALTER TABLE notificaciones ADD COLUMN leida BOOLEAN DEFAULT false;
     END IF;
@@ -17,6 +45,7 @@ END $$;
 -- Crear índices para optimizar consultas
 CREATE INDEX IF NOT EXISTS idx_notificaciones_usuario_leida ON notificaciones(usuario_id, leida);
 CREATE INDEX IF NOT EXISTS idx_notificaciones_leida ON notificaciones(leida) WHERE leida = false;
+CREATE INDEX IF NOT EXISTS idx_notificaciones_created_at ON notificaciones(created_at DESC);
 
 -- RLS para notificaciones
 ALTER TABLE notificaciones ENABLE ROW LEVEL SECURITY;
@@ -52,5 +81,6 @@ CREATE POLICY "users_update_own_notifications" ON notificaciones
     );
 
 -- Comentarios
+COMMENT ON TABLE notificaciones IS 'Notificaciones del sistema para usuarios del panel administrativo';
 COMMENT ON COLUMN notificaciones.leida IS 'Indica si la notificación fue leída por el usuario';
 COMMENT ON COLUMN notificaciones.metadata IS 'Datos adicionales en formato JSON para referencias o acciones';
