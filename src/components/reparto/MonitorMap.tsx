@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button'
 import { getRouteColor, getColorName } from '@/lib/colors'
 import RutasSidebar from './RutasSidebar'
 import { toast } from 'sonner'
+import { config } from '@/lib/config'
 
 // Tipos
 interface UbicacionVehiculo {
@@ -105,18 +106,19 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Verificar API Key
+  // Verificar API Key (solo como fallback si después de los reintentos no carga)
+  // La verificación principal está en el useEffect de inicialización
   useEffect(() => {
     const checkTimer = setTimeout(() => {
-      if (typeof window !== 'undefined' && !window.google) {
-        console.error('[MonitorMap] Google Maps no detectado')
+      if (typeof window !== 'undefined' && !window.google && !mapsLoaded && !error) {
+        console.error('[MonitorMap] Google Maps no detectado después de tiempo de espera')
         setGoogleMapsApiKeyMissing(true)
-        setError('Google Maps no está configurado')
+        setError('Google Maps no está configurado correctamente. Verifica NEXT_PUBLIC_GOOGLE_MAPS_API_KEY.')
         setLoading(false)
       }
-    }, 3000)
+    }, 10000) // Aumentado a 10 segundos para dar tiempo a la carga asíncrona
     return () => clearTimeout(checkTimer)
-  }, [])
+  }, [mapsLoaded, error])
 
   // Cargar datos
   const fetchData = useCallback(async () => {
@@ -153,52 +155,124 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
         if (u.ruta_activa_id) rutasActivasIds.add(u.ruta_activa_id)
       })
 
-      // Si no hay desde ubicaciones, buscar en endpoint de rutas activas
-      if (rutasActivasIds.size === 0) {
-        const fechaParam = fecha || new Date().toISOString().split('T')[0]
-        const rutasRes = await fetch(`/api/reparto/rutas-activas?fecha=${fechaParam}${zonaId ? `&zona_id=${zonaId}` : ''}`)
-        if (rutasRes.ok) {
-          const rutasData = await rutasRes.json()
-          if (rutasData.success && Array.isArray(rutasData.data)) {
-            rutasData.data.forEach((r: any) => rutasActivasIds.add(r.id))
-          }
-        }
-      }
+      // 2.5 Cargar rutas planificadas (para rutas mock) - buscar de las últimas 24 horas
+      const fechaActual = fecha || new Date().toISOString().split('T')[0]
+      const fechaParam = fechaActual
+      const ayer = new Date(fechaActual)
+      ayer.setDate(ayer.getDate() - 1)
+      const fechaDesde = ayer.toISOString().split('T')[0]
 
-      // 3. Cargar detalles de cada ruta (polyline, clientes)
+      console.log('🔍 [DEBUG] Buscando rutas planificadas desde:', fechaDesde, 'hasta:', fechaParam)
+
+      const rutasPlanificadasRes = await fetch(`/api/reparto/rutas-planificadas?fecha=${fechaParam}${zonaId ? `&zona_id=${zonaId}` : ''}`)
+
+      // 3. Procesar rutas
       const nuevasRutas = new Map<string, RutaData>()
 
-      for (const rutaId of rutasActivasIds) {
-        try {
-          // Verificar si ya tenemos la ruta y no ha cambiado (opcional: optimización)
-          // Por ahora recargamos para tener estado actualizado de clientes
-          const rutaRes = await fetch(`/api/rutas/${rutaId}/recorrido`)
-          if (rutaRes.ok) {
-            const res = await rutaRes.json()
-            if (res.success && res.data) {
-              const color = getRouteColor(rutaId)
-              const ordenVisita = res.data.ordenVisita || []
+      // Primero procesar rutas planificadas (rutas mock)
+      if (rutasPlanificadasRes.ok) {
+        const rutasPlanificadasData = await rutasPlanificadasRes.json()
+        console.log('🔍 [DEBUG] Respuesta rutas planificadas:', rutasPlanificadasData)
 
-              // Calcular progreso
-              const total = ordenVisita.length
-              const completadas = ordenVisita.filter((c: any) => c.estado === 'entregado').length
+        if (rutasPlanificadasData.success && Array.isArray(rutasPlanificadasData.data)) {
+          console.log('🔍 [DEBUG] Procesando rutas planificadas:', rutasPlanificadasData.data.length)
+          rutasPlanificadasData.data.forEach((rutaPlanificada: any, index: number) => {
+            console.log(`🔍 [DEBUG] Ruta planificada ${index + 1}:`, {
+              id: rutaPlanificada.id,
+              numero: rutaPlanificada.numero_ruta,
+              polyline: rutaPlanificada.polyline?.substring(0, 50),
+              polylineLength: rutaPlanificada.polyline?.length,
+              ordenVisita: rutaPlanificada.orden_visita?.length
+            })
+            const color = getRouteColor(rutaPlanificada.id)
+            const ordenVisita = rutaPlanificada.orden_visita || []
 
-              nuevasRutas.set(rutaId, {
-                id: rutaId,
-                numero: res.data.numero_ruta || 'S/N',
-                repartidor: res.data.repartidor_nombre || 'Sin asignar',
-                polyline: res.data.polyline,
-                ordenVisita: ordenVisita,
-                color: color,
-                progreso: { completadas, total },
-                estado: completadas === total ? 'completada' : 'en_curso'
-              })
-            }
-          }
-        } catch (e) {
-          console.error(`Error cargando ruta ${rutaId}`, e)
+            // Transformar orden_visita al formato esperado
+            const ordenVisitaFormateado = ordenVisita.map((cliente: any) => ({
+              id: cliente.detalle_ruta_id || cliente.cliente_id,
+              orden: cliente.orden,
+              lat: cliente.lat,
+              lng: cliente.lng,
+              cliente_nombre: cliente.cliente_nombre,
+              estado: cliente.estado_entrega || 'pendiente'
+            }))
+
+            // Calcular progreso
+            const total = ordenVisitaFormateado.length
+            const completadas = ordenVisitaFormateado.filter((c: any) => c.estado === 'entregado').length
+
+            nuevasRutas.set(rutaPlanificada.id, {
+              id: rutaPlanificada.id,
+              numero: rutaPlanificada.numero_ruta || 'S/N',
+              repartidor: rutaPlanificada.repartidor ?
+                `${rutaPlanificada.repartidor.nombre} ${rutaPlanificada.repartidor.apellido || ''}`.trim() :
+                'Sin asignar',
+              polyline: rutaPlanificada.polyline,
+              ordenVisita: ordenVisitaFormateado,
+              color: color,
+              progreso: { completadas, total },
+              estado: completadas === total ? 'completada' : 'en_curso'
+            })
+
+            // Agregar a rutas activas para que se procesen los vehículos
+            rutasActivasIds.add(rutaPlanificada.id)
+          })
         }
       }
+
+      // Si no hay rutas planificadas, buscar rutas activas tradicionales
+      if (nuevasRutas.size === 0) {
+        console.log('🔍 [DEBUG] No hay rutas planificadas, buscando rutas activas tradicionales')
+
+        // Desde ubicaciones
+        ubicacionesData.data?.forEach((u: UbicacionVehiculo) => {
+          if (u.ruta_activa_id) rutasActivasIds.add(u.ruta_activa_id)
+        })
+
+        // Si no hay desde ubicaciones, buscar en endpoint de rutas activas
+        if (rutasActivasIds.size === 0) {
+          const rutasRes = await fetch(`/api/reparto/rutas-activas?fecha=${fechaParam}${zonaId ? `&zona_id=${zonaId}` : ''}`)
+          if (rutasRes.ok) {
+            const rutasData = await rutasRes.json()
+            if (rutasData.success && Array.isArray(rutasData.data)) {
+              rutasData.data.forEach((r: any) => rutasActivasIds.add(r.id))
+            }
+          }
+        }
+
+        // Cargar detalles de rutas activas tradicionales
+        for (const rutaId of rutasActivasIds) {
+          try {
+            const rutaRes = await fetch(`/api/rutas/${rutaId}/recorrido`)
+            if (rutaRes.ok) {
+              const res = await rutaRes.json()
+              if (res.success && res.data) {
+                const color = getRouteColor(rutaId)
+                const ordenVisita = res.data.ordenVisita || []
+
+                // Calcular progreso
+                const total = ordenVisita.length
+                const completadas = ordenVisita.filter((c: any) => c.estado === 'entregado').length
+
+                nuevasRutas.set(rutaId, {
+                  id: rutaId,
+                  numero: res.data.numero_ruta || 'S/N',
+                  repartidor: res.data.repartidor_nombre || 'Sin asignar',
+                  polyline: res.data.polyline,
+                  ordenVisita: ordenVisita,
+                  color: color,
+                  progreso: { completadas, total },
+                  estado: completadas === total ? 'completada' : 'en_curso'
+                })
+              }
+            }
+          } catch (e) {
+            console.error(`Error cargando ruta ${rutaId}`, e)
+          }
+        }
+      }
+
+      console.log('✅ [DEBUG] Rutas finales procesadas:', nuevasRutas.size)
 
       setRutas(nuevasRutas)
       setLoading(false)
@@ -220,7 +294,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
       if (!isPollingPaused && document.visibilityState === 'visible') {
         fetchData()
       }
-    }, 10000) // 10 segundos
+    }, 30000) // 30 segundos (reducido para mejor rendimiento)
 
     intervalRef.current = interval
     return () => clearInterval(interval)
@@ -272,70 +346,275 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
 
   // Inicializar mapa
   const initializeMap = useCallback(() => {
-    if (!mapRef.current || mapInstanceRef.current || !window.google) return
+    try {
+      console.log('🗺️ [DEBUG] Iniciando initializeMap...')
+      console.log('🗺️ [DEBUG] Estado:', {
+        mapRef: !!mapRef.current,
+        mapInstance: !!mapInstanceRef.current,
+        google: !!window.google,
+        googleMaps: !!(window.google && window.google.maps)
+      })
 
-    const defaultCenter = { lat: -27.1671, lng: -65.4995 } // Monteros
+      if (!mapRef.current || mapInstanceRef.current || !window.google || !window.google.maps) {
+        console.warn('⚠️ [DEBUG] No se puede inicializar mapa:', {
+          mapRef: !!mapRef.current,
+          mapInstance: !!mapInstanceRef.current,
+          google: !!window.google,
+          googleMaps: !!(window.google && window.google.maps)
+        })
+        return
+      }
 
-    mapInstanceRef.current = new window.google.maps.Map(mapRef.current, {
-      center: defaultCenter,
-      zoom: 13,
-      styles: [
-        {
-          featureType: "poi",
-          elementType: "labels",
-          stylers: [{ visibility: "off" }]
-        }
-      ],
-      mapTypeControl: false,
-      fullscreenControl: true,
-      streetViewControl: false
-    })
+      console.log('🗺️ [DEBUG] Creando instancia del mapa...')
 
-    console.log('Mapa inicializado')
-  }, [])
+      const defaultCenter = {
+        lat: config.rutas.homeBase.lat,
+        lng: config.rutas.homeBase.lng
+      } // Casa Central Monteros
+
+      mapInstanceRef.current = new window.google.maps.Map(mapRef.current, {
+        center: defaultCenter,
+        zoom: 13,
+        styles: [
+          {
+            featureType: "poi",
+            elementType: "labels",
+            stylers: [{ visibility: "off" }]
+          }
+        ],
+        mapTypeControl: false,
+        fullscreenControl: true,
+        streetViewControl: false
+      })
+
+      console.log('🗺️ [DEBUG] Mapa creado, agregando listeners...')
+
+      // Agregar listener para deseleccionar ruta al hacer clic en el mapa
+      mapInstanceRef.current.addListener('click', () => {
+        setSelectedRutaId(undefined)
+        console.log('🗺️ [DEBUG] Deseleccionada ruta, vista general activada')
+      })
+
+      console.log('✅ Mapa inicializado correctamente')
+    } catch (error) {
+      console.error('❌ Error fatal inicializando mapa:', error)
+      console.error('❌ Stack trace:', error.stack)
+    }
+  }, [setSelectedRutaId])
 
   // Actualizar elementos del mapa
   const updateMapElements = useCallback(() => {
-    if (!mapInstanceRef.current || !window.google) return
+    // Verificación mejorada: asegurar que mapInstance esté completamente inicializado
+    if (!mapInstanceRef.current) {
+      console.warn('[MonitorMap] mapInstanceRef no está disponible aún')
+      return
+    }
 
-    // Limpiar todo
+    // Verificación robusta de todas las APIs necesarias
+    if (!window.google || !window.google.maps) {
+      console.warn('[MonitorMap] Google Maps no está disponible')
+      return
+    }
+
+    // Verificar APIs básicas
+    const requiredAPIs = [
+      window.google.maps.Map,
+      window.google.maps.Marker,
+      window.google.maps.Polyline,
+      window.google.maps.InfoWindow,
+      window.google.maps.LatLng,
+      window.google.maps.LatLngBounds
+    ]
+
+    const missingAPIs = requiredAPIs.filter(api => !api)
+    if (missingAPIs.length > 0) {
+      console.warn('[MonitorMap] Faltan APIs básicas de Google Maps:', missingAPIs.length)
+      return
+    }
+
+    // Verificar geometry.encoding con validación más robusta
+    if (!window.google.maps.geometry || !window.google.maps.geometry.encoding) {
+      console.warn('[MonitorMap] Geometry.encoding no está disponible aún')
+      return
+    }
+
+    // Verificar que decodePath sea una función
+    if (typeof window.google.maps.geometry.encoding.decodePath !== 'function') {
+      console.warn('[MonitorMap] decodePath no es una función')
+      return
+    }
+
+    // Limpiar todo - Cerrar InfoWindows primero para evitar overlays residuales
+    infoWindowsRef.current.forEach(iw => iw.close())
     markersRef.current.forEach(m => m.setMap(null))
     polylinesRef.current.forEach(p => p.setMap(null))
     markersRef.current.clear()
     polylinesRef.current.clear()
+    infoWindowsRef.current.clear()
+
+    // Limitar ubicaciones para rendimiento
+    const ubicacionesLimitadas = getUbicacionesLimitadas(ubicaciones)
+
+    console.log('🎨 [DEBUG] Dibujando mapa - Rutas:', rutas.size, 'Ubicaciones GPS:', ubicaciones.length, '-> Limitado a:', ubicacionesLimitadas.length)
 
     const bounds = new window.google.maps.LatLngBounds()
     let hasPoints = false
 
     // 1. Dibujar Rutas (Polylines y Clientes)
-    rutas.forEach((ruta) => {
-      // Polyline
-      if (ruta.polyline) {
-        const path = window.google.maps.geometry.encoding.decodePath(ruta.polyline)
+    rutas.forEach((ruta, rutaIndex) => {
+      console.log(`🎨 [DEBUG] Dibujando ruta ${rutaIndex + 1}:`, {
+        id: ruta.id,
+        numero: ruta.numero,
+        color: ruta.color,
+        polylineLength: ruta.polyline?.length,
+        polylineType: typeof ruta.polyline,
+        polylineTruthy: !!ruta.polyline,
+        polylineValue: ruta.polyline,
+        clientes: ruta.ordenVisita?.length,
+        ordenVisitaType: typeof ruta.ordenVisita,
+        rutaCompleta: ruta
+      })
 
-        // Si la ruta está seleccionada, la resaltamos
-        const isSelected = selectedRutaId === ruta.id
-        const opacity = selectedRutaId && !isSelected ? 0.3 : 0.8
-        const weight = isSelected ? 6 : 4
-        const zIndex = isSelected ? 10 : 1
+      // Polyline - Intentar usar el existente o generar uno desde los puntos
+      console.log(`🎨 [DEBUG] Verificando polyline para ruta ${ruta.numero}: ${!!ruta.polyline}`)
+      let path: any[] | null = null
 
-        const polyline = new window.google.maps.Polyline({
-          path,
-          geodesic: true,
-          strokeColor: ruta.color,
-          strokeOpacity: opacity,
-          strokeWeight: weight,
-          zIndex: zIndex,
-          map: mapInstanceRef.current
+      // Intentar decodificar polyline existente
+      if (ruta.polyline && typeof ruta.polyline === 'string' && ruta.polyline.trim().length > 0) {
+        try {
+          console.log(`🎨 [DEBUG] Decodificando polyline para ruta ${ruta.numero}...`)
+          
+          // Verificar si es formato simple (lat,lng;lat,lng) o formato codificado de Google
+          if (ruta.polyline.includes(';')) {
+            // Formato simple: convertir a array de puntos
+            console.log(`🎨 [DEBUG] Polyline en formato simple, convirtiendo...`)
+            const puntos = ruta.polyline.split(';').map(segment => {
+              const [latStr, lngStr] = segment.trim().split(',')
+              const lat = parseFloat(latStr)
+              const lng = parseFloat(lngStr)
+              if (!isNaN(lat) && !isNaN(lng)) {
+                return new window.google.maps.LatLng(lat, lng)
+              }
+              return null
+            }).filter(p => p !== null)
+            path = puntos
+          } else {
+            // Formato codificado de Google Maps
+            path = window.google.maps.geometry.encoding.decodePath(ruta.polyline)
+          }
+          
+          if (!path || !Array.isArray(path) || path.length === 0) {
+            console.warn(`⚠️ [DEBUG] Polyline decodificada está vacía o inválida para ruta ${ruta.numero}`)
+            path = null
+          } else {
+            console.log(`🎨 [DEBUG] Polyline decodificada: ${path.length} puntos`)
+          }
+        } catch (error: any) {
+          console.warn(`⚠️ [DEBUG] Error decodificando polyline para ruta ${ruta.numero}:`, error?.message)
+          path = null
+        }
+      }
+
+      // Si no hay polyline válido, generar uno desde los puntos de la ruta
+      if (!path || path.length === 0) {
+        console.log(`🎨 [DEBUG] Generando polyline dinámicamente desde puntos de la ruta ${ruta.numero}`)
+        
+        // Construir path desde: casa central -> clientes (en orden) -> casa central
+        const puntosRuta: any[] = []
+        
+        // 1. Agregar casa central (origen)
+        const homeBase = config.rutas.homeBase
+        puntosRuta.push(new window.google.maps.LatLng(homeBase.lat, homeBase.lng))
+        
+        // 2. Agregar clientes en orden de visita
+        const clientesOrdenados = [...ruta.ordenVisita].sort((a, b) => (a.orden || 0) - (b.orden || 0))
+        clientesOrdenados.forEach(cliente => {
+          if (cliente.lat && cliente.lng && !isNaN(cliente.lat) && !isNaN(cliente.lng)) {
+            puntosRuta.push(new window.google.maps.LatLng(cliente.lat, cliente.lng))
+          }
         })
+        
+        // 3. Agregar casa central de nuevo (destino) si returnToBase está activo
+        if (config.rutas.returnToBase) {
+          puntosRuta.push(new window.google.maps.LatLng(homeBase.lat, homeBase.lng))
+        }
+        
+        if (puntosRuta.length > 0) {
+          path = puntosRuta
+          console.log(`🎨 [DEBUG] Polyline generado con ${path.length} puntos (casa central + ${clientesOrdenados.length} clientes)`)
+        }
+      }
 
-        polylinesRef.current.set(`ruta-${ruta.id}`, polyline)
-        path.forEach((p: any) => bounds.extend(p))
-        hasPoints = true
+      // Dibujar polyline si hay path válido
+      if (path && path.length > 0) {
+        try {
+          // Si la ruta está seleccionada, la resaltamos
+          const isSelected = selectedRutaId === ruta.id
+          const opacity = selectedRutaId && !isSelected ? 0.3 : 0.8
+          const weight = isSelected ? 6 : 4
+          const zIndex = isSelected ? 10 : 1
+
+          console.log(`🎨 [DEBUG] Creando polyline - Color: ${ruta.color}, Opacity: ${opacity}, Weight: ${weight}`)
+
+          // Asegurar que el color sea válido
+          const validColor = /^#[0-9A-F]{6}$/i.test(ruta.color) ? ruta.color : '#FF0000'
+          if (validColor !== ruta.color) {
+            console.warn(`⚠️ [DEBUG] Color inválido ${ruta.color}, usando ${validColor}`)
+          }
+
+          const polyline = new window.google.maps.Polyline({
+            path,
+            geodesic: true,
+            strokeColor: validColor,
+            strokeOpacity: opacity,
+            strokeWeight: weight,
+            zIndex: zIndex,
+            map: mapInstanceRef.current
+          })
+
+          console.log(`🎨 [DEBUG] Polyline creada exitosamente para ruta ${ruta.numero} con ${path.length} puntos`)
+          polylinesRef.current.set(`ruta-${ruta.id}`, polyline)
+
+          // Extender bounds
+          path.forEach((p: any) => {
+            bounds.extend(p)
+            console.log(`📍 [DEBUG] Punto agregado a bounds: ${p.lat()}, ${p.lng()}`)
+
+            // Verificar si las coordenadas están en zona razonable (Argentina/Tucumán)
+            const lat = p.lat()
+            const lng = p.lng()
+            if (lat < -60 || lat > 10 || lng < -80 || lng > -50) {
+              console.warn(`⚠️ [DEBUG] Coordenada sospechosa: ${lat}, ${lng} - podría estar fuera de Argentina`)
+            }
+          })
+          hasPoints = true
+
+          console.log(`🎨 [DEBUG] Bounds finales para ruta ${ruta.numero}:`, {
+            northEast: bounds.getNorthEast().toString(),
+            southWest: bounds.getSouthWest().toString(),
+            center: bounds.getCenter().toString()
+          })
+        } catch (error: any) {
+          console.error(`❌ [ERROR] Error dibujando polyline para ruta ${ruta.numero}:`, error)
+          console.error(`❌ [ERROR] Detalles del error:`, {
+            message: error?.message,
+            polylineLength: ruta.polyline?.length,
+            polylinePreview: ruta.polyline?.substring(0, 50)
+          })
+          // No lanzar el error, simplemente omitir esta ruta
+        }
+      } else {
+        console.warn(`⚠️ [DEBUG] Ruta ${ruta.numero} no tiene polyline válido para dibujar`)
       }
 
       // Marcadores de Clientes
-      ruta.ordenVisita.forEach((cliente) => {
+      // Si la ruta está seleccionada, mostrar TODOS los clientes
+      // Si no está seleccionada, limitar a 10 por rendimiento
+      const clientesLimitados = selectedRutaId === ruta.id 
+        ? ruta.ordenVisita 
+        : ruta.ordenVisita.slice(0, 10)
+      
+      clientesLimitados.forEach((cliente) => {
         if (!cliente.lat || !cliente.lng) return
 
         const position = { lat: cliente.lat, lng: cliente.lng }
@@ -348,7 +627,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
           position,
           map: mapInstanceRef.current,
           icon: createClientIcon(cliente.orden, ruta.color, cliente.estado),
-          title: `${cliente.orden}. ${cliente.cliente_nombre}`,
+          title: `${cliente.orden}. ${cliente.cliente_nombre} ${ruta.ordenVisita.length > 10 ? '(+' + (ruta.ordenVisita.length - 10) + ' más)' : ''}`,
           opacity: opacity,
           zIndex: isSelected ? 20 : 5
         })
@@ -381,10 +660,57 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
       })
     })
 
-    // 2. Dibujar Vehículos (encima de todo)
-    ubicaciones.forEach((ubicacion) => {
+    // 2. Dibujar Marcador de Casa Central (homeBase) para todas las rutas visibles
+    if (rutas.size > 0 && window.google.maps.Marker) {
+      const homeBase = config.rutas.homeBase
+      const homeBaseMarkerId = 'home-base'
+      
+      // Verificar si ya existe el marcador para no duplicarlo
+      if (!markersRef.current.has(homeBaseMarkerId)) {
+        const homeBaseMarker = new window.google.maps.Marker({
+          position: { lat: homeBase.lat, lng: homeBase.lng },
+          map: mapInstanceRef.current,
+          icon: {
+            path: window.google.maps.SymbolPath.CIRCLE,
+            scale: 8,
+            fillColor: '#2F7058',
+            fillOpacity: 1,
+            strokeColor: '#ffffff',
+            strokeWeight: 2,
+          },
+          title: homeBase.nombre,
+          zIndex: 200, // Siempre visible encima de todo
+        })
+
+        const homeBaseInfoWindow = new window.google.maps.InfoWindow({
+          content: `
+            <div class="p-3 min-w-[200px]">
+              <div class="flex items-center gap-2 mb-2 border-b pb-2">
+                <span style="font-size: 20px;">🏠</span>
+                <div>
+                  <p class="font-bold text-sm">${homeBase.nombre}</p>
+                  <p class="text-xs text-gray-500">Punto de origen</p>
+                </div>
+              </div>
+            </div>
+          `
+        })
+
+        homeBaseMarker.addListener('click', () => {
+          infoWindowsRef.current.forEach(iw => iw.close())
+          homeBaseInfoWindow.open(mapInstanceRef.current, homeBaseMarker)
+        })
+
+        markersRef.current.set(homeBaseMarkerId, homeBaseMarker)
+        infoWindowsRef.current.set(homeBaseMarkerId, homeBaseInfoWindow)
+      }
+    }
+
+    // 3. Dibujar Vehículos (encima de todo) - limitado para rendimiento
+    ubicacionesLimitadas.forEach((ubicacion, vehIndex) => {
       const ruta = ubicacion.ruta_activa_id ? rutas.get(ubicacion.ruta_activa_id) : null
       const color = ruta ? ruta.color : '#333333'
+      console.log(`🚛 [DEBUG] Dibujando vehículo ${vehIndex + 1}/${ubicacionesLimitadas.length}:`, ubicacion.patente || 'Sin patente', 'Ruta:', ruta?.numero || 'Sin ruta')
 
       const position = { lat: ubicacion.lat, lng: ubicacion.lng }
       bounds.extend(position)
@@ -449,33 +775,204 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
     // NOTA: Eliminamos fitBounds de aquí para evitar saltos
   }, [rutas, ubicaciones, selectedRutaId, createClientIcon, createTruckIcon])
 
-  // Efecto para inicializar mapa
+  // Función auxiliar para limitar ubicaciones por rendimiento
+  const getUbicacionesLimitadas = useCallback((ubicaciones: UbicacionVehiculo[]) => {
+    const ubicacionesPorVehiculo = new Map<string, UbicacionVehiculo>()
+    ubicaciones.forEach((ubicacion) => {
+      const vehiculoId = ubicacion.vehiculo_id
+      const existing = ubicacionesPorVehiculo.get(vehiculoId)
+      if (!existing || new Date(ubicacion.created_at) > new Date(existing.created_at)) {
+        ubicacionesPorVehiculo.set(vehiculoId, ubicacion)
+      }
+    })
+    return Array.from(ubicacionesPorVehiculo.values()).slice(0, 20)
+  }, [])
+
+  // Función para calcular zoom óptimo basado en bounds
+  const calculateOptimalZoom = useCallback((bounds: google.maps.LatLngBounds) => {
+    try {
+      if (!bounds || bounds.isEmpty()) {
+        console.warn('⚠️ [DEBUG] Bounds vacío o inválido en calculateOptimalZoom')
+        return 14 // zoom por defecto
+      }
+
+      const northEast = bounds.getNorthEast()
+      const southWest = bounds.getSouthWest()
+
+      if (!northEast || !southWest) {
+        console.warn('⚠️ [DEBUG] NorthEast o SouthWest inválidos en calculateOptimalZoom')
+        return 14 // zoom por defecto
+      }
+
+      // Calcular distancia diagonal aproximada en grados
+      const latDiff = Math.abs(northEast.lat() - southWest.lat())
+      const lngDiff = Math.abs(northEast.lng() - southWest.lng())
+
+      console.log('🔍 [DEBUG] Diferencias calculadas - lat:', latDiff.toFixed(6), 'lng:', lngDiff.toFixed(6))
+
+      // Estimar zoom basado en la distancia
+      const maxDiff = Math.max(latDiff, lngDiff)
+
+      let zoom
+      if (maxDiff < 0.005) zoom = 17 // Muy cerca (< 500m)
+      else if (maxDiff < 0.01) zoom = 16  // Cerca (< 1km)
+      else if (maxDiff < 0.05) zoom = 15  // Pequeño (< 5km)
+      else if (maxDiff < 0.1) zoom = 14   // Mediano (< 10km)
+      else if (maxDiff < 0.2) zoom = 13   // Grande (< 20km)
+      else if (maxDiff < 0.5) zoom = 12   // Muy grande (< 50km)
+      else zoom = 11 // Enorme (> 50km)
+
+      console.log('🔍 [DEBUG] Zoom calculado:', zoom, 'para maxDiff:', maxDiff.toFixed(6))
+      return zoom
+    } catch (error) {
+      console.error('❌ [ERROR] Error en calculateOptimalZoom:', error)
+      return 14 // zoom seguro por defecto
+    }
+  }, [])
+
+  // Efecto para inicializar mapa cuando Google Maps está disponible
   useEffect(() => {
-    if (window.google && !mapsLoaded) {
-      initializeMap()
-      setMapsLoaded(true)
+    let timeoutId: NodeJS.Timeout | null = null
+    let retryCount = 0
+    const maxRetries = 30
+
+    const checkGoogleMaps = () => {
+      if (
+        window.google && 
+        window.google.maps && 
+        window.google.maps.Map &&
+        window.google.maps.Marker &&
+        window.google.maps.Polyline &&
+        window.google.maps.InfoWindow &&
+        window.google.maps.LatLng &&
+        window.google.maps.LatLngBounds &&
+        window.google.maps.geometry &&
+        window.google.maps.geometry.encoding
+      ) {
+        if (!mapsLoaded) {
+          setMapsLoaded(true)
+          // Pequeño delay para asegurar que todo esté listo
+          setTimeout(() => {
+            initializeMap()
+          }, 100)
+        }
+        return true
+      }
+      return false
+    }
+
+    const checkGoogleMapsLoop = () => {
+      if (checkGoogleMaps()) return
+
+      if (retryCount < maxRetries) {
+        retryCount++
+        timeoutId = setTimeout(checkGoogleMapsLoop, 500)
+      } else {
+        console.error('[MonitorMap] Google Maps API failed to load after retries')
+        setError('Google Maps no se pudo cargar después de múltiples intentos')
+        setLoading(false)
+      }
+    }
+
+    const handleGoogleMapsLoaded = () => {
+      if (!mapsLoaded) {
+        // Pequeño delay para asegurar que todo esté listo
+        setTimeout(() => {
+          if (
+            window.google && 
+            window.google.maps && 
+            window.google.maps.Map &&
+            window.google.maps.Marker &&
+            window.google.maps.Polyline &&
+            window.google.maps.InfoWindow &&
+            window.google.maps.LatLng &&
+            window.google.maps.LatLngBounds &&
+            window.google.maps.geometry &&
+            window.google.maps.geometry.encoding
+          ) {
+            setMapsLoaded(true)
+            initializeMap()
+          }
+        }, 100)
+      }
+    }
+
+    // Escuchar el evento personalizado de carga de Google Maps
+    window.addEventListener('google-maps-loaded', handleGoogleMapsLoaded)
+
+    // Intentar verificar inmediatamente si ya está cargado
+    if (checkGoogleMaps()) {
+      return () => {
+        window.removeEventListener('google-maps-loaded', handleGoogleMapsLoaded)
+      }
+    }
+
+    // Si no está disponible, iniciar loop de verificación después de un delay
+    const initialDelay = setTimeout(() => {
+      if (!window.google) {
+        setError('Google Maps script no se cargó. Verifica la configuración de la API key.')
+        setLoading(false)
+        return
+      }
+      checkGoogleMapsLoop()
+    }, 1000)
+
+    return () => {
+      clearTimeout(initialDelay)
+      if (timeoutId) clearTimeout(timeoutId)
+      window.removeEventListener('google-maps-loaded', handleGoogleMapsLoaded)
     }
   }, [initializeMap, mapsLoaded])
 
   // Efecto para actualizar elementos visuales
   useEffect(() => {
-    if (mapsLoaded) {
-      updateMapElements()
+    // Verificar que el mapa esté completamente inicializado antes de actualizar
+    if (mapsLoaded && mapInstanceRef.current) {
+      // Pequeño delay para asegurar que el mapa esté completamente listo
+      const timeoutId = setTimeout(() => {
+        if (mapInstanceRef.current) {
+          updateMapElements()
+        }
+      }, 50)
+      
+      return () => clearTimeout(timeoutId)
     }
   }, [mapsLoaded, updateMapElements])
 
   // Efecto para Control de Cámara (Zoom Inicial)
   useEffect(() => {
-    if (!mapInstanceRef.current || !window.google || rutas.size === 0 || initialZoomDone.current) return
+    if (!mapInstanceRef.current || !window.google || !window.google.maps || initialZoomDone.current) return
+
+    // Verificar que geometry.encoding esté disponible
+    if (!window.google.maps.geometry || !window.google.maps.geometry.encoding) {
+      return
+    }
+
+    // Verificar que haya datos para mostrar (rutas o ubicaciones)
+    const hasRutas = rutas.size > 0
+    const hasUbicaciones = ubicaciones.length > 0
+
+    if (!hasRutas && !hasUbicaciones) {
+      // Si no hay datos, usar zoom por defecto pero no marcar como completado
+      // para que se ejecute nuevamente cuando lleguen los datos
+      return
+    }
 
     const bounds = new window.google.maps.LatLngBounds()
     let hasPoints = false
 
+    // 1. Procesar rutas (polylines y clientes)
     rutas.forEach(r => {
       if (r.polyline) {
-        const path = window.google.maps.geometry.encoding.decodePath(r.polyline)
-        path.forEach((p: any) => bounds.extend(p))
-        hasPoints = true
+        try {
+          const path = window.google.maps.geometry.encoding.decodePath(r.polyline)
+          if (path && path.length > 0) {
+            path.forEach((p: any) => bounds.extend(p))
+            hasPoints = true
+          }
+        } catch (error) {
+          console.warn(`⚠️ [DEBUG] Error decodificando polyline en zoom inicial para ruta ${r.numero}:`, error)
+        }
       }
       r.ordenVisita.forEach(c => {
         if (c.lat && c.lng) {
@@ -485,24 +982,193 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
       })
     })
 
+    // 2. Procesar ubicaciones GPS (si no hay rutas o para incluir todos los puntos)
+    const ubicacionesLimitadas = getUbicacionesLimitadas(ubicaciones)
+    ubicacionesLimitadas.forEach(ubicacion => {
+      bounds.extend({ lat: ubicacion.lat, lng: ubicacion.lng })
+      hasPoints = true
+    })
+
     if (hasPoints) {
+      console.log('🎯 [DEBUG] Aplicando fitBounds con bounds:', {
+        northEast: bounds.getNorthEast().toString(),
+        southWest: bounds.getSouthWest().toString(),
+        center: bounds.getCenter().toString()
+      })
+
       mapInstanceRef.current.fitBounds(bounds)
+
+      // Limitar zoom para vista general (no demasiado alejado ni cercano)
+      setTimeout(() => {
+        if (mapInstanceRef.current) {
+          const currentZoom = mapInstanceRef.current.getZoom()
+          const center = mapInstanceRef.current.getCenter()
+
+          console.log('📍 [DEBUG] Zoom y centro actuales:', {
+            zoom: currentZoom,
+            center: center.toString(),
+            mapInstance: !!mapInstanceRef.current
+          })
+
+          if (currentZoom) {
+            let adjustedZoom = currentZoom
+            if (currentZoom > 13) {
+              adjustedZoom = 13 // máximo para vista general
+            } else if (currentZoom < 10) {
+              adjustedZoom = 10 // mínimo para vista general
+            }
+
+            if (adjustedZoom !== currentZoom) {
+              mapInstanceRef.current.setZoom(adjustedZoom)
+              console.log('📍 [DEBUG] Zoom ajustado de', currentZoom, 'a', adjustedZoom)
+            }
+          }
+        }
+      }, 100)
+
       initialZoomDone.current = true
+      console.log('📍 [DEBUG] Zoom inicial completado, ajustado para vista general')
+    } else {
+      console.warn('⚠️ [DEBUG] No hay puntos para centrar el mapa')
+      // Si no hay puntos pero hay ubicaciones, usar ubicación por defecto con zoom apropiado
+      if (ubicaciones.length > 0) {
+        const primeraUbicacion = ubicaciones[0]
+        mapInstanceRef.current.setCenter({ lat: primeraUbicacion.lat, lng: primeraUbicacion.lng })
+        mapInstanceRef.current.setZoom(13)
+        initialZoomDone.current = true
+        console.log('📍 [DEBUG] Centrado en primera ubicación GPS disponible')
+      }
     }
-  }, [rutas, mapsLoaded])
+  }, [rutas, ubicaciones, mapsLoaded, getUbicacionesLimitadas])
 
   // Efecto para centrar cuando se selecciona una ruta
   useEffect(() => {
-    if (selectedRutaId && mapInstanceRef.current && rutas.has(selectedRutaId) && window.google) {
+    if (!mapInstanceRef.current || !window.google || !window.google.maps) return
+    
+    if (selectedRutaId && rutas.has(selectedRutaId)) {
       const ruta = rutas.get(selectedRutaId)
-      if (ruta && ruta.polyline) {
-        const path = window.google.maps.geometry.encoding.decodePath(ruta.polyline)
-        const bounds = new window.google.maps.LatLngBounds()
-        path.forEach((p: any) => bounds.extend(p))
-        mapInstanceRef.current.fitBounds(bounds)
+      if (!ruta) return
+
+      console.log('🎯 [DEBUG] Ruta seleccionada:', selectedRutaId, '- centrando mapa y mostrando trazo completo')
+
+      const bounds = new window.google.maps.LatLngBounds()
+      let hasPoints = false
+
+      // Función helper para validar coordenadas (Argentina/Tucumán)
+      const isValidCoordinate = (lat: number, lng: number): boolean => {
+        // Coordenadas válidas para Argentina (Tucumán aproximadamente -27.5 a -26, -66 a -64)
+        return (
+          lat >= -28 && lat <= -25 &&
+          lng >= -67 && lng <= -63 &&
+          !isNaN(lat) && !isNaN(lng) &&
+          isFinite(lat) && isFinite(lng)
+        )
       }
+
+      // Agregar polyline de la ruta a bounds
+      if (ruta.polyline && window.google.maps.geometry?.encoding) {
+        try {
+          const path = window.google.maps.geometry.encoding.decodePath(ruta.polyline)
+          if (path && path.length > 0) {
+            path.forEach((p: any) => {
+              const lat = typeof p.lat === 'function' ? p.lat() : p.lat
+              const lng = typeof p.lng === 'function' ? p.lng() : p.lng
+              if (isValidCoordinate(lat, lng)) {
+                bounds.extend({ lat, lng })
+                hasPoints = true
+              }
+            })
+          }
+        } catch (error) {
+          console.warn(`⚠️ Error decodificando polyline para centrar:`, error)
+        }
+      }
+
+      // Agregar clientes de la ruta a bounds (solo coordenadas válidas)
+      ruta.ordenVisita.forEach(cliente => {
+        if (cliente.lat && cliente.lng && isValidCoordinate(cliente.lat, cliente.lng)) {
+          bounds.extend({ lat: cliente.lat, lng: cliente.lng })
+          hasPoints = true
+        }
+      })
+
+      // Agregar vehículos de esta ruta si están disponibles (solo coordenadas válidas)
+      ubicaciones.forEach(ubicacion => {
+        if (ubicacion.ruta_activa_id === selectedRutaId && 
+            isValidCoordinate(ubicacion.lat, ubicacion.lng)) {
+          bounds.extend({ lat: ubicacion.lat, lng: ubicacion.lng })
+          hasPoints = true
+        }
+      })
+
+      // Centrar el mapa en la ruta seleccionada
+      if (hasPoints) {
+        // Validar que los bounds sean válidos y no demasiado grandes
+        const northEast = bounds.getNorthEast()
+        const southWest = bounds.getSouthWest()
+        
+        // Calcular la diferencia en grados
+        const latDiff = Math.abs(northEast.lat() - southWest.lat())
+        const lngDiff = Math.abs(northEast.lng() - southWest.lng())
+        
+        // Si los bounds son demasiado grandes (>1 grado = ~111km), usar fallback
+        const boundsTooLarge = latDiff > 1.0 || lngDiff > 1.0
+        
+        if (boundsTooLarge) {
+          console.warn('⚠️ [DEBUG] Bounds demasiado grandes, usando fallback centrado en clientes')
+          // Usar el primer cliente o primer punto de polyline como centro
+          if (ruta.ordenVisita.length > 0 && ruta.ordenVisita[0].lat && ruta.ordenVisita[0].lng) {
+            mapInstanceRef.current.setCenter({
+              lat: ruta.ordenVisita[0].lat,
+              lng: ruta.ordenVisita[0].lng
+            })
+            mapInstanceRef.current.setZoom(13) // Zoom apropiado para vista de ruta
+          }
+        } else {
+          // Aplicar fitBounds con límites de zoom
+          mapInstanceRef.current.fitBounds(bounds, {
+            padding: 50 // Padding en píxeles alrededor de los bounds
+          })
+          
+          // Ajustar zoom después de fitBounds con límites
+          setTimeout(() => {
+            if (mapInstanceRef.current) {
+              const currentZoom = mapInstanceRef.current.getZoom()
+              
+              if (currentZoom) {
+                let adjustedZoom = currentZoom
+                
+                // Límite superior: no más de zoom 15 (muy cercano)
+                if (currentZoom > 15) {
+                  adjustedZoom = 15
+                }
+                // Límite inferior: no menos de zoom 11 (vista de ciudad/área)
+                else if (currentZoom < 11) {
+                  adjustedZoom = 11
+                }
+                
+                if (adjustedZoom !== currentZoom) {
+                  mapInstanceRef.current.setZoom(adjustedZoom)
+                  console.log('📍 [DEBUG] Zoom ajustado de', currentZoom, 'a', adjustedZoom)
+                }
+              }
+            }
+          }, 300)
+        }
+      } else {
+        // Si no hay puntos, centrar en el primer cliente si existe
+        if (ruta.ordenVisita.length > 0 && ruta.ordenVisita[0].lat && ruta.ordenVisita[0].lng) {
+          mapInstanceRef.current.setCenter({
+            lat: ruta.ordenVisita[0].lat,
+            lng: ruta.ordenVisita[0].lng
+          })
+          mapInstanceRef.current.setZoom(13)
+        }
+      }
+    } else {
+      console.log('ℹ️ [DEBUG] Ruta deseleccionada o no encontrada')
     }
-  }, [selectedRutaId, rutas])
+  }, [selectedRutaId, rutas, ubicaciones])
 
   // Efecto para visibilidad de página
   useEffect(() => {
@@ -536,7 +1202,9 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
             <Card className="h-10 flex items-center px-3 shadow-lg bg-background/90 backdrop-blur">
               <div className="flex items-center gap-2">
                 <Truck className="h-4 w-4 text-primary" />
-                <span className="font-bold text-sm">{ubicaciones.length}</span>
+                <span className="font-bold text-sm">
+                  {new Set(ubicaciones.map(u => u.vehiculo_id)).size}
+                </span>
                 <span className="text-xs text-muted-foreground hidden sm:inline">vehículos</span>
               </div>
             </Card>
