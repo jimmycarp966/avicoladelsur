@@ -217,6 +217,10 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- Usar peso real en lugar de total_final
 -- ===========================================
 
+-- Eliminar versión anterior de la función
+DROP FUNCTION IF EXISTS fn_asignar_vehiculos_por_peso(DATE, UUID, VARCHAR);
+DROP FUNCTION IF EXISTS fn_asignar_vehiculos_por_peso(DATE, UUID, TEXT);
+
 CREATE OR REPLACE FUNCTION fn_asignar_vehiculos_por_peso(
     p_fecha DATE,
     p_zona_id UUID DEFAULT NULL,
