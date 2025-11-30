@@ -1500,31 +1500,47 @@ export async function crearRutasMockMonteros(
   cantidadRutas: number = 2,
   clientesPorRuta: number = 7
 ): Promise<ApiResponse<{ rutasCreadas: string[] }>> {
+  const inicioTotal = Date.now()
   try {
+    console.log('🚀 [INICIO] ===== INICIANDO crearRutasMockMonteros =====')
+    console.log('🔍 [DEBUG] Parámetros:', { cantidadRutas, clientesPorRuta })
+    console.log('⏱️ [TIME] Tiempo inicio:', new Date().toISOString())
     const supabase = await createClient()
 
     // Verificar que el usuario sea admin
+    const tiempoAuth = Date.now()
+    console.log('⏱️ [TIME] Iniciando verificación de autenticación...')
     const { data: { user }, error: userError } = await supabase.auth.getUser()
+    console.log('⏱️ [TIME] Auth completado en:', Date.now() - tiempoAuth, 'ms')
     if (userError || !user) {
+      console.error('❌ [ERROR] Usuario no autenticado:', userError)
       return { success: false, error: 'Usuario no autenticado' }
     }
 
+    const tiempoUsuario = Date.now()
+    console.log('⏱️ [TIME] Consultando rol de usuario...')
     const { data: usuario } = await supabase
       .from('usuarios')
       .select('rol')
       .eq('id', user.id)
       .single()
+    console.log('⏱️ [TIME] Consulta usuario completada en:', Date.now() - tiempoUsuario, 'ms')
 
     if (!usuario || usuario.rol !== 'admin') {
+      console.error('❌ [ERROR] Usuario no es admin:', usuario?.rol)
       return { success: false, error: 'Solo los administradores pueden crear rutas mock' }
     }
+    console.log('✅ [AUTH] Usuario autenticado como admin')
 
     // Crear o obtener vehículos mock
+    const tiempoVehiculos = Date.now()
+    console.log('⏱️ [TIME] Consultando vehículos...')
     let { data: vehiculos } = await supabase
       .from('vehiculos')
       .select('id, patente')
       .eq('activo', true)
       .limit(cantidadRutas)
+    console.log('⏱️ [TIME] Vehículos consultados en:', Date.now() - tiempoVehiculos, 'ms, encontrados:', vehiculos?.length || 0)
 
     if (!vehiculos || vehiculos.length === 0) {
       // Crear vehículo mock
@@ -1550,12 +1566,15 @@ export async function crearRutasMockMonteros(
     }
 
     // Crear o obtener repartidores mock
+    const tiempoRepartidores = Date.now()
+    console.log('⏱️ [TIME] Consultando repartidores...')
     let { data: repartidores } = await supabase
       .from('usuarios')
       .select('id, nombre, apellido')
       .eq('rol', 'repartidor')
       .eq('activo', true)
       .limit(cantidadRutas)
+    console.log('⏱️ [TIME] Repartidores consultados en:', Date.now() - tiempoRepartidores, 'ms, encontrados:', repartidores?.length || 0)
 
     if (!repartidores || repartidores.length === 0) {
       // Crear repartidor mock directamente en la tabla usuarios
@@ -1588,12 +1607,15 @@ export async function crearRutasMockMonteros(
     }
 
     // Crear o obtener zona de Monteros
+    const tiempoZona = Date.now()
+    console.log('⏱️ [TIME] Consultando zona Monteros...')
     let { data: zonas } = await supabase
       .from('zonas')
       .select('id, nombre')
       .ilike('nombre', '%monteros%')
       .eq('activo', true)
       .limit(1)
+    console.log('⏱️ [TIME] Zona consultada en:', Date.now() - tiempoZona, 'ms')
 
     let zonaId: string | null = null
 
@@ -1642,17 +1664,22 @@ export async function crearRutasMockMonteros(
     ]
 
     const totalClientesNecesarios = cantidadRutas * clientesPorRuta
+    const tiempoClientes = Date.now()
+    console.log('⏱️ [TIME] Consultando clientes existentes, necesarios:', totalClientesNecesarios)
     const { data: clientesExistentes } = await supabase
       .from('clientes')
       .select('id, nombre')
       .ilike('nombre', '%mock%')
       .limit(totalClientesNecesarios)
+    console.log('⏱️ [TIME] Clientes consultados en:', Date.now() - tiempoClientes, 'ms, encontrados:', clientesExistentes?.length || 0)
 
     const clientesIds: string[] = []
 
     // Crear clientes mock faltantes
     if (!clientesExistentes || clientesExistentes.length < totalClientesNecesarios) {
       const clientesACrear = totalClientesNecesarios - (clientesExistentes?.length || 0)
+      const tiempoCrearClientes = Date.now()
+      console.log('⏱️ [TIME] Creando', clientesACrear, 'clientes mock...')
       
       for (let i = 0; i < clientesACrear; i++) {
         const nombre = nombresClientes[i % nombresClientes.length] + ` (Mock ${i + 1})`
@@ -1677,15 +1704,20 @@ export async function crearRutasMockMonteros(
           clientesIds.push(cliente.id)
         }
       }
+      console.log('⏱️ [TIME] Clientes creados en:', Date.now() - tiempoCrearClientes, 'ms')
     }
 
     // Agregar IDs de clientes existentes
     if (clientesExistentes) {
       clientesExistentes.forEach(c => clientesIds.push(c.id))
     }
+    console.log('✅ [CLIENTES] Total clientes disponibles:', clientesIds.length)
 
     // Crear rutas mock
+    console.log('🏗️ [RUTAS] Iniciando creación de', cantidadRutas, 'rutas...')
     for (let rutaIndex = 0; rutaIndex < cantidadRutas; rutaIndex++) {
+      const tiempoRuta = Date.now()
+      console.log(`⏱️ [TIME] Iniciando ruta ${rutaIndex + 1}/${cantidadRutas}...`)
       const vehiculo = vehiculos[rutaIndex % vehiculos.length]
       const repartidor = repartidores[rutaIndex % repartidores.length]
       
@@ -1700,74 +1732,97 @@ export async function crearRutasMockMonteros(
       }
 
       // Obtener coordenadas de los clientes
+      const tiempoCoords = Date.now()
+      console.log('🔍 [DEBUG] Consultando clientes para ruta:', { clientesRuta, clientesRutaLength: clientesRuta.length })
       const { data: clientesData } = await supabase
         .from('clientes')
         .select('id, nombre, coordenadas')
         .in('id', clientesRuta)
+      console.log('⏱️ [TIME] Coordenadas consultadas en:', Date.now() - tiempoCoords, 'ms')
+
+      console.log('🔍 [DEBUG] Clientes obtenidos:', { clientesDataLength: clientesData?.length, clientesData })
 
       if (!clientesData || clientesData.length === 0) {
+        console.warn('⚠️ [WARNING] No se encontraron datos de clientes para la ruta')
         continue
       }
 
       // Convertir coordenadas PostGIS a {lat, lng}
+      console.log('🔍 [DEBUG] Procesando coordenadas de clientes')
       const puntos: Array<{ lat: number; lng: number; id: string; nombre: string }> = []
-      for (const cliente of clientesData) {
-        if (cliente.coordenadas) {
-          let coords: { lat: number; lng: number } | null = null
-          
-          try {
-            // Supabase puede devolver geometrías PostGIS de diferentes formas
-            if (typeof cliente.coordenadas === 'string') {
-              // Si viene como WKT: "POINT(lng lat)" o "SRID=4326;POINT(lng lat)"
-              const match = cliente.coordenadas.match(/POINT\(([\d.-]+)\s+([\d.-]+)\)/)
-              if (match) {
-                coords = {
-                  lng: parseFloat(match[1]),
-                  lat: parseFloat(match[2])
-                }
-              } else {
-                // Intentar parsear como JSON
-                try {
-                  const parsed = JSON.parse(cliente.coordenadas)
-                  if (parsed && typeof parsed === 'object') {
-                    if ('lat' in parsed && 'lng' in parsed) {
-                      coords = { lat: parsed.lat, lng: parsed.lng }
-                    } else if ('coordinates' in parsed && Array.isArray(parsed.coordinates)) {
-                      // Formato GeoJSON: [lng, lat]
-                      coords = {
-                        lng: parsed.coordinates[0],
-                        lat: parsed.coordinates[1]
+
+      try {
+        for (const cliente of clientesData) {
+          console.log('🔍 [DEBUG] Procesando cliente:', { clienteId: cliente.id, coordenadas: cliente.coordenadas })
+          if (cliente.coordenadas) {
+            let coords: { lat: number; lng: number } | null = null
+
+            try {
+              // Supabase puede devolver geometrías PostGIS de diferentes formas
+              if (typeof cliente.coordenadas === 'string') {
+                // Si viene como WKT: "POINT(lng lat)" o "SRID=4326;POINT(lng lat)"
+                const match = cliente.coordenadas.match(/POINT\(([\d.-]+)\s+([\d.-]+)\)/)
+                if (match) {
+                  coords = {
+                    lng: parseFloat(match[1]),
+                    lat: parseFloat(match[2])
+                  }
+                } else {
+                  // Intentar parsear como JSON
+                  try {
+                    const parsed = JSON.parse(cliente.coordenadas)
+                    if (parsed && typeof parsed === 'object') {
+                      if ('lat' in parsed && 'lng' in parsed) {
+                        coords = { lat: parsed.lat, lng: parsed.lng }
+                      } else if ('coordinates' in parsed && Array.isArray(parsed.coordinates)) {
+                        // Formato GeoJSON: [lng, lat]
+                        coords = {
+                          lng: parsed.coordinates[0],
+                          lat: parsed.coordinates[1]
+                        }
                       }
                     }
+                  } catch (e) {
+                    // Ignorar
                   }
-                } catch (e) {
-                  // Ignorar
+                }
+              } else if (cliente.coordenadas && typeof cliente.coordenadas === 'object') {
+                // Si viene como objeto con propiedades lat/lng
+                if ('lat' in cliente.coordenadas && 'lng' in cliente.coordenadas) {
+                  coords = {
+                    lat: typeof cliente.coordenadas.lat === 'string' ? parseFloat(cliente.coordenadas.lat) : cliente.coordenadas.lat,
+                    lng: typeof cliente.coordenadas.lng === 'string' ? parseFloat(cliente.coordenadas.lng) : cliente.coordenadas.lng
+                  }
+                } else if ('coordinates' in cliente.coordenadas && Array.isArray(cliente.coordenadas.coordinates)) {
+                  // Formato GeoJSON: [lng, lat]
+                  coords = {
+                    lng: cliente.coordenadas.coordinates[0],
+                    lat: cliente.coordenadas.coordinates[1]
+                  }
                 }
               }
-            } else if (cliente.coordenadas && typeof cliente.coordenadas === 'object') {
-              // Si viene como objeto con propiedades lat/lng
-              if ('lat' in cliente.coordenadas && 'lng' in cliente.coordenadas) {
-                coords = {
-                  lat: typeof cliente.coordenadas.lat === 'string' ? parseFloat(cliente.coordenadas.lat) : cliente.coordenadas.lat,
-                  lng: typeof cliente.coordenadas.lng === 'string' ? parseFloat(cliente.coordenadas.lng) : cliente.coordenadas.lng
-                }
-              } else if ('coordinates' in cliente.coordenadas && Array.isArray(cliente.coordenadas.coordinates)) {
-                // Formato GeoJSON: [lng, lat]
-                coords = {
-                  lng: cliente.coordenadas.coordinates[0],
-                  lat: cliente.coordenadas.coordinates[1]
-                }
+
+              console.log('🔍 [DEBUG] Coordenadas procesadas:', { clienteId: cliente.id, coords })
+
+              if (coords && !isNaN(coords.lat) && !isNaN(coords.lng) && Number.isFinite(coords.lat) && Number.isFinite(coords.lng)) {
+                puntos.push({ lat: coords.lat, lng: coords.lng, id: cliente.id, nombre: cliente.nombre })
+                console.log('🔍 [DEBUG] Punto agregado:', { punto: { lat: coords.lat, lng: coords.lng, id: cliente.id, nombre: cliente.nombre } })
+              } else {
+                console.warn('⚠️ [WARNING] Coordenadas inválidas para cliente:', cliente.id, coords)
               }
+            } catch (e) {
+              console.warn('Error parseando coordenadas del cliente:', cliente.id, e)
             }
-            
-            if (coords && !isNaN(coords.lat) && !isNaN(coords.lng) && Number.isFinite(coords.lat) && Number.isFinite(coords.lng)) {
-              puntos.push({ lat: coords.lat, lng: coords.lng, id: cliente.id, nombre: cliente.nombre })
-            }
-          } catch (e) {
-            console.warn('Error parseando coordenadas del cliente:', cliente.id, e)
+          } else {
+            console.warn('⚠️ [WARNING] Cliente sin coordenadas:', cliente.id)
           }
         }
+      } catch (e) {
+        console.error('❌ [ERROR] Error en el loop de procesamiento de coordenadas:', e)
+        continue
       }
+
+      console.log('🔍 [DEBUG] Puntos finales:', { puntosLength: puntos.length, puntos })
 
       if (puntos.length === 0) {
         continue
@@ -1779,6 +1834,13 @@ export async function crearRutasMockMonteros(
         ? { lat: homeBase.lat, lng: homeBase.lng, id: 'destination', nombre: homeBase.nombre }
         : undefined
 
+      // Validar que puntos sea un array válido
+      console.log('🔍 [DEBUG] Puntos obtenidos:', { puntos, length: puntos?.length })
+      if (!Array.isArray(puntos)) {
+        console.error('Error: puntos no es un array válido', { puntos })
+        continue
+      }
+
       const waypoints = puntos.map(p => ({
         lat: p.lat,
         lng: p.lng,
@@ -1786,8 +1848,19 @@ export async function crearRutasMockMonteros(
         nombreCliente: p.nombre,
         clienteId: p.id,
       }))
+      console.log('🔍 [DEBUG] Waypoints creados:', { waypointsLength: waypoints.length, waypoints })
 
+      const tiempoOptimizacion = Date.now()
+      console.log('🔍 [DEBUG] Llamando optimizeRouteLocal con:', { origin, waypointsLength: waypoints.length, destination })
       const rutaOptimizada = optimizeRouteLocal(origin, waypoints, destination)
+      console.log('⏱️ [TIME] Optimización completada en:', Date.now() - tiempoOptimizacion, 'ms')
+      console.log('🔍 [DEBUG] optimizeRouteLocal retornó:', rutaOptimizada)
+
+      // Validar que la optimización retornó datos válidos
+      if (!rutaOptimizada || !rutaOptimizada.orderedPoints || !Array.isArray(rutaOptimizada.orderedPoints)) {
+        console.error('Error: optimizeRouteLocal retornó datos inválidos', { rutaOptimizada })
+        continue
+      }
 
       // Generar número de ruta
       const { data: numeroRutaData } = await supabase.rpc('obtener_siguiente_numero_ruta')
@@ -1816,6 +1889,8 @@ export async function crearRutasMockMonteros(
       }
 
       // Crear pedidos mock para cada cliente
+      const tiempoPedidos = Date.now()
+      console.log('⏱️ [TIME] Creando pedidos mock...')
       const pedidosIds: string[] = []
       for (const cliente of clientesData) {
         // Generar número de pedido
@@ -1846,6 +1921,7 @@ export async function crearRutasMockMonteros(
           console.error('Error al crear pedido mock:', pedidoError)
         }
       }
+      console.log('⏱️ [TIME] Pedidos creados en:', Date.now() - tiempoPedidos, 'ms, total:', pedidosIds.length)
 
       // Verificar que se crearon pedidos
       if (pedidosIds.length === 0) {
@@ -1854,8 +1930,10 @@ export async function crearRutasMockMonteros(
       }
 
       // Crear detalles_ruta con orden optimizado
+      console.log('🔍 [DEBUG] Creando detalles_ruta, orderedPoints:', { length: rutaOptimizada.orderedPoints.length, orderedPoints: rutaOptimizada.orderedPoints })
       const ordenVisita: any[] = []
-      const puntosOrdenados = rutaOptimizada.orderedPoints.filter(p => p.clienteId)
+      const puntosOrdenados = rutaOptimizada.orderedPoints.filter(p => p && p.clienteId)
+      console.log('🔍 [DEBUG] Puntos ordenados filtrados:', { puntosOrdenadosLength: puntosOrdenados.length, puntosOrdenados })
 
       for (let i = 0; i < puntosOrdenados.length && i < pedidosIds.length; i++) {
         const punto = puntosOrdenados[i]
@@ -1928,7 +2006,9 @@ export async function crearRutasMockMonteros(
       }
 
       // Generar polilínea simple
-      const polyline = generateSimplePolyline(rutaOptimizada.orderedPoints)
+      console.log('🔍 [DEBUG] Generando polilínea con orderedPoints:', { orderedPoints: rutaOptimizada.orderedPoints })
+      const polyline = generateSimplePolyline(rutaOptimizada.orderedPoints || [])
+      console.log('🔍 [DEBUG] Polilínea generada:', polyline)
 
       // Crear ruta_planificada
       const { error: rutaPlanificadaError } = await supabase
@@ -1952,8 +2032,16 @@ export async function crearRutasMockMonteros(
 
       // Generar ubicaciones GPS simuladas
       // IMPORTANTE: Usar fecha/hora actual para que aparezcan en el monitor
+      const tiempoGPS = Date.now()
+      console.log('⏱️ [TIME] Generando ubicaciones GPS...')
+      console.log('🔍 [DEBUG] Generando ubicaciones GPS, orderedPoints:', { orderedPoints: rutaOptimizada.orderedPoints })
       const ubicacionesGPS: Array<{ lat: number; lng: number; timestamp: Date }> = []
-      const puntosRuta = rutaOptimizada.orderedPoints
+      const puntosRuta = rutaOptimizada.orderedPoints || []
+      console.log('🔍 [DEBUG] Puntos ruta para GPS:', { puntosRutaLength: puntosRuta.length, puntosRuta })
+
+      if (!Array.isArray(puntosRuta) || puntosRuta.length === 0) {
+        console.warn(`No hay puntos de ruta válidos para generar GPS en ruta ${ruta.id}`)
+      }
       
       // Usar hora actual como base, pero ajustar para que parezca que la ruta está en curso
       const ahora = new Date()
@@ -1963,13 +2051,14 @@ export async function crearRutasMockMonteros(
       
       // Generar puntos intermedios entre cada par de puntos de la ruta
       let tiempoAcumulado = 0
-      for (let i = 0; i < puntosRuta.length - 1; i++) {
+      for (let i = 0; i < Math.max(0, puntosRuta.length - 1); i++) {
         const puntoActual = puntosRuta[i]
         const puntoSiguiente = puntosRuta[i + 1]
 
         // Calcular distancia entre puntos
         const distancia = haversineDistance(puntoActual, puntoSiguiente)
-        const numPuntosIntermedios = Math.max(1, Math.floor(distancia * 10)) // ~1 punto cada 100m
+        // Reducir puntos intermedios para optimizar tiempo en Vercel Free: ~1 punto cada 500m
+        const numPuntosIntermedios = Math.max(1, Math.floor(distancia * 2)) // ~1 punto cada 500m
 
         // Calcular tiempo del segmento (asumiendo velocidad promedio de 30 km/h)
         const tiempoSegmento = (distancia / 30) * 3600 // segundos
@@ -1998,8 +2087,12 @@ export async function crearRutasMockMonteros(
         tiempoAcumulado += tiempoSegmento
       }
 
-      // Insertar ubicaciones GPS (limitado a 100 por ruta para no sobrecargar)
-      const ubicacionesLimitadas = ubicacionesGPS.slice(0, 100)
+      // Insertar ubicaciones GPS (limitado a 20 por ruta para optimizar tiempo en Vercel Free)
+      // Reducido a 20 para evitar timeouts en Vercel Free (10s límite)
+      console.log('⏱️ [TIME] Generación GPS completada en:', Date.now() - tiempoGPS, 'ms')
+      console.log('🔍 [DEBUG] Ubicaciones GPS generadas:', { ubicacionesGPSLength: ubicacionesGPS.length, ubicacionesGPS })
+      const ubicacionesLimitadas = Array.isArray(ubicacionesGPS) ? ubicacionesGPS.slice(0, 20) : []
+      console.log('🔍 [DEBUG] Ubicaciones limitadas:', { ubicacionesLimitadasLength: ubicacionesLimitadas.length })
       
       // Asegurar que todas las ubicaciones sean de hoy
       const hoy = new Date()
@@ -2019,9 +2112,12 @@ export async function crearRutasMockMonteros(
       })
 
       if (ubicacionesInsert.length > 0) {
+        const tiempoInsertGPS = Date.now()
+        console.log('⏱️ [TIME] Insertando ubicaciones GPS en BD...')
         const { error: ubicacionesError } = await supabase
           .from('ubicaciones_repartidores')
           .insert(ubicacionesInsert)
+        console.log('⏱️ [TIME] Inserción GPS completada en:', Date.now() - tiempoInsertGPS, 'ms')
 
         if (ubicacionesError) {
           console.error('Error al insertar ubicaciones GPS:', ubicacionesError)
@@ -2055,8 +2151,14 @@ export async function crearRutasMockMonteros(
       }
 
       rutasCreadas.push(ruta.id)
+      const tiempoTotalRuta = Date.now() - tiempoRuta
+      console.log(`⏱️ [TIME] Ruta ${rutaIndex + 1} completada en:`, tiempoTotalRuta, 'ms')
+      console.log(`✅ [RUTA] Ruta ${rutaIndex + 1}/${cantidadRutas} creada exitosamente`)
     }
 
+    const tiempoTotal = Date.now() - inicioTotal
+    console.log('✅ [SUCCESS] Función completada exitosamente en:', tiempoTotal, 'ms')
+    console.log('✅ [SUCCESS] Rutas creadas:', { rutasCreadasLength: rutasCreadas.length, rutasCreadas })
     revalidatePath('/(admin)/(dominios)/reparto/monitor')
     revalidatePath('/(admin)/(dominios)/reparto/rutas')
 
@@ -2066,7 +2168,15 @@ export async function crearRutasMockMonteros(
       message: `Se crearon ${rutasCreadas.length} rutas mock exitosamente`,
     }
   } catch (error: any) {
-    console.error('Error al crear rutas mock:', error)
+    const tiempoTotal = Date.now() - inicioTotal
+    console.error('❌ [ERROR] Error al crear rutas mock después de:', tiempoTotal, 'ms')
+    console.error('❌ [ERROR] Error al crear rutas mock:', error)
+    console.error('❌ [ERROR] Stack trace:', error.stack)
+    console.error('❌ [ERROR] Error details:', {
+      message: error.message,
+      name: error.name,
+      cause: error.cause
+    })
     return {
       success: false,
       error: error.message || 'Error al crear rutas mock',

@@ -10,34 +10,44 @@ import { getTodayArgentina } from '@/lib/utils'
 
 export async function GET(request: NextRequest) {
   try {
+    console.log('🔍 [DEBUG-API] Endpoint debug-rutas-mock llamado')
     const supabase = await createClient()
 
     // Verificar autenticación
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
+      console.log('❌ [DEBUG-API] Error de autenticación:', authError)
       return NextResponse.json(
         { success: false, error: 'No autenticado' },
         { status: 401 }
       )
     }
+    console.log('✅ [DEBUG-API] Usuario autenticado:', user.email)
 
     const fecha = getTodayArgentina()
 
-    // Obtener rutas mock creadas hoy
+    // Obtener rutas mock creadas recientemente (últimas 24 horas)
+    const yesterday = new Date(fecha)
+    yesterday.setDate(yesterday.getDate() - 1)
+
+    console.log('🔍 [DEBUG-API] Buscando rutas desde:', yesterday.toISOString(), 'hasta hoy')
+
     const { data: rutas, error: rutasError } = await supabase
       .from('rutas_reparto')
       .select(`
         id,
         numero_ruta,
         fecha_ruta,
+        turno,
         estado,
         vehiculo_id,
         repartidor_id,
         zona_id,
-        vehiculo:vehiculos(patente),
-        repartidor:usuarios(nombre, apellido)
+        distancia_estimada_km,
+        tiempo_estimado_min,
+        created_at
       `)
-      .eq('fecha_ruta', fecha)
+      .gte('created_at', yesterday.toISOString())
       .in('estado', ['planificada', 'en_curso'])
       .order('created_at', { ascending: false })
       .limit(10)
@@ -112,4 +122,5 @@ export async function GET(request: NextRequest) {
     )
   }
 }
+
 

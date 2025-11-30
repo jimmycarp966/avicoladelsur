@@ -392,3 +392,6 @@ export async function analizarSentimiento(mensajes: string[]): Promise<{
 
 **¿Necesitas ayuda con la implementación?** Puedo crear un ejemplo completo de integración del bot con Gemini como primer paso.
 
+
+
+

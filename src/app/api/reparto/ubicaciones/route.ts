@@ -41,23 +41,37 @@ export async function GET(request: NextRequest) {
     const fecha = searchParams.get('fecha') || getTodayArgentina()
     const zonaId = searchParams.get('zona_id') || null
 
-    // Llamar RPC
-    const { data, error } = await supabase.rpc('fn_obtener_ultima_ubicacion_por_vehiculo', {
-      p_fecha: fecha,
-      p_zona_id: zonaId
-    })
+    // Consulta directa (la función RPC se creará manualmente después)
+    console.log('🔍 [DEBUG] Consultando ubicaciones directamente para fecha:', fecha)
+
+    const { data: ubicaciones, error } = await supabase
+      .from('ubicaciones_repartidores')
+      .select(`
+        repartidor_id,
+        vehiculo_id,
+        lat,
+        lng,
+        created_at,
+        usuarios!ubicaciones_repartidores_repartidor_id_fkey(nombre, apellido),
+        vehiculos!ubicaciones_repartidores_vehiculo_id_fkey(patente)
+      `)
+      .gte('created_at', `${fecha}T00:00:00`)
+      .lt('created_at', `${fecha}T23:59:59`)
+      .order('created_at', { ascending: false })
 
     if (error) {
-      console.error('Error RPC ubicaciones:', error)
+      console.error('Error obteniendo ubicaciones:', error)
       return NextResponse.json(
-        { success: false, error: error.message, details: error },
+        { success: false, error: error.message },
         { status: 500 }
       )
     }
 
+    console.log('✅ [DEBUG] Ubicaciones encontradas:', ubicaciones?.length || 0)
+
     return NextResponse.json({
       success: true,
-      data: data || []
+      data: ubicaciones || []
     })
   } catch (error: any) {
     console.error('Error al obtener ubicaciones:', error)
