@@ -121,6 +121,7 @@ supabase/                         # Scripts SQL y migraciones
 - **Registro de Pagos**: Repartidores registran estado de pago (Ya pagó/Pendiente/Pagará después) durante la ruta
 - **Validación de Cobros**: Sistema de validación donde tesorero verifica y acredita cobros antes de afectar caja
 - **Firma Digital**: Verificación con QR y subida automática a Supabase Storage
+- **Generación de Datos Mock**: Sistema completo para crear datos de prueba (rutas, clientes, GPS) para testing del monitor GPS, optimizado para Vercel Free (10s timeout) con logs detallados
 
 ### 💵 **Tesorería**: Control Financiero
 - **Cajas**: Por sucursal con saldos iniciales/actuales

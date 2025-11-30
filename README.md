@@ -807,6 +807,8 @@ Ver la guía completa en [`docs/GOOGLE_MAPS_SETUP.md`](./docs/GOOGLE_MAPS_SETUP.
 | `POST` | `/api/rutas/:id/alerta` | Crear alerta manual |
 | `GET` | `/api/reparto/alertas` | Listar alertas (desvíos, cliente saltado) |
 | `POST` | `/api/integrations/google/directions` | Endpoint interno para Google Directions |
+| `POST` | `/api/reparto/rutas-mock` | Generar datos mock para monitor GPS (testing/demo) |
+| `DELETE` | `/api/reparto/limpiar-mock` | Limpiar todos los datos mock del sistema |
 
 ### Páginas y Componentes
 
@@ -822,6 +824,38 @@ Ver la guía completa en [`docs/GOOGLE_MAPS_SETUP.md`](./docs/GOOGLE_MAPS_SETUP.
 **Repartidor:**
 - `/repartidor/ruta/[ruta_id]` - Hoja de ruta con GPS tracker integrado
 - Componente `GpsTracker` envía ubicaciones automáticamente cuando la ruta está en curso
+
+### Generación de Datos Mock para Monitor GPS
+
+**Estado**: ✅ **IMPLEMENTADO Y OPTIMIZADO**
+
+Sistema completo para generar datos de prueba (rutas, clientes, vehículos, ubicaciones GPS) para el monitor GPS, útil para testing y demos.
+
+**Características principales:**
+- 🎲 **Generación Automática**: Crea rutas completas con clientes, pedidos, vehículos y ubicaciones GPS simuladas
+- 📍 **Ubicaciones GPS Realistas**: Genera hasta 20 ubicaciones GPS por ruta con puntos intermedios entre paradas
+- 🗺️ **Optimización Incluida**: Aplica algoritmo de optimización local (Nearest Neighbor + 2-opt) a las rutas generadas
+- ⚡ **Optimizado para Vercel Free**: Configurado con `maxDuration = 10` segundos y datos reducidos para evitar timeouts
+- 📊 **Logs Detallados**: Sistema completo de logging con tiempos de ejecución por sección para diagnóstico
+- 🧹 **Limpieza Automática**: Endpoint dedicado para eliminar todos los datos mock anteriores antes de generar nuevos
+
+**Endpoints:**
+- `POST /api/reparto/rutas-mock`: Genera rutas mock (parámetros: `cantidad_rutas`, `clientes_por_ruta`)
+- `DELETE /api/reparto/limpiar-mock`: Elimina todos los datos mock del sistema
+
+**Optimizaciones para Vercel Free (10s timeout):**
+- Reducido a 20 ubicaciones GPS por ruta (antes 100)
+- Densidad de puntos intermedios reducida (1 cada 500m en lugar de 100m)
+- Logs detallados con tiempos de ejecución para identificar cuellos de botella
+- `maxDuration = 10` configurado en ambos endpoints
+
+**Uso:**
+1. Desde el monitor GPS (`/reparto/monitor`), hacer clic en "Generar Rutas Mock"
+2. El sistema limpia automáticamente datos mock anteriores
+3. Genera nuevas rutas con datos de prueba
+4. Las rutas aparecen inmediatamente en el monitor GPS
+
+**Nota**: Si necesitas más datos o el proceso tarda más de 10s, considera actualizar a Vercel Pro (permite hasta 60s) o reducir los parámetros (`cantidad_rutas`, `clientes_por_ruta`).
 
 ### Cómo Probar
 

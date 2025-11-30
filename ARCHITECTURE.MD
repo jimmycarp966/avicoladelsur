@@ -1769,6 +1769,8 @@ CREATE POLICY "repartidor_rutas_propias" ON pedidos FOR SELECT USING (
 | `GET` | `/api/rutas/[id]/recorrido` | Polyline + historial |
 | `POST` | `/api/rutas/[id]/alerta` | Alertas manuales |
 | `GET` | `/api/reparto/alertas` | Lista alertas |
+| `POST` | `/api/reparto/rutas-mock` | Generar datos mock para monitor GPS (testing/demo) |
+| `DELETE` | `/api/reparto/limpiar-mock` | Limpiar todos los datos mock del sistema |
 
 ### 🗄️ Migraciones Ejecutadas:
 
@@ -2185,6 +2187,16 @@ Conciliación automática → Reportes CSV/PDF
   - Control de pausa/reanudación manual del polling
   - Indicador visual del estado del polling y última actualización
   - Reducción estimada de requests: ~50-70% menos carga en el servidor
+- ✅ **Sistema de Generación de Datos Mock para Monitor GPS (Diciembre 2025)**
+  - Función `crearRutasMockMonteros()` para generar datos de prueba completos (rutas, clientes, vehículos, pedidos, ubicaciones GPS)
+  - Endpoint `POST /api/reparto/rutas-mock` con parámetros configurables (cantidad_rutas, clientes_por_ruta)
+  - Endpoint `DELETE /api/reparto/limpiar-mock` para eliminar todos los datos mock anteriores
+  - Generación de hasta 20 ubicaciones GPS por ruta con puntos intermedios realistas
+  - Optimización automática de rutas usando algoritmo local (Nearest Neighbor + 2-opt)
+  - Optimizado para Vercel Free: `maxDuration = 10` segundos, datos reducidos para evitar timeouts
+  - Sistema completo de logging con tiempos de ejecución por sección para diagnóstico
+  - Componente `GenerarRutasMockButton` integrado en el monitor GPS para generación desde UI
+  - Logs detallados con prefijos: `⏱️ [TIME]`, `📥 [ENDPOINT]`, `🚀 [INICIO]`, `✅ [SUCCESS]`, `❌ [ERROR]`
 - ✅ **Sistema de Listas de Precios implementado (15/01/2025)**
   - Listas base (MINORISTA, MAYORISTA, DISTRIBUIDOR) con asignación automática
   - Margen de ganancia configurable por lista
