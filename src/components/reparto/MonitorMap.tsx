@@ -396,9 +396,11 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
       })
 
       console.log('✅ Mapa inicializado correctamente')
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error fatal inicializando mapa:', error)
-      console.error('❌ Stack trace:', error.stack)
+      if (error?.stack) {
+        console.error('❌ Stack trace:', error.stack)
+      }
     }
   }, [setSelectedRutaId])
 
@@ -789,7 +791,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
   }, [])
 
   // Función para calcular zoom óptimo basado en bounds
-  const calculateOptimalZoom = useCallback((bounds: google.maps.LatLngBounds) => {
+  const calculateOptimalZoom = useCallback((bounds: any) => {
     try {
       if (!bounds || bounds.isEmpty()) {
         console.warn('⚠️ [DEBUG] Bounds vacío o inválido en calculateOptimalZoom')
@@ -824,7 +826,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
 
       console.log('🔍 [DEBUG] Zoom calculado:', zoom, 'para maxDiff:', maxDiff.toFixed(6))
       return zoom
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ [ERROR] Error en calculateOptimalZoom:', error)
       return 14 // zoom seguro por defecto
     }
@@ -970,7 +972,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
             path.forEach((p: any) => bounds.extend(p))
             hasPoints = true
           }
-        } catch (error) {
+        } catch (error: any) {
           console.warn(`⚠️ [DEBUG] Error decodificando polyline en zoom inicial para ruta ${r.numero}:`, error)
         }
       }
@@ -1079,7 +1081,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
               }
             })
           }
-        } catch (error) {
+        } catch (error: any) {
           console.warn(`⚠️ Error decodificando polyline para centrar:`, error)
         }
       }
