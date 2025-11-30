@@ -85,6 +85,9 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
   const polylinesRef = useRef<Map<string, any>>(new Map())
   const infoWindowsRef = useRef<Map<string, any>>(new Map())
 
+  // Ref para controlar el zoom inicial
+  const initialZoomDone = useRef(false)
+
   // Estado de datos
   const [ubicaciones, setUbicaciones] = useState<UbicacionVehiculo[]>([])
   const [alertas, setAlertas] = useState<Alerta[]>([])
@@ -443,10 +446,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
       infoWindowsRef.current.set(`vehiculo-${ubicacion.vehiculo_id}`, infoWindow)
     })
 
-    // Ajustar vista si hay puntos
-    if (hasPoints && !mapInstanceRef.current.getBounds()?.equals(bounds)) {
-      mapInstanceRef.current.fitBounds(bounds)
-    }
+    // NOTA: Eliminamos fitBounds de aquí para evitar saltos
   }, [rutas, ubicaciones, selectedRutaId, createClientIcon, createTruckIcon])
 
   // Efecto para inicializar mapa
@@ -457,12 +457,52 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
     }
   }, [initializeMap, mapsLoaded])
 
-  // Efecto para actualizar elementos
+  // Efecto para actualizar elementos visuales
   useEffect(() => {
     if (mapsLoaded) {
       updateMapElements()
     }
   }, [mapsLoaded, updateMapElements])
+
+  // Efecto para Control de Cámara (Zoom Inicial)
+  useEffect(() => {
+    if (!mapInstanceRef.current || !window.google || rutas.size === 0 || initialZoomDone.current) return
+
+    const bounds = new window.google.maps.LatLngBounds()
+    let hasPoints = false
+
+    rutas.forEach(r => {
+      if (r.polyline) {
+        const path = window.google.maps.geometry.encoding.decodePath(r.polyline)
+        path.forEach((p: any) => bounds.extend(p))
+        hasPoints = true
+      }
+      r.ordenVisita.forEach(c => {
+        if (c.lat && c.lng) {
+          bounds.extend({ lat: c.lat, lng: c.lng })
+          hasPoints = true
+        }
+      })
+    })
+
+    if (hasPoints) {
+      mapInstanceRef.current.fitBounds(bounds)
+      initialZoomDone.current = true
+    }
+  }, [rutas, mapsLoaded])
+
+  // Efecto para centrar cuando se selecciona una ruta
+  useEffect(() => {
+    if (selectedRutaId && mapInstanceRef.current && rutas.has(selectedRutaId) && window.google) {
+      const ruta = rutas.get(selectedRutaId)
+      if (ruta && ruta.polyline) {
+        const path = window.google.maps.geometry.encoding.decodePath(ruta.polyline)
+        const bounds = new window.google.maps.LatLngBounds()
+        path.forEach((p: any) => bounds.extend(p))
+        mapInstanceRef.current.fitBounds(bounds)
+      }
+    }
+  }, [selectedRutaId, rutas])
 
   // Efecto para visibilidad de página
   useEffect(() => {
