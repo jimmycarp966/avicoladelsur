@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { VehiculosTableSkeleton } from './vehiculos-table-skeleton'
 import { VehiculosTableWrapper } from './vehiculos-table-wrapper'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 300 // Revalida cada 5 minutos
 
 export const metadata = {
   title: 'Vehículos - Avícola del Sur ERP',

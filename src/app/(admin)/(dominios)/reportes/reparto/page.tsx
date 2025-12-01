@@ -4,7 +4,7 @@ import { obtenerKpisReparto, obtenerRankingRepartidores } from '@/actions/report
 import { createClient } from '@/lib/supabase/server'
 import { ReporteRepartoContent } from './reporte-reparto-content'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 3600 // Revalida cada hora
 
 export default async function ReporteRepartoPage({
   searchParams,

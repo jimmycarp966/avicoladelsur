@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { devLog, devError, devWarn } from '@/lib/utils/logger'
 import type {
   CrearPedidoParams,
   CrearPedidoBotParams,
@@ -75,7 +76,7 @@ export async function crearCliente(
       message: 'Cliente creado exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al crear cliente:', error)
+    devError('Error al crear cliente:', error)
     return {
       success: false,
       error: error.message || 'Error al crear cliente',
@@ -320,7 +321,7 @@ export async function obtenerClientes(
   }
 ): Promise<ApiResponse> {
   try {
-    console.log('[obtenerClientes] Filtros recibidos:', filtros)
+    devLog('[obtenerClientes] Filtros recibidos:', filtros)
     const supabase = await createClient()
 
     // Primero obtenemos todos los datos, luego ordenamos numéricamente en memoria
@@ -328,10 +329,10 @@ export async function obtenerClientes(
       .from('clientes')
       .select('*', { count: 'exact' })
 
-    console.log('[obtenerClientes] Query base creada')
+    devLog('[obtenerClientes] Query base creada')
 
     if (filtros?.search) {
-      console.log('[obtenerClientes] Aplicando filtro de búsqueda:', filtros.search)
+      devLog('[obtenerClientes] Aplicando filtro de búsqueda:', filtros.search)
 
       // Dividir la búsqueda en palabras individuales para búsqueda más flexible
       const searchTerms = filtros.search.trim().split(/\s+/).filter(term => term.length > 0)
@@ -352,28 +353,28 @@ export async function obtenerClientes(
     }
 
     if (filtros?.zona_entrega) {
-      console.log('[obtenerClientes] Aplicando filtro de zona:', filtros.zona_entrega)
+      devLog('[obtenerClientes] Aplicando filtro de zona:', filtros.zona_entrega)
       query = query.eq('zona_entrega', filtros.zona_entrega)
     }
 
     if (filtros?.activo !== undefined) {
-      console.log('[obtenerClientes] Aplicando filtro de activo:', filtros.activo)
+      devLog('[obtenerClientes] Aplicando filtro de activo:', filtros.activo)
       query = query.eq('activo', filtros.activo)
     }
 
     if (filtros?.page && filtros?.limit) {
       const from = (filtros.page - 1) * filtros.limit
       const to = from + filtros.limit - 1
-      console.log('[obtenerClientes] Aplicando paginación:', { from, to, page: filtros.page, limit: filtros.limit })
+      devLog('[obtenerClientes] Aplicando paginación:', { from, to, page: filtros.page, limit: filtros.limit })
       query = query.range(from, to)
     } else {
-      console.log('[obtenerClientes] Sin paginación aplicada')
+      devLog('[obtenerClientes] Sin paginación aplicada')
     }
 
-    console.log('[obtenerClientes] Ejecutando query...')
+    devLog('[obtenerClientes] Ejecutando query...')
     const { data, error, count } = await query
 
-    console.log('[obtenerClientes] Resultado:', {
+    devLog('[obtenerClientes] Resultado:', {
       success: !error,
       dataLength: data?.length || 0,
       count: count,
@@ -408,7 +409,7 @@ export async function obtenerClientes(
       } : undefined,
     }
   } catch (error: any) {
-    console.error('Error al obtener clientes:', error)
+    devError('Error al obtener clientes:', error)
     return {
       success: false,
       error: error.message || 'Error al obtener clientes',
@@ -439,115 +440,49 @@ export async function obtenerClientePorId(
       return { success: false, error: 'No tienes permisos para ver clientes' }
     }
 
-    // Obtener cliente
-    const { data: cliente, error: clienteError } = await supabase
-      .from('clientes')
-      .select('*')
-      .eq('id', clienteId)
-      .single()
+    // OPTIMIZADO: Usar función RPC que consolida todas las queries en una sola
+    const { data: resultado, error: rpcError } = await supabase
+      .rpc('fn_obtener_cliente_completo', {
+        p_cliente_id: clienteId
+      })
 
-    if (clienteError || !cliente) {
-      return { success: false, error: 'Cliente no encontrado' }
+    if (rpcError) {
+      return { success: false, error: rpcError.message || 'Error al obtener cliente' }
     }
 
-    // Calcular estadísticas de pedidos en paralelo
-    const [
-      { data: pedidosEntregados, count: countEntregados },
-      { data: pedidosPendientes, count: countPendientes },
-      { count: countTotalPedidos },
-      { data: cuentaCorriente },
-      { data: listasResult }
-    ] = await Promise.all([
-      // Pedidos entregados (para total_compras y promedio)
-      supabase
-        .from('pedidos')
-        .select('total, fecha_pedido', { count: 'exact' })
-        .eq('cliente_id', clienteId)
-        .eq('estado', 'entregado'),
-      
-      // Pedidos pendientes
-      supabase
-        .from('pedidos')
-        .select('id', { count: 'exact' })
-        .eq('cliente_id', clienteId)
-        .not('estado', 'eq', 'entregado')
-        .not('estado', 'eq', 'cancelado'),
-      
-      // Total de pedidos (solo count)
-      supabase
-        .from('pedidos')
-        .select('*', { count: 'exact', head: true })
-        .eq('cliente_id', clienteId),
-      
-      // Cuenta corriente
-      supabase
-        .from('cuentas_corrientes')
-        .select('saldo, limite_credito')
-        .eq('cliente_id', clienteId)
-        .single(),
-      
-      // Listas de precios (usando la función existente)
-      supabase
-        .from('clientes_listas_precios')
-        .select(`
-          *,
-          lista_precio:listas_precios(*)
-        `)
-        .eq('cliente_id', clienteId)
-        .eq('activa', true)
-        .order('prioridad', { ascending: true })
-    ])
-
-    // Calcular estadísticas
-    const totalPedidos = countTotalPedidos || 0
-    const totalCompras = pedidosEntregados?.reduce((sum, p) => sum + (Number(p.total) || 0), 0) || 0
-    const pedidosEntregadosCount = countEntregados || 0
-    const promedioCompra = pedidosEntregadosCount > 0 ? totalCompras / pedidosEntregadosCount : 0
-    const pedidosPendientesCount = countPendientes || 0
-    
-    // Último pedido (fecha más reciente de pedidos entregados)
-    let ultimoPedido: string | null = null
-    if (pedidosEntregados && pedidosEntregados.length > 0) {
-      const fechas = pedidosEntregados
-        .map(p => p.fecha_pedido)
-        .filter(Boolean)
-        .sort()
-        .reverse()
-      ultimoPedido = fechas[0] || null
+    if (!resultado || !resultado.success) {
+      return { success: false, error: resultado?.error || 'Cliente no encontrado' }
     }
+
+    const { cliente: clienteRaw, estadisticas, cuenta_corriente, listas_precios } = resultado.data
 
     // Parsear coordenadas desde formato PostGIS
     let coordenadas: { lat: number; lng: number } | undefined
-    if (cliente.coordenadas) {
+    if (clienteRaw.coordenadas) {
       try {
-        // Supabase puede devolver geometrías PostGIS de diferentes formas
         let coords: any = null
         
-        if (typeof cliente.coordenadas === 'string') {
-          // Si viene como WKT: "POINT(lng lat)" o "SRID=4326;POINT(lng lat)"
-          const match = cliente.coordenadas.match(/POINT\(([\d.-]+)\s+([\d.-]+)\)/)
+        if (typeof clienteRaw.coordenadas === 'string') {
+          const match = clienteRaw.coordenadas.match(/POINT\(([\d.-]+)\s+([\d.-]+)\)/)
           if (match) {
             coords = {
               lng: parseFloat(match[1]),
               lat: parseFloat(match[2])
             }
           } else {
-            // Intentar parsear como JSON
             try {
-              coords = JSON.parse(cliente.coordenadas)
+              coords = JSON.parse(clienteRaw.coordenadas)
             } catch (e) {
               // Ignorar
             }
           }
-        } else if (cliente.coordenadas && typeof cliente.coordenadas === 'object') {
-          // Si viene como objeto con propiedades lat/lng
-          if ('lat' in cliente.coordenadas && 'lng' in cliente.coordenadas) {
-            coords = cliente.coordenadas
-          } else if ('coordinates' in cliente.coordenadas && Array.isArray(cliente.coordenadas.coordinates)) {
-            // Formato GeoJSON: [lng, lat]
+        } else if (clienteRaw.coordenadas && typeof clienteRaw.coordenadas === 'object') {
+          if ('lat' in clienteRaw.coordenadas && 'lng' in clienteRaw.coordenadas) {
+            coords = clienteRaw.coordenadas
+          } else if ('coordinates' in clienteRaw.coordenadas && Array.isArray(clienteRaw.coordenadas.coordinates)) {
             coords = {
-              lng: cliente.coordenadas.coordinates[0],
-              lat: cliente.coordenadas.coordinates[1]
+              lng: clienteRaw.coordenadas.coordinates[0],
+              lat: clienteRaw.coordenadas.coordinates[1]
             }
           }
         }
@@ -556,39 +491,30 @@ export async function obtenerClientePorId(
           coordenadas = { lat: coords.lat, lng: coords.lng }
         }
       } catch (e) {
-        console.warn('Error parseando coordenadas:', e)
+        // Ignorar error de parseo
       }
     }
 
-    // Filtrar listas válidas (vigencia)
-    const hoy = new Date().toISOString().split('T')[0]
-    const listasValidas = listasResult?.filter((asignacion: any) => {
-      const lista = asignacion.lista_precio
-      if (!lista?.activa) return false
-      if (!lista.vigencia_activa) return true
-      const desdeValida = !lista.fecha_vigencia_desde || lista.fecha_vigencia_desde <= hoy
-      const hastaValida = !lista.fecha_vigencia_hasta || lista.fecha_vigencia_hasta >= hoy
-      return desdeValida && hastaValida
-    }) || []
+    // Calcular promedio de compra
+    const pedidosEntregadosCount = estadisticas?.pedidos_entregados || 0
+    const totalCompras = estadisticas?.total_compras || 0
+    const promedioCompra = pedidosEntregadosCount > 0 ? totalCompras / pedidosEntregadosCount : 0
 
-    // Construir respuesta
+    // Construir respuesta con datos de la función RPC
     const clienteData = {
-      ...cliente,
+      ...clienteRaw,
       coordenadas,
-      total_pedidos: totalPedidos,
+      total_pedidos: estadisticas?.total_pedidos || 0,
       total_compras: totalCompras,
       promedio_compra: promedioCompra,
-      pedidos_pendientes: pedidosPendientesCount,
-      ultimo_pedido: ultimoPedido,
-      fecha_registro: cliente.created_at,
-      cuenta_corriente: cuentaCorriente ? {
-        saldo: cuentaCorriente.saldo || 0,
-        limite_credito: cuentaCorriente.limite_credito || cliente.limite_credito || 0
-      } : {
+      pedidos_pendientes: estadisticas?.pedidos_pendientes || 0,
+      ultimo_pedido: estadisticas?.ultimo_pedido || null,
+      fecha_registro: clienteRaw.created_at,
+      cuenta_corriente: cuenta_corriente || {
         saldo: 0,
-        limite_credito: cliente.limite_credito || 0
+        limite_credito: clienteRaw.limite_credito || 0
       },
-      listas_precios: listasValidas
+      listas_precios: listas_precios || []
     }
 
     return {
@@ -596,7 +522,7 @@ export async function obtenerClientePorId(
       data: clienteData
     }
   } catch (error: any) {
-    console.error('Error al obtener cliente por ID:', error)
+    devError('Error al obtener cliente por ID:', error)
     return {
       success: false,
       error: error.message || 'Error al obtener cliente',
@@ -658,7 +584,7 @@ export async function crearPedido(
       message: 'Pedido creado exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al crear pedido:', error)
+    devError('Error al crear pedido:', error)
     return {
       success: false,
       error: error.message || 'Error al crear pedido',
@@ -713,7 +639,7 @@ export async function crearPedidoBot(
       message: 'Pedido creado desde bot exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al crear pedido desde bot:', error)
+    devError('Error al crear pedido desde bot:', error)
     return {
       success: false,
       error: error.message || 'Error al crear pedido desde bot',
@@ -747,7 +673,7 @@ export async function actualizarEstadoPedido(
       message: 'Estado del pedido actualizado exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al actualizar estado del pedido:', error)
+    devError('Error al actualizar estado del pedido:', error)
     return {
       success: false,
       error: error.message || 'Error al actualizar estado del pedido',
@@ -825,7 +751,7 @@ export async function crearCotizacion(
       message: 'Cotización creada exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al crear cotización:', error)
+    devError('Error al crear cotización:', error)
     return {
       success: false,
       error: error.message || 'Error al crear cotización',
@@ -906,7 +832,7 @@ export async function convertirCotizacionAPedido(
       message: 'Cotización convertida a pedido exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al convertir cotización:', error)
+    devError('Error al convertir cotización:', error)
     return {
       success: false,
       error: error.message || 'Error al convertir cotización a pedido',
@@ -945,7 +871,7 @@ export async function crearReclamo(
       message: 'Reclamo creado exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al crear reclamo:', error)
+    devError('Error al crear reclamo:', error)
     return {
       success: false,
       error: error.message || 'Error al crear reclamo',
@@ -985,7 +911,7 @@ export async function crearReclamoBot(
       message: 'Reclamo creado desde bot exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al crear reclamo desde bot:', error)
+    devError('Error al crear reclamo desde bot:', error)
     return {
       success: false,
       error: error.message || 'Error al crear reclamo desde bot',
@@ -1026,7 +952,7 @@ export async function actualizarEstadoReclamo(
       message: 'Estado del reclamo actualizado exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al actualizar estado del reclamo:', error)
+    devError('Error al actualizar estado del reclamo:', error)
     return {
       success: false,
       error: error.message || 'Error al actualizar estado del reclamo',
@@ -1100,7 +1026,7 @@ export async function obtenerPedidos(
       data: data || [],
     }
   } catch (error: any) {
-    console.error('Error al obtener pedidos:', error)
+    devError('Error al obtener pedidos:', error)
     return {
       success: false,
       error: error.message || 'Error al obtener pedidos',
@@ -1113,62 +1039,26 @@ export async function obtenerPedidoPorId(pedidoId: string): Promise<ApiResponse<
   try {
     const supabase = await createClient()
 
-    const { data: pedido, error } = await supabase
-      .from('pedidos')
-      .select(
-        `
-        *,
-        clientes (*),
-        detalles_pedido (
-          id,
-          cantidad,
-          precio_unitario,
-          subtotal,
-          productos (nombre, codigo)
-        )
-      `
-      )
-      .eq('id', pedidoId)
-      .single()
+    // OPTIMIZADO: Usar función RPC que consolida todas las queries en una sola
+    const { data: resultado, error: rpcError } = await supabase
+      .rpc('fn_obtener_pedido_completo', {
+        p_pedido_id: pedidoId
+      })
 
-    if (error) throw error
-    if (!pedido) {
-      return { success: false, error: 'Pedido no encontrado' }
+    if (rpcError) {
+      return { success: false, error: rpcError.message || 'Error al obtener pedido' }
     }
 
-    const [{ data: pagos }, { data: cuenta }] = await Promise.all([
-      supabase
-        .from('tesoreria_movimientos')
-        .select(
-          `
-          id,
-          tipo,
-          monto,
-          metodo_pago,
-          created_at,
-          tesoreria_cajas (nombre)
-        `
-        )
-        .eq('origen_tipo', 'pedido')
-        .eq('origen_id', pedidoId)
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('cuentas_corrientes')
-        .select('id, saldo, limite_credito')
-        .eq('cliente_id', pedido.cliente_id)
-        .single(),
-    ])
+    if (!resultado || !resultado.success) {
+      return { success: false, error: resultado?.error || 'Pedido no encontrado' }
+    }
 
     return {
       success: true,
-      data: {
-        pedido,
-        pagos: pagos ?? [],
-        cuenta,
-      },
+      data: resultado.data,
     }
   } catch (error: any) {
-    console.error('obtenerPedidoPorId', error)
+    devError('obtenerPedidoPorId', error)
     return {
       success: false,
       error: error.message || 'Error al obtener el pedido',

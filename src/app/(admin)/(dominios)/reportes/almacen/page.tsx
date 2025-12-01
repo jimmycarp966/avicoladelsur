@@ -3,7 +3,7 @@ import { getTodayArgentina } from '@/lib/utils'
 import { obtenerKpisAlmacen, obtenerVariacionPeso } from '@/actions/reportes-almacen.actions'
 import { ReporteAlmacenContent } from './reporte-almacen-content'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 3600 // Revalida cada hora
 
 export default async function ReporteAlmacenPage({
   searchParams,

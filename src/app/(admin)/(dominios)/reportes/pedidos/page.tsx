@@ -4,7 +4,7 @@ import { obtenerKpisPedidos, obtenerFunnelPedidos, obtenerClientesSinComprar } f
 import { createClient } from '@/lib/supabase/server'
 import { ReportePedidosContent } from './reporte-pedidos-content'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 3600 // Revalida cada hora
 
 export default async function ReportePedidosPage({
   searchParams,

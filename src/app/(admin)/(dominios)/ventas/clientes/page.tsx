@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ClientesTableSkeleton } from './clientes-table-skeleton'
 import { ClientesTableWrapper } from './clientes-table-wrapper'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 300 // Revalida cada 5 minutos
 
 export const metadata = {
   title: 'Clientes - Avícola del Sur ERP',

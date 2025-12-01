@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { RecepcionAlmacenForm } from './recepcion-almacen-form'
 import { RecepcionAlmacenLista } from './recepcion-almacen-lista'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 300 // Revalida cada 5 minutos
 
 export const metadata = {
   title: 'Recepción de Almacén - Avícola del Sur ERP',

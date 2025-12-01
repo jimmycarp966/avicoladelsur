@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import { ReportesRRHHForm } from './reportes-rrhh-form'
 import { ReportesFormSkeleton } from './reportes-form-skeleton'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 3600 // Revalida cada hora
 
 export const metadata = {
   title: 'Reportes RRHH - Avícola del Sur ERP',

@@ -17,7 +17,7 @@ import { PresupuestosDiaSkeleton } from './presupuestos-dia-skeleton'
 import { PresupuestosDiaFiltros } from './presupuestos-dia-filtros'
 import { PresupuestosDiaAcciones, PresupuestoIndividualAccion } from '@/components/almacen/PresupuestosDiaAcciones'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 60 // Revalida cada 60 segundos
 
 export const metadata = {
   title: 'Presupuestos del Día - Almacén - Avícola del Sur ERP',

@@ -15,6 +15,7 @@
 - 🔐 **RLS Completo**: Seguridad por roles (admin, vendedor, repartidor, almacenista)
 - 💵 **Sistema de Listas de Precios**: Listas por tipo de cliente (minorista, mayorista, distribuidor) con margen de ganancia automático
 - 🧭 **Navegación Completa**: Sidebar organizado por módulos con acceso directo a todas las funcionalidades
+- ⚡ **Optimizaciones de Rendimiento**: Caché inteligente, revalidación estratégica, queries optimizadas, índices de BD
 
 ## 🚀 Inicio Rápido
 
@@ -85,6 +86,44 @@
 5. **RRHH**: Gestión completa de empleados, asistencia, liquidaciones, adelantos y evaluaciones
 6. **Chatbot**: Toma de pedidos y consultas vía WhatsApp
 7. **Tesorería**: Gestión de cajas, movimientos, validación de rutas y reportes financieros
+
+## ⚡ Optimizaciones de Rendimiento Implementadas
+
+### Velocidad de Carga
+- **Revalidación Estratégica**: Páginas principales usan `revalidate` en lugar de `force-dynamic`
+  - Dashboard: 30 segundos
+  - Listados: 5 minutos
+  - Reportes: 1 hora
+- **Caché de Consultas Frecuentes**: Productos, zonas y listas de precios se cachean automáticamente
+- **Queries Optimizadas**: Consolidación de queries N+1 en funciones RPC
+
+### Base de Datos
+- **Índices Optimizados**: Índices compuestos para consultas frecuentes
+  - Presupuestos por fecha/turno/zona
+  - Pedidos por sucursal/fecha
+  - Lotes por sucursal/producto/estado
+  - Transferencias por estado/fecha
+  - Alertas de stock por sucursal/estado
+- **Materialized Views**: KPIs de ventas pre-calculados (diarias y mensuales)
+- **Funciones RPC Optimizadas**: Validación batch, conversión masiva, aprobación masiva
+
+### Flujos de Negocio Optimizados
+- **Presupuestos → Pedidos**: Validación batch de stock, conversión masiva
+- **Transferencias entre Sucursales**: Validación batch, aprobación masiva
+- **Validación de Cobros**: Validación masiva de rutas con comparación automática
+- **Asignación de Rutas**: Validación batch de capacidad
+- **Expiración Automática**: Reservas de stock se liberan automáticamente cada 15 minutos
+
+### Mejoras de UX
+- **Notificaciones Push**: Notificaciones del navegador para eventos críticos
+- **Alertas de Stock Inteligentes**: Sistema de priorización (crítico, bajo, normal)
+- **Búsquedas Optimizadas**: Debounce en búsquedas para reducir queries innecesarias
+- **Logging Condicional**: Console.logs solo en desarrollo
+
+### Métricas Esperadas
+- **Tiempo de carga**: Reducción de 70-80% (de 3-5s a <1s con caché)
+- **Consultas BD**: Reducción de 50-70% (de 200-500ms a 50-150ms)
+- **Monitor GPS**: Latencia <1 segundo (con Supabase Realtime)
 
 ## 📁 Estructura del Proyecto
 

@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { RutasTableSkeleton } from './rutas-table-skeleton'
 import { RutasTableWrapper } from './rutas-table-wrapper'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 300 // Revalida cada 5 minutos
 
 export const metadata = {
   title: 'Rutas - Avícola del Sur ERP',

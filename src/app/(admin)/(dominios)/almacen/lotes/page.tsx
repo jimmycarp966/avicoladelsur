@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { LotesTableSkeleton } from './lotes-table-skeleton'
 import { LotesTableWrapper } from './lotes-table-wrapper'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 300 // Revalida cada 5 minutos
 
 export const metadata = {
   title: 'Lotes - Avícola del Sur ERP',

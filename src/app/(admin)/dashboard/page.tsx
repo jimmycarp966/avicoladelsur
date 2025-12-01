@@ -17,7 +17,7 @@ import {
   Clock
 } from 'lucide-react'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 30 // Revalida cada 30 segundos
 
 export default async function AdminDashboard() {
   const user = await getCurrentUser()

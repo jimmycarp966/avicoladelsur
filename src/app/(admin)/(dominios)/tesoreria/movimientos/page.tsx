@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { ArrowDownCircle, ArrowUpCircle, Wallet } from 'lucide-react'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 300 // Revalida cada 5 minutos
 
 export default async function MovimientosPage() {
   const [movimientos, cajas] = await Promise.all([obtenerMovimientosCaja(), listarCajas()])

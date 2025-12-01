@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { PresupuestosTableSkeleton } from './presupuestos-table-skeleton'
 import { PresupuestosTableWrapper } from './presupuestos-table-wrapper'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 300 // Revalida cada 5 minutos
 
 export const metadata = {
   title: 'Presupuestos - Avícola del Sur ERP',

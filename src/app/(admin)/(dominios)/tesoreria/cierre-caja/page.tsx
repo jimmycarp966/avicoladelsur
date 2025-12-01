@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { CierreCajaLista } from './cierre-caja-lista'
 import { CierreCajaForm } from './cierre-caja-form'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 300 // Revalida cada 5 minutos
 
 export const metadata = {
   title: 'Cierres de Caja - Tesorería - Avícola del Sur ERP',

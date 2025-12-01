@@ -3,7 +3,7 @@ import { getTodayArgentina } from '@/lib/utils'
 import { obtenerKpisTesoreria, obtenerRecaudacionDiaria } from '@/actions/reportes-tesoreria.actions'
 import { ReporteTesoreriaContent } from './reporte-tesoreria-content'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 3600 // Revalida cada hora
 
 export default async function ReporteTesoreriaPage({
   searchParams,

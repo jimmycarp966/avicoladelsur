@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { PiggyBank, Wallet, TrendingUp, TrendingDown, CheckCircle2 } from 'lucide-react'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 300 // Revalida cada 5 minutos
 
 export default async function TesoreriaPage() {
   const [resumen, cajas, rutasPendientes] = await Promise.all([
