@@ -80,3 +80,7 @@ COMMENT ON POLICY "repartidor_vehiculos_read" ON vehiculos IS 'Repartidor puede 
 
 
 
+
+
+
+

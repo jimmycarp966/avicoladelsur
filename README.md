@@ -348,6 +348,17 @@ Sistema mejorado con validaciones críticas y automatizaciones para mayor confia
 - **Beneficio**: Clientes reciben estimación realista de llegada
 - **Pendiente**: Integración en UI de presupuestos
 
+#### 7. ✅ Módulo de Sucursales Completo
+- **Gestión Multi-Sucursal**: CRUD completo de sucursales con configuración individual.
+- **Transferencias de Stock**: Flujo completo de solicitud, aprobación y recepción de mercadería entre sucursales.
+- **Dashboard Individual**: Vista detallada por sucursal con KPIs, inventario y movimientos recientes.
+- **Alertas de Stock**: Configuración de umbrales y notificaciones automáticas.
+
+#### 8. ✅ Sistema de Notificaciones UI
+- **Campana en Header**: Notificaciones en tiempo real para usuarios administrativos.
+- **Gestión**: Marcar como leída, ver historial, notificaciones push en navegador.
+- **Integración**: Conectado a eventos del sistema (stock bajo, nuevos pedidos, transferencias).
+
 ### Funciones SQL Mejoradas
 
 ```sql
@@ -370,7 +381,15 @@ SELECT fn_convertir_presupuesto_a_pedido(
 SELECT * FROM fn_asignar_vehiculos_por_peso(
     p_fecha := '2025-11-30'::date,
     p_zona_id := 'uuid-zona',
-    p_turno := 'mañana·
+    p_turno := 'mañana'
+);
+
+-- Crear transferencia de stock
+SELECT * FROM fn_crear_transferencia_stock(
+    p_sucursal_origen_id := 'uuid-origen',
+    p_sucursal_destino_id := 'uuid-destino',
+    p_items := '[{"producto_id": "uuid", "cantidad": 10}]'::jsonb,
+    p_user_id := 'uuid-user'
 );
 
 -- Configurar expiración automática (una sola vez)
@@ -380,7 +399,9 @@ SELECT fn_configurar_expirar_reservas();
 ### Nuevas Migraciones
 
 - `20251130_mejoras_flujo_ventas.sql`: Mejoras críticas completas
-- `20251130_tabla_notificaciones.sql`: Historial de notificaciones
+- `20251130_tabla_notificaciones.sql`: Historial de notificaciones clientes
+- `20251130_transferencias_sucursales.sql`: Tablas y funciones para transferencias
+- `20251130_notificaciones_rls.sql`: Sistema de notificaciones UI y RLS
 
 ### Impacto Operativo
 
@@ -389,12 +410,14 @@ SELECT fn_configurar_expirar_reservas();
 - ❌ Vehículos mal asignados → Sobrecarga o desperdicio
 - ❌ Reservas bloqueadas indefinidamente → Stock no disponible
 - ❌ Clientes sin información → Consultas constantes
+- ❌ Gestión de sucursales manual → Descontrol de stock
 
 **Después de las mejoras:**
 - ✅ Solo presupuestos con stock confirmado
 - ✅ Vehículos asignados según peso real
 - ✅ Stock se libera automáticamente cada 15 minutos
 - ✅ Clientes reciben actualizaciones automáticas por WhatsApp
+- ✅ Control total de stock y movimientos entre sucursales
 
 ---
 
