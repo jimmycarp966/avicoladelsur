@@ -19,9 +19,9 @@ import { obtenerInventarioSucursalAction } from '@/actions/sucursales.actions'
 import { listarTransferencias } from '@/actions/sucursales-transferencias.actions'
 
 interface PageProps {
-    params: {
+    params: Promise<{
         id: string
-    }
+    }>
 }
 
 async function getSucursal(id: string) {
@@ -32,7 +32,10 @@ async function getSucursal(id: string) {
         .eq('id', id)
         .single()
 
-    if (error || !data) return null
+    if (error || !data) {
+        console.error('Error al obtener sucursal:', error)
+        return null
+    }
     return data
 }
 
@@ -47,11 +50,12 @@ async function getTransferencias(id: string) {
 }
 
 export default async function SucursalDashboardPage({ params }: PageProps) {
-    const sucursal = await getSucursal(params.id)
+    const { id } = await params
+    const sucursal = await getSucursal(id)
     if (!sucursal) notFound()
 
-    const inventario = await getInventario(params.id)
-    const transferencias = await getTransferencias(params.id)
+    const inventario = await getInventario(id)
+    const transferencias = await getTransferencias(id)
 
     const productosBajoStock = inventario.filter(i => i.bajoStock)
     const totalProductos = inventario.length
