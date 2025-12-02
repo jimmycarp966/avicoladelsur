@@ -355,6 +355,7 @@ Muestra en dashboard → Casa central revisa
 - `fn_detectar_comportamiento_sospechoso()`: Alertas de fraude
 
 #### Rutas y Componentes
+- `/sucursal/dashboard`: Dashboard principal con identificación clara de sucursal y selector para admins
 - `/sucursal/ventas`: POS con control de precios
 - `/sucursal/inventario/conteos`: Gestión de conteos físicos
 - `/sucursal/reportes/auditoria`: Reportes de auditoría de precios
@@ -362,11 +363,30 @@ Muestra en dashboard → Casa central revisa
 - `ConteosStockContent.tsx`: Interfaz de conteos
 - `AuditoriaListasContent.tsx`: Reportes de auditoría
 
+#### Mejoras de UX y Manejo de Admins (Diciembre 2025)
+- **Dashboard Mejorado**: 
+  - Banner destacado con identificación clara de sucursal actual
+  - Selector de sucursales para administradores (permite cambiar entre sucursales)
+  - Badges de estado (Activa/Inactiva) y vista admin
+  - Información de contacto (dirección, teléfono) con iconos
+- **Manejo de Administradores sin Sucursal**:
+  - Función helper `getSucursalUsuarioConAdmin()` que maneja el caso de admin sin sucursal asignada
+  - Todos los componentes de sucursal ahora manejan correctamente el caso de admin sin sucursal
+  - Mensajes informativos con opción para crear primera sucursal cuando no hay sucursales activas
+  - Datos vacíos sin errores cuando admin no tiene sucursal asignada
+- **Componentes Actualizados**: 
+  - `dashboard/page.tsx`: Selector de sucursales y banner de identificación
+  - `ventas/page.tsx`: Manejo de admin sin sucursal
+  - `alerts/page.tsx`: Cambio a createClient del servidor + manejo de admin
+  - `inventario/page.tsx`, `tesoreria/page.tsx`, `novedades/page.tsx`, `transferencias/page.tsx`, `inventario/conteos/page.tsx`, `reportes/auditoria/page.tsx`: Todos actualizados con soporte para admin sin sucursal
+
 **Filosofía de Diseño:**
 - ✅ **Control Posterior**: No bloquea operaciones, pero registra todo para auditoría
 - ✅ **Ajustes Automáticos**: Mermas normales se aplican automáticamente
 - ✅ **Detección Proactiva**: Alertas automáticas de comportamientos sospechosos
 - ✅ **Visibilidad Total**: Casa central ve stock, valor y márgenes en tiempo real
+- ✅ **UX Mejorada**: Identificación clara de sucursal y navegación intuitiva para admins
+- ✅ **Robustez**: Manejo elegante de casos edge (admin sin sucursal, sin sucursales activas)
 
 ### 5️⃣ Dominio: Bot de WhatsApp (Interfaz de Cliente) ✅ FUNCIONANDO
 
