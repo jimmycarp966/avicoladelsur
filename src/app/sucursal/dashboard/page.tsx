@@ -36,13 +36,21 @@ async function getSucursalData(searchParams?: { sid?: string }) {
   }
 
   // Obtener rol del usuario
-  const { data: usuarioData } = await supabase
+  const { data: usuarioData, error: usuarioError } = await supabase
     .from('usuarios')
     .select('rol')
     .eq('email', user.email)
     .single()
 
-  const esAdmin = usuarioData?.rol === 'admin'
+  // Si hay error al obtener el usuario, verificar también por auth.users
+  let esAdmin = false
+  if (usuarioData?.rol === 'admin') {
+    esAdmin = true
+  } else if (usuarioError) {
+    // Si no existe en usuarios, verificar si es admin en auth.users metadata
+    const { data: { user: authUser } } = await supabase.auth.getUser()
+    esAdmin = authUser?.user_metadata?.rol === 'admin' || authUser?.user_metadata?.role === 'admin'
+  }
 
   // Obtener sucursal del usuario
   const sucursalId = await getSucursalUsuario(supabase, user.id)
@@ -69,30 +77,51 @@ async function getSucursalData(searchParams?: { sid?: string }) {
 
   // Si es admin y no tiene sucursal asignada, obtener la primera sucursal activa
   if (!sucursalIdFinal && esAdmin) {
-    const { data: primeraSucursal } = await supabase
+    const { data: sucursalesActivas } = await supabase
       .from('sucursales')
       .select('id')
       .eq('active', true)
       .order('nombre')
       .limit(1)
-      .single()
     
-    if (primeraSucursal) {
-      sucursalIdFinal = primeraSucursal.id
+    if (sucursalesActivas && sucursalesActivas.length > 0) {
+      sucursalIdFinal = sucursalesActivas[0].id
     } else {
-      throw new Error('No hay sucursales activas en el sistema')
+      // Si es admin y no hay sucursales, permitir acceso pero mostrar mensaje
+      // No lanzar error, permitir que el admin vea el dashboard vacío
+      // Esto permite que el admin pueda crear sucursales desde el sistema
+      console.warn('Admin sin sucursal asignada y sin sucursales activas en el sistema')
     }
   }
 
   // Obtener información de la sucursal
-  const { data: sucursal, error: sucursalError } = await supabase
-    .from('sucursales')
-    .select('*')
-    .eq('id', sucursalIdFinal)
-    .single()
+  let sucursal = null
+  if (sucursalIdFinal) {
+    const { data: sucursalData, error: sucursalError } = await supabase
+      .from('sucursales')
+      .select('*')
+      .eq('id', sucursalIdFinal)
+      .single()
 
-  if (sucursalError) {
-    throw new Error('Error al obtener datos de sucursal')
+    if (sucursalError) {
+      throw new Error('Error al obtener datos de sucursal')
+    }
+    sucursal = sucursalData
+  }
+
+  // Si es admin y no hay sucursal, crear un objeto dummy para evitar errores
+  if (!sucursal && esAdmin) {
+    sucursal = {
+      id: null,
+      nombre: 'Sin sucursal asignada',
+      direccion: null,
+      telefono: null,
+      active: false
+    }
+  }
+
+  if (!sucursal) {
+    throw new Error('No se pudo obtener información de la sucursal')
   }
 
   // Si es admin, obtener lista de todas las sucursales para el selector
@@ -107,37 +136,49 @@ async function getSucursalData(searchParams?: { sid?: string }) {
     todasLasSucursales = sucursales || []
   }
 
-  // Obtener ventas del día
-  const hoy = new Date().toISOString().split('T')[0]
-  const { data: ventasDia, error: ventasError } = await supabase
-    .from('pedidos')
-    .select('total, estado')
-    .eq('sucursal_id', sucursalId)
-    .eq('estado', 'completado')
-    .gte('created_at', `${hoy}T00:00:00.000Z`)
-    .lte('created_at', `${hoy}T23:59:59.999Z`)
+  // Obtener datos solo si hay una sucursal válida
+  let ventasDia: any[] = []
+  let alertas: any[] = []
+  let caja: any = null
+  let transferencias: any[] = []
 
-  // Obtener alertas activas
-  const { data: alertas, error: alertasError } = await supabase
-    .from('alertas_stock')
-    .select('id, producto_id, cantidad_actual, umbral')
-    .eq('sucursal_id', sucursalId)
-    .eq('estado', 'pendiente')
+  if (sucursalIdFinal) {
+    // Obtener ventas del día
+    const hoy = new Date().toISOString().split('T')[0]
+    const { data: ventasDiaData } = await supabase
+      .from('pedidos')
+      .select('total, estado')
+      .eq('sucursal_id', sucursalIdFinal)
+      .eq('estado', 'completado')
+      .gte('created_at', `${hoy}T00:00:00.000Z`)
+      .lte('created_at', `${hoy}T23:59:59.999Z`)
+    ventasDia = ventasDiaData || []
 
-  // Obtener saldo de caja
-  const { data: caja, error: cajaError } = await supabase
-    .from('tesoreria_cajas')
-    .select('saldo_actual')
-    .eq('sucursal_id', sucursalId)
-    .eq('active', true)
-    .single()
+    // Obtener alertas activas
+    const { data: alertasData } = await supabase
+      .from('alertas_stock')
+      .select('id, producto_id, cantidad_actual, umbral')
+      .eq('sucursal_id', sucursalIdFinal)
+      .eq('estado', 'pendiente')
+    alertas = alertasData || []
 
-  // Obtener transferencias pendientes
-  const { data: transferencias, error: transferenciasError } = await supabase
-    .from('transferencias_stock')
-    .select('id, estado')
-    .or(`sucursal_origen_id.eq.${sucursalId},sucursal_destino_id.eq.${sucursalId}`)
-    .in('estado', ['pendiente', 'en_transito'])
+    // Obtener saldo de caja
+    const { data: cajaData } = await supabase
+      .from('tesoreria_cajas')
+      .select('saldo_actual')
+      .eq('sucursal_id', sucursalIdFinal)
+      .eq('active', true)
+      .single()
+    caja = cajaData
+
+    // Obtener transferencias pendientes
+    const { data: transferenciasData } = await supabase
+      .from('transferencias_stock')
+      .select('id, estado')
+      .or(`sucursal_origen_id.eq.${sucursalIdFinal},sucursal_destino_id.eq.${sucursalIdFinal}`)
+      .in('estado', ['pendiente', 'en_transito'])
+    transferencias = transferenciasData || []
+  }
 
   return {
     sucursal,
@@ -187,6 +228,7 @@ export default async function SucursalDashboardPage(props: PageProps) {
 
     const totalVentasDia = data.ventasDia.reduce((sum, venta) => sum + (venta.total || 0), 0)
     const transferenciasPendientes = data.transferencias.filter(t => t.estado === 'pendiente').length
+    const sinSucursal = data.esAdmin && !data.sucursalId
 
     return (
       <div className="space-y-6">
@@ -214,6 +256,31 @@ export default async function SucursalDashboardPage(props: PageProps) {
             </div>
           </CardContent>
         </Card>
+
+        {/* Mensaje para admin sin sucursal asignada */}
+        {sinSucursal && (
+          <Card className="border-amber-200 bg-amber-50">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <h3 className="font-semibold text-amber-900 mb-2">
+                    No hay sucursales activas en el sistema
+                  </h3>
+                  <p className="text-amber-800 mb-4">
+                    Como administrador, puedes crear nuevas sucursales desde la sección de gestión.
+                  </p>
+                  <Button asChild>
+                    <Link href="/sucursales/nueva">
+                      <Building2 className="w-4 h-4 mr-2" />
+                      Crear Primera Sucursal
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -246,9 +313,11 @@ export default async function SucursalDashboardPage(props: PageProps) {
                 </div>
               )}
             </div>
-            {data.esAdmin && data.todasLasSucursales.length > 1 && (
+            {data.esAdmin && data.todasLasSucursales.length > 0 && (
               <div className="mt-3">
-                <p className="text-xs text-muted-foreground mb-1">Cambiar sucursal:</p>
+                <p className="text-xs text-muted-foreground mb-1">
+                  {data.todasLasSucursales.length > 1 ? 'Cambiar sucursal:' : 'Sucursales disponibles:'}
+                </p>
                 <div className="flex flex-wrap gap-2">
                   {data.todasLasSucursales.map((s) => (
                     <Button
