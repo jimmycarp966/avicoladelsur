@@ -133,18 +133,6 @@ const navigation = [
     icon: FileText,
     roles: ['admin'],
   },
-  {
-    name: 'Diagnóstico Stock',
-    href: '/diagnostico-stock',
-    icon: Package,
-    roles: ['admin'],
-  },
-  {
-    name: 'Debug Transferencias',
-    href: '/debug-transferencias',
-    icon: Package,
-    roles: ['admin'],
-  },
 ]
 
 function hasAccess(user: Usuario | null, requiredRoles: string[]): boolean {
