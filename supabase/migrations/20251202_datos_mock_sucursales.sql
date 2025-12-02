@@ -24,10 +24,12 @@ BEGIN;
 
 -- Configuración para todas las sucursales existentes
 INSERT INTO sucursal_settings (sucursal_id, low_stock_threshold_default)
-SELECT id, 5
-FROM sucursales
-WHERE nombre IN ('Sucursal Alberdi', 'Sucursal San Martín', 'Sucursal Colón', 'Sucursal Simoca')
-ON CONFLICT (sucursal_id) DO NOTHING;
+SELECT s.id, 5
+FROM sucursales s
+WHERE s.nombre IN ('Sucursal Alberdi', 'Sucursal San Martín', 'Sucursal Colón', 'Sucursal Simoca')
+AND NOT EXISTS (
+    SELECT 1 FROM sucursal_settings ss WHERE ss.sucursal_id = s.id
+);
 
 -- ===========================================
 -- 3. CREAR CAJAS PARA LAS SUCURSALES EXISTENTES
@@ -161,20 +163,24 @@ FROM productos p
 CROSS JOIN sucursales s
 WHERE s.nombre IN ('Sucursal Alberdi', 'Sucursal San Martín', 'Sucursal Colón', 'Sucursal Simoca')
 AND p.activo = true
-ON CONFLICT (numero_lote) DO UPDATE SET
-    cantidad_disponible = EXCLUDED.cantidad_disponible,
-    updated_at = NOW();
+AND NOT EXISTS (
+    SELECT 1 FROM lotes l2 WHERE l2.numero_lote = UPPER(LEFT(REPLACE(s.nombre, 'Sucursal ', ''), 4)) || '-' || p.codigo || '-001'
+);
 
 -- ===========================================
 -- 6. CREAR LISTAS DE PRECIOS SI NO EXISTEN
 -- ===========================================
 
+-- Crear listas de precios si no existen
 INSERT INTO listas_precios (codigo, nombre, tipo, activa, margen_ganancia)
-VALUES 
-    ('MINORISTA', 'Lista Minorista', 'minorista', true, 30.00),
-    ('MAYORISTA', 'Lista Mayorista', 'mayorista', true, 15.00),
-    ('DISTRIBUIDOR', 'Lista Distribuidor', 'distribuidor', true, 10.00)
-ON CONFLICT (codigo) DO NOTHING;
+SELECT v.* FROM (VALUES
+    ('MINORISTA', 'Lista Minorista', 'minorista'::varchar(50), true, 30.00),
+    ('MAYORISTA', 'Lista Mayorista', 'mayorista'::varchar(50), true, 15.00),
+    ('DISTRIBUIDOR', 'Lista Distribuidor', 'distribuidor'::varchar(50), true, 10.00)
+) AS v(codigo, nombre, tipo, activa, margen_ganancia)
+WHERE NOT EXISTS (
+    SELECT 1 FROM listas_precios lp WHERE lp.codigo = v.codigo
+);
 
 -- ===========================================
 -- 5. CREAR CLIENTES DE EJEMPLO PARA LAS SUCURSALES
@@ -182,24 +188,27 @@ ON CONFLICT (codigo) DO NOTHING;
 
 -- Clientes para todas las zonas de sucursales
 INSERT INTO clientes (codigo, nombre, telefono, direccion, zona_entrega, tipo_cliente, activo)
-VALUES
-    ('CLI-ALB-001', 'Almacén Centro', '381-555-1001', 'Av. Alberdi 1234', 'Alberdi', 'minorista', true),
-    ('CLI-ALB-002', 'Carnicería El Progreso', '381-555-1002', 'Calle San Juan 567', 'Alberdi', 'minorista', true),
-    ('CLI-ALB-003', 'Distribuidora Alberdi', '381-555-1003', 'Av. Alem 890', 'Alberdi', 'mayorista', true),
-    ('CLI-ALB-004', 'Restaurante El Patio', '381-555-1004', 'Esquina Alberdi y San Martín', 'Alberdi', 'mayorista', true),
-    ('CLI-SMA-001', 'Despensa Doña Ana', '381-555-1101', 'Av. San Martín 234', 'San Martín', 'minorista', true),
-    ('CLI-SMA-002', 'Carnicería San Martín', '381-555-1102', 'Calle Córdoba 345', 'San Martín', 'minorista', true),
-    ('CLI-SMA-003', 'Mayorista del Centro', '381-555-1103', 'Av. Belgrano 456', 'San Martín', 'mayorista', true),
-    ('CLI-SMA-004', 'Hotel Plaza', '381-555-1104', 'Plaza Principal 789', 'San Martín', 'mayorista', true),
-    ('CLI-COL-001', 'Almacén Don Pedro', '381-555-1201', 'Av. Colón 1234', 'Colón', 'minorista', true),
-    ('CLI-COL-002', 'Carnicería El Gaucho', '381-555-1202', 'Calle San Juan 567', 'Colón', 'minorista', true),
-    ('CLI-COL-003', 'Distribuidora Norte', '381-555-1203', 'Av. Alem 890', 'Colón', 'mayorista', true),
-    ('CLI-COL-004', 'Restaurante La Esquina', '381-555-1204', 'Esquina Colón y San Martín', 'Colón', 'mayorista', true),
-    ('CLI-SIM-001', 'Despensa María', '381-555-1301', 'Ruta 9 Km 44', 'Simoca', 'minorista', true),
-    ('CLI-SIM-002', 'Granja Los Pinos', '381-555-1302', 'Camino Rural 12', 'Simoca', 'mayorista', true),
-    ('CLI-SIM-003', 'Pollería Central Simoca', '381-555-1303', 'Plaza Principal S/N', 'Simoca', 'minorista', true),
-    ('CLI-SIM-004', 'Cooperativa Agrícola', '381-555-1304', 'Ruta 9 Km 48', 'Simoca', 'distribuidor', true)
-ON CONFLICT (codigo) DO NOTHING;
+SELECT * FROM (VALUES
+    ('CLI-ALB-001', 'Almacén Centro', '381-555-1001', 'Av. Alberdi 1234', 'Alberdi', 'minorista'::varchar(50), true),
+    ('CLI-ALB-002', 'Carnicería El Progreso', '381-555-1002', 'Calle San Juan 567', 'Alberdi', 'minorista'::varchar(50), true),
+    ('CLI-ALB-003', 'Distribuidora Alberdi', '381-555-1003', 'Av. Alem 890', 'Alberdi', 'mayorista'::varchar(50), true),
+    ('CLI-ALB-004', 'Restaurante El Patio', '381-555-1004', 'Esquina Alberdi y San Martín', 'Alberdi', 'mayorista'::varchar(50), true),
+    ('CLI-SMA-001', 'Despensa Doña Ana', '381-555-1101', 'Av. San Martín 234', 'San Martín', 'minorista'::varchar(50), true),
+    ('CLI-SMA-002', 'Carnicería San Martín', '381-555-1102', 'Calle Córdoba 345', 'San Martín', 'minorista'::varchar(50), true),
+    ('CLI-SMA-003', 'Mayorista del Centro', '381-555-1103', 'Av. Belgrano 456', 'San Martín', 'mayorista'::varchar(50), true),
+    ('CLI-SMA-004', 'Hotel Plaza', '381-555-1104', 'Plaza Principal 789', 'San Martín', 'mayorista'::varchar(50), true),
+    ('CLI-COL-001', 'Almacén Don Pedro', '381-555-1201', 'Av. Colón 1234', 'Colón', 'minorista'::varchar(50), true),
+    ('CLI-COL-002', 'Carnicería El Gaucho', '381-555-1202', 'Calle San Juan 567', 'Colón', 'minorista'::varchar(50), true),
+    ('CLI-COL-003', 'Distribuidora Norte', '381-555-1203', 'Av. Alem 890', 'Colón', 'mayorista'::varchar(50), true),
+    ('CLI-COL-004', 'Restaurante La Esquina', '381-555-1204', 'Esquina Colón y San Martín', 'Colón', 'mayorista'::varchar(50), true),
+    ('CLI-SIM-001', 'Despensa María', '381-555-1301', 'Ruta 9 Km 44', 'Simoca', 'minorista'::varchar(50), true),
+    ('CLI-SIM-002', 'Granja Los Pinos', '381-555-1302', 'Camino Rural 12', 'Simoca', 'mayorista'::varchar(50), true),
+    ('CLI-SIM-003', 'Pollería Central Simoca', '381-555-1303', 'Plaza Principal S/N', 'Simoca', 'minorista'::varchar(50), true),
+    ('CLI-SIM-004', 'Cooperativa Agrícola', '381-555-1304', 'Ruta 9 Km 48', 'Simoca', 'distribuidor'::varchar(50), true)
+) AS v(codigo, nombre, telefono, direccion, zona_entrega, tipo_cliente, activo)
+WHERE NOT EXISTS (
+    SELECT 1 FROM clientes c WHERE c.codigo = v.codigo
+);
 
 -- ===========================================
 -- 6. CREAR PEDIDOS (VENTAS) PARA TODAS LAS SUCURSALES - Últimos 7 días
@@ -207,14 +216,14 @@ ON CONFLICT (codigo) DO NOTHING;
 
 -- Ventas para Sucursal Alberdi
 INSERT INTO pedidos (
-    sucursal_id, cliente_id, estado, metodo_pago, total, subtotal,
+    sucursal_id, cliente_id, estado, pago_estado, total, subtotal,
     costo_total, margen_bruto_total, fecha_entrega, created_at
 )
 SELECT
     s.id,
     c.id,
     'completado',
-    CASE WHEN c.tipo_cliente = 'minorista' THEN 'efectivo' ELSE 'transferencia' END,
+    CASE WHEN c.tipo_cliente = 'minorista' THEN 'pagado' ELSE 'pagado' END,
     CASE
         WHEN c.codigo = 'CLI-ALB-001' THEN 3950.00
         WHEN c.codigo = 'CLI-ALB-002' THEN 2650.00
@@ -257,14 +266,14 @@ WHERE s.nombre = 'Sucursal Alberdi' AND c.zona_entrega = 'Alberdi';
 
 -- Ventas para Sucursal San Martín
 INSERT INTO pedidos (
-    sucursal_id, cliente_id, estado, metodo_pago, total, subtotal,
+    sucursal_id, cliente_id, estado, pago_estado, total, subtotal,
     costo_total, margen_bruto_total, fecha_entrega, created_at
 )
 SELECT
     s.id,
     c.id,
     'completado',
-    CASE WHEN c.tipo_cliente = 'minorista' THEN 'efectivo' ELSE 'transferencia' END,
+    CASE WHEN c.tipo_cliente = 'minorista' THEN 'pagado' ELSE 'pagado' END,
     CASE
         WHEN c.codigo = 'CLI-SMA-001' THEN 3650.00
         WHEN c.codigo = 'CLI-SMA-002' THEN 2450.00
@@ -307,14 +316,14 @@ WHERE s.nombre = 'Sucursal San Martín' AND c.zona_entrega = 'San Martín';
 
 -- Ventas para Sucursal Colón
 INSERT INTO pedidos (
-    sucursal_id, cliente_id, estado, metodo_pago, total, subtotal,
+    sucursal_id, cliente_id, estado, pago_estado, total, subtotal,
     costo_total, margen_bruto_total, fecha_entrega, created_at
 )
 SELECT
     s.id,
     c.id,
     'completado',
-    CASE WHEN c.tipo_cliente = 'minorista' THEN 'efectivo' ELSE 'transferencia' END,
+    CASE WHEN c.tipo_cliente = 'minorista' THEN 'pagado' ELSE 'pagado' END,
     CASE
         WHEN c.codigo = 'CLI-COL-001' THEN 4250.00
         WHEN c.codigo = 'CLI-COL-002' THEN 2850.00
@@ -357,14 +366,14 @@ WHERE s.nombre = 'Sucursal Colón' AND c.zona_entrega = 'Colón';
 
 -- Ventas para Sucursal Simoca
 INSERT INTO pedidos (
-    sucursal_id, cliente_id, estado, metodo_pago, total, subtotal,
+    sucursal_id, cliente_id, estado, pago_estado, total, subtotal,
     costo_total, margen_bruto_total, fecha_entrega, created_at
 )
 SELECT
     s.id,
     c.id,
     'completado',
-    CASE WHEN c.tipo_cliente = 'minorista' THEN 'efectivo' ELSE 'transferencia' END,
+    CASE WHEN c.tipo_cliente = 'minorista' THEN 'pagado' ELSE 'pagado' END,
     CASE
         WHEN c.codigo = 'CLI-SIM-001' THEN 3200.00
         WHEN c.codigo = 'CLI-SIM-002' THEN 1850.00
@@ -465,193 +474,227 @@ AND NOT EXISTS (
 );
 
 -- ===========================================
--- 11. CREAR TRANSFERENCIAS ENTRE SUCURSALES
+-- 8. CREAR TRANSFERENCIAS ENTRE SUCURSALES
 -- ===========================================
 
--- Transferencia pendiente: Casa Central -> Colón
+-- Transferencias para todas las sucursales
 INSERT INTO transferencias_stock (
-    sucursal_origen_id, sucursal_destino_id, estado, 
-    solicitado_por, observaciones, created_at
-)
-SELECT 
-    origen.id,
-    destino.id,
-    'pendiente',
-    (SELECT id FROM usuarios WHERE rol = 'admin' LIMIT 1),
-    'Reposición semanal de stock',
-    CURRENT_DATE - INTERVAL '1 day'
-FROM sucursales origen, sucursales destino
-WHERE origen.nombre = 'Casa Central' AND destino.nombre = 'Sucursal Colón';
-
--- Transferencia en tránsito: Casa Central -> Simoca
-INSERT INTO transferencias_stock (
-    sucursal_origen_id, sucursal_destino_id, estado, 
-    solicitado_por, aprobado_por, fecha_aprobacion, observaciones, created_at
-)
-SELECT 
-    origen.id,
-    destino.id,
-    'en_transito',
-    (SELECT id FROM usuarios WHERE rol = 'admin' LIMIT 1),
-    (SELECT id FROM usuarios WHERE rol = 'admin' LIMIT 1),
-    CURRENT_DATE,
-    'Envío urgente por demanda alta',
-    CURRENT_DATE - INTERVAL '2 days'
-FROM sucursales origen, sucursales destino
-WHERE origen.nombre = 'Casa Central' AND destino.nombre = 'Sucursal Simoca';
-
--- Transferencia completada: Casa Central -> Colón (histórica)
-INSERT INTO transferencias_stock (
-    sucursal_origen_id, sucursal_destino_id, estado, 
+    sucursal_origen_id, sucursal_destino_id, estado,
     solicitado_por, aprobado_por, fecha_aprobacion,
     recibido_por, fecha_recepcion, observaciones, created_at
 )
-SELECT 
+SELECT
     origen.id,
     destino.id,
-    'completada',
+    CASE
+        WHEN destino.nombre = 'Sucursal Alberdi' THEN 'completada'
+        WHEN destino.nombre = 'Sucursal San Martín' THEN 'en_transito'
+        WHEN destino.nombre = 'Sucursal Colón' THEN 'pendiente'
+        WHEN destino.nombre = 'Sucursal Simoca' THEN 'completada'
+    END,
     (SELECT id FROM usuarios WHERE rol = 'admin' LIMIT 1),
-    (SELECT id FROM usuarios WHERE rol = 'admin' LIMIT 1),
-    CURRENT_DATE - INTERVAL '8 days',
-    (SELECT id FROM usuarios WHERE rol = 'admin' LIMIT 1),
-    CURRENT_DATE - INTERVAL '7 days',
-    'Transferencia mensual completada',
-    CURRENT_DATE - INTERVAL '10 days'
+    CASE
+        WHEN destino.nombre IN ('Sucursal Alberdi', 'Sucursal Simoca') THEN (SELECT id FROM usuarios WHERE rol = 'admin' LIMIT 1)
+        ELSE NULL
+    END,
+    CASE
+        WHEN destino.nombre IN ('Sucursal Alberdi', 'Sucursal Simoca') THEN CURRENT_DATE - INTERVAL '5 days'
+        ELSE NULL
+    END,
+    CASE
+        WHEN destino.nombre = 'Sucursal Alberdi' THEN (SELECT id FROM usuarios WHERE rol = 'admin' LIMIT 1)
+        WHEN destino.nombre = 'Sucursal Simoca' THEN (SELECT id FROM usuarios WHERE rol = 'admin' LIMIT 1)
+        ELSE NULL
+    END,
+    CASE
+        WHEN destino.nombre = 'Sucursal Alberdi' THEN CURRENT_DATE - INTERVAL '4 days'
+        WHEN destino.nombre = 'Sucursal Simoca' THEN CURRENT_DATE - INTERVAL '3 days'
+        ELSE NULL
+    END,
+    CASE
+        WHEN destino.nombre = 'Sucursal Alberdi' THEN 'Transferencia semanal completada'
+        WHEN destino.nombre = 'Sucursal San Martín' THEN 'Envío programado'
+        WHEN destino.nombre = 'Sucursal Colón' THEN 'Reposición semanal de stock'
+        WHEN destino.nombre = 'Sucursal Simoca' THEN 'Transferencia mensual completada'
+    END,
+    CASE
+        WHEN destino.nombre = 'Sucursal Alberdi' THEN CURRENT_DATE - INTERVAL '7 days'
+        WHEN destino.nombre = 'Sucursal San Martín' THEN CURRENT_DATE - INTERVAL '2 days'
+        WHEN destino.nombre = 'Sucursal Colón' THEN CURRENT_DATE - INTERVAL '1 day'
+        WHEN destino.nombre = 'Sucursal Simoca' THEN CURRENT_DATE - INTERVAL '10 days'
+    END
 FROM sucursales origen, sucursales destino
-WHERE origen.nombre = 'Casa Central' AND destino.nombre = 'Sucursal Colón';
+WHERE origen.nombre = 'Casa Central'
+AND destino.nombre IN ('Sucursal Alberdi', 'Sucursal San Martín', 'Sucursal Colón', 'Sucursal Simoca');
 
 -- ===========================================
--- 12. CREAR CONTEOS DE STOCK
+-- 9. CREAR CONTEOS DE STOCK
 -- ===========================================
 
--- Conteo completado para Colón (hace 5 días)
+-- Conteos para todas las sucursales
 INSERT INTO conteos_stock (
     sucursal_id, fecha_conteo, estado, realizado_por,
     total_diferencias, total_merma_valor, observaciones, created_at
 )
-SELECT 
+SELECT
     s.id,
-    CURRENT_DATE - INTERVAL '5 days',
-    'aprobado',
+    CASE
+        WHEN s.nombre = 'Sucursal Alberdi' THEN CURRENT_DATE - INTERVAL '7 days'
+        WHEN s.nombre = 'Sucursal San Martín' THEN CURRENT_DATE - INTERVAL '3 days'
+        WHEN s.nombre = 'Sucursal Colón' THEN CURRENT_DATE - INTERVAL '5 days'
+        WHEN s.nombre = 'Sucursal Simoca' THEN CURRENT_DATE
+    END,
+    CASE
+        WHEN s.nombre = 'Sucursal Alberdi' THEN 'aprobado'
+        WHEN s.nombre = 'Sucursal San Martín' THEN 'aprobado'
+        WHEN s.nombre = 'Sucursal Colón' THEN 'aprobado'
+        WHEN s.nombre = 'Sucursal Simoca' THEN 'en_proceso'
+    END,
     (SELECT id FROM usuarios WHERE rol = 'admin' LIMIT 1),
-    3,
-    1250.00,
-    'Conteo mensual - Diferencias menores dentro de tolerancia',
-    CURRENT_DATE - INTERVAL '5 days'
+    CASE
+        WHEN s.nombre = 'Sucursal Alberdi' THEN 2
+        WHEN s.nombre = 'Sucursal San Martín' THEN 1
+        WHEN s.nombre = 'Sucursal Colón' THEN 3
+        WHEN s.nombre = 'Sucursal Simoca' THEN 0
+    END,
+    CASE
+        WHEN s.nombre = 'Sucursal Alberdi' THEN 950.00
+        WHEN s.nombre = 'Sucursal San Martín' THEN 480.00
+        WHEN s.nombre = 'Sucursal Colón' THEN 1250.00
+        WHEN s.nombre = 'Sucursal Simoca' THEN 0
+    END,
+    CASE
+        WHEN s.nombre = 'Sucursal Alberdi' THEN 'Conteo mensual aprobado'
+        WHEN s.nombre = 'Sucursal San Martín' THEN 'Conteo semanal aprobado'
+        WHEN s.nombre = 'Sucursal Colón' THEN 'Conteo mensual - Diferencias menores dentro de tolerancia'
+        WHEN s.nombre = 'Sucursal Simoca' THEN 'Conteo semanal en progreso'
+    END,
+    CASE
+        WHEN s.nombre = 'Sucursal Alberdi' THEN CURRENT_DATE - INTERVAL '7 days'
+        WHEN s.nombre = 'Sucursal San Martín' THEN CURRENT_DATE - INTERVAL '3 days'
+        WHEN s.nombre = 'Sucursal Colón' THEN CURRENT_DATE - INTERVAL '5 days'
+        WHEN s.nombre = 'Sucursal Simoca' THEN CURRENT_DATE
+    END
 FROM sucursales s
-WHERE s.nombre = 'Sucursal Colón';
-
--- Conteo en proceso para Simoca (hoy)
-INSERT INTO conteos_stock (
-    sucursal_id, fecha_conteo, estado, realizado_por,
-    total_diferencias, total_merma_valor, observaciones, created_at
-)
-SELECT 
-    s.id,
-    CURRENT_DATE,
-    'en_proceso',
-    (SELECT id FROM usuarios WHERE rol = 'admin' LIMIT 1),
-    0,
-    0,
-    'Conteo semanal en progreso',
-    CURRENT_DATE
-FROM sucursales s
-WHERE s.nombre = 'Sucursal Simoca';
+WHERE s.nombre IN ('Sucursal Alberdi', 'Sucursal San Martín', 'Sucursal Colón', 'Sucursal Simoca');
 
 -- ===========================================
--- 13. CREAR MOVIMIENTOS DE CAJA
+-- 10. CREAR MOVIMIENTOS DE CAJA
 -- ===========================================
 
--- Movimientos para Caja Colón
+-- Movimientos para todas las sucursales
 INSERT INTO tesoreria_movimientos (
     caja_id, tipo, monto, concepto, metodo_pago, created_at
 )
-SELECT 
+SELECT
     c.id,
-    'ingreso',
-    4250.00,
-    'Venta del día - Almacén Don Pedro',
-    'efectivo',
-    CURRENT_DATE - INTERVAL '1 day'
+    CASE WHEN tipo_mov = 'ingreso' THEN 'ingreso' ELSE 'egreso' END,
+    monto,
+    concepto,
+    metodo_pago,
+    fecha
 FROM tesoreria_cajas c
-WHERE c.nombre = 'Caja Sucursal Colón';
-
-INSERT INTO tesoreria_movimientos (
-    caja_id, tipo, monto, concepto, metodo_pago, created_at
-)
-SELECT 
-    c.id,
-    'ingreso',
-    2850.00,
-    'Venta del día - Carnicería El Gaucho',
-    'efectivo',
-    CURRENT_DATE - INTERVAL '3 days'
-FROM tesoreria_cajas c
-WHERE c.nombre = 'Caja Sucursal Colón';
-
-INSERT INTO tesoreria_movimientos (
-    caja_id, tipo, monto, concepto, metodo_pago, created_at
-)
-SELECT 
-    c.id,
-    'egreso',
-    1500.00,
-    'Gastos operativos - Limpieza',
-    'efectivo',
-    CURRENT_DATE - INTERVAL '2 days'
-FROM tesoreria_cajas c
-WHERE c.nombre = 'Caja Sucursal Colón';
-
--- Movimientos para Caja Simoca
-INSERT INTO tesoreria_movimientos (
-    caja_id, tipo, monto, concepto, metodo_pago, created_at
-)
-SELECT 
-    c.id,
-    'ingreso',
-    3200.00,
-    'Venta del día - Despensa María',
-    'efectivo',
-    CURRENT_DATE - INTERVAL '1 day'
-FROM tesoreria_cajas c
-WHERE c.nombre = 'Caja Sucursal Simoca';
-
-INSERT INTO tesoreria_movimientos (
-    caja_id, tipo, monto, concepto, metodo_pago, created_at
-)
-SELECT 
-    c.id,
-    'ingreso',
-    1850.00,
-    'Venta del día - Pollería Central',
-    'efectivo',
-    CURRENT_DATE - INTERVAL '4 days'
-FROM tesoreria_cajas c
-WHERE c.nombre = 'Caja Sucursal Simoca';
-
-INSERT INTO tesoreria_movimientos (
-    caja_id, tipo, monto, concepto, metodo_pago, created_at
-)
-SELECT 
-    c.id,
-    'egreso',
-    800.00,
-    'Gastos operativos - Combustible',
-    'efectivo',
-    CURRENT_DATE - INTERVAL '3 days'
-FROM tesoreria_cajas c
-WHERE c.nombre = 'Caja Sucursal Simoca';
+CROSS JOIN (
+    VALUES
+        ('Sucursal Alberdi', 'ingreso', 3950.00, 'Venta del día - Almacén Centro', 'efectivo', CURRENT_DATE - INTERVAL '1 day'),
+        ('Sucursal Alberdi', 'ingreso', 2650.00, 'Venta del día - Carnicería El Progreso', 'efectivo', CURRENT_DATE - INTERVAL '2 days'),
+        ('Sucursal Alberdi', 'egreso', 1200.00, 'Gastos operativos - Suministros', 'efectivo', CURRENT_DATE - INTERVAL '1 day'),
+        ('Sucursal San Martín', 'ingreso', 3650.00, 'Venta del día - Despensa Doña Ana', 'efectivo', CURRENT_DATE - INTERVAL '1 day'),
+        ('Sucursal San Martín', 'ingreso', 2450.00, 'Venta del día - Carnicería San Martín', 'efectivo', CURRENT_DATE - INTERVAL '2 days'),
+        ('Sucursal San Martín', 'egreso', 1000.00, 'Gastos operativos - Servicios', 'efectivo', CURRENT_DATE - INTERVAL '2 days'),
+        ('Sucursal Colón', 'ingreso', 4250.00, 'Venta del día - Almacén Don Pedro', 'efectivo', CURRENT_DATE - INTERVAL '1 day'),
+        ('Sucursal Colón', 'ingreso', 2850.00, 'Venta del día - Carnicería El Gaucho', 'efectivo', CURRENT_DATE - INTERVAL '3 days'),
+        ('Sucursal Colón', 'egreso', 1500.00, 'Gastos operativos - Limpieza', 'efectivo', CURRENT_DATE - INTERVAL '2 days'),
+        ('Sucursal Simoca', 'ingreso', 3200.00, 'Venta del día - Despensa María', 'efectivo', CURRENT_DATE - INTERVAL '1 day'),
+        ('Sucursal Simoca', 'ingreso', 1850.00, 'Venta del día - Pollería Central', 'efectivo', CURRENT_DATE - INTERVAL '4 days'),
+        ('Sucursal Simoca', 'egreso', 800.00, 'Gastos operativos - Combustible', 'efectivo', CURRENT_DATE - INTERVAL '3 days')
+) AS movimientos(sucursal, tipo_mov, monto, concepto, metodo_pago, fecha)
+WHERE c.nombre = 'Caja ' || movimientos.sucursal;
 
 -- ===========================================
--- 14. CREAR AUDITORÍA DE LISTAS DE PRECIOS
+-- 11. CREAR AUDITORÍA DE LISTAS DE PRECIOS
 -- ===========================================
 
--- Auditoría para ventas de Colón
+-- Auditoría para Sucursal Alberdi
 INSERT INTO auditoria_listas_precios (
     sucursal_id, usuario_id, cliente_id, lista_precio_id, tipo_lista,
     cantidad_total, monto_total, fecha_venta
 )
-SELECT 
+SELECT
+    s.id,
+    (SELECT id FROM usuarios WHERE rol = 'admin' LIMIT 1),
+    c.id,
+    lp.id,
+    'minorista',
+    5.0,
+    3950.00,
+    CURRENT_DATE - INTERVAL '1 day'
+FROM sucursales s, clientes c, listas_precios lp
+WHERE s.nombre = 'Sucursal Alberdi'
+AND c.codigo = 'CLI-ALB-001'
+AND lp.codigo = 'MINORISTA';
+
+INSERT INTO auditoria_listas_precios (
+    sucursal_id, usuario_id, cliente_id, lista_precio_id, tipo_lista,
+    cantidad_total, monto_total, fecha_venta
+)
+SELECT
+    s.id,
+    (SELECT id FROM usuarios WHERE rol = 'admin' LIMIT 1),
+    c.id,
+    lp.id,
+    'mayorista',
+    18.0,
+    14200.00,
+    CURRENT_DATE - INTERVAL '3 days'
+FROM sucursales s, clientes c, listas_precios lp
+WHERE s.nombre = 'Sucursal Alberdi'
+AND c.codigo = 'CLI-ALB-003'
+AND lp.codigo = 'MAYORISTA';
+
+-- Auditoría para Sucursal San Martín
+INSERT INTO auditoria_listas_precios (
+    sucursal_id, usuario_id, cliente_id, lista_precio_id, tipo_lista,
+    cantidad_total, monto_total, fecha_venta
+)
+SELECT
+    s.id,
+    (SELECT id FROM usuarios WHERE rol = 'admin' LIMIT 1),
+    c.id,
+    lp.id,
+    'minorista',
+    4.0,
+    3650.00,
+    CURRENT_DATE - INTERVAL '1 day'
+FROM sucursales s, clientes c, listas_precios lp
+WHERE s.nombre = 'Sucursal San Martín'
+AND c.codigo = 'CLI-SMA-001'
+AND lp.codigo = 'MINORISTA';
+
+INSERT INTO auditoria_listas_precios (
+    sucursal_id, usuario_id, cliente_id, lista_precio_id, tipo_lista,
+    cantidad_total, monto_total, fecha_venta
+)
+SELECT
+    s.id,
+    (SELECT id FROM usuarios WHERE rol = 'admin' LIMIT 1),
+    c.id,
+    lp.id,
+    'mayorista',
+    15.0,
+    13100.00,
+    CURRENT_DATE - INTERVAL '2 days'
+FROM sucursales s, clientes c, listas_precios lp
+WHERE s.nombre = 'Sucursal San Martín'
+AND c.codigo = 'CLI-SMA-003'
+AND lp.codigo = 'MAYORISTA';
+
+-- Auditoría para Sucursal Colón
+INSERT INTO auditoria_listas_precios (
+    sucursal_id, usuario_id, cliente_id, lista_precio_id, tipo_lista,
+    cantidad_total, monto_total, fecha_venta
+)
+SELECT
     s.id,
     (SELECT id FROM usuarios WHERE rol = 'admin' LIMIT 1),
     c.id,
@@ -661,7 +704,7 @@ SELECT
     4250.00,
     CURRENT_DATE - INTERVAL '1 day'
 FROM sucursales s, clientes c, listas_precios lp
-WHERE s.nombre = 'Sucursal Colón' 
+WHERE s.nombre = 'Sucursal Colón'
 AND c.codigo = 'CLI-COL-001'
 AND lp.codigo = 'MINORISTA';
 
@@ -669,7 +712,7 @@ INSERT INTO auditoria_listas_precios (
     sucursal_id, usuario_id, cliente_id, lista_precio_id, tipo_lista,
     cantidad_total, monto_total, fecha_venta
 )
-SELECT 
+SELECT
     s.id,
     (SELECT id FROM usuarios WHERE rol = 'admin' LIMIT 1),
     c.id,
@@ -679,16 +722,16 @@ SELECT
     15600.00,
     CURRENT_DATE - INTERVAL '2 days'
 FROM sucursales s, clientes c, listas_precios lp
-WHERE s.nombre = 'Sucursal Colón' 
+WHERE s.nombre = 'Sucursal Colón'
 AND c.codigo = 'CLI-COL-003'
 AND lp.codigo = 'MAYORISTA';
 
--- Auditoría para ventas de Simoca
+-- Auditoría para Sucursal Simoca
 INSERT INTO auditoria_listas_precios (
     sucursal_id, usuario_id, cliente_id, lista_precio_id, tipo_lista,
     cantidad_total, monto_total, fecha_venta
 )
-SELECT 
+SELECT
     s.id,
     (SELECT id FROM usuarios WHERE rol = 'admin' LIMIT 1),
     c.id,
@@ -698,7 +741,7 @@ SELECT
     3200.00,
     CURRENT_DATE - INTERVAL '1 day'
 FROM sucursales s, clientes c, listas_precios lp
-WHERE s.nombre = 'Sucursal Simoca' 
+WHERE s.nombre = 'Sucursal Simoca'
 AND c.codigo = 'CLI-SIM-001'
 AND lp.codigo = 'MINORISTA';
 
@@ -706,7 +749,7 @@ INSERT INTO auditoria_listas_precios (
     sucursal_id, usuario_id, cliente_id, lista_precio_id, tipo_lista,
     cantidad_total, monto_total, fecha_venta
 )
-SELECT 
+SELECT
     s.id,
     (SELECT id FROM usuarios WHERE rol = 'admin' LIMIT 1),
     c.id,
@@ -716,7 +759,7 @@ SELECT
     35000.00,
     CURRENT_DATE - INTERVAL '6 days'
 FROM sucursales s, clientes c, listas_precios lp
-WHERE s.nombre = 'Sucursal Simoca' 
+WHERE s.nombre = 'Sucursal Simoca'
 AND c.codigo = 'CLI-SIM-004'
 AND lp.codigo = 'DISTRIBUIDOR';
 
