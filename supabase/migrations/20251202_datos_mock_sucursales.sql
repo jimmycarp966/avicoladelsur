@@ -41,8 +41,8 @@ ON CONFLICT (sucursal_id) DO NOTHING;
 -- ===========================================
 
 -- Caja para Sucursal Colón (solo si no existe)
-INSERT INTO tesoreria_cajas (nombre, sucursal_id, saldo_actual, saldo_inicial, active)
-SELECT 'Caja Sucursal Colón', s.id, 125000.00, 50000.00, true
+INSERT INTO tesoreria_cajas (nombre, sucursal_id, saldo_actual, saldo_inicial)
+SELECT 'Caja Sucursal Colón', s.id, 125000.00, 50000.00
 FROM sucursales s
 WHERE s.nombre = 'Sucursal Colón'
 AND NOT EXISTS (
@@ -50,8 +50,8 @@ AND NOT EXISTS (
 );
 
 -- Caja para Sucursal Simoca (solo si no existe)
-INSERT INTO tesoreria_cajas (nombre, sucursal_id, saldo_actual, saldo_inicial, active)
-SELECT 'Caja Sucursal Simoca', s.id, 87500.00, 30000.00, true
+INSERT INTO tesoreria_cajas (nombre, sucursal_id, saldo_actual, saldo_inicial)
+SELECT 'Caja Sucursal Simoca', s.id, 87500.00, 30000.00
 FROM sucursales s
 WHERE s.nombre = 'Sucursal Simoca'
 AND NOT EXISTS (
