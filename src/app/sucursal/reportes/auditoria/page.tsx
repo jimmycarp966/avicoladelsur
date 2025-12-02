@@ -8,7 +8,13 @@ import Link from 'next/link'
 
 export const revalidate = 300 // Revalidar cada 5 minutos
 
-async function getAuditoriaData() {
+interface PageProps {
+  searchParams: Promise<{
+    sid?: string
+  }>
+}
+
+async function getAuditoriaData(sidParam?: string) {
   const supabase = await createClient()
 
   // Obtener usuario actual
@@ -18,7 +24,7 @@ async function getAuditoriaData() {
   }
 
   // Obtener sucursal del usuario con soporte para admin
-  const { sucursalId, esAdmin } = await getSucursalUsuarioConAdmin(supabase, user.id, user.email || '')
+  const { sucursalId, esAdmin } = await getSucursalUsuarioConAdmin(supabase, user.id, user.email || '', sidParam)
 
   if (!sucursalId && !esAdmin) {
     throw new Error('Usuario no tiene sucursal asignada')
@@ -67,9 +73,10 @@ async function getAuditoriaData() {
   }
 }
 
-export default async function AuditoriaListasPage() {
+export default async function AuditoriaListasPage({ searchParams }: PageProps) {
+  const params = await searchParams
   try {
-    const data = await getAuditoriaData()
+    const data = await getAuditoriaData(params.sid)
 
     // Si es admin sin sucursal, mostrar mensaje informativo
     if (data.sinSucursal && data.esAdmin) {

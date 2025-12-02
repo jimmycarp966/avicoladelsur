@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -99,6 +99,8 @@ interface NavigationItemProps {
 function NavigationItem({ item, pathname }: NavigationItemProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [alertsCount] = useState(3) // TODO: Obtener dinámicamente
+  const searchParams = useSearchParams()
+  const sid = searchParams.get('sid')
 
   const getBadgeCount = (badgeType: string) => {
     switch (badgeType) {
@@ -107,6 +109,14 @@ function NavigationItem({ item, pathname }: NavigationItemProps) {
       default:
         return 0
     }
+  }
+
+  // Función para agregar sid a la URL si existe
+  const getHrefWithSid = (href: string) => {
+    if (sid && href !== '#') {
+      return `${href}${href.includes('?') ? '&' : '?'}sid=${sid}`
+    }
+    return href
   }
 
   // Check if current item or any child is active
@@ -144,7 +154,7 @@ function NavigationItem({ item, pathname }: NavigationItemProps) {
               const badgeCount = child.badge ? getBadgeCount(child.badge) : 0
 
               return (
-                <Link key={child.href} href={child.href}>
+                <Link key={child.href} href={getHrefWithSid(child.href)}>
                   <Button
                     variant={childIsActive ? 'secondary' : 'ghost'}
                     size="sm"
@@ -174,7 +184,7 @@ function NavigationItem({ item, pathname }: NavigationItemProps) {
   const badgeCount = item.badge ? getBadgeCount(item.badge) : 0
 
   return (
-    <Link href={item.href}>
+    <Link href={getHrefWithSid(item.href)}>
       <Button
         variant={isActive ? 'secondary' : 'ghost'}
         className={cn(

@@ -7,7 +7,13 @@ import { Package, AlertTriangle, Building2 } from 'lucide-react'
 import { getSucursalUsuarioConAdmin } from '@/lib/utils'
 import Link from 'next/link'
 
-async function getInventarioSucursal() {
+interface PageProps {
+  searchParams: Promise<{
+    sid?: string
+  }>
+}
+
+async function getInventarioSucursal(sidParam?: string) {
   const supabase = await createClient()
 
   // Obtener usuario actual
@@ -17,7 +23,7 @@ async function getInventarioSucursal() {
   }
 
   // Obtener sucursal del usuario con soporte para admin
-  const { sucursalId, esAdmin } = await getSucursalUsuarioConAdmin(supabase, user.id, user.email || '')
+  const { sucursalId, esAdmin } = await getSucursalUsuarioConAdmin(supabase, user.id, user.email || '', sidParam)
 
   if (!sucursalId && !esAdmin) {
     throw new Error('Usuario no tiene sucursal asignada')
@@ -58,9 +64,10 @@ async function getInventarioSucursal() {
   }
 }
 
-export default async function SucursalInventarioPage() {
+export default async function SucursalInventarioPage({ searchParams }: PageProps) {
+  const params = await searchParams
   try {
-    const data = await getInventarioSucursal()
+    const data = await getInventarioSucursal(params.sid)
 
     // Si es admin sin sucursal, mostrar mensaje informativo
     if (data.sinSucursal && data.esAdmin) {

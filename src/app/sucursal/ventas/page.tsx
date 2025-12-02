@@ -1,10 +1,16 @@
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ShoppingCart, AlertTriangle } from 'lucide-react'
-import { getSucursalUsuario } from '@/lib/utils'
+import { getSucursalUsuarioConAdmin } from '@/lib/utils'
 import { SucursalVentasContent } from '@/components/sucursales/SucursalVentasContent'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
+
+interface PageProps {
+  searchParams: Promise<{
+    sid?: string
+  }>
+}
 
 interface ProductoDisponible {
   id: string
@@ -28,7 +34,7 @@ interface Caja {
   saldo_actual: number
 }
 
-async function getVentasData() {
+async function getVentasData(sidParam?: string) {
   const supabase = await createClient()
 
   // Obtener usuario actual
@@ -37,17 +43,8 @@ async function getVentasData() {
     throw new Error('Usuario no autenticado')
   }
 
-  // Obtener rol del usuario
-  const { data: usuarioData } = await supabase
-    .from('usuarios')
-    .select('rol')
-    .eq('email', user.email)
-    .single()
-
-  const esAdmin = usuarioData?.rol === 'admin'
-
-  // Obtener sucursal del usuario
-  const sucursalId = await getSucursalUsuario(supabase, user.id)
+  // Obtener sucursal del usuario con soporte para admin
+  const { sucursalId, esAdmin } = await getSucursalUsuarioConAdmin(supabase, user.id, user.email || '', sidParam)
 
   // Si es admin y no tiene sucursal asignada, obtener la primera sucursal activa
   let sucursalIdFinal = sucursalId
@@ -210,9 +207,10 @@ async function getVentasData() {
   }
 }
 
-export default async function SucursalVentasPage() {
+export default async function SucursalVentasPage({ searchParams }: PageProps) {
+  const params = await searchParams
   try {
-    const data = await getVentasData()
+    const data = await getVentasData(params.sid)
     
     // Si es admin sin sucursal, mostrar mensaje informativo
     if (data.sinSucursal && data.esAdmin) {

@@ -6,6 +6,12 @@ import { AlertasContent } from '@/components/shared/AlertasContent'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 
+interface PageProps {
+  searchParams: Promise<{
+    sid?: string
+  }>
+}
+
 interface AlertaStock {
   id: string
   sucursal_id: string
@@ -17,7 +23,7 @@ interface AlertaStock {
   updated_at: string
 }
 
-async function getAlertasSucursal() {
+async function getAlertasSucursal(sidParam?: string) {
   const supabase = await createClient()
 
   // Obtener usuario actual
@@ -27,7 +33,7 @@ async function getAlertasSucursal() {
   }
 
   // Obtener sucursal del usuario con soporte para admin
-  const { sucursalId, esAdmin } = await getSucursalUsuarioConAdmin(supabase, user.id, user.email || '')
+  const { sucursalId, esAdmin } = await getSucursalUsuarioConAdmin(supabase, user.id, user.email || '', sidParam)
 
   if (!sucursalId && !esAdmin) {
     throw new Error('Usuario no tiene sucursal asignada')
@@ -70,9 +76,10 @@ async function getAlertasSucursal() {
   }
 }
 
-export default async function SucursalAlertsPage() {
+export default async function SucursalAlertsPage({ searchParams }: PageProps) {
+  const params = await searchParams
   try {
-    const data = await getAlertasSucursal()
+    const data = await getAlertasSucursal(params.sid)
 
     // Si es admin sin sucursal, mostrar mensaje informativo
     if (data.sinSucursal && data.esAdmin) {

@@ -257,7 +257,8 @@ export async function getSucursalUsuario(supabase: any, userId: string): Promise
 export async function getSucursalUsuarioConAdmin(
   supabase: any,
   userId: string,
-  userEmail: string
+  userEmail: string,
+  sidParam?: string
 ): Promise<{ sucursalId: string | null; esAdmin: boolean }> {
   // Obtener rol del usuario
   const { data: usuarioData } = await supabase
@@ -267,6 +268,19 @@ export async function getSucursalUsuarioConAdmin(
     .single()
 
   const esAdmin = usuarioData?.rol === 'admin'
+
+  // Si es admin y hay un parámetro sid en la URL, validar y usar ese (permite cambiar de sucursal)
+  if (esAdmin && sidParam) {
+    const { data: sucursalParam } = await supabase
+      .from('sucursales')
+      .select('id, active')
+      .eq('id', sidParam)
+      .single()
+    
+    if (sucursalParam && sucursalParam.active) {
+      return { sucursalId: sidParam, esAdmin: true }
+    }
+  }
 
   // Obtener sucursal del usuario
   const sucursalId = await getSucursalUsuario(supabase, userId)
