@@ -138,8 +138,22 @@ async function getVentasData() {
     .eq('sucursal_id', sucursalIdFinal)
     .eq('active', true)
 
-  if (ventasError || productosError || clientesError || cajasError) {
-    throw new Error('Error al obtener datos de ventas')
+  // Mejorar manejo de errores con mensajes específicos
+  if (ventasError) {
+    console.error('Error al obtener ventas:', ventasError)
+    throw new Error(`Error al obtener ventas: ${ventasError.message}`)
+  }
+  if (productosError) {
+    console.error('Error al obtener productos:', productosError)
+    throw new Error(`Error al obtener productos: ${productosError.message}`)
+  }
+  if (clientesError) {
+    console.error('Error al obtener clientes:', clientesError)
+    throw new Error(`Error al obtener clientes: ${clientesError.message}`)
+  }
+  if (cajasError) {
+    console.error('Error al obtener cajas:', cajasError)
+    throw new Error(`Error al obtener cajas: ${cajasError.message}`)
   }
 
   // Agrupar productos por ID único
@@ -171,10 +185,21 @@ async function getVentasData() {
   }
 
   return {
-    ventasDia: (ventasDia || []).map(venta => ({
-      ...venta,
-      clientes: venta.clientes?.[0] || null
-    })),
+    ventasDia: (ventasDia || []).map(venta => {
+      // Manejar caso donde clientes puede ser un array o un objeto
+      let clienteData = null
+      if (venta.clientes) {
+        if (Array.isArray(venta.clientes)) {
+          clienteData = venta.clientes[0] || null
+        } else {
+          clienteData = venta.clientes
+        }
+      }
+      return {
+        ...venta,
+        clientes: clienteData
+      }
+    }),
     productosDisponibles: Object.values(productosAgrupados) as ProductoDisponible[],
     clientes: clientes || [] as Cliente[],
     cajas: cajas || [] as Caja[],

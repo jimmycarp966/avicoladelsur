@@ -30,8 +30,8 @@ async function getConteosData() {
       conteos: [],
       sucursalId: '',
       sucursalNombre: '',
-      conteoEnProceso: null,
-      ultimoConteoCompletado: null,
+      conteoEnProceso: undefined,
+      ultimoConteoCompletado: undefined,
       estadisticas: {
         totalConteos: 0,
         enProceso: 0,
@@ -46,11 +46,7 @@ async function getConteosData() {
   // Obtener conteos de la sucursal
   const { data: conteos, error: conteosError } = await supabase
     .from('conteos_stock')
-    .select(`
-      *,
-      usuarios:realizado_por (nombre),
-      aprobador:aprobado_por (nombre)
-    `)
+    .select('*')
     .eq('sucursal_id', sucursalId)
     .order('fecha_conteo', { ascending: false })
     .limit(20)
@@ -59,6 +55,42 @@ async function getConteosData() {
     throw new Error(`Error al obtener conteos: ${conteosError.message}`)
   }
 
+  // Obtener nombres de usuarios para los conteos
+  const conteosConUsuarios = await Promise.all(
+    (conteos || []).map(async (conteo) => {
+      let nombreRealizadoPor = 'Desconocido'
+      let nombreAprobadoPor = null
+
+      if (conteo.realizado_por) {
+        const { data: usuarioRealizado } = await supabase
+          .from('usuarios')
+          .select('nombre')
+          .eq('id', conteo.realizado_por)
+          .single()
+        if (usuarioRealizado) {
+          nombreRealizadoPor = usuarioRealizado.nombre || 'Desconocido'
+        }
+      }
+
+      if (conteo.aprobado_por) {
+        const { data: usuarioAprobado } = await supabase
+          .from('usuarios')
+          .select('nombre')
+          .eq('id', conteo.aprobado_por)
+          .single()
+        if (usuarioAprobado) {
+          nombreAprobadoPor = usuarioAprobado.nombre
+        }
+      }
+
+      return {
+        ...conteo,
+        nombreRealizadoPor,
+        nombreAprobadoPor
+      }
+    })
+  )
+
   // Obtener sucursal info
   const { data: sucursal } = await supabase
     .from('sucursales')
@@ -66,21 +98,32 @@ async function getConteosData() {
     .eq('id', sucursalId)
     .single()
 
+  // Mapear conteos al formato esperado por el componente
+  const conteosMapeados = conteosConUsuarios.map(conteo => ({
+    id: conteo.id,
+    fecha_conteo: conteo.fecha_conteo,
+    estado: conteo.estado,
+    total_diferencias: conteo.total_diferencias || 0,
+    total_merma_valor: conteo.total_merma_valor || 0,
+    usuarios: { nombre: conteo.nombreRealizadoPor },
+    aprobador: conteo.nombreAprobadoPor ? { nombre: conteo.nombreAprobadoPor } : null
+  }))
+
   // Estadísticas
-  const conteoEnProceso = conteos?.find(c => c.estado === 'en_proceso')
-  const ultimoConteoCompletado = conteos?.find(c => c.estado === 'completado' || c.estado === 'aprobado')
+  const conteoEnProceso = conteosMapeados.find(c => c.estado === 'en_proceso')
+  const ultimoConteoCompletado = conteosMapeados.find(c => c.estado === 'completado' || c.estado === 'aprobado')
 
   return {
-    conteos: conteos || [],
+    conteos: conteosMapeados,
     sucursalId,
     sucursalNombre: sucursal?.nombre || 'Sucursal',
     conteoEnProceso,
     ultimoConteoCompletado,
     estadisticas: {
-      totalConteos: conteos?.length || 0,
-      enProceso: conteos?.filter(c => c.estado === 'en_proceso').length || 0,
-      completados: conteos?.filter(c => c.estado === 'completado').length || 0,
-      aprobados: conteos?.filter(c => c.estado === 'aprobado').length || 0,
+      totalConteos: conteosMapeados.length,
+      enProceso: conteosMapeados.filter(c => c.estado === 'en_proceso').length,
+      completados: conteosMapeados.filter(c => c.estado === 'completado').length,
+      aprobados: conteosMapeados.filter(c => c.estado === 'aprobado').length,
     },
     sinSucursal: false,
     esAdmin

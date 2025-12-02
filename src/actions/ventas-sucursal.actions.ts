@@ -238,15 +238,26 @@ export async function obtenerConteoStockAction(
     // Obtener conteo
     const { data: conteo, error: conteoError } = await supabase
       .from('conteos_stock')
-      .select(`
-        *,
-        usuarios:realizado_por (nombre)
-      `)
+      .select('*')
       .eq('id', conteoId)
       .single()
 
     if (conteoError) {
       return { success: false, error: `Error al obtener conteo: ${conteoError.message}` }
+    }
+
+    // Obtener nombre del usuario que realizó el conteo
+    let nombreUsuario = 'Desconocido'
+    if (conteo.realizado_por) {
+      const { data: usuarioData } = await supabase
+        .from('usuarios')
+        .select('nombre')
+        .eq('id', conteo.realizado_por)
+        .single()
+      
+      if (usuarioData) {
+        nombreUsuario = usuarioData.nombre || 'Desconocido'
+      }
     }
 
     // Obtener items
@@ -270,7 +281,7 @@ export async function obtenerConteoStockAction(
         sucursalId: conteo.sucursal_id,
         fechaConteo: conteo.fecha_conteo,
         estado: conteo.estado,
-        realizadoPor: (conteo.usuarios as { nombre: string })?.nombre || 'Desconocido',
+        realizadoPor: nombreUsuario,
         totalDiferencias: conteo.total_diferencias || 0,
         totalMermaValor: conteo.total_merma_valor || 0,
         items: items.map(item => ({
@@ -406,10 +417,7 @@ export async function listarConteosStockAction(
 
     const { data, error } = await supabase
       .from('conteos_stock')
-      .select(`
-        *,
-        usuarios:realizado_por (nombre)
-      `)
+      .select('*')
       .eq('sucursal_id', sucursalId)
       .order('fecha_conteo', { ascending: false })
       .limit(50)
@@ -418,16 +426,37 @@ export async function listarConteosStockAction(
       return { success: false, error: `Error al listar conteos: ${error.message}` }
     }
 
+    // Obtener nombres de usuarios para todos los conteos
+    const conteosConUsuarios = await Promise.all(
+      (data || []).map(async (conteo) => {
+        let nombreRealizadoPor = 'Desconocido'
+        
+        if (conteo.realizado_por) {
+          const { data: usuarioData } = await supabase
+            .from('usuarios')
+            .select('nombre')
+            .eq('id', conteo.realizado_por)
+            .single()
+          
+          if (usuarioData) {
+            nombreRealizadoPor = usuarioData.nombre || 'Desconocido'
+          }
+        }
+
+        return {
+          id: conteo.id,
+          fechaConteo: conteo.fecha_conteo,
+          estado: conteo.estado,
+          realizadoPor: nombreRealizadoPor,
+          totalDiferencias: conteo.total_diferencias || 0,
+          totalMermaValor: conteo.total_merma_valor || 0
+        }
+      })
+    )
+
     return {
       success: true,
-      data: data.map(conteo => ({
-        id: conteo.id,
-        fechaConteo: conteo.fecha_conteo,
-        estado: conteo.estado,
-        realizadoPor: (conteo.usuarios as { nombre: string })?.nombre || 'Desconocido',
-        totalDiferencias: conteo.total_diferencias || 0,
-        totalMermaValor: conteo.total_merma_valor || 0
-      }))
+      data: conteosConUsuarios
     }
   } catch (error) {
     return {
