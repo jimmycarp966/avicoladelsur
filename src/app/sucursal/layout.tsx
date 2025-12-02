@@ -1,15 +1,33 @@
 'use client'
 
+import { Suspense } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { SucursalSidebar } from '@/components/layout/SucursalSidebar'
 import { NotificationBell } from '@/components/layout/NotificationBell'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
-import { Menu, LogOut } from 'lucide-react'
+import { Menu, LogOut, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+
+// Fallback para el sidebar mientras carga
+function SidebarSkeleton() {
+  return (
+    <div className="flex h-full w-full flex-col bg-card border-r p-4">
+      <div className="flex items-center gap-2 mb-6">
+        <div className="h-8 w-8 rounded-lg bg-muted animate-pulse" />
+        <div className="h-6 w-32 rounded bg-muted animate-pulse" />
+      </div>
+      <div className="space-y-2">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div key={i} className="h-10 rounded-md bg-muted animate-pulse" />
+        ))}
+      </div>
+    </div>
+  )
+}
 
 interface SucursalLayoutProps {
   children: React.ReactNode
@@ -34,7 +52,9 @@ export default function SucursalLayout({ children }: SucursalLayoutProps) {
     <div className="flex h-screen bg-background">
       {/* Desktop Sidebar */}
       <div className="hidden lg:flex lg:w-64 lg:flex-col">
-        <SucursalSidebar />
+        <Suspense fallback={<SidebarSkeleton />}>
+          <SucursalSidebar />
+        </Suspense>
       </div>
 
       {/* Main Content */}
@@ -49,7 +69,9 @@ export default function SucursalLayout({ children }: SucursalLayoutProps) {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="w-64 p-0">
-              <SucursalSidebar />
+              <Suspense fallback={<SidebarSkeleton />}>
+                <SucursalSidebar />
+              </Suspense>
             </SheetContent>
           </Sheet>
 
