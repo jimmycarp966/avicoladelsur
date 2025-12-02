@@ -132,6 +132,17 @@ const navigation = [
     href: '/reportes',
     icon: FileText,
     roles: ['admin'],
+    children: [
+      { name: 'Ventas', href: '/reportes/ventas' },
+      { name: 'Pedidos', href: '/reportes/pedidos' },
+      { name: 'Stock', href: '/reportes/stock' },
+      { name: 'Almacén', href: '/reportes/almacen' },
+      { name: 'Reparto', href: '/reportes/reparto' },
+      { name: 'Tesorería', href: '/reportes/tesoreria' },
+      { name: 'Clientes', href: '/reportes/clientes' },
+      { name: 'Empleados', href: '/reportes/empleados' },
+      { name: 'Sucursales', href: '/reportes/sucursales' },
+    ],
   },
 ]
 

@@ -12,7 +12,10 @@ import {
   Truck,
   Calendar,
   Clock,
-  Building2
+  Building2,
+  MapPin,
+  Phone,
+  ExternalLink
 } from 'lucide-react'
 import Link from 'next/link'
 import { getSucursalUsuario } from '@/lib/utils'
@@ -26,23 +29,62 @@ async function getSucursalData() {
     throw new Error('Usuario no autenticado')
   }
 
+  // Obtener rol del usuario
+  const { data: usuarioData } = await supabase
+    .from('usuarios')
+    .select('rol')
+    .eq('email', user.email)
+    .single()
+
+  const esAdmin = usuarioData?.rol === 'admin'
+
   // Obtener sucursal del usuario
   const sucursalId = await getSucursalUsuario(supabase, user.id)
 
-  if (!sucursalId) {
-    // Usuario no tiene sucursal asignada - redirigir a página de configuración
+  if (!sucursalId && !esAdmin) {
+    // Usuario no tiene sucursal asignada y no es admin - redirigir a página de configuración
     redirect('/sucursal/configuracion?mensaje=sucursal-requerida')
+  }
+
+  // Si es admin y no tiene sucursal asignada, obtener la primera sucursal activa
+  let sucursalIdFinal = sucursalId
+  if (!sucursalIdFinal && esAdmin) {
+    const { data: primeraSucursal } = await supabase
+      .from('sucursales')
+      .select('id')
+      .eq('active', true)
+      .order('nombre')
+      .limit(1)
+      .single()
+    
+    if (primeraSucursal) {
+      sucursalIdFinal = primeraSucursal.id
+    } else {
+      throw new Error('No hay sucursales activas en el sistema')
+    }
   }
 
   // Obtener información de la sucursal
   const { data: sucursal, error: sucursalError } = await supabase
     .from('sucursales')
     .select('*')
-    .eq('id', sucursalId)
+    .eq('id', sucursalIdFinal)
     .single()
 
   if (sucursalError) {
     throw new Error('Error al obtener datos de sucursal')
+  }
+
+  // Si es admin, obtener lista de todas las sucursales para el selector
+  let todasLasSucursales: Array<{ id: string; nombre: string }> = []
+  if (esAdmin) {
+    const { data: sucursales } = await supabase
+      .from('sucursales')
+      .select('id, nombre')
+      .eq('active', true)
+      .order('nombre')
+    
+    todasLasSucursales = sucursales || []
   }
 
   // Obtener ventas del día
@@ -82,7 +124,10 @@ async function getSucursalData() {
     ventasDia: ventasDia || [],
     alertas: alertas || [],
     caja,
-    transferencias: transferencias || []
+    transferencias: transferencias || [],
+    esAdmin,
+    todasLasSucursales,
+    sucursalId: sucursalIdFinal
   }
 }
 
@@ -124,19 +169,97 @@ export default async function SucursalDashboardPage() {
 
     return (
       <div className="space-y-6">
+        {/* Banner de Identificación de Sucursal */}
+        <Card className="border-primary/50 bg-primary/5">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                  <Building2 className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Sucursal Actual</p>
+                  <p className="text-xl font-bold">{data.sucursal.nombre}</p>
+                </div>
+              </div>
+              {data.esAdmin && (
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/sucursales">
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Ver Todas las Sucursales
+                  </Link>
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-              <Building2 className="w-8 h-8" />
-              {data.sucursal.nombre}
-            </h1>
-            <p className="text-muted-foreground">
-              {data.sucursal.direccion && `${data.sucursal.direccion} • `}
-              {data.sucursal.telefono && `${data.sucursal.telefono}`}
-            </p>
+          <div className="flex-1">
+            <div className="flex items-center gap-3 mb-2">
+              <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+                <Building2 className="w-8 h-8" />
+                {data.sucursal.nombre}
+              </h1>
+              <Badge variant={data.sucursal.active ? "default" : "secondary"} className="text-sm">
+                {data.sucursal.active ? 'Activa' : 'Inactiva'}
+              </Badge>
+              {data.esAdmin && (
+                <Badge variant="outline" className="text-xs">
+                  Vista Admin
+                </Badge>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+              {data.sucursal.direccion && (
+                <div className="flex items-center gap-1">
+                  <MapPin className="w-4 h-4" />
+                  <span>{data.sucursal.direccion}</span>
+                </div>
+              )}
+              {data.sucursal.telefono && (
+                <div className="flex items-center gap-1">
+                  <Phone className="w-4 h-4" />
+                  <span>{data.sucursal.telefono}</span>
+                </div>
+              )}
+            </div>
+            {data.esAdmin && data.todasLasSucursales.length > 1 && (
+              <div className="mt-3">
+                <p className="text-xs text-muted-foreground mb-1">Cambiar sucursal:</p>
+                <div className="flex flex-wrap gap-2">
+                  {data.todasLasSucursales.map((s) => (
+                    <Button
+                      key={s.id}
+                      variant={s.id === data.sucursal.id ? "default" : "outline"}
+                      size="sm"
+                      asChild
+                    >
+                      <Link href={`/sucursales/${s.id}`}>
+                        {s.nombre}
+                      </Link>
+                    </Button>
+                  ))}
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href="/sucursales">
+                      <ExternalLink className="w-3 h-3 mr-1" />
+                      Ver Todas
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
           <div className="flex gap-2">
+            {data.esAdmin && (
+              <Button variant="outline" asChild>
+                <Link href="/sucursales">
+                  <Building2 className="w-4 h-4 mr-2" />
+                  Gestión Sucursales
+                </Link>
+              </Button>
+            )}
             <Button variant="outline" asChild>
               <Link href="/sucursal/alerts">
                 <AlertTriangle className="w-4 h-4 mr-2" />

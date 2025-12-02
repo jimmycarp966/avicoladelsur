@@ -67,6 +67,11 @@ const navigation = [
       { name: 'Auditoría Precios', href: '/sucursal/reportes/auditoria', icon: FileBarChart },
     ],
   },
+  {
+    name: 'Configuración',
+    href: '/sucursal/configuracion',
+    icon: Settings,
+  },
 ]
 
 interface SucursalSidebarProps {

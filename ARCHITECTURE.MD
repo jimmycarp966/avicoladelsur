@@ -127,6 +127,62 @@ Referencia PAY-XXXXXX → GET /api/tesoreria/movimientos-tiempo-real
 Conciliación automática → Reportes CSV/PDF → Cierres de caja
 ```
 
+### Flujo H: Venta en Sucursal con Control de Precios ✅ NUEVO
+
+```
+Cajero Sucursal → POS (/sucursal/ventas) → Selecciona Cliente + Lista Precio
+    ↓
+Agrega productos → Sistema calcula precio según lista
+    ↓
+Al cobrar → fn_registrar_venta_sucursal()
+    ↓
+Calcula costo promedio ponderado → Calcula margen bruto
+    ↓
+Registra en pedidos + detalles_pedido:
+  - precio_unitario, costo_unitario, margen_bruto
+  - lista_precio_id, tipo_lista
+    ↓
+Registra en auditoria_listas_precios:
+  - usuario_id, cliente_id, tipo_lista, cantidad, monto
+    ↓
+Descuenta stock FIFO → Actualiza lotes
+```
+
+### Flujo I: Conteo Físico de Stock ✅ NUEVO
+
+```
+Sucursal → Iniciar Conteo → fn_iniciar_conteo_stock()
+    ↓
+Sistema lista productos → Crea items con stock teórico
+    ↓
+Usuario cuenta físicamente → Ingresa cantidades contadas
+    ↓
+Completar Conteo → fn_completar_conteo_stock()
+    ↓
+Evalúa diferencias:
+  - Si diferencia ≤ tolerancia (2%) → Ajuste automático
+  - Si diferencia > tolerancia → Marca para revisión
+    ↓
+Ajustes automáticos → Descuenta stock FIFO → Crea movimientos_stock
+```
+
+### Flujo J: Detección de Comportamiento Sospechoso ✅ NUEVO
+
+```
+Sistema → fn_detectar_comportamiento_sospechoso() (cada X días)
+    ↓
+Analiza auditoria_listas_precios:
+  - Calcula % mayorista por usuario
+  - Compara con promedio sucursal
+  - Detecta ventas mayoristas < 10 kg
+    ↓
+Genera alertas:
+  - Alto % mayorista (>1.5x promedio)
+  - Mayorista bajo volumen (<10 kg)
+    ↓
+Muestra en dashboard → Casa central revisa
+```
+
 **Características de todos los flujos:**
 - ✅ **Operaciones Atómicas**: RPCs de Postgres garantizan consistencia
 - ✅ **FIFO Automático**: Gestión inteligente de lotes por vencimiento
@@ -253,6 +309,64 @@ Conciliación automática → Reportes CSV/PDF → Cierres de caja
 - **Asignación automática**: Pedidos se asignan a rutas planificadas según zona/turno/día
 - **Validación capacidad**: Peso final del pedido ≤ capacidad del vehículo planificada
 - **RPC integrada**: `fn_asignar_pedido_a_ruta()` busca planes y valida restricciones
+
+### 8️⃣ Dominio: Control de Sucursales ✅ NUEVO (Diciembre 2025)
+
+**Funcionalidades Implementadas:**
+
+#### Control de Precios Mayorista/Minorista
+- **POS Mejorado**: Componente `POSSucursal` con selección de lista de precios
+- **Registro Automático**: Cada venta registra qué lista se usó (mayorista/minorista/distribuidor)
+- **Auditoría Completa**: Tabla `auditoria_listas_precios` con registro de todas las ventas
+- **Detección de Fraude**: Alertas automáticas por:
+  - Alto % de ventas mayoristas vs promedio (1.5x umbral)
+  - Ventas mayoristas de bajo volumen (<10 kg)
+
+#### Cálculo de Costo Real y Margen
+- **Costo Promedio Ponderado**: Función `fn_obtener_costo_promedio_sucursal()` calcula costo real por producto
+- **Margen Bruto Automático**: Cada venta calcula margen = precio - costo
+- **Valorización de Stock**: Stock visible a costo real en tiempo real desde casa central
+- **Campos Nuevos**: `detalles_pedido` incluye `costo_unitario`, `margen_bruto`, `lista_precio_id`, `tipo_lista`
+
+#### Conteos Físicos de Stock
+- **Ciclo Semanal**: Sistema diseñado para conteos físicos semanales
+- **Tablas Nuevas**: `conteos_stock`, `conteo_stock_items`, `ajustes_stock`
+- **Proceso Automatizado**:
+  1. Iniciar conteo → Sistema lista productos con stock teórico
+  2. Contar físicamente → Usuario ingresa cantidades contadas
+  3. Completar conteo → Sistema evalúa diferencias y aplica ajustes automáticos
+- **Tolerancia de Merma**: Configurable (default 2%)
+  - Diferencias ≤ tolerancia → Ajuste automático (merma normal)
+  - Diferencias > tolerancia → Marca para revisión (no ajusta automáticamente)
+- **Ajustes FIFO**: Mermas aprobadas se descuentan usando FIFO (lote más antiguo primero)
+
+#### Reportes y Auditoría
+- **Reporte de Uso de Listas**: Por usuario, muestra % de ventas mayorista vs minorista
+- **Reporte de Márgenes**: Por día y tipo de lista, muestra rentabilidad
+- **Alertas de Comportamiento**: Detección automática de patrones sospechosos
+- **Vista Materializada**: `mv_resumen_listas_sucursal` para reportes rápidos
+
+#### Funciones RPC Principales
+- `fn_registrar_venta_sucursal()`: Venta con control completo de lista, costo y margen
+- `fn_iniciar_conteo_stock()`: Inicia conteo físico
+- `fn_completar_conteo_stock()`: Completa conteo y genera ajustes
+- `fn_reporte_uso_listas_sucursal()`: Reporte de uso de listas por usuario
+- `fn_reporte_margenes_sucursal()`: Reporte de márgenes por día
+- `fn_detectar_comportamiento_sospechoso()`: Alertas de fraude
+
+#### Rutas y Componentes
+- `/sucursal/ventas`: POS con control de precios
+- `/sucursal/inventario/conteos`: Gestión de conteos físicos
+- `/sucursal/reportes/auditoria`: Reportes de auditoría de precios
+- `POSSucursal.tsx`: Componente POS mejorado
+- `ConteosStockContent.tsx`: Interfaz de conteos
+- `AuditoriaListasContent.tsx`: Reportes de auditoría
+
+**Filosofía de Diseño:**
+- ✅ **Control Posterior**: No bloquea operaciones, pero registra todo para auditoría
+- ✅ **Ajustes Automáticos**: Mermas normales se aplican automáticamente
+- ✅ **Detección Proactiva**: Alertas automáticas de comportamientos sospechosos
+- ✅ **Visibilidad Total**: Casa central ve stock, valor y márgenes en tiempo real
 
 ### 5️⃣ Dominio: Bot de WhatsApp (Interfaz de Cliente) ✅ FUNCIONANDO
 
@@ -670,6 +784,99 @@ CREATE TABLE reportes_export (
 );
 
 -- ===========================================
+-- CONTROL DE SUCURSALES: CONTEOS Y AJUSTES
+-- ===========================================
+
+-- CONTEOS FÍSICOS DE STOCK
+CREATE TABLE conteos_stock (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    sucursal_id UUID NOT NULL REFERENCES sucursales(id),
+    fecha_conteo DATE NOT NULL DEFAULT CURRENT_DATE,
+    estado VARCHAR(20) DEFAULT 'en_proceso' CHECK (estado IN ('en_proceso', 'completado', 'aprobado', 'rechazado')),
+    realizado_por UUID NOT NULL REFERENCES usuarios(id),
+    aprobado_por UUID REFERENCES usuarios(id),
+    fecha_aprobacion TIMESTAMPTZ,
+    observaciones TEXT,
+    total_diferencias INTEGER DEFAULT 0,
+    total_merma_valor DECIMAL(12,2) DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- DETALLE DE CONTEOS POR PRODUCTO
+CREATE TABLE conteo_stock_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    conteo_id UUID NOT NULL REFERENCES conteos_stock(id) ON DELETE CASCADE,
+    producto_id UUID NOT NULL REFERENCES productos(id),
+    cantidad_teorica DECIMAL(10,3) NOT NULL,
+    cantidad_contada DECIMAL(10,3),
+    diferencia DECIMAL(10,3) GENERATED ALWAYS AS (COALESCE(cantidad_contada, 0) - cantidad_teorica) STORED,
+    costo_unitario_promedio DECIMAL(10,2),
+    valor_diferencia DECIMAL(12,2) GENERATED ALWAYS AS (
+        (COALESCE(cantidad_contada, 0) - cantidad_teorica) * COALESCE(costo_unitario_promedio, 0)
+    ) STORED,
+    motivo_diferencia VARCHAR(100),
+    observaciones TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- AJUSTES DE STOCK
+CREATE TABLE ajustes_stock (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    sucursal_id UUID NOT NULL REFERENCES sucursales(id),
+    conteo_id UUID REFERENCES conteos_stock(id),
+    producto_id UUID NOT NULL REFERENCES productos(id),
+    lote_id UUID REFERENCES lotes(id),
+    tipo_ajuste VARCHAR(20) NOT NULL CHECK (tipo_ajuste IN ('merma', 'sobrante', 'vencimiento', 'rotura', 'otro')),
+    cantidad DECIMAL(10,3) NOT NULL,
+    costo_unitario DECIMAL(10,2),
+    valor_ajuste DECIMAL(12,2),
+    motivo TEXT NOT NULL,
+    aprobado BOOLEAN DEFAULT false,
+    aprobado_por UUID REFERENCES usuarios(id),
+    fecha_aprobacion TIMESTAMPTZ,
+    realizado_por UUID NOT NULL REFERENCES usuarios(id),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- AUDITORÍA DE USO DE LISTAS DE PRECIO
+CREATE TABLE auditoria_listas_precios (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    sucursal_id UUID REFERENCES sucursales(id),
+    usuario_id UUID NOT NULL REFERENCES usuarios(id),
+    cliente_id UUID NOT NULL REFERENCES clientes(id),
+    pedido_id UUID REFERENCES pedidos(id),
+    lista_precio_id UUID NOT NULL REFERENCES listas_precios(id),
+    tipo_lista VARCHAR(50) NOT NULL,
+    cantidad_total DECIMAL(10,3),
+    monto_total DECIMAL(12,2),
+    fecha_venta TIMESTAMPTZ DEFAULT NOW(),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- VISTA MATERIALIZADA: RESUMEN DE USO DE LISTAS
+CREATE MATERIALIZED VIEW mv_resumen_listas_sucursal AS
+SELECT 
+    a.sucursal_id,
+    s.nombre as sucursal_nombre,
+    a.usuario_id,
+    u.nombre as usuario_nombre,
+    a.tipo_lista,
+    DATE_TRUNC('day', a.fecha_venta) as fecha,
+    COUNT(*) as cantidad_ventas,
+    SUM(a.cantidad_total) as kg_totales,
+    SUM(a.monto_total) as monto_total,
+    ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (PARTITION BY a.sucursal_id, DATE_TRUNC('day', a.fecha_venta)), 2) as porcentaje_del_dia
+FROM auditoria_listas_precios a
+LEFT JOIN sucursales s ON a.sucursal_id = s.id
+LEFT JOIN usuarios u ON a.usuario_id = u.id
+GROUP BY a.sucursal_id, s.nombre, a.usuario_id, u.nombre, a.tipo_lista, DATE_TRUNC('day', a.fecha_venta);
+
+-- CAMPOS AGREGADOS A TABLAS EXISTENTES
+-- detalles_pedido: costo_unitario, margen_bruto, lista_precio_id, tipo_lista
+-- pedidos: costo_total, margen_bruto_total, usuario_cajero_id
+
+-- ===========================================
 -- ÍNDICES PARA OPTIMIZACIÓN
 -- ===========================================
 
@@ -779,6 +986,116 @@ BEGIN
 
     RETURN jsonb_build_object('success', true, 'lista_id', v_lista_id);
 END;
+$$ LANGUAGE plpgsql;
+
+-- ===========================================
+-- FUNCIONES RPC: CONTROL DE SUCURSALES
+-- ===========================================
+
+-- Función para obtener costo promedio ponderado de un producto en una sucursal
+CREATE OR REPLACE FUNCTION fn_obtener_costo_promedio_sucursal(
+    p_sucursal_id UUID,
+    p_producto_id UUID
+) RETURNS DECIMAL(10,2) AS $$
+-- Calcula: Suma(lote.cantidad × lote.costo) / Suma(lote.cantidad)
+-- Si no hay lotes, usa precio_costo del producto
+$$ LANGUAGE plpgsql;
+
+-- Función para registrar venta en sucursal con control completo
+CREATE OR REPLACE FUNCTION fn_registrar_venta_sucursal(
+    p_sucursal_id UUID,
+    p_cliente_id UUID,
+    p_usuario_id UUID,
+    p_lista_precio_id UUID,
+    p_items JSONB,
+    p_pago JSONB DEFAULT NULL
+) RETURNS JSONB AS $$
+-- Registra venta con:
+-- - Validación de stock
+-- - Cálculo de costo promedio ponderado
+-- - Cálculo de precio según lista
+-- - Cálculo de margen bruto
+-- - Descuento FIFO de stock
+-- - Registro en auditoria_listas_precios
+-- Retorna: pedido_id, numero_pedido, total, costo_total, margen_bruto, tipo_lista
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Función para iniciar conteo físico de stock
+CREATE OR REPLACE FUNCTION fn_iniciar_conteo_stock(
+    p_sucursal_id UUID,
+    p_usuario_id UUID
+) RETURNS JSONB AS $$
+-- Crea registro de conteo
+-- Lista todos los productos con stock en la sucursal
+-- Crea items con stock teórico y costo promedio
+-- Retorna: conteo_id
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Función para completar conteo y generar ajustes
+CREATE OR REPLACE FUNCTION fn_completar_conteo_stock(
+    p_conteo_id UUID,
+    p_usuario_id UUID,
+    p_tolerancia_porcentaje DECIMAL(5,2) DEFAULT 2.0
+) RETURNS JSONB AS $$
+-- Procesa diferencias detectadas
+-- Si diferencia ≤ tolerancia → Ajuste automático (merma normal)
+-- Si diferencia > tolerancia → Marca para revisión
+-- Aplica ajustes automáticos usando FIFO
+-- Retorna: total_diferencias, total_merma_valor
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Función para reporte de uso de listas por usuario
+CREATE OR REPLACE FUNCTION fn_reporte_uso_listas_sucursal(
+    p_sucursal_id UUID,
+    p_fecha_desde DATE DEFAULT NULL,
+    p_fecha_hasta DATE DEFAULT NULL
+) RETURNS TABLE (
+    usuario_id UUID,
+    usuario_nombre VARCHAR,
+    tipo_lista VARCHAR,
+    cantidad_ventas BIGINT,
+    kg_totales DECIMAL,
+    monto_total DECIMAL,
+    porcentaje_ventas DECIMAL
+) AS $$
+-- Agrupa ventas por usuario y tipo de lista
+-- Calcula estadísticas y porcentajes
+$$ LANGUAGE plpgsql;
+
+-- Función para reporte de márgenes por día
+CREATE OR REPLACE FUNCTION fn_reporte_margenes_sucursal(
+    p_sucursal_id UUID,
+    p_fecha_desde DATE DEFAULT NULL,
+    p_fecha_hasta DATE DEFAULT NULL
+) RETURNS TABLE (
+    fecha DATE,
+    tipo_lista VARCHAR,
+    cantidad_ventas BIGINT,
+    venta_total DECIMAL,
+    costo_total DECIMAL,
+    margen_bruto DECIMAL,
+    porcentaje_margen DECIMAL
+) AS $$
+-- Agrupa ventas por día y tipo de lista
+-- Calcula márgenes y porcentajes
+$$ LANGUAGE plpgsql;
+
+-- Función para detectar comportamientos sospechosos
+CREATE OR REPLACE FUNCTION fn_detectar_comportamiento_sospechoso(
+    p_sucursal_id UUID,
+    p_dias_atras INTEGER DEFAULT 7
+) RETURNS TABLE (
+    usuario_id UUID,
+    usuario_nombre VARCHAR,
+    tipo_alerta VARCHAR,
+    descripcion TEXT,
+    valor_actual DECIMAL,
+    valor_promedio DECIMAL,
+    fecha_deteccion TIMESTAMPTZ
+) AS $$
+-- Detecta:
+-- - Alto % de ventas mayoristas (>1.5x promedio)
+-- - Ventas mayoristas de bajo volumen (<10 kg)
 $$ LANGUAGE plpgsql;
 
 -- Función para validar que un cliente no tenga más de 2 listas activas
