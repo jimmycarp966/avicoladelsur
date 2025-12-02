@@ -196,3 +196,4 @@ Todos los módulos principales y sus subpáginas están correctamente representa
 **Auditoría realizada:** Diciembre 2025  
 **Última actualización:** Diciembre 2025
 
+

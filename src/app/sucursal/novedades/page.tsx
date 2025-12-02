@@ -2,8 +2,10 @@ import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Megaphone, Bell, Calendar, User, AlertTriangle, Truck, Package } from 'lucide-react'
-import { getSucursalUsuario } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { Megaphone, Bell, Calendar, User, AlertTriangle, Truck, Package, Building2 } from 'lucide-react'
+import { getSucursalUsuarioConAdmin } from '@/lib/utils'
+import Link from 'next/link'
 
 async function getNovedadesSucursal() {
   const supabase = await createClient()
@@ -14,11 +16,29 @@ async function getNovedadesSucursal() {
     throw new Error('Usuario no autenticado')
   }
 
-  // Obtener sucursal del usuario
-  const sucursalId = await getSucursalUsuario(supabase, user.id)
+  // Obtener sucursal del usuario con soporte para admin
+  const { sucursalId, esAdmin } = await getSucursalUsuarioConAdmin(supabase, user.id, user.email || '')
+
+  if (!sucursalId && !esAdmin) {
+    throw new Error('Usuario no tiene sucursal asignada')
+  }
 
   if (!sucursalId) {
-    throw new Error('Usuario no tiene sucursal asignada')
+    // Admin sin sucursales activas
+    return {
+      novedades: [],
+      estadisticas: {
+        total: 0,
+        importantes: 0,
+        automaticas: 0,
+        estaSemana: 0,
+        alertasActivas: 0,
+        transferenciasPendientes: 0,
+        ventasRecientes: 0
+      },
+      sinSucursal: true,
+      esAdmin: true
+    }
   }
 
   // Obtener datos para generar notificaciones inteligentes
@@ -148,18 +168,50 @@ async function getNovedadesSucursal() {
       const semanaAtras = new Date()
       semanaAtras.setDate(semanaAtras.getDate() - 7)
       return fecha >= semanaAtras
-    }).length
+    }).length,
+    alertasActivas: alertasActivas.length,
+    transferenciasPendientes: transferenciasActivas.length,
+    ventasRecientes: ventasRecientes.length
   }
 
   return {
     novedades: todasLasNovedades,
-    estadisticas
+    estadisticas,
+    sinSucursal: false,
+    esAdmin
   }
 }
 
 export default async function SucursalNovedadesPage() {
   try {
     const data = await getNovedadesSucursal()
+
+    // Si es admin sin sucursal, mostrar mensaje informativo
+    if (data.sinSucursal && data.esAdmin) {
+      return (
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Card className="w-full max-w-md border-amber-200 bg-amber-50">
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <AlertTriangle className="w-12 h-12 text-amber-600 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2 text-amber-900">
+                  No hay sucursales activas
+                </h3>
+                <p className="text-amber-800 mb-4">
+                  Como administrador, necesitas crear una sucursal antes de poder ver las novedades.
+                </p>
+                <Button asChild>
+                  <Link href="/sucursales/nueva">
+                    <Building2 className="w-4 h-4 mr-2" />
+                    Crear Primera Sucursal
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )
+    }
 
     return (
       <div className="space-y-6">

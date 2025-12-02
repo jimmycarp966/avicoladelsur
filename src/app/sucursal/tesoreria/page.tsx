@@ -2,9 +2,11 @@ import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { CreditCard, DollarSign, TrendingUp, TrendingDown, RefreshCw, ArrowUpRight, ArrowDownRight } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { CreditCard, DollarSign, TrendingUp, TrendingDown, RefreshCw, ArrowUpRight, ArrowDownRight, AlertTriangle, Building2 } from 'lucide-react'
 import { TesoreriaTable } from '@/components/sucursales/TesoreriaTable'
-import { getSucursalUsuario } from '@/lib/utils'
+import { getSucursalUsuarioConAdmin } from '@/lib/utils'
+import Link from 'next/link'
 
 async function getTesoreriaSucursal() {
   const supabase = await createClient()
@@ -15,11 +17,30 @@ async function getTesoreriaSucursal() {
     throw new Error('Usuario no autenticado')
   }
 
-  // Obtener sucursal del usuario
-  const sucursalId = await getSucursalUsuario(supabase, user.id)
+  // Obtener sucursal del usuario con soporte para admin
+  const { sucursalId, esAdmin } = await getSucursalUsuarioConAdmin(supabase, user.id, user.email || '')
+
+  if (!sucursalId && !esAdmin) {
+    throw new Error('Usuario no tiene sucursal asignada')
+  }
 
   if (!sucursalId) {
-    throw new Error('Usuario no tiene sucursal asignada')
+    // Admin sin sucursales activas
+    return {
+      caja: null,
+      movimientos: [],
+      estadisticas: {
+        saldoActual: 0,
+        saldoInicial: 0,
+        movimientosRecientes: 0,
+        ingresosMes: 0,
+        egresosMes: 0,
+        balanceMes: 0,
+        movimientosHoy: 0
+      },
+      sinSucursal: true,
+      esAdmin: true
+    }
   }
 
   // Obtener caja de la sucursal
@@ -89,13 +110,42 @@ async function getTesoreriaSucursal() {
   return {
     caja,
     movimientos: movimientosList,
-    estadisticas
+    estadisticas,
+    sinSucursal: false,
+    esAdmin
   }
 }
 
 export default async function SucursalTesoreriaPage() {
   try {
     const data = await getTesoreriaSucursal()
+
+    // Si es admin sin sucursal, mostrar mensaje informativo
+    if (data.sinSucursal && data.esAdmin) {
+      return (
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Card className="w-full max-w-md border-amber-200 bg-amber-50">
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <AlertTriangle className="w-12 h-12 text-amber-600 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2 text-amber-900">
+                  No hay sucursales activas
+                </h3>
+                <p className="text-amber-800 mb-4">
+                  Como administrador, necesitas crear una sucursal antes de poder ver la tesorería.
+                </p>
+                <Button asChild>
+                  <Link href="/sucursales/nueva">
+                    <Building2 className="w-4 h-4 mr-2" />
+                    Crear Primera Sucursal
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )
+    }
 
     return (
       <div className="space-y-6">

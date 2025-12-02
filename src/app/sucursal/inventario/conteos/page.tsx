@@ -1,7 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { ClipboardList, AlertCircle } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { ClipboardList, AlertCircle, AlertTriangle, Building2 } from 'lucide-react'
 import { ConteosStockContent } from '@/components/sucursales/ConteosStockContent'
+import { getSucursalUsuarioConAdmin } from '@/lib/utils'
+import Link from 'next/link'
 
 export const revalidate = 60 // Revalidar cada minuto
 
@@ -14,27 +17,30 @@ async function getConteosData() {
     throw new Error('Usuario no autenticado')
   }
 
-  // Obtener sucursal del usuario desde metadata o tabla usuarios
-  const { data: userData, error: userDataError } = await supabase
-    .from('usuarios')
-    .select('id, sucursal_id')
-    .eq('email', user.email)
-    .single()
+  // Obtener sucursal del usuario con soporte para admin
+  const { sucursalId, esAdmin } = await getSucursalUsuarioConAdmin(supabase, user.id, user.email || '')
 
-  // Si no tiene sucursal en usuarios, buscar en rrhh_empleados
-  let sucursalId = userData?.sucursal_id
-  if (!sucursalId) {
-    const { data: empleado } = await supabase
-      .from('rrhh_empleados')
-      .select('sucursal_id')
-      .eq('usuario_id', userData?.id)
-      .single()
-    
-    sucursalId = empleado?.sucursal_id
+  if (!sucursalId && !esAdmin) {
+    throw new Error('Usuario no tiene sucursal asignada')
   }
 
   if (!sucursalId) {
-    throw new Error('Usuario no tiene sucursal asignada')
+    // Admin sin sucursales activas
+    return {
+      conteos: [],
+      sucursalId: '',
+      sucursalNombre: '',
+      conteoEnProceso: null,
+      ultimoConteoCompletado: null,
+      estadisticas: {
+        totalConteos: 0,
+        enProceso: 0,
+        completados: 0,
+        aprobados: 0
+      },
+      sinSucursal: true,
+      esAdmin: true
+    }
   }
 
   // Obtener conteos de la sucursal
@@ -75,13 +81,43 @@ async function getConteosData() {
       enProceso: conteos?.filter(c => c.estado === 'en_proceso').length || 0,
       completados: conteos?.filter(c => c.estado === 'completado').length || 0,
       aprobados: conteos?.filter(c => c.estado === 'aprobado').length || 0,
-    }
+    },
+    sinSucursal: false,
+    esAdmin
   }
 }
 
 export default async function ConteosStockPage() {
   try {
     const data = await getConteosData()
+
+    // Si es admin sin sucursal, mostrar mensaje informativo
+    if (data.sinSucursal && data.esAdmin) {
+      return (
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Card className="w-full max-w-md border-amber-200 bg-amber-50">
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <AlertTriangle className="w-12 h-12 text-amber-600 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2 text-amber-900">
+                  No hay sucursales activas
+                </h3>
+                <p className="text-amber-800 mb-4">
+                  Como administrador, necesitas crear una sucursal antes de poder realizar conteos de stock.
+                </p>
+                <Button asChild>
+                  <Link href="/sucursales/nueva">
+                    <Building2 className="w-4 h-4 mr-2" />
+                    Crear Primera Sucursal
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )
+    }
+
     return <ConteosStockContent data={data} />
   } catch (error) {
     return (

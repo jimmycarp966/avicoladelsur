@@ -1,8 +1,10 @@
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { AlertTriangle } from 'lucide-react'
-import { getSucursalUsuario } from '@/lib/utils'
+import { AlertTriangle, Building2 } from 'lucide-react'
+import { getSucursalUsuarioConAdmin } from '@/lib/utils'
 import { AlertasContent } from '@/components/shared/AlertasContent'
+import { Button } from '@/components/ui/button'
+import Link from 'next/link'
 
 interface AlertaStock {
   id: string
@@ -16,7 +18,7 @@ interface AlertaStock {
 }
 
 async function getAlertasSucursal() {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   // Obtener usuario actual
   const { data: { user }, error: userError } = await supabase.auth.getUser()
@@ -24,11 +26,25 @@ async function getAlertasSucursal() {
     throw new Error('Usuario no autenticado')
   }
 
-  // Obtener sucursal del usuario
-  const sucursalId = await getSucursalUsuario(supabase, user.id)
+  // Obtener sucursal del usuario con soporte para admin
+  const { sucursalId, esAdmin } = await getSucursalUsuarioConAdmin(supabase, user.id, user.email || '')
+
+  if (!sucursalId && !esAdmin) {
+    throw new Error('Usuario no tiene sucursal asignada')
+  }
 
   if (!sucursalId) {
-    throw new Error('Usuario no tiene sucursal asignada')
+    // Admin sin sucursales activas
+    return {
+      alertas: [],
+      estadisticas: {
+        pendientes: 0,
+        resueltas: 0,
+        total: 0
+      },
+      sinSucursal: true,
+      esAdmin: true
+    }
   }
 
   // Obtener alertas
@@ -48,13 +64,42 @@ async function getAlertasSucursal() {
       pendientes: alertas.filter(a => a.estado === 'pendiente').length,
       resueltas: alertas.filter(a => a.estado !== 'pendiente').length,
       total: alertas.length
-    }
+    },
+    sinSucursal: false,
+    esAdmin
   }
 }
 
 export default async function SucursalAlertsPage() {
   try {
     const data = await getAlertasSucursal()
+
+    // Si es admin sin sucursal, mostrar mensaje informativo
+    if (data.sinSucursal && data.esAdmin) {
+      return (
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Card className="w-full max-w-md border-amber-200 bg-amber-50">
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <AlertTriangle className="w-12 h-12 text-amber-600 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2 text-amber-900">
+                  No hay sucursales activas
+                </h3>
+                <p className="text-amber-800 mb-4">
+                  Como administrador, necesitas crear una sucursal antes de poder ver alertas.
+                </p>
+                <Button asChild>
+                  <Link href="/sucursales/nueva">
+                    <Building2 className="w-4 h-4 mr-2" />
+                    Crear Primera Sucursal
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )
+    }
 
     return <AlertasContent data={data} />
   } catch (error) {

@@ -246,3 +246,46 @@ export async function getSucursalUsuario(supabase: any, userId: string): Promise
   }
 }
 
+/**
+ * Obtiene la sucursal del usuario con soporte para admins
+ * Si el usuario es admin y no tiene sucursal asignada, intenta obtener la primera sucursal activa
+ * @param supabase - Cliente de Supabase
+ * @param userId - ID del usuario autenticado
+ * @param userEmail - Email del usuario (para verificar rol)
+ * @returns ID de la sucursal o null si no tiene asignada y no es admin
+ */
+export async function getSucursalUsuarioConAdmin(
+  supabase: any,
+  userId: string,
+  userEmail: string
+): Promise<{ sucursalId: string | null; esAdmin: boolean }> {
+  // Obtener rol del usuario
+  const { data: usuarioData } = await supabase
+    .from('usuarios')
+    .select('rol')
+    .eq('email', userEmail)
+    .single()
+
+  const esAdmin = usuarioData?.rol === 'admin'
+
+  // Obtener sucursal del usuario
+  const sucursalId = await getSucursalUsuario(supabase, userId)
+
+  // Si es admin y no tiene sucursal asignada, obtener la primera sucursal activa
+  let sucursalIdFinal = sucursalId
+  if (!sucursalIdFinal && esAdmin) {
+    const { data: sucursalesActivas } = await supabase
+      .from('sucursales')
+      .select('id')
+      .eq('active', true)
+      .order('nombre')
+      .limit(1)
+    
+    if (sucursalesActivas && sucursalesActivas.length > 0) {
+      sucursalIdFinal = sucursalesActivas[0].id
+    }
+  }
+
+  return { sucursalId: sucursalIdFinal, esAdmin }
+}
+
