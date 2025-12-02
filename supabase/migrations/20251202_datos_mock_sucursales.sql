@@ -64,7 +64,7 @@ AND NOT EXISTS (
 
 -- Lotes para Sucursal Colón (stock variado)
 INSERT INTO lotes (numero_lote, producto_id, sucursal_id, cantidad_ingresada, cantidad_disponible, 
-                   precio_costo_unitario, precio_venta_sugerido, estado, fecha_vencimiento, observaciones)
+                   costo_unitario, estado, fecha_ingreso, fecha_vencimiento)
 SELECT 
     'COLON-' || p.codigo || '-001',
     p.id,
@@ -86,10 +86,9 @@ SELECT
         ELSE 80
     END,
     p.precio_costo,
-    p.precio_venta,
     'disponible',
-    CURRENT_DATE + INTERVAL '30 days',
-    'Stock inicial Sucursal Colón'
+    CURRENT_DATE - INTERVAL '10 days',
+    CURRENT_DATE + INTERVAL '30 days'
 FROM productos p
 CROSS JOIN sucursales s
 WHERE s.nombre = 'Sucursal Colón'
@@ -104,7 +103,7 @@ ON CONFLICT (numero_lote) DO UPDATE SET
 
 -- Lotes para Sucursal Simoca (stock diferente)
 INSERT INTO lotes (numero_lote, producto_id, sucursal_id, cantidad_ingresada, cantidad_disponible, 
-                   precio_costo_unitario, precio_venta_sugerido, estado, fecha_vencimiento, observaciones)
+                   costo_unitario, estado, fecha_ingreso, fecha_vencimiento)
 SELECT 
     'SIMOCA-' || p.codigo || '-001',
     p.id,
@@ -126,10 +125,9 @@ SELECT
         ELSE 55
     END,
     p.precio_costo,
-    p.precio_venta,
     'disponible',
-    CURRENT_DATE + INTERVAL '25 days',
-    'Stock inicial Sucursal Simoca'
+    CURRENT_DATE - INTERVAL '8 days',
+    CURRENT_DATE + INTERVAL '25 days'
 FROM productos p
 CROSS JOIN sucursales s
 WHERE s.nombre = 'Sucursal Simoca'
