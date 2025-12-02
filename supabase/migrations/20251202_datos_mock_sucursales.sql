@@ -11,12 +11,14 @@ BEGIN;
 -- 1. VERIFICAR/CREAR SUCURSALES
 -- ===========================================
 
--- Verificar que existan las sucursales Colón y Simoca
+-- Verificar que existan las sucursales Colón y Simoca (usando INSERT si no existe)
 INSERT INTO sucursales (nombre, direccion, telefono, active)
-VALUES 
-    ('Sucursal Colón', 'Av. Colón 3456, San Miguel de Tucumán', '381-678-9012', true),
-    ('Sucursal Simoca', 'Ruta Nacional 9 Km 45, Simoca, Tucumán', '381-789-0123', true)
-ON CONFLICT (nombre) DO UPDATE SET active = true;
+SELECT 'Sucursal Colón', 'Av. Colón 3456, San Miguel de Tucumán', '381-678-9012', true
+WHERE NOT EXISTS (SELECT 1 FROM sucursales WHERE nombre = 'Sucursal Colón');
+
+INSERT INTO sucursales (nombre, direccion, telefono, active)
+SELECT 'Sucursal Simoca', 'Ruta Nacional 9 Km 45, Simoca, Tucumán', '381-789-0123', true
+WHERE NOT EXISTS (SELECT 1 FROM sucursales WHERE nombre = 'Sucursal Simoca');
 
 -- ===========================================
 -- 2. CREAR CONFIGURACIÓN DE SUCURSALES
@@ -38,17 +40,23 @@ ON CONFLICT (sucursal_id) DO NOTHING;
 -- 3. CREAR CAJAS PARA LAS SUCURSALES
 -- ===========================================
 
--- Caja para Sucursal Colón
+-- Caja para Sucursal Colón (solo si no existe)
 INSERT INTO tesoreria_cajas (nombre, sucursal_id, saldo_actual, saldo_inicial, active)
-SELECT 'Caja Sucursal Colón', id, 125000.00, 50000.00, true
-FROM sucursales WHERE nombre = 'Sucursal Colón'
-ON CONFLICT DO NOTHING;
+SELECT 'Caja Sucursal Colón', s.id, 125000.00, 50000.00, true
+FROM sucursales s
+WHERE s.nombre = 'Sucursal Colón'
+AND NOT EXISTS (
+    SELECT 1 FROM tesoreria_cajas tc WHERE tc.sucursal_id = s.id
+);
 
--- Caja para Sucursal Simoca
+-- Caja para Sucursal Simoca (solo si no existe)
 INSERT INTO tesoreria_cajas (nombre, sucursal_id, saldo_actual, saldo_inicial, active)
-SELECT 'Caja Sucursal Simoca', id, 87500.00, 30000.00, true
-FROM sucursales WHERE nombre = 'Sucursal Simoca'
-ON CONFLICT DO NOTHING;
+SELECT 'Caja Sucursal Simoca', s.id, 87500.00, 30000.00, true
+FROM sucursales s
+WHERE s.nombre = 'Sucursal Simoca'
+AND NOT EXISTS (
+    SELECT 1 FROM tesoreria_cajas tc WHERE tc.sucursal_id = s.id
+);
 
 -- ===========================================
 -- 4. CREAR INVENTARIO (LOTES) PARA COLÓN
@@ -327,7 +335,7 @@ WHERE s.nombre = 'Sucursal Simoca' AND c.codigo = 'CLI-SIM-004';
 -- 10. CREAR ALERTAS DE STOCK
 -- ===========================================
 
--- Alerta para Colón: Alas de pollo bajo stock
+-- Alerta para Colón: Alas de pollo bajo stock (solo si no existe una pendiente)
 INSERT INTO alertas_stock (sucursal_id, producto_id, cantidad_actual, umbral, estado)
 SELECT 
     s.id,
@@ -337,9 +345,12 @@ SELECT
     'pendiente'
 FROM sucursales s, productos p
 WHERE s.nombre = 'Sucursal Colón' AND p.codigo = 'POLLO003'
-ON CONFLICT DO NOTHING;
+AND NOT EXISTS (
+    SELECT 1 FROM alertas_stock a 
+    WHERE a.sucursal_id = s.id AND a.producto_id = p.id AND a.estado = 'pendiente'
+);
 
--- Alerta para Simoca: Pechuga bajo stock
+-- Alerta para Simoca: Pechuga bajo stock (solo si no existe una pendiente)
 INSERT INTO alertas_stock (sucursal_id, producto_id, cantidad_actual, umbral, estado)
 SELECT 
     s.id,
@@ -349,9 +360,12 @@ SELECT
     'pendiente'
 FROM sucursales s, productos p
 WHERE s.nombre = 'Sucursal Simoca' AND p.codigo = 'POLLO002'
-ON CONFLICT DO NOTHING;
+AND NOT EXISTS (
+    SELECT 1 FROM alertas_stock a 
+    WHERE a.sucursal_id = s.id AND a.producto_id = p.id AND a.estado = 'pendiente'
+);
 
--- Alerta resuelta para Colón (histórico)
+-- Alerta resuelta para Colón (histórico) - solo si no existe
 INSERT INTO alertas_stock (sucursal_id, producto_id, cantidad_actual, umbral, estado, created_at, updated_at)
 SELECT 
     s.id,
@@ -363,7 +377,10 @@ SELECT
     CURRENT_DATE - INTERVAL '3 days'
 FROM sucursales s, productos p
 WHERE s.nombre = 'Sucursal Colón' AND p.codigo = 'HUEVO002'
-ON CONFLICT DO NOTHING;
+AND NOT EXISTS (
+    SELECT 1 FROM alertas_stock a 
+    WHERE a.sucursal_id = s.id AND a.producto_id = p.id AND a.estado = 'resuelto'
+);
 
 -- ===========================================
 -- 11. CREAR TRANSFERENCIAS ENTRE SUCURSALES
