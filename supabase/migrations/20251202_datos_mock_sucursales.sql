@@ -239,8 +239,18 @@ SELECT
         WHEN c.codigo = 'CLI-ALB-003' THEN 2100.00
         WHEN c.codigo = 'CLI-ALB-004' THEN 5160.00
     END,
-    CURRENT_DATE - INTERVAL (ROW_NUMBER() OVER (ORDER BY c.id)) || ' days',
-    CURRENT_DATE - INTERVAL (ROW_NUMBER() OVER (ORDER BY c.id)) || ' days'
+    CASE
+        WHEN c.codigo = 'CLI-ALB-001' THEN CURRENT_DATE - INTERVAL '1 day'
+        WHEN c.codigo = 'CLI-ALB-002' THEN CURRENT_DATE - INTERVAL '2 days'
+        WHEN c.codigo = 'CLI-ALB-003' THEN CURRENT_DATE - INTERVAL '3 days'
+        WHEN c.codigo = 'CLI-ALB-004' THEN CURRENT_DATE - INTERVAL '4 days'
+    END,
+    CASE
+        WHEN c.codigo = 'CLI-ALB-001' THEN CURRENT_DATE - INTERVAL '1 day'
+        WHEN c.codigo = 'CLI-ALB-002' THEN CURRENT_DATE - INTERVAL '2 days'
+        WHEN c.codigo = 'CLI-ALB-003' THEN CURRENT_DATE - INTERVAL '3 days'
+        WHEN c.codigo = 'CLI-ALB-004' THEN CURRENT_DATE - INTERVAL '4 days'
+    END
 FROM sucursales s
 CROSS JOIN clientes c
 WHERE s.nombre = 'Sucursal Alberdi' AND c.zona_entrega = 'Alberdi';
@@ -279,8 +289,18 @@ SELECT
         WHEN c.codigo = 'CLI-SMA-003' THEN 1950.00
         WHEN c.codigo = 'CLI-SMA-004' THEN 4700.00
     END,
-    CURRENT_DATE - INTERVAL (ROW_NUMBER() OVER (ORDER BY c.id)) || ' days',
-    CURRENT_DATE - INTERVAL (ROW_NUMBER() OVER (ORDER BY c.id)) || ' days'
+    CASE
+        WHEN c.codigo = 'CLI-SMA-001' THEN CURRENT_DATE - INTERVAL '1 day'
+        WHEN c.codigo = 'CLI-SMA-002' THEN CURRENT_DATE - INTERVAL '2 days'
+        WHEN c.codigo = 'CLI-SMA-003' THEN CURRENT_DATE - INTERVAL '3 days'
+        WHEN c.codigo = 'CLI-SMA-004' THEN CURRENT_DATE - INTERVAL '4 days'
+    END,
+    CASE
+        WHEN c.codigo = 'CLI-SMA-001' THEN CURRENT_DATE - INTERVAL '1 day'
+        WHEN c.codigo = 'CLI-SMA-002' THEN CURRENT_DATE - INTERVAL '2 days'
+        WHEN c.codigo = 'CLI-SMA-003' THEN CURRENT_DATE - INTERVAL '3 days'
+        WHEN c.codigo = 'CLI-SMA-004' THEN CURRENT_DATE - INTERVAL '4 days'
+    END
 FROM sucursales s
 CROSS JOIN clientes c
 WHERE s.nombre = 'Sucursal San Martín' AND c.zona_entrega = 'San Martín';
@@ -319,8 +339,18 @@ SELECT
         WHEN c.codigo = 'CLI-COL-003' THEN 2100.00
         WHEN c.codigo = 'CLI-COL-004' THEN 4000.00
     END,
-    CURRENT_DATE - INTERVAL (ROW_NUMBER() OVER (ORDER BY c.id)) || ' days',
-    CURRENT_DATE - INTERVAL (ROW_NUMBER() OVER (ORDER BY c.id)) || ' days'
+    CASE
+        WHEN c.codigo = 'CLI-COL-001' THEN CURRENT_DATE - INTERVAL '1 day'
+        WHEN c.codigo = 'CLI-COL-002' THEN CURRENT_DATE - INTERVAL '2 days'
+        WHEN c.codigo = 'CLI-COL-003' THEN CURRENT_DATE - INTERVAL '3 days'
+        WHEN c.codigo = 'CLI-COL-004' THEN CURRENT_DATE - INTERVAL '4 days'
+    END,
+    CASE
+        WHEN c.codigo = 'CLI-COL-001' THEN CURRENT_DATE - INTERVAL '1 day'
+        WHEN c.codigo = 'CLI-COL-002' THEN CURRENT_DATE - INTERVAL '2 days'
+        WHEN c.codigo = 'CLI-COL-003' THEN CURRENT_DATE - INTERVAL '3 days'
+        WHEN c.codigo = 'CLI-COL-004' THEN CURRENT_DATE - INTERVAL '4 days'
+    END
 FROM sucursales s
 CROSS JOIN clientes c
 WHERE s.nombre = 'Sucursal Colón' AND c.zona_entrega = 'Colón';
@@ -359,60 +389,78 @@ SELECT
         WHEN c.codigo = 'CLI-SIM-003' THEN 1600.00
         WHEN c.codigo = 'CLI-SIM-004' THEN 3500.00
     END,
-    CURRENT_DATE - INTERVAL (ROW_NUMBER() OVER (ORDER BY c.id)) || ' days',
-    CURRENT_DATE - INTERVAL (ROW_NUMBER() OVER (ORDER BY c.id)) || ' days'
+    CASE
+        WHEN c.codigo = 'CLI-SIM-001' THEN CURRENT_DATE - INTERVAL '1 day'
+        WHEN c.codigo = 'CLI-SIM-002' THEN CURRENT_DATE - INTERVAL '2 days'
+        WHEN c.codigo = 'CLI-SIM-003' THEN CURRENT_DATE - INTERVAL '3 days'
+        WHEN c.codigo = 'CLI-SIM-004' THEN CURRENT_DATE - INTERVAL '4 days'
+    END,
+    CASE
+        WHEN c.codigo = 'CLI-SIM-001' THEN CURRENT_DATE - INTERVAL '1 day'
+        WHEN c.codigo = 'CLI-SIM-002' THEN CURRENT_DATE - INTERVAL '2 days'
+        WHEN c.codigo = 'CLI-SIM-003' THEN CURRENT_DATE - INTERVAL '3 days'
+        WHEN c.codigo = 'CLI-SIM-004' THEN CURRENT_DATE - INTERVAL '4 days'
+    END
 FROM sucursales s
 CROSS JOIN clientes c
 WHERE s.nombre = 'Sucursal Simoca' AND c.zona_entrega = 'Simoca';
 
 -- ===========================================
--- 10. CREAR ALERTAS DE STOCK
+-- 7. CREAR ALERTAS DE STOCK PARA TODAS LAS SUCURSALES
 -- ===========================================
 
--- Alerta para Colón: Alas de pollo bajo stock (solo si no existe una pendiente)
+-- Alertas pendientes (solo si no existen)
 INSERT INTO alertas_stock (sucursal_id, producto_id, cantidad_actual, umbral, estado)
-SELECT 
+SELECT DISTINCT
     s.id,
     p.id,
-    45,
-    50,
+    CASE
+        WHEN s.nombre = 'Sucursal Alberdi' AND p.codigo = 'POLLO003' THEN 32
+        WHEN s.nombre = 'Sucursal San Martín' AND p.codigo = 'POLLO002' THEN 42
+        WHEN s.nombre = 'Sucursal Colón' AND p.codigo = 'POLLO003' THEN 45
+        WHEN s.nombre = 'Sucursal Simoca' AND p.codigo = 'POLLO002' THEN 35
+    END,
+    CASE
+        WHEN s.nombre = 'Sucursal Alberdi' THEN 35
+        WHEN s.nombre = 'Sucursal San Martín' THEN 45
+        WHEN s.nombre = 'Sucursal Colón' THEN 50
+        WHEN s.nombre = 'Sucursal Simoca' THEN 40
+    END,
     'pendiente'
 FROM sucursales s, productos p
-WHERE s.nombre = 'Sucursal Colón' AND p.codigo = 'POLLO003'
+WHERE s.nombre IN ('Sucursal Alberdi', 'Sucursal San Martín', 'Sucursal Colón', 'Sucursal Simoca')
+AND p.activo = true
+AND (
+    (s.nombre = 'Sucursal Alberdi' AND p.codigo = 'POLLO003') OR
+    (s.nombre = 'Sucursal San Martín' AND p.codigo = 'POLLO002') OR
+    (s.nombre = 'Sucursal Colón' AND p.codigo = 'POLLO003') OR
+    (s.nombre = 'Sucursal Simoca' AND p.codigo = 'POLLO002')
+)
 AND NOT EXISTS (
-    SELECT 1 FROM alertas_stock a 
+    SELECT 1 FROM alertas_stock a
     WHERE a.sucursal_id = s.id AND a.producto_id = p.id AND a.estado = 'pendiente'
 );
 
--- Alerta para Simoca: Pechuga bajo stock (solo si no existe una pendiente)
-INSERT INTO alertas_stock (sucursal_id, producto_id, cantidad_actual, umbral, estado)
-SELECT 
-    s.id,
-    p.id,
-    35,
-    40,
-    'pendiente'
-FROM sucursales s, productos p
-WHERE s.nombre = 'Sucursal Simoca' AND p.codigo = 'POLLO002'
-AND NOT EXISTS (
-    SELECT 1 FROM alertas_stock a 
-    WHERE a.sucursal_id = s.id AND a.producto_id = p.id AND a.estado = 'pendiente'
-);
-
--- Alerta resuelta para Colón (histórico) - solo si no existe
+-- Alertas resueltas (históricas)
 INSERT INTO alertas_stock (sucursal_id, producto_id, cantidad_actual, umbral, estado, created_at, updated_at)
-SELECT 
+SELECT DISTINCT
     s.id,
     p.id,
-    8,
+    CASE
+        WHEN s.nombre = 'Sucursal Alberdi' THEN 6
+        WHEN s.nombre = 'Sucursal San Martín' THEN 7
+        WHEN s.nombre = 'Sucursal Colón' THEN 8
+        WHEN s.nombre = 'Sucursal Simoca' THEN 5
+    END,
     10,
     'resuelto',
     CURRENT_DATE - INTERVAL '5 days',
     CURRENT_DATE - INTERVAL '3 days'
 FROM sucursales s, productos p
-WHERE s.nombre = 'Sucursal Colón' AND p.codigo = 'HUEVO002'
+WHERE s.nombre IN ('Sucursal Alberdi', 'Sucursal San Martín', 'Sucursal Colón', 'Sucursal Simoca')
+AND p.codigo = 'HUEVO002'
 AND NOT EXISTS (
-    SELECT 1 FROM alertas_stock a 
+    SELECT 1 FROM alertas_stock a
     WHERE a.sucursal_id = s.id AND a.producto_id = p.id AND a.estado = 'resuelto'
 );
 
