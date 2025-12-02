@@ -406,6 +406,18 @@ supabase/                         # Scripts SQL y migraciones
 - ✅ **Vista materializada**: `mv_resumen_listas_sucursal` para reportes rápidos
 - ✅ **Migración**: `20251202_modelo_control_sucursales.sql`
 
+### **Mejoras de UX y Manejo de Admins para Sucursales (Diciembre 2025)**
+- ✅ **Dashboard mejorado**: Banner destacado con identificación clara de sucursal actual
+- ✅ **Selector de sucursales**: Administradores pueden cambiar entre sucursales desde el dashboard
+- ✅ **Badges informativos**: Estado de sucursal (Activa/Inactiva) y vista admin
+- ✅ **Función helper**: `getSucursalUsuarioConAdmin()` maneja el caso de admin sin sucursal asignada
+- ✅ **Manejo robusto**: Todos los componentes de sucursal manejan correctamente admin sin sucursal
+- ✅ **Mensajes informativos**: Opción para crear primera sucursal cuando no hay sucursales activas
+- ✅ **Componentes actualizados**: 
+  - `dashboard/page.tsx`: Selector de sucursales y banner de identificación
+  - `ventas/page.tsx`, `alerts/page.tsx`, `inventario/page.tsx`, `tesoreria/page.tsx`, `novedades/page.tsx`, `transferencias/page.tsx`, `inventario/conteos/page.tsx`, `reportes/auditoria/page.tsx`: Todos con soporte para admin sin sucursal
+- ✅ **Correcciones técnicas**: Cambio de `createClient` del cliente al servidor en componentes que lo requerían
+
 ### **Optimizaciones de Rendimiento (16/12/2025)**
 - ✅ **Revalidación Estratégica**: 20+ páginas optimizadas con `revalidate` (Dashboard 30s, Listados 5min, Reportes 1h)
 - ✅ **Caché de Consultas**: Productos, zonas y listas de precios cacheados automáticamente
@@ -423,4 +435,4 @@ supabase/                         # Scripts SQL y migraciones
 
 ---
 
-*Resumen actualizado el Diciembre 2025 - Modelo de control para sucursales implementado*
+*Resumen actualizado el Diciembre 2025 - Modelo de control para sucursales implementado + Mejoras de UX y manejo de admins*

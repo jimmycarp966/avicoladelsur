@@ -139,6 +139,8 @@ Controlar que las sucursales no manipulen precios mayorista/minorista para queda
 - **Conteos Físicos**: Ciclo semanal con tolerancia de merma configurable (1-2%)
 - **Detección de Fraude**: Alertas automáticas por alto % mayorista o ventas mayoristas de bajo volumen
 - **Reportes de Control**: Uso de listas por usuario, márgenes por día, diferencias de stock
+- **Dashboard Mejorado**: Identificación clara de sucursal activa con banner destacado y selector para administradores
+- **Manejo de Admins**: Los administradores pueden navegar todas las secciones sin sucursal asignada, con mensajes informativos cuando no hay sucursales activas
 
 ### 🔄 Flujo de Control
 ```
