@@ -20,7 +20,13 @@ import {
 import Link from 'next/link'
 import { getSucursalUsuario } from '@/lib/utils'
 
-async function getSucursalData() {
+interface PageProps {
+  searchParams: Promise<{
+    sid?: string
+  }>
+}
+
+async function getSucursalData(searchParams?: { sid?: string }) {
   const supabase = await createClient()
 
   // Obtener usuario actual
@@ -41,13 +47,27 @@ async function getSucursalData() {
   // Obtener sucursal del usuario
   const sucursalId = await getSucursalUsuario(supabase, user.id)
 
-  if (!sucursalId && !esAdmin) {
+  // Si es admin y hay un parámetro sid en la URL, usar ese (permite cambiar de sucursal)
+  let sucursalIdFinal = sucursalId
+  if (esAdmin && searchParams?.sid) {
+    // Validar que la sucursal existe y está activa
+    const { data: sucursalParam } = await supabase
+      .from('sucursales')
+      .select('id, active')
+      .eq('id', searchParams.sid)
+      .single()
+    
+    if (sucursalParam && sucursalParam.active) {
+      sucursalIdFinal = searchParams.sid
+    }
+  }
+
+  if (!sucursalIdFinal && !esAdmin) {
     // Usuario no tiene sucursal asignada y no es admin - redirigir a página de configuración
     redirect('/sucursal/configuracion?mensaje=sucursal-requerida')
   }
 
   // Si es admin y no tiene sucursal asignada, obtener la primera sucursal activa
-  let sucursalIdFinal = sucursalId
   if (!sucursalIdFinal && esAdmin) {
     const { data: primeraSucursal } = await supabase
       .from('sucursales')
@@ -160,9 +180,10 @@ function DashboardSkeleton() {
   )
 }
 
-export default async function SucursalDashboardPage() {
+export default async function SucursalDashboardPage(props: PageProps) {
   try {
-    const data = await getSucursalData()
+    const searchParams = await props.searchParams
+    const data = await getSucursalData(searchParams)
 
     const totalVentasDia = data.ventasDia.reduce((sum, venta) => sum + (venta.total || 0), 0)
     const transferenciasPendientes = data.transferencias.filter(t => t.estado === 'pendiente').length
@@ -236,7 +257,7 @@ export default async function SucursalDashboardPage() {
                       size="sm"
                       asChild
                     >
-                      <Link href={`/sucursales/${s.id}`}>
+                      <Link href={`/sucursal/dashboard?sid=${s.id}`}>
                         {s.nombre}
                       </Link>
                     </Button>
