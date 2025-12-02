@@ -269,9 +269,9 @@ BEGIN
 END;
 $$;
 
--- Insertar sucursal central por defecto (si no existe)
+-- Insertar sistema central (no es una sucursal operativa, sino el punto central de administración)
 INSERT INTO sucursales (id, nombre, direccion, telefono, active)
-VALUES ('00000000-0000-0000-0000-000000000001', 'Casa Central', 'Dirección Principal', '381-000-0000', true)
+VALUES ('00000000-0000-0000-0000-000000000001', 'Sistema Central', 'Av. Mate de Luna 1234, San Miguel de Tucumán', '381-555-0000', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- Configurar settings para casa central

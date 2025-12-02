@@ -3,11 +3,11 @@
 -- Fecha: 2025-11-26
 -- ===========================================
 -- Importa los 22 empleados de la lista al sistema RRHH
--- Todos se asignan a sucursal "Casa Central"
+-- Todos se asignan inicialmente a Casa Central
 -- Fecha de ingreso: fecha actual
 -- Legajos generados automáticamente (EMP001, EMP002, etc.)
 
--- Obtener ID de sucursal "Casa Central"
+-- Obtener ID de Casa Central
 DO $$
 DECLARE
     v_sucursal_id UUID;
@@ -44,11 +44,11 @@ BEGIN
     -- Si no existe, crear sucursal
     IF v_sucursal_id IS NULL THEN
         INSERT INTO sucursales (nombre, direccion, telefono, activo)
-        VALUES ('Casa Central', 'Av. Principal 123, Ciudad Central', '011-1234-5678', true)
+        VALUES ('Sistema Central', 'Av. Mate de Luna 1234, San Miguel de Tucumán', '381-555-0000', true)
         RETURNING id INTO v_sucursal_id;
-        RAISE NOTICE 'Sucursal "Casa Central" creada con ID: %', v_sucursal_id;
+        RAISE NOTICE 'Casa Central creado con ID: %', v_sucursal_id;
     ELSE
-        RAISE NOTICE 'Sucursal "Casa Central" encontrada con ID: %', v_sucursal_id;
+        RAISE NOTICE 'Casa Central encontrado con ID: %', v_sucursal_id;
     END IF;
 
     -- Obtener IDs de categorías y verificar que existan

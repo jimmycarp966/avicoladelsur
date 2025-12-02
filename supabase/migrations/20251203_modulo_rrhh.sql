@@ -316,11 +316,12 @@ CREATE POLICY "Empleados ven sus propias evaluaciones" ON rrhh_evaluaciones
 
 -- INSERTS DE DATOS INICIALES
 
--- Sucursales de ejemplo
+-- Sucursales de Avícola del Sur
 INSERT INTO sucursales (nombre, direccion, telefono) VALUES
-('Casa Central', 'Av. Principal 123, Ciudad Central', '011-1234-5678'),
-('Sucursal Norte', 'Calle Norte 456, Ciudad Norte', '011-2345-6789'),
-('Sucursal Sur', 'Calle Sur 789, Ciudad Sur', '011-3456-7890');
+('Sucursal Alberdi', 'Av. Alberdi 1456, San Miguel de Tucumán', '381-456-7890'),
+('Sucursal San Martín', 'Av. San Martín 2341, San Miguel de Tucumán', '381-567-8901'),
+('Sucursal Colón', 'Av. Colón 3456, San Miguel de Tucumán', '381-678-9012'),
+('Sucursal Simoca', 'Ruta Nacional 9 Km 45, Simoca, Tucumán', '381-789-0123');
 
 -- Categorías de empleados
 INSERT INTO rrhh_categorias (nombre, descripcion, sueldo_basico, adicional_cajero, adicional_produccion) VALUES

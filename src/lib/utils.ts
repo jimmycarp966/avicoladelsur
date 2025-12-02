@@ -220,3 +220,29 @@ export function formatDuration(seconds: number): string {
   return parts.join(' ')
 }
 
+/**
+ * Obtiene la sucursal asignada a un usuario desde la tabla rrhh_empleados
+ * @param supabase - Cliente de Supabase
+ * @param userId - ID del usuario autenticado
+ * @returns ID de la sucursal o null si no tiene asignada
+ */
+export async function getSucursalUsuario(supabase: any, userId: string): Promise<string | null> {
+  try {
+    const { data: empleado, error } = await supabase
+      .from('rrhh_empleados')
+      .select('sucursal_id')
+      .eq('usuario_id', userId)
+      .eq('activo', true)
+      .single()
+
+    if (error || !empleado?.sucursal_id) {
+      return null
+    }
+
+    return empleado.sucursal_id
+  } catch (error) {
+    console.error('Error al obtener sucursal del usuario:', error)
+    return null
+  }
+}
+

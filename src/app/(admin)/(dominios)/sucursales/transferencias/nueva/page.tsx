@@ -7,10 +7,10 @@ export default function NuevaTransferenciaPage() {
             <div>
                 <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
                     <ArrowRightLeft className="w-8 h-8" />
-                    Nueva Transferencia
+                    Distribuir desde Almacén Central
                 </h1>
                 <p className="text-muted-foreground">
-                    Inicia un movimiento de stock entre sucursales
+                    Distribuye productos desde el almacén central hacia las sucursales operativas
                 </p>
             </div>
 

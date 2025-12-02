@@ -17,9 +17,9 @@ import { obtenerTransferenciaAction } from '@/actions/sucursales-transferencias.
 import { TransferenciaActions } from '@/components/sucursales/TransferenciaActions'
 
 interface PageProps {
-    params: {
+    params: Promise<{
         id: string
-    }
+    }>
 }
 
 async function getTransferencia(id: string) {
@@ -28,7 +28,8 @@ async function getTransferencia(id: string) {
 }
 
 export default async function TransferenciaDetallePage({ params }: PageProps) {
-    const transferencia = await getTransferencia(params.id)
+    const { id } = await params
+    const transferencia = await getTransferencia(id)
     if (!transferencia) notFound()
 
     return (

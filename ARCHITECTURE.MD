@@ -21,9 +21,11 @@
 ### 📱 Aplicaciones del Sistema - COMPLETAS ✅
 1. **App Admin**: Dashboard web completo con planificación semanal, monitor GPS, reportes
 2. **App Repartidor**: PWA móvil completa con GPS tracking, entregas, cobros y firma digital
-3. **Bot Vendedor**: Automatización completa de pedidos vía WhatsApp con reserva stock
-4. **Planificación Semanal**: Gestión de rutas fijas por zona/día/turno/vehículo
-5. **Monitor GPS**: Tiempo real con alertas automáticas y mapa Google Maps
+3. **App Sucursal**: POS con control de precios mayorista/minorista y auditoría automática
+4. **Bot Vendedor**: Automatización completa de pedidos vía WhatsApp con reserva stock
+5. **Planificación Semanal**: Gestión de rutas fijas por zona/día/turno/vehículo
+6. **Monitor GPS**: Tiempo real con alertas automáticas y mapa Google Maps
+7. **Control de Sucursales**: Auditoría de precios, conteos físicos de stock y detección de desvíos
 
 ---
 
@@ -2045,6 +2047,299 @@ GET /api/tesoreria/movimientos-tiempo-real
 - **Transaccional**: Operaciones atómicas garantizan consistencia
 - **Escalabilidad**: Arquitectura preparada para crecimiento
 - **UX Mejorada**: Interfaces intuitivas para cada rol
+
+---
+
+## 🎯 Modelo de Pedidos Agrupados por Turno/Zona/Fecha (Diciembre 2025)
+
+### 📋 Arquitectura del Nuevo Modelo
+
+**Revolución en el flujo operativo**: Sistema único donde un pedido agrupa automáticamente todas las entregas del mismo turno + zona + fecha, transformando la logística y simplificando la gestión.
+
+#### 🏗️ **Estructura de Datos Transformada**
+
+##### **Nueva Tabla: `entregas`**
+Cada entrega representa la porción específica de un pedido para un cliente individual:
+
+```sql
+CREATE TABLE entregas (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pedido_id UUID NOT NULL REFERENCES pedidos(id) ON DELETE CASCADE,
+    cliente_id UUID NOT NULL REFERENCES clientes(id),
+    presupuesto_id UUID REFERENCES presupuestos(id),
+
+    -- Totales por entrega
+    subtotal DECIMAL(12,2) NOT NULL DEFAULT 0,
+    recargo DECIMAL(12,2) DEFAULT 0,
+    total DECIMAL(12,2) NOT NULL DEFAULT 0,
+
+    -- Ubicación histórica
+    direccion TEXT,
+    coordenadas GEOMETRY(POINT, 4326),
+
+    -- Estados de entrega
+    orden_entrega INTEGER,
+    estado_entrega VARCHAR(50) DEFAULT 'pendiente',
+    fecha_hora_entrega TIMESTAMPTZ,
+    notas_entrega TEXT,
+    firma_url VARCHAR(500),
+    qr_verificacion VARCHAR(100),
+
+    -- Estados de pago individuales
+    estado_pago VARCHAR(20) DEFAULT 'pendiente',
+    metodo_pago VARCHAR(50),
+    monto_cobrado DECIMAL(12,2) DEFAULT 0,
+    numero_transaccion VARCHAR(100),
+    comprobante_url VARCHAR(500),
+    notas_pago TEXT,
+    pago_validado BOOLEAN DEFAULT false,
+
+    -- Referencia de pago única
+    referencia_pago VARCHAR(60),
+    instruccion_repartidor TEXT,
+
+    -- Observaciones del presupuesto
+    observaciones TEXT,
+
+    -- Auditoría
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+##### **Pedido Transformado**
+- **`cliente_id` ahora opcional**: Ya no hay "cliente del pedido"
+- **Nuevo campo `estado_cierre`**: 'abierto' (agrupando) / 'cerrado' (completado)
+- **Nuevo campo `hora_cierre`**: Timestamp automático cuando se cierra
+- **Nuevo campo `cantidad_entregas`**: Conteo de entregas en el pedido
+- **Índice único condicional**: Solo pedidos abiertos tienen restricción por turno/zona/fecha
+
+#### 🔄 **Flujo Operativo Transformado**
+
+```
+Cliente A pide → Presupuesto A → Conversión → Entrega A en Pedido XYZ
+Cliente B pide → Presupuesto B → Conversión → Entrega B en Pedido XYZ
+Cliente C pide → Presupuesto C → Conversión → Entrega C en Pedido XYZ
+
+Resultado: 1 Pedido (XYZ) con 3 Entregas (A, B, C) = 1 Ruta de Reparto
+```
+
+#### ⚙️ **Funciones RPC Principales**
+
+##### **1. `fn_obtener_o_crear_pedido_abierto()`**
+```sql
+CREATE OR REPLACE FUNCTION fn_obtener_o_crear_pedido_abierto(
+    p_zona_id UUID,
+    p_turno TEXT,
+    p_fecha DATE
+) RETURNS UUID AS $$
+-- Busca pedido abierto para turno/zona/fecha
+-- Si no existe, lo crea
+-- Valida horarios de corte automáticos
+-- Retorna pedido_id
+```
+
+##### **2. `fn_agregar_presupuesto_a_pedido()`**
+```sql
+CREATE OR REPLACE FUNCTION fn_agregar_presupuesto_a_pedido(
+    p_presupuesto_id UUID,
+    p_pedido_id UUID,
+    p_user_id UUID
+) RETURNS JSONB AS $$
+-- Agrega presupuesto como nueva entrega al pedido
+-- Crea detalles_pedido con entrega_id
+-- Descuenta stock físico del lote reservado
+-- Registra movimientos de stock
+-- Actualiza cuenta corriente del cliente
+-- Actualiza totales del pedido
+```
+
+##### **3. `fn_convertir_presupuesto_a_pedido()` (Actualizada)**
+```sql
+CREATE OR REPLACE FUNCTION fn_convertir_presupuesto_a_pedido(
+    p_presupuesto_id UUID,
+    p_user_id UUID,
+    p_caja_id UUID DEFAULT NULL
+) RETURNS JSONB AS $$
+-- Determina turno/fecha automáticamente si no definidos
+-- Llama a fn_obtener_o_crear_pedido_abierto()
+-- Llama a fn_agregar_presupuesto_a_pedido()
+-- Retorna pedido_id con información completa
+```
+
+##### **4. `fn_cerrar_pedidos_por_horario()`**
+```sql
+CREATE OR REPLACE FUNCTION fn_cerrar_pedidos_por_horario() RETURNS INTEGER AS $$
+-- Cierra pedidos cuando pasa horario de corte
+-- Turno mañana: cierra a las 5:00 AM
+-- Turno tarde: cierra a las 15:00
+-- Retorna cantidad de pedidos cerrados
+```
+
+##### **5. `fn_obtener_entregas_pedido()`**
+```sql
+CREATE OR REPLACE FUNCTION fn_obtener_entregas_pedido(p_pedido_id UUID)
+RETURNS TABLE (
+    entrega_id UUID,
+    cliente_id UUID,
+    cliente_nombre VARCHAR,
+    cliente_telefono VARCHAR,
+    subtotal DECIMAL,
+    total DECIMAL,
+    estado_entrega VARCHAR,
+    estado_pago VARCHAR,
+    referencia_pago VARCHAR
+) AS $$
+-- Retorna todas las entregas de un pedido con datos del cliente
+```
+
+##### **6. `fn_registrar_cobro_entrega()`**
+```sql
+CREATE OR REPLACE FUNCTION fn_registrar_cobro_entrega(
+    p_entrega_id UUID,
+    p_metodo_pago VARCHAR,
+    p_monto_cobrado DECIMAL,
+    p_repartidor_id UUID
+) RETURNS JSONB AS $$
+-- Registra cobro específico de una entrega
+-- Actualiza cuenta corriente del cliente
+-- Bloquea/desbloquea cliente según saldo
+```
+
+##### **7. `fn_marcar_entrega_completada()`**
+```sql
+CREATE OR REPLACE FUNCTION fn_marcar_entrega_completada(p_entrega_id UUID) RETURNS JSONB AS $$
+-- Marca entrega como completada
+-- Verifica si todas las entregas del pedido están completadas
+-- Si sí, marca pedido como entregado
+```
+
+### 🎨 **Interfaz de Usuario Actualizada**
+
+#### **Vista de Pedido Administrativo**
+- **Nueva sección "Entregas del Pedido"**: Lista expansible de entregas por cliente
+- **Resumen de cobros**: Total cobrado vs pendiente vs fiado
+- **Estados por cliente**: Cada entrega con su estado de entrega/pago independiente
+- **Referencias individuales**: PAY-XXXXXX por entrega para seguimiento
+
+#### **PWA Repartidor Transformada**
+- **Entregas individuales**: Formulario específico por cliente
+- **Cobros por entrega**: Estado + método + monto por cliente
+- **Estados flexibles**: pagado/parcial/fiado con montos precisos
+- **Validación requerida**: Todas las entregas deben tener estado definido
+
+#### **Tesorería por Entrega**
+- **Validación individual**: Tesorero valida cada entrega por separado
+- **Movimientos agrupados**: Crea movimientos de caja por método de pago
+- **Cuenta corriente**: Actualización individual por cliente
+- **Trazabilidad completa**: Quién cobró, quién validó, cuándo
+
+### 📊 **Beneficios Operativos**
+
+#### **🚀 Eficiencia Logística**
+- **Una sola ruta** = **Un pedido** = **Múltiples entregas**
+- **Optimización automática** de rutas por zona completa
+- **Vehículos asignados** por capacidad total del pedido
+- **GPS tracking** para toda la ruta, no por cliente
+
+#### **💰 Control Financiero Preciso**
+- **Cobros por cliente** con referencias individuales
+- **Validación de tesorería** por entrega específica
+- **Cuenta corriente** actualizada en tiempo real por cliente
+- **Reportes detallados** de recaudación por método y cliente
+
+#### **📱 Experiencia del Repartidor**
+- **Hoja de ruta clara** con orden de entregas
+- **Registro simple** de cobros por cliente
+- **Estados flexibles** (pagado/parcial/fiado) por entrega
+- **Validación automática** antes de finalizar ruta
+
+#### **📊 Gestión Administrativa**
+- **Vista consolidada** de entregas por pedido
+- **Seguimiento individual** de cada cliente en la ruta
+- **Reportes unificados** de rutas y entregas
+- **Cierres automáticos** sin intervención manual
+
+### 🧪 **Cómo Probar el Nuevo Modelo**
+
+#### **1. Crear Presupuestos Agrupados**
+```bash
+# POST /api/ventas/presupuestos (Cliente A - Zona Norte)
+{
+  "cliente_id": "uuid-cliente-a",
+  "items": [{"producto_id": "uuid-pollo", "cantidad": 5}],
+  "zona_id": "uuid-zona-norte"
+}
+
+# POST /api/ventas/presupuestos (Cliente B - MISMA Zona Norte)
+{
+  "cliente_id": "uuid-cliente-b",
+  "items": [{"producto_id": "uuid-huevo", "cantidad": 10}],
+  "zona_id": "uuid-zona-norte"
+}
+```
+
+#### **2. Conversión Automática**
+```bash
+# POST /api/almacen/presupuestos/convertir-masivo
+{
+  "presupuestos_ids": ["uuid-presupuesto-a", "uuid-presupuesto-b"]
+}
+# Resultado: 1 pedido con 2 entregas
+```
+
+#### **3. Cobros por Cliente**
+```bash
+# POST /api/entregas/registrar-cobro (Cliente A)
+{
+  "entrega_id": "uuid-entrega-a",
+  "metodo_pago": "efectivo",
+  "monto_cobrado": 2500.00
+}
+
+# POST /api/entregas/registrar-cobro (Cliente B)
+{
+  "entrega_id": "uuid-entrega-b",
+  "metodo_pago": "cuenta_corriente",
+  "monto_cobrado": 0
+}
+```
+
+#### **4. Validación de Tesorería**
+```bash
+# POST /api/tesoreria/validar-entregas
+{
+  "pedido_id": "uuid-pedido",
+  "caja_id": "uuid-caja",
+  "observaciones": "Validación completa de ruta"
+}
+```
+
+### 🔄 **Migración de Datos Transparente**
+
+#### **Compatibilidad Total**
+- **Pedidos históricos**: Marcados como `estado_cierre = 'cerrado'`
+- **Sin afectación**: Operaciones existentes siguen funcionando
+- **Índice condicional**: Solo aplica restricción a pedidos nuevos
+- **Transición gradual**: Sistema soporta ambos modelos
+
+#### **Escalabilidad Garantizada**
+- **Sin límite**: Cantidad de entregas por pedido
+- **Rendimiento optimizado**: Índices por zona/turno/fecha
+- **Queries eficientes**: Para volúmenes grandes
+- **Caché inteligente**: En vistas administrativas
+
+### 📈 **Impacto en KPIs**
+
+#### **Antes del Modelo Agrupado**
+- **Múltiples pedidos** = **Múltiples rutas** = **Ineficiencia logística**
+- **Cobros agregados** = **Dificultad para seguimiento individual**
+- **Gestión manual** = **Errores en conciliación**
+
+#### **Después del Modelo Agrupado**
+- **1 pedido** = **1 ruta optimizada** = **Eficiencia máxima**
+- **Cobros por cliente** = **Trazabilidad perfecta**
+- **Cierre automático** = **Operaciones sin intervención**
 
 ---
 

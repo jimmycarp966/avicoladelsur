@@ -14,8 +14,10 @@
 - 📊 **Reportes Avanzados**: CSV/PDF con business intelligence
 - 🔐 **RLS Completo**: Seguridad por roles (admin, vendedor, repartidor, almacenista)
 - 💵 **Sistema de Listas de Precios**: Listas por tipo de cliente (minorista, mayorista, distribuidor) con margen de ganancia automático
-- 🧭 **Navegación Completa**: Sidebar organizado por módulos con acceso directo a todas las funcionalidades
+- 🧭 **Navegación Inteligente**: Sidebar organizado por dominios funcionales con submenús jerárquicos y navegación intuitiva
 - ⚡ **Optimizaciones de Rendimiento**: Caché inteligente, revalidación estratégica, queries optimizadas, índices de BD
+- 🎯 **Pedidos Agrupados**: Sistema único donde pedidos agrupan múltiples entregas por turno/zona/fecha
+- 🏢 **Control de Sucursales**: Modelo completo de control mayorista/minorista con auditoría de precios, conteos físicos de stock y detección automática de desvíos
 
 ## 🚀 Inicio Rápido
 
@@ -78,14 +80,15 @@
 - **App Repartidor**: PWA móvil (`/(repartidor)`)
 - **Bot Vendedor**: API webhook (`/api/bot`)
 
-### Dominios de Negocio
-1. **Almacén (WMS)**: Control de stock, lotes, picking
+### Dominios de Negocio (Organización Funcional)
+1. **Almacén (WMS)**: Control de stock, lotes, picking, transferencias entre sucursales
 2. **Ventas (CRM)**: Clientes, pedidos, cotizaciones, reclamos, listas de precios
-3. **Reparto (TMS)**: Vehículos, rutas, entregas, GPS
-4. **Sucursales**: Gestión multi-sucursal con inventario distribuido, alertas de stock y tesorería independiente
-5. **RRHH**: Gestión completa de empleados, asistencia, liquidaciones, adelantos y evaluaciones
-6. **Chatbot**: Toma de pedidos y consultas vía WhatsApp
-7. **Tesorería**: Gestión de cajas, movimientos, validación de rutas y reportes financieros
+3. **Reparto (TMS)**: Vehículos, rutas, entregas, GPS tracking
+4. **Tesorería**: Gestión de cajas, movimientos, validación de cobros, cierres
+5. **Sucursales**: Gestión multi-sucursal, inventario distribuido, alertas centralizadas
+6. **Control de Sucursales**: Auditoría de precios mayorista/minorista, conteos físicos de stock, detección de desvíos
+7. **RRHH**: Gestión completa de empleados, asistencia, liquidaciones, adelantos
+8. **Chatbot**: Toma automática de pedidos vía WhatsApp
 
 ## ⚡ Optimizaciones de Rendimiento Implementadas
 
@@ -124,6 +127,27 @@
 - **Tiempo de carga**: Reducción de 70-80% (de 3-5s a <1s con caché)
 - **Consultas BD**: Reducción de 50-70% (de 200-500ms a 50-150ms)
 - **Monitor GPS**: Latencia <1 segundo (con Supabase Realtime)
+
+## 🏢 Control de Sucursales - Modelo de Auditoría y Stock
+
+### 🎯 Problema Resuelto
+Controlar que las sucursales no manipulen precios mayorista/minorista para quedarse con diferencias, mientras se mantiene stock y valor a costo real visible en tiempo real desde casa central.
+
+### ✨ Características Principales
+- **Auditoría de Precios**: Registro automático de qué lista de precios (mayorista/minorista) se usa en cada venta
+- **Cálculo de Costo Real**: Costo promedio ponderado por sucursal + margen bruto por venta
+- **Conteos Físicos**: Ciclo semanal con tolerancia de merma configurable (1-2%)
+- **Detección de Fraude**: Alertas automáticas por alto % mayorista o ventas mayoristas de bajo volumen
+- **Reportes de Control**: Uso de listas por usuario, márgenes por día, diferencias de stock
+
+### 🔄 Flujo de Control
+```
+Venta Sucursal → Selección Lista Precio → Registro Automático Costo/Margen → Auditoría
+    ↓
+Conteo Semanal → Comparación Teórico vs Contado → Ajustes Automáticos (merma ≤2%)
+    ↓
+Reportes Casa Central → Alertas Desvíos → Investigación si necesario
+```
 
 ## 📁 Estructura del Proyecto
 
@@ -330,6 +354,238 @@ Sistema completo de presupuestos que transforma el proceso operativo:
 POST /api/almacen/simular-peso     # Simular balanza
 POST /api/reparto/entrega         # Registrar entrega
 GET /api/tesoreria/movimientos-tiempo-real  # Ver caja
+```
+
+---
+
+## 🎯 Modelo de Pedidos Agrupados por Turno/Zona/Fecha (Dic 2025)
+
+### Estado: ✅ IMPLEMENTADO COMPLETAMENTE
+
+**Revolución en el flujo operativo**: Sistema único donde un pedido agrupa automáticamente todas las entregas del mismo turno + zona + fecha, transformando la logística y simplificando la gestión.
+
+### Arquitectura del Nuevo Modelo
+
+#### 1. **Nueva Tabla: `entregas`**
+Cada entrega representa la porción específica de un pedido para un cliente individual:
+
+- `id`, `pedido_id`, `cliente_id`, `presupuesto_id` (referencias)
+- `subtotal`, `recargo`, `total` (montos por entrega)
+- `direccion`, `coordenadas` (ubicación histórica)
+- `orden_entrega` (secuencia en la ruta)
+- `estado_entrega` ('pendiente', 'en_camino', 'entregado', 'fallido', 'parcial')
+- `estado_pago` ('pendiente', 'parcial', 'pagado', 'fiado')
+- `metodo_pago`, `monto_cobrado`, `referencia_pago`
+- `pago_validado` (control de tesorería)
+
+#### 2. **Pedido = Ruta de Entregas**
+- **Un pedido** = **Una ruta** = **Múltiples entregas** para diferentes clientes
+- **Agrupación automática** por: `turno + zona + fecha_entrega_estimada`
+- **Cierre automático** cuando pasa el horario de corte del turno
+- **Cliente_id opcional** en pedidos (ya no es 1 cliente por pedido)
+
+#### 3. **Flujo Operativo Transformado**
+```
+Cliente A pide → Presupuesto A → Conversión → Entrega A en Pedido XYZ
+Cliente B pide → Presupuesto B → Conversión → Entrega B en Pedido XYZ
+Cliente C pide → Presupuesto C → Conversión → Entrega C en Pedido XYZ
+
+Resultado: 1 Pedido (XYZ) con 3 Entregas (A, B, C) en 1 ruta
+```
+
+### Funcionalidades Implementadas
+
+#### 🔄 **Conversión Automática y Agrupada**
+- **Función principal**: `fn_obtener_o_crear_pedido_abierto(zona_id, turno, fecha)`
+- **Lógica inteligente**: Busca pedido abierto existente o crea nuevo
+- **Validación de horarios**: Bloquea creación si pasó el horario de corte:
+  - Turno mañana: cierra automáticamente a las 5:00 AM
+  - Turno tarde: cierra automáticamente a las 3:00 PM
+- **Agrupación transparente**: Todos los presupuestos del mismo turno/zona/fecha van al mismo pedido
+
+#### 🛒 **Gestión de Entregas Individuales**
+- **Cobros por cliente**: Cada entrega tiene su propio estado de pago
+- **Referencias únicas**: `PAY-YYYYMMDD-XXXXXX` por entrega
+- **Métodos de pago flexibles**: efectivo, transferencia, QR, tarjeta, cuenta corriente
+- **Estados detallados**: pendiente → pagado/parcial/fiado con montos precisos
+- **Cuenta corriente individual**: Cada cliente mantiene su saldo independiente
+
+#### 📊 **Vista Administrativa Mejorada**
+- **Lista de entregas por pedido**: Expansible con detalles por cliente
+- **Resumen de cobros**: Total cobrado vs pendiente vs fiado
+- **Estado de cierre**: Pedidos abiertos vs cerrados automáticamente
+- **Navegación intuitiva**: De pedido → entregas → clientes individuales
+
+#### 📱 **PWA Repartidor Optimizada**
+- **Entregas individuales**: Formulario específico por cliente
+- **Registro de cobros**: Estado + método + monto por entrega
+- **Marcado de estados**: Entregado/Fallido con notas específicas
+- **Validación requerida**: Todas las entregas deben tener estado definido
+
+#### 💰 **Tesorería por Entrega**
+- **Validación individual**: Tesorero valida cada entrega por separado
+- **Movimientos agrupados**: Crea movimientos de caja por método de pago
+- **Cuenta corriente**: Actualiza saldo de cada cliente independientemente
+- **Trazabilidad completa**: Quién cobró, quién validó, cuándo
+
+### Funciones SQL Clave
+
+```sql
+-- Obtener o crear pedido abierto para turno/zona/fecha
+SELECT fn_obtener_o_crear_pedido_abierto('uuid-zona', 'mañana', '2025-12-02'::date);
+
+-- Agregar presupuesto como entrega a pedido existente
+SELECT fn_agregar_presupuesto_a_pedido('uuid-presupuesto', 'uuid-pedido', 'uuid-usuario');
+
+-- Convertir presupuesto (agrupa automáticamente)
+SELECT fn_convertir_presupuesto_a_pedido('uuid-presupuesto', 'uuid-usuario', NULL);
+
+-- Registrar cobro de entrega específica
+SELECT fn_registrar_cobro_entrega('uuid-entrega', 'efectivo', 1250.50, 'uuid-repartidor');
+
+-- Marcar entrega como completada
+SELECT fn_marcar_entrega_completada('uuid-entrega');
+
+-- Cerrar pedidos automáticamente por horario
+SELECT fn_cerrar_pedidos_por_horario(); -- Devuelve cantidad de pedidos cerrados
+
+-- Obtener entregas de un pedido
+SELECT * FROM fn_obtener_entregas_pedido('uuid-pedido');
+```
+
+### Beneficios Operativos
+
+#### 🚀 **Eficiencia Logística**
+- **Una sola ruta** = **Un pedido** = **Múltiples entregas**
+- **Optimización automática** de rutas por zona completa
+- **Vehículos asignados** por capacidad total del pedido
+- **GPS tracking** para toda la ruta, no por cliente
+
+#### 💰 **Control Financiero Preciso**
+- **Cobros por cliente** con referencias individuales
+- **Validación de tesorería** por entrega específica
+- **Cuenta corriente** actualizada en tiempo real por cliente
+- **Reportes detallados** de recaudación por método y cliente
+
+#### 📱 **Experiencia del Repartidor**
+- **Hoja de ruta clara** con orden de entregas
+- **Registro simple** de cobros por cliente
+- **Estados flexibles** (pagado/parcial/fiado) por entrega
+- **Validación automática** antes de finalizar ruta
+
+#### 📊 **Gestión Administrativa**
+- **Vista consolidada** de entregas por pedido
+- **Seguimiento individual** de cada cliente en la ruta
+- **Reportes unificados** de rutas y entregas
+- **Cierres automáticos** sin intervención manual
+
+### Migración de Datos
+
+#### 🔄 **Transición Transparente**
+- **Pedidos históricos** marcados como `estado_cierre = 'cerrado'`
+- **Índice único** solo aplica a pedidos nuevos del modelo agrupado
+- **Compatibilidad total** con sistema existente
+- **No afecta** operaciones en curso
+
+#### 📈 **Escalabilidad**
+- **Sin límite** de entregas por pedido
+- **Rendimiento optimizado** con índices por zona/turno/fecha
+- **Queries eficientes** para grandes volúmenes
+- **Caché inteligente** en vistas administrativas
+
+### Cómo Probar
+
+#### 1. **Crear Presupuestos Agrupados**
+```bash
+# Cliente A - Zona Norte, Turno Mañana
+POST /api/ventas/presupuestos
+{
+  "cliente_id": "uuid-cliente-a",
+  "items": [{"producto_id": "uuid-pollo", "cantidad": 5}],
+  "zona_id": "uuid-zona-norte"
+}
+
+# Cliente B - MISMA Zona Norte, Turno Mañana
+POST /api/ventas/presupuestos
+{
+  "cliente_id": "uuid-cliente-b",
+  "items": [{"producto_id": "uuid-huevo", "cantidad": 10}],
+  "zona_id": "uuid-zona-norte"
+}
+```
+
+#### 2. **Conversión Automática**
+```bash
+# Ambos presupuestos van al mismo pedido automáticamente
+POST /api/almacen/presupuestos/convertir-masivo
+{
+  "presupuestos_ids": ["uuid-presupuesto-a", "uuid-presupuesto-b"]
+}
+# Resultado: 1 pedido con 2 entregas
+```
+
+#### 3. **Registro de Cobros (Repartidor)**
+```bash
+# Cobrar al cliente A
+POST /api/entregas/registrar-cobro
+{
+  "entrega_id": "uuid-entrega-a",
+  "metodo_pago": "efectivo",
+  "monto_cobrado": 2500.00
+}
+
+# Cliente B pagará después
+POST /api/entregas/registrar-cobro
+{
+  "entrega_id": "uuid-entrega-b",
+  "metodo_pago": "cuenta_corriente",
+  "monto_cobrado": 0
+}
+```
+
+#### 4. **Validación de Tesorería**
+```bash
+# Tesorero valida todas las entregas del pedido
+POST /api/tesoreria/validar-entregas
+{
+  "pedido_id": "uuid-pedido",
+  "caja_id": "uuid-caja",
+  "observaciones": "Validación completa de ruta"
+}
+```
+
+### Endpoints Nuevos
+
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| `GET` | `/api/entregas/pedido/[pedido_id]` | Lista entregas de un pedido |
+| `GET` | `/api/entregas/[entrega_id]` | Detalle de entrega específica |
+| `POST` | `/api/entregas/registrar-cobro` | Registrar cobro de entrega |
+| `POST` | `/api/entregas/marcar-completada` | Marcar entrega como entregada |
+| `POST` | `/api/entregas/marcar-fallida` | Marcar entrega como fallida |
+| `GET` | `/api/entregas/resumen/[pedido_id]` | Resumen de entregas |
+| `POST` | `/api/tesoreria/validar-entregas` | Validar cobros de entregas |
+| `GET` | `/api/tesoreria/pedidos-pendientes-validacion` | Pedidos pendientes de validación |
+
+### Páginas Actualizadas
+
+- **`/almacen/pedidos/[id]`**: Nueva sección "Entregas del Pedido"
+- **`/repartidor/ruta/[ruta_id]/entrega/[entrega_id]`**: Formulario por cliente individual
+- **`/tesoreria/validar-rutas`**: Nueva opción para validar entregas por pedido
+
+### Scripts de Prueba
+
+```bash
+# Ejecutar migración
+psql -U postgres -d avicola_db -f supabase/migrations/20251202_refactor_pedidos_agrupados.sql
+
+# Verificar estructura
+SELECT * FROM entregas LIMIT 5;
+SELECT pedido_id, COUNT(*) as entregas FROM entregas GROUP BY pedido_id;
+
+# Probar funciones
+SELECT fn_obtener_o_crear_pedido_abierto('uuid-zona', 'mañana', CURRENT_DATE);
+SELECT fn_cerrar_pedidos_por_horario();
 ```
 
 ---
@@ -1128,23 +1384,54 @@ BOTPRESS_WEBHOOK_URL=https://your-botpress-webhook
 - ✅ **Validación de UUID**: Agregada validación robusta de IDs antes de consultas
 - ✅ **Manejo de Errores Mejorado**: Logging detallado para diagnóstico de problemas
 
-### **Estructura de Navegación Completa**
+### **Estructura de Navegación por Dominios Funcionales**
 ```
 🏠 Dashboard
-📦 Almacén
-  ├── Productos, Lotes, Presupuestos del Día, Pedidos, Recepción
 
-🛒 Ventas
+📦 Almacén (WMS)
+  ├── Productos, Lotes, Presupuestos del Día, Pedidos
+  ├── Transferencias entre Sucursales
+  └── Recepción
+
+🛒 Ventas (CRM)
   ├── Presupuestos, Clientes, Listas de Precios, Facturas
 
-🚚 Reparto
+🚚 Reparto (TMS)
   ├── Planificación semanal, Rutas, Monitor GPS, Vehículos
 
 💰 Tesorería
-  ├── Cajas, Movimientos, Validar rutas, Cierres, Tesoro, Gastos
+  ├── Cajas, Movimientos, Validar rutas, Cierres
+  ├── Tesoro, Gastos, Cuentas Corrientes
+  └── Reportes Financieros
+
+🏢 Sucursales (Multi-sucursal)
+  ├── Gestión de Sucursales, Dashboard Sucursal
+  ├── Alertas de Stock (Monitoreo Central)
+  └── Reportes Consolidados
 
 👥 RRHH
-  ├── Empleados, Asistencia, Liquidaciones, Adelantos, Licencias, Evaluaciones, Novedades, Reportes
+  ├── Empleados, Asistencia, Liquidaciones, Adelantos
+  ├── Licencias, Evaluaciones, Novedades
+  └── Reportes de Personal
+
+📊 Reportes Globales
+```
+
+### **Navegación Sucursal (Jerárquica)**
+```
+🏠 Dashboard
+
+📦 Gestión Local
+  ├── Inventario
+  ├── Ventas
+  └── Alertas de Stock
+
+🚚 Operaciones
+  ├── Transferencias
+  └── Tesorería
+
+📢 Comunicación
+  └── Novedades
 
 📊 Reportes
 ```
@@ -1153,6 +1440,7 @@ BOTPRESS_WEBHOOK_URL=https://your-botpress-webhook
 1. **Búsqueda de clientes por código**: Campo faltante agregado a consultas
 2. **Errores en Listas de Precios**: Políticas RLS y compatibilidad Next.js corregidas
 3. **Navegación incompleta**: Módulos faltantes agregados al sidebar
+4. **Reorganización del Sidebar**: Navegación funcional por dominios de negocio con submenús jerárquicos
 
 ---
 

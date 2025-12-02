@@ -89,6 +89,15 @@ supabase/                         # Scripts SQL y migraciones
 - **FIFO Automático**: Descuento de lotes ordenados por vencimiento/ingreso
 - **Referencias**: Genera PAY-XXXXXX para seguimiento de pagos
 
+### 🎯 **Modelo de Pedidos Agrupados por Turno/Zona/Fecha**
+- **Nueva tabla**: `entregas` - cada entrega representa cliente individual dentro pedido
+- **Pedido = Ruta**: Un pedido agrupa múltiples entregas del mismo turno/zona/fecha
+- **Cierre automático**: Pedidos se cierran cuando pasa horario de corte (5:00 AM / 15:00)
+- **Funciones RPC**: `fn_obtener_o_crear_pedido_abierto()`, `fn_agregar_presupuesto_a_pedido()`
+- **Agrupación automática**: Conversión agrupa presupuestos por turno/zona/fecha
+- **Cobros individuales**: Cada entrega tiene estado de pago independiente
+- **Cuenta corriente**: Actualización individual por cliente en tiempo real
+
 ### 🏭 **Almacén (WMS)**: Control de Inventario
 - **Lotes**: Trazabilidad completa con fechas vencimiento/proveedor
 - **Stock FIFO**: Consulta y descuento automático del lote más antiguo
@@ -268,6 +277,13 @@ supabase/                         # Scripts SQL y migraciones
   - `20251207_agregar_vigencia_activa_listas_precios.sql` (agrega campo)
   - `20251207_actualizar_fn_asignar_lista_automatica_vigencia.sql` (actualiza función RPC)
 
+### **Reorganización Funcional del Sidebar (Diciembre 2025)**
+- ✅ **Agrupación por Dominios**: Navegación organizada por funciones de negocio (Almacén, Ventas, Reparto, Tesorería)
+- ✅ **Transferencias movidas**: De "Sucursales" a "Almacén" (lógica de gestión de inventario)
+- ✅ **Submenús Jerárquicos**: Vista sucursal con navegación expandible/collapsible
+- ✅ **Auto-expansión**: Submenús se expanden automáticamente cuando contienen página activa
+- ✅ **Navegación Intuitiva**: Funciones relacionadas agrupadas lógicamente
+
 ### **Navegación del Sidebar Actualizada (03/12/2025)**
 - ✅ **Agregado**: "Listas de Precios" al menú Ventas (`/ventas/listas-precios`)
 - ✅ **Agregado**: "Facturas" al menú Ventas (`/ventas/facturas`)
@@ -280,23 +296,25 @@ supabase/                         # Scripts SQL y migraciones
 - ✅ **Validación de UUID**: Agregada validación de IDs antes de consultas a BD
 - ✅ **Manejo de Errores Mejorado**: Logging detallado para diagnóstico de problemas
 
-### **Estructura de Navegación Completa**
+### **Estructura de Navegación por Dominios Funcionales**
 ```
 🏠 Dashboard
-📦 Almacén
+
+📦 Almacén (WMS)
   ├── Productos
   ├── Lotes
   ├── Presupuestos del Día
   ├── Pedidos
+  ├── Transferencias ✅ (Movidas desde Sucursales)
   └── Recepción
 
-🛒 Ventas
+🛒 Ventas (CRM)
   ├── Presupuestos
   ├── Clientes
   ├── Listas de Precios ✅
   └── Facturas ✅
 
-🚚 Reparto
+🚚 Reparto (TMS)
   ├── Planificación semanal
   ├── Rutas
   ├── Monitor GPS
@@ -308,15 +326,13 @@ supabase/                         # Scripts SQL y migraciones
   ├── Validar rutas
   ├── Cierres de Caja
   ├── Tesoro
-  └── Gastos
+  ├── Gastos
+  └── Por Sucursal
 
-🏢 Sucursales
+🏢 Sucursales (Multi-sucursal)
   ├── Gestión de Sucursales
   ├── Dashboard Sucursal
-  ├── Alertas de Stock
-  ├── Inventario
-  ├── Ventas
-  ├── Tesorería
+  ├── Alertas de Stock ✅ (Monitoreo centralizado)
   └── Reportes
 
 👥 RRHH
@@ -329,6 +345,25 @@ supabase/                         # Scripts SQL y migraciones
   ├── Novedades
   └── Reportes
 
+📊 Reportes Globales
+```
+
+### **Navegación Sucursal (Jerárquica)**
+```
+🏠 Dashboard
+
+📦 Gestión Local
+  ├── Inventario
+  ├── Ventas
+  └── Alertas de Stock
+
+🚚 Operaciones
+  ├── Transferencias
+  └── Tesorería
+
+📢 Comunicación
+  └── Novedades
+
 📊 Reportes
 ```
 
@@ -336,7 +371,8 @@ supabase/                         # Scripts SQL y migraciones
 1. **Error de búsqueda de clientes**: Agregado campo `codigo` faltante en consulta de clientes
 2. **Errores en Listas de Precios**: Políticas RLS simplificadas y compatibilidad Next.js 15
 3. **Navegación incompleta**: Agregados módulos faltantes al sidebar
-4. **Google Maps no funcionaba**: Implementado sistema completo de selección de ubicaciones con Maps JavaScript API
+4. **Reorganización del Sidebar**: Navegación funcional por dominios con submenús jerárquicos
+5. **Google Maps no funcionaba**: Implementado sistema completo de selección de ubicaciones con Maps JavaScript API
 
 ### **Módulo de Sucursales Completo (28/11/2025)**
 - ✅ **Tablas nuevas**: `sucursales`, `sucursal_settings`, `alertas_stock`
@@ -347,6 +383,28 @@ supabase/                         # Scripts SQL y migraciones
 - ✅ **Alertas automáticas**: Sistema de bajo stock con job/cron integrado
 - ✅ **Componente Avisos**: Reutilizable en RRHH y Sucursales
 - ✅ **Tesorería integrada**: Movimientos automáticos por sucursal
+
+### **Modelo de Control para Sucursales (02/12/2025)**
+- ✅ **Control de precios mayorista/minorista**: Sistema de auditoría de qué lista de precios se usa en cada venta
+- ✅ **Cálculo de costo y margen**: Costo promedio ponderado por sucursal + margen bruto por venta
+- ✅ **Tablas nuevas**: `conteos_stock`, `conteo_stock_items`, `ajustes_stock`, `auditoria_listas_precios`
+- ✅ **Conteos físicos de stock**: Ciclo semanal con tolerancia de merma configurable (1-2%)
+- ✅ **Ajustes automáticos**: Mermas dentro de tolerancia se aplican automáticamente
+- ✅ **POS mejorado para sucursales**: Componente `POSSucursal` con selección de lista de precios
+- ✅ **Reportes de auditoría**: Uso de listas por usuario, márgenes por día, alertas de comportamiento sospechoso
+- ✅ **Detección de fraude**: Alertas automáticas por alto % mayorista o ventas mayoristas de bajo volumen
+- ✅ **Funciones RPC nuevas**: 
+  - `fn_registrar_venta_sucursal()` - Venta con control de lista, costo y margen
+  - `fn_iniciar_conteo_stock()` - Inicia conteo físico
+  - `fn_completar_conteo_stock()` - Completa conteo y genera ajustes
+  - `fn_obtener_costo_promedio_sucursal()` - Costo promedio ponderado
+  - `fn_reporte_uso_listas_sucursal()` - Reporte de uso de listas
+  - `fn_reporte_margenes_sucursal()` - Reporte de márgenes
+  - `fn_detectar_comportamiento_sospechoso()` - Alertas de fraude
+- ✅ **Server Actions**: `ventas-sucursal.actions.ts` con 12 funciones
+- ✅ **Rutas nuevas**: `/sucursal/inventario/conteos`, `/sucursal/reportes/auditoria`
+- ✅ **Vista materializada**: `mv_resumen_listas_sucursal` para reportes rápidos
+- ✅ **Migración**: `20251202_modelo_control_sucursales.sql`
 
 ### **Optimizaciones de Rendimiento (16/12/2025)**
 - ✅ **Revalidación Estratégica**: 20+ páginas optimizadas con `revalidate` (Dashboard 30s, Listados 5min, Reportes 1h)
@@ -365,4 +423,4 @@ supabase/                         # Scripts SQL y migraciones
 
 ---
 
-*Resumen actualizado el 28/11/2025 - Google Maps implementado para selección de ubicaciones de clientes*
+*Resumen actualizado el Diciembre 2025 - Modelo de control para sucursales implementado*

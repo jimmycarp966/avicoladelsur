@@ -4,11 +4,12 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { ArrowLeft, Edit, Truck, FileText, Printer, User, MapPin, CheckCircle, Wallet } from 'lucide-react'
+import { ArrowLeft, Edit, Truck, FileText, Printer, User, MapPin, CheckCircle, Wallet, Users, Clock } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { obtenerPedidoPorId } from '@/actions/ventas.actions'
 import { listarCajas } from '@/actions/tesoreria.actions'
 import { RegistrarPagoPedidoForm } from '@/components/forms/RegistrarPagoPedidoForm'
+import { EntregasPedido } from '@/components/pedidos/EntregasPedido'
 
 interface PedidoDetallePageProps {
   params: { id: string }
@@ -31,6 +32,14 @@ const estadoConfig = (estado: string) => {
     cancelado: { label: 'Cancelado', variant: 'destructive' as const, color: 'bg-red-100 text-red-800' },
   }
   return configs[estado as keyof typeof configs] || { label: estado, variant: 'outline' as const, color: 'bg-gray-100 text-gray-800' }
+}
+
+const estadoCierreConfig = (estado: string) => {
+  const configs = {
+    abierto: { label: 'Abierto', color: 'bg-green-100 text-green-800 border-green-300' },
+    cerrado: { label: 'Cerrado', color: 'bg-gray-100 text-gray-800 border-gray-300' },
+  }
+  return configs[estado as keyof typeof configs] || { label: estado, color: 'bg-gray-100 text-gray-800' }
 }
 
 export default async function PedidoDetallePage({ params }: PedidoDetallePageProps) {
@@ -89,13 +98,32 @@ export default async function PedidoDetallePage({ params }: PedidoDetallePagePro
           <Badge variant={estado.variant} className={estado.color}>
             {estado.label}
           </Badge>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <User className="h-4 w-4" />
-            {pedido.clientes?.nombre || 'Cliente'}
-          </div>
+          {pedido.estado_cierre && (
+            <Badge variant="outline" className={estadoCierreConfig(pedido.estado_cierre).color}>
+              {estadoCierreConfig(pedido.estado_cierre).label}
+            </Badge>
+          )}
+          {pedido.clientes && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <User className="h-4 w-4" />
+              {pedido.clientes?.nombre || 'Cliente'}
+            </div>
+          )}
+          {pedido.cantidad_entregas > 0 && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Users className="h-4 w-4" />
+              {pedido.cantidad_entregas} entrega(s)
+            </div>
+          )}
+          {pedido.turno && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Clock className="h-4 w-4" />
+              Turno: {pedido.turno}
+            </div>
+          )}
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <MapPin className="h-4 w-4" />
-            Zona: {pedido.clientes?.zona_entrega || 'N/D'}
+            Zona: {pedido.zonas?.nombre || pedido.clientes?.zona_entrega || 'N/D'}
           </div>
         </div>
         <div className="text-right">
@@ -175,6 +203,10 @@ export default async function PedidoDetallePage({ params }: PedidoDetallePagePro
         </Card>
       </div>
 
+      {/* Entregas del pedido (nuevo modelo agrupado) */}
+      <EntregasPedido pedidoId={pedido.id} />
+
+      {/* Productos del pedido (vista tradicional) */}
       <Card>
         <CardHeader>
           <CardTitle>Productos del pedido</CardTitle>

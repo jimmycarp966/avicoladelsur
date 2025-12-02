@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { ShoppingCart, Loader2, AlertTriangle } from 'lucide-react'
+import { ShoppingCart, Loader2, AlertTriangle, Info } from 'lucide-react'
 import { confirmarPresupuestoAction, confirmarPresupuestosAgrupadosAction } from '@/actions/presupuestos.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 import {
@@ -37,9 +37,7 @@ export function PresupuestosDiaAcciones({
   const router = useRouter()
   const { showToast } = useNotificationStore()
   const [isLoading, setIsLoading] = useState(false)
-  const [presupuestoSeleccionado, setPresupuestoSeleccionado] = useState<string | null>(null)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
-  const [modoMasivo, setModoMasivo] = useState(false)
 
   // Filtrar presupuestos que pueden convertirse (tienen turno y zona)
   const presupuestosConvertibles = presupuestos.filter(
@@ -51,27 +49,6 @@ export function PresupuestosDiaAcciones({
     return presupuesto.items?.some(
       (item) => item.pesable && !item.peso_final
     )
-  }
-
-  const handleConvertirIndividual = (presupuesto: Presupuesto) => {
-    if (!presupuesto.turno || !presupuesto.zona_id) {
-      showToast(
-        'error',
-        'El presupuesto debe tener turno y zona asignados antes de convertir a pedido'
-      )
-      return
-    }
-
-    if (tieneItemsSinPesar(presupuesto)) {
-      showToast(
-        'warning',
-        'Hay productos pesables sin pesar. ¿Deseas continuar de todos modos?'
-      )
-    }
-
-    setPresupuestoSeleccionado(presupuesto.id)
-    setModoMasivo(false)
-    setShowConfirmDialog(true)
   }
 
   const handleConvertirMasivo = () => {
@@ -94,26 +71,7 @@ export function PresupuestosDiaAcciones({
       )
     }
 
-    setPresupuestoSeleccionado(null)
-    setModoMasivo(true)
     setShowConfirmDialog(true)
-  }
-
-  // Función para agrupar presupuestos por cliente, turno y zona
-  const agruparPresupuestos = (presupuestos: Presupuesto[]) => {
-    const grupos: Record<string, Presupuesto[]> = {}
-
-    for (const presupuesto of presupuestos) {
-      // Crear clave única para el grupo
-      const clave = `${presupuesto.cliente_id || 'sin-cliente'}-${presupuesto.turno || 'sin-turno'}-${presupuesto.zona_id || 'sin-zona'}`
-
-      if (!grupos[clave]) {
-        grupos[clave] = []
-      }
-      grupos[clave].push(presupuesto)
-    }
-
-    return Object.values(grupos)
   }
 
   const confirmarConversion = async () => {
@@ -121,97 +79,21 @@ export function PresupuestosDiaAcciones({
     setShowConfirmDialog(false)
 
     try {
-      const presupuestosAConvertir = modoMasivo
-        ? presupuestosConvertibles
-        : presupuestos.filter((p) => p.id === presupuestoSeleccionado)
+      // Convertir todos los presupuestos - la función SQL agrupa automáticamente por turno/zona/fecha
+      const formData = new FormData()
+      formData.append('presupuestos_ids', JSON.stringify(presupuestosConvertibles.map(p => p.id)))
 
-      if (modoMasivo) {
-        // Agrupar presupuestos por cliente/turno/zona
-        const grupos = agruparPresupuestos(presupuestosAConvertir)
-        let pedidosCreados = 0
-        let errores = 0
-        const erroresDetalle: string[] = []
+      const result = await confirmarPresupuestosAgrupadosAction(formData)
 
-        for (const grupo of grupos) {
-          try {
-            const formData = new FormData()
-            formData.append('presupuestos_ids', JSON.stringify(grupo.map(p => p.id)))
-
-            const result = await confirmarPresupuestosAgrupadosAction(formData)
-
-            if (result.success) {
-              pedidosCreados++
-            } else {
-              errores++
-              erroresDetalle.push(
-                `Grupo de ${grupo.length} presupuesto(s): ${result.message}`
-              )
-            }
-          } catch (error: any) {
-            errores++
-            erroresDetalle.push(
-              `Grupo de ${grupo.length} presupuesto(s): ${error.message || 'Error desconocido'}`
-            )
-          }
-        }
-
-        if (pedidosCreados > 0) {
-          showToast(
-            'success',
-            `${pedidosCreados} pedido(s) creado(s) desde ${presupuestosAConvertir.length} presupuesto(s) agrupado(s)`
-          )
-        }
-
-        if (errores > 0) {
-          showToast(
-            'error',
-            `${errores} grupo(s) tuvieron errores. Ver detalles en consola.`
-          )
-          console.error('Errores de conversión agrupada:', erroresDetalle)
-        }
+      if (result.success) {
+        const data = result.data as { exitosos?: number; pedidos_afectados?: string[] }
+        const pedidosAfectados = data?.pedidos_afectados?.length || 1
+        showToast(
+          'success',
+          result.message || `${presupuestosConvertibles.length} presupuesto(s) agregados a ${pedidosAfectados} pedido(s)`
+        )
       } else {
-        // Conversión individual (sin cambios)
-        let exitosos = 0
-        let errores = 0
-        const erroresDetalle: string[] = []
-
-        for (const presupuesto of presupuestosAConvertir) {
-          try {
-            const formData = new FormData()
-            formData.append('presupuesto_id', presupuesto.id)
-
-            const result = await confirmarPresupuestoAction(formData)
-
-            if (result.success) {
-              exitosos++
-            } else {
-              errores++
-              erroresDetalle.push(
-                `${presupuesto.numero_presupuesto}: ${result.message}`
-              )
-            }
-          } catch (error: any) {
-            errores++
-            erroresDetalle.push(
-              `${presupuesto.numero_presupuesto}: ${error.message || 'Error desconocido'}`
-            )
-          }
-        }
-
-        if (exitosos > 0) {
-          showToast(
-            'success',
-            `${exitosos} presupuesto(s) convertido(s) a pedido(s) exitosamente`
-          )
-        }
-
-        if (errores > 0) {
-          showToast(
-            'error',
-            `${errores} presupuesto(s) tuvieron errores. Ver detalles en consola.`
-          )
-          console.error('Errores de conversión:', erroresDetalle)
-        }
+        showToast('error', result.message || 'Error al convertir presupuestos')
       }
 
       if (onSuccess) {
@@ -224,7 +106,6 @@ export function PresupuestosDiaAcciones({
       showToast('error', 'Error al convertir presupuestos: ' + error.message)
     } finally {
       setIsLoading(false)
-      setPresupuestoSeleccionado(null)
     }
   }
 
@@ -238,7 +119,7 @@ export function PresupuestosDiaAcciones({
         disabled={isLoading || cantidadMasiva === 0}
         className="bg-green-600 hover:bg-green-700"
       >
-        {isLoading && modoMasivo ? (
+        {isLoading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             Convirtiendo...
@@ -255,31 +136,33 @@ export function PresupuestosDiaAcciones({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {modoMasivo
-                ? `¿Convertir ${cantidadMasiva} presupuesto(s) a pedidos?`
-                : '¿Convertir presupuesto a pedido?'}
+              ¿Convertir {cantidadMasiva} presupuesto(s) a pedidos?
             </DialogTitle>
-            <DialogDescription>
-              {modoMasivo ? (
-                <>
+            <DialogDescription asChild>
+              <div className="space-y-3">
+                <p>
                   Se convertirán <strong>{cantidadMasiva}</strong> de{' '}
-                  <strong>{cantidadTotal}</strong> presupuestos a pedidos.
-                  {cantidadMasiva < cantidadTotal && (
-                    <div className="mt-2 flex items-start gap-2 text-yellow-600">
-                      <AlertTriangle className="h-4 w-4 mt-0.5" />
-                      <span className="text-sm">
-                        {cantidadTotal - cantidadMasiva} presupuesto(s) no se
-                        convertirán porque no tienen turno y/o zona asignados.
-                      </span>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <>
-                  El presupuesto se convertirá a pedido y se descontarán las
-                  existencias del almacén.
-                </>
-              )}
+                  <strong>{cantidadTotal}</strong> presupuestos.
+                </p>
+                
+                <div className="flex items-start gap-2 text-blue-600 bg-blue-50 p-3 rounded-md">
+                  <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <span className="text-sm">
+                    Los presupuestos se agruparán automáticamente por <strong>turno + zona + fecha</strong> en un solo pedido. 
+                    Cada cliente tendrá su propia entrega dentro del pedido.
+                  </span>
+                </div>
+
+                {cantidadMasiva < cantidadTotal && (
+                  <div className="flex items-start gap-2 text-yellow-600 bg-yellow-50 p-3 rounded-md">
+                    <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                    <span className="text-sm">
+                      {cantidadTotal - cantidadMasiva} presupuesto(s) no se
+                      convertirán porque no tienen turno y/o zona asignados.
+                    </span>
+                  </div>
+                )}
+              </div>
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

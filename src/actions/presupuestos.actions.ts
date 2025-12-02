@@ -351,7 +351,7 @@ export async function confirmarPresupuestoAction(formData: FormData) {
   }
 }
 
-// Acción para convertir múltiples presupuestos agrupados en un solo pedido
+// Acción para convertir múltiples presupuestos (cada uno se agrega al pedido abierto de su turno/zona/fecha)
 export async function confirmarPresupuestosAgrupadosAction(formData: FormData) {
   try {
     const supabase = await createClient()
@@ -386,82 +386,72 @@ export async function confirmarPresupuestosAgrupadosAction(formData: FormData) {
       caja_id: rawData.caja_id || undefined,
     })
 
-    // Llamar RPC para convertir presupuestos agrupados a pedido
-    const { data: result, error } = await supabase.rpc('fn_convertir_presupuestos_agrupados_a_pedido', {
-      p_presupuestos_ids: data.presupuestos_ids,
-      p_user_id: user.id,
-      p_caja_id: data.caja_id,
-    })
+    // Convertir cada presupuesto usando la función que agrupa automáticamente por turno/zona/fecha
+    let exitosos = 0
+    let errores = 0
+    const erroresDetalle: string[] = []
+    const pedidosAfectados = new Set<string>()
+    let ultimoResultado: any = null
 
-    if (error) {
-      console.error('Error convirtiendo presupuestos agrupados:', error)
-      return { success: false, message: 'Error al convertir presupuestos a pedido' }
-    }
+    for (const presupuestoId of data.presupuestos_ids) {
+      const { data: result, error } = await supabase.rpc('fn_convertir_presupuesto_a_pedido', {
+        p_presupuesto_id: presupuestoId,
+        p_user_id: user.id,
+        p_caja_id: data.caja_id,
+      })
 
-    if (!result.success) {
-      return { success: false, message: result.error || 'Error en la conversión de los presupuestos' }
-    }
-
-    // Crear factura interna desde el pedido consolidado
-    if (result.pedido_id) {
-      try {
-        const { data: facturaResult, error: facturaError } = await supabase.rpc(
-          'fn_crear_factura_desde_pedido',
-          {
-            p_pedido_id: result.pedido_id,
-            p_user_id: user.id,
-          }
-        )
-
-        if (facturaError) {
-          console.error(
-            'Error creando factura desde pedido (presupuestos agrupados):',
-            facturaError
-          )
-        } else if (!facturaResult?.success) {
-          console.error(
-            'RPC fn_crear_factura_desde_pedido devolvió error:',
-            facturaResult?.error
-          )
-        }
-      } catch (factError) {
-        console.error('Excepción creando factura desde pedido (agrupados):', factError)
+      if (error) {
+        errores++
+        erroresDetalle.push(`Presupuesto ${presupuestoId}: ${error.message}`)
+      } else if (!result.success) {
+        errores++
+        erroresDetalle.push(`Presupuesto ${presupuestoId}: ${result.error}`)
+      } else {
+        exitosos++
+        pedidosAfectados.add(result.pedido_id)
+        ultimoResultado = result
       }
     }
 
-    if (result.ruta_id) {
-      try {
-        await generateRutaOptimizada({
-          supabase,
-          rutaId: result.ruta_id,
-          usarGoogle: true,
-        })
-      } catch (optError) {
-        console.error('No se pudo optimizar la ruta planificada automáticamente:', optError)
-      }
+    if (errores > 0) {
+      console.error('Errores en conversión masiva:', erroresDetalle)
     }
 
     // Crear notificación
-    await createNotification({
-      titulo: 'Presupuestos convertidos a pedido',
-      mensaje: `Pedido ${result.numero_pedido} creado desde ${data.presupuestos_ids.length} presupuesto(s)`,
-      tipo: 'success',
-      usuario_id: null,
-      metadata: {
-        pedido_id: result.pedido_id,
-        presupuestos_ids: data.presupuestos_ids
-      }
-    })
+    if (exitosos > 0) {
+      await createNotification({
+        titulo: 'Presupuestos convertidos',
+        mensaje: `${exitosos} presupuesto(s) agregado(s) a ${pedidosAfectados.size} pedido(s)`,
+        tipo: 'success',
+        usuario_id: null,
+        metadata: {
+          presupuestos_convertidos: exitosos,
+          pedidos_afectados: Array.from(pedidosAfectados)
+        }
+      })
+    }
 
     revalidatePath('/ventas/presupuestos')
     revalidatePath('/almacen/pedidos')
     revalidatePath('/tesoreria/cajas')
     revalidatePath('/almacen/presupuestos-dia')
 
+    if (exitosos === 0) {
+      return {
+        success: false,
+        message: `No se pudo convertir ningún presupuesto. ${erroresDetalle[0] || 'Error desconocido'}`
+      }
+    }
+
     return {
       success: true,
-      message: `${data.presupuestos_ids.length} presupuesto(s) convertido(s) a pedido ${result.numero_pedido} exitosamente`,
-      data: result
+      message: `${exitosos} presupuesto(s) agregado(s) a ${pedidosAfectados.size} pedido(s)${errores > 0 ? ` (${errores} con errores)` : ''}`,
+      data: {
+        exitosos,
+        errores,
+        pedidos_afectados: Array.from(pedidosAfectados),
+        ultimo_resultado: ultimoResultado
+      }
     }
 
   } catch (error) {

@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { Package, Scale, Calendar, MapPin, Truck, Clock, Filter } from 'lucide-react'
+import { Package, Scale, Calendar, MapPin, Truck, Clock, Filter, ArrowRightLeft } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -11,11 +11,14 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { createClient } from '@/lib/supabase/server'
 import { getTodayArgentina } from '@/lib/utils'
 import { PresupuestosDiaSkeleton } from './presupuestos-dia-skeleton'
 import { PresupuestosDiaFiltros } from './presupuestos-dia-filtros'
 import { PresupuestosDiaAcciones, PresupuestoIndividualAccion } from '@/components/almacen/PresupuestosDiaAcciones'
+import { TransferenciasDiaCard } from '@/components/almacen/TransferenciasDiaCard'
+import { obtenerTransferenciasDiaAction } from '@/actions/sucursales-transferencias.actions'
 
 export const revalidate = 60 // Revalida cada 60 segundos
 
@@ -76,6 +79,9 @@ async function PresupuestosDiaContent({
   if (error) {
     console.error('Error obteniendo presupuestos:', error)
   }
+
+  // Obtener transferencias del día
+  const transferencias = await obtenerTransferenciasDiaAction(fecha, turno, zonaId)
 
   const { data: presupuestosDiaData, error: presupuestosDiaError } = await supabase
     .from('presupuestos')
@@ -334,6 +340,13 @@ async function PresupuestosDiaContent({
       sum + calcularKgItem(item), 0) || 0), 0
   ) || 0
 
+  // Estadísticas de transferencias
+  const totalTransferencias = transferencias?.length || 0
+  const totalKgTransferencias = transferencias?.reduce((acc: number, t: any) =>
+    acc + (t.items?.reduce((sum: number, item: any) => 
+      sum + (item.peso_preparado || item.cantidad_enviada || item.cantidad_solicitada || 0), 0) || 0), 0
+  ) || 0
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -341,9 +354,9 @@ async function PresupuestosDiaContent({
         <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-10"></div>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Presupuestos del Día</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Almacén del Día</h1>
             <p className="text-muted-foreground mt-1">
-              Presupuestos pendientes de pesaje en almacén
+              Presupuestos y transferencias pendientes de preparación
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -359,16 +372,29 @@ async function PresupuestosDiaContent({
       </div>
 
       {/* Estadísticas rápidas */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-5">
         <Card className="border-t-[3px] border-t-primary bg-primary/5">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Presupuestos Hoy</CardTitle>
+            <CardTitle className="text-sm font-medium">Presupuestos</CardTitle>
             <Package className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{totalPresupuestos}</div>
             <p className="text-xs text-muted-foreground">
-              En almacén
+              Clientes
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-t-[3px] border-t-orange-500 bg-orange-50">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Transferencias</CardTitle>
+            <ArrowRightLeft className="h-4 w-4 text-orange-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">{totalTransferencias}</div>
+            <p className="text-xs text-muted-foreground">
+              Sucursales
             </p>
           </CardContent>
         </Card>
@@ -388,13 +414,26 @@ async function PresupuestosDiaContent({
 
         <Card className="border-t-[3px] border-t-info bg-info/5">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">KG Estimados</CardTitle>
+            <CardTitle className="text-sm font-medium">KG Presupuestos</CardTitle>
             <Truck className="h-4 w-4 text-info" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-info">{totalKgEstimados.toFixed(1)}kg</div>
             <p className="text-xs text-muted-foreground">
-              Total aproximado
+              Clientes
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-t-[3px] border-t-orange-500 bg-orange-50">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">KG Transferencias</CardTitle>
+            <ArrowRightLeft className="h-4 w-4 text-orange-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">{totalKgTransferencias.toFixed(1)}kg</div>
+            <p className="text-xs text-muted-foreground">
+              Sucursales
             </p>
           </CardContent>
         </Card>
@@ -544,6 +583,11 @@ async function PresupuestosDiaContent({
 
       {/* Filtros */}
       <PresupuestosDiaFiltros zonas={zonas || []} fecha={fecha} zonaId={zonaId} turno={turno} />
+
+      {/* Transferencias del Día */}
+      {transferencias && transferencias.length > 0 && (
+        <TransferenciasDiaCard transferencias={transferencias} />
+      )}
 
       {/* Lista de preparación consolidada */}
       <Card>

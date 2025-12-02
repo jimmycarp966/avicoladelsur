@@ -1495,6 +1495,186 @@ export async function asignarPedidoARutaDesdeAlmacen(
   }
 }
 
+// Asignar transferencia a una ruta desde almacén
+export async function asignarTransferenciaARutaDesdeAlmacen(
+  transferenciaId: string
+): Promise<ApiResponse<{ rutaId: string }>> {
+  try {
+    const supabase = await createClient()
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, error: 'Usuario no autenticado' }
+    }
+
+    // Obtener transferencia y validar estado
+    const { data: transferencia, error: transferenciaError } = await supabase
+      .from('transferencias_stock')
+      .select(`
+        id, 
+        numero_transferencia, 
+        estado, 
+        turno, 
+        fecha_entrega, 
+        zona_id,
+        sucursal_destino:sucursales!sucursal_destino_id(id, nombre, direccion)
+      `)
+      .eq('id', transferenciaId)
+      .single()
+
+    if (transferenciaError || !transferencia) {
+      return {
+        success: false,
+        error: 'Transferencia no encontrada',
+      }
+    }
+
+    if (transferencia.estado !== 'preparado') {
+      return {
+        success: false,
+        error: `Solo se pueden asignar a ruta transferencias preparadas (actual: ${transferencia.estado})`,
+      }
+    }
+
+    // Buscar ruta existente que coincida con fecha, turno y zona
+    const { data: rutaExistente, error: rutaError } = await supabase
+      .from('rutas_reparto')
+      .select('id')
+      .eq('fecha_ruta', transferencia.fecha_entrega)
+      .eq('turno', transferencia.turno)
+      .eq('zona_id', transferencia.zona_id)
+      .in('estado', ['planificada', 'en_curso'])
+      .limit(1)
+      .single()
+
+    let rutaId: string
+
+    if (rutaExistente) {
+      rutaId = rutaExistente.id
+    } else {
+      // Buscar plan semanal para obtener vehículo y repartidor
+      const { data: planSemanal, error: planError } = await supabase
+        .from('plan_rutas_semanal')
+        .select('vehiculo_id, repartidor_id')
+        .eq('zona_id', transferencia.zona_id)
+        .eq('turno', transferencia.turno)
+        .eq('activo', true)
+        .limit(1)
+        .single()
+
+      if (planError || !planSemanal) {
+        return {
+          success: false,
+          error: 'No hay plan de ruta disponible para esta zona y turno. Configure un plan semanal primero.',
+        }
+      }
+
+      // Crear nueva ruta
+      const { data: numeroRutaData, error: numeroError } = await supabase
+        .rpc('obtener_siguiente_numero_ruta')
+
+      if (numeroError) {
+        throw new Error('Error al generar número de ruta')
+      }
+
+      const { data: nuevaRuta, error: crearRutaError } = await supabase
+        .from('rutas_reparto')
+        .insert({
+          numero_ruta: numeroRutaData as string,
+          vehiculo_id: planSemanal.vehiculo_id,
+          repartidor_id: planSemanal.repartidor_id,
+          fecha_ruta: transferencia.fecha_entrega,
+          turno: transferencia.turno,
+          zona_id: transferencia.zona_id,
+          estado: 'planificada',
+          observaciones: 'Ruta creada automáticamente para transferencia',
+        })
+        .select()
+        .single()
+
+      if (crearRutaError || !nuevaRuta) {
+        throw new Error('Error al crear la ruta: ' + crearRutaError?.message)
+      }
+
+      rutaId = nuevaRuta.id
+    }
+
+    // Asignar transferencia a la ruta usando la función RPC
+    const { data: resultado, error: asignacionError } = await supabase.rpc(
+      'fn_asignar_transferencia_a_ruta',
+      {
+        p_transferencia_id: transferenciaId,
+        p_ruta_id: rutaId,
+        p_user_id: user.id,
+      }
+    )
+
+    if (asignacionError) {
+      console.error(
+        `Error asignando transferencia ${transferencia.numero_transferencia} a ruta:`,
+        asignacionError
+      )
+      return {
+        success: false,
+        error: asignacionError.message || 'Error al asignar transferencia a ruta',
+      }
+    }
+
+    if (!resultado?.success) {
+      return {
+        success: false,
+        error: resultado?.error || 'No se pudo asignar la transferencia a la ruta',
+      }
+    }
+
+    // Agregar como destino en detalles_ruta (como cliente interno)
+    const { data: sucursalDestino } = transferencia as any
+
+    // Obtener el orden de entrega siguiente
+    const { data: ultimoDetalle } = await supabase
+      .from('detalles_ruta')
+      .select('orden_entrega')
+      .eq('ruta_id', rutaId)
+      .order('orden_entrega', { ascending: false })
+      .limit(1)
+      .single()
+
+    const siguienteOrden = (ultimoDetalle?.orden_entrega || 0) + 1
+
+    // Insertar en detalles_ruta con transferencia_id
+    const { error: detalleError } = await supabase
+      .from('detalles_ruta')
+      .insert({
+        ruta_id: rutaId,
+        transferencia_id: transferenciaId,
+        orden_entrega: siguienteOrden,
+        estado_entrega: 'pendiente',
+        notas: `Transferencia a ${(transferencia.sucursal_destino as any)?.nombre || 'sucursal'}`,
+      })
+
+    if (detalleError) {
+      console.warn('No se pudo agregar detalle de ruta para transferencia:', detalleError)
+      // No fallamos, la transferencia ya fue asignada
+    }
+
+    revalidatePath('/(admin)/(dominios)/reparto/rutas')
+    revalidatePath('/(admin)/(dominios)/sucursales/transferencias')
+    revalidatePath('/(admin)/(dominios)/almacen/presupuestos-dia')
+
+    return {
+      success: true,
+      data: { rutaId },
+      message: `Transferencia ${transferencia.numero_transferencia} asignada a ruta exitosamente`,
+    }
+  } catch (error: any) {
+    console.error('Error en asignarTransferenciaARutaDesdeAlmacen:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al asignar transferencia a ruta',
+    }
+  }
+}
+
 // Crear rutas mock para Monteros, Tucumán
 export async function crearRutasMockMonteros(
   cantidadRutas: number = 2,

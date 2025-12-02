@@ -55,6 +55,7 @@ const navigation = [
       { name: 'Lotes', href: '/almacen/lotes' },
       { name: 'Presupuestos del Día', href: '/almacen/presupuestos-dia' },
       { name: 'Pedidos', href: '/almacen/pedidos' },
+      { name: 'Transferencias', href: '/sucursales/transferencias' },
       { name: 'Recepción', href: '/almacen/recepcion' },
     ],
   },
@@ -105,7 +106,9 @@ const navigation = [
     badge: 'sucursales_alerts',
     children: [
       { name: 'Gestión de Sucursales', href: '/sucursales' },
-      { name: 'Reportes', href: '/reportes/sucursales' },
+      { name: 'Dashboard Sucursal', href: '/sucursal/dashboard' },
+      { name: 'Alertas de Stock', href: '/sucursal/alerts' },
+      { name: 'Reportes', href: '/sucursal/reportes' },
     ],
   },
   {
@@ -128,6 +131,18 @@ const navigation = [
     name: 'Reportes',
     href: '/reportes',
     icon: FileText,
+    roles: ['admin'],
+  },
+  {
+    name: 'Diagnóstico Stock',
+    href: '/diagnostico-stock',
+    icon: Package,
+    roles: ['admin'],
+  },
+  {
+    name: 'Debug Transferencias',
+    href: '/debug-transferencias',
+    icon: Package,
     roles: ['admin'],
   },
 ]

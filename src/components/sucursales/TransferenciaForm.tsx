@@ -23,9 +23,9 @@ import {
     SelectValue,
 } from '@/components/ui/select'
 import { Card, CardContent } from '@/components/ui/card'
-import { crearTransferenciaAction, listarSucursales, obtenerStockPorSucursal } from '@/actions/sucursales-transferencias.actions'
+import { crearTransferenciaAction, listarSucursales, obtenerAlmacenCentral, obtenerStockPorSucursal, obtenerProductosAlmacenCentral } from '@/actions/sucursales-transferencias.actions'
 import { toast } from 'sonner'
-import { Loader2, Plus, Trash2 } from 'lucide-react'
+import { Loader2, Plus, Trash2, Search } from 'lucide-react'
 
 const formSchema = z.object({
     sucursal_origen_id: z.string().min(1, 'Seleccione origen'),
@@ -45,13 +45,19 @@ export function TransferenciaForm() {
     const searchParams = useSearchParams()
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [sucursales, setSucursales] = useState<any[]>([])
+    const [almacenCentral, setAlmacenCentral] = useState<any>(null)
     const [stockOrigen, setStockOrigen] = useState<any[]>([])
+    const [stockOrigenFiltrado, setStockOrigenFiltrado] = useState<any[]>([])
     const [loadingStock, setLoadingStock] = useState(false)
+    const [busquedaProducto, setBusquedaProducto] = useState('')
+
+    // ID fijo del almacén central
+    const ALMACEN_CENTRAL_ID = '00000000-0000-0000-0000-000000000001'
 
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema) as any,
         defaultValues: {
-            sucursal_origen_id: searchParams.get('origen') || '',
+            sucursal_origen_id: ALMACEN_CENTRAL_ID, // Siempre desde almacén central
             sucursal_destino_id: '',
             motivo: '',
             observaciones: '',
@@ -67,16 +73,62 @@ export function TransferenciaForm() {
     const sucursalOrigenId = form.watch('sucursal_origen_id')
 
     useEffect(() => {
+        loadAlmacenCentral()
         loadSucursales()
     }, [])
 
     useEffect(() => {
-        if (sucursalOrigenId) {
+        if (sucursalOrigenId && sucursalOrigenId === '00000000-0000-0000-0000-000000000001') {
+            loadStock(sucursalOrigenId)
+        } else if (sucursalOrigenId) {
             loadStock(sucursalOrigenId)
         } else {
             setStockOrigen([])
+            setStockOrigenFiltrado([])
         }
     }, [sucursalOrigenId])
+
+    // Filtrar productos cuando cambie la búsqueda
+    useEffect(() => {
+        if (busquedaProducto.trim() === '') {
+            setStockOrigenFiltrado(stockOrigen)
+        } else {
+            const filtrados = stockOrigen.filter(item =>
+                item.producto.nombre.toLowerCase().includes(busquedaProducto.toLowerCase()) ||
+                item.producto.codigo.toLowerCase().includes(busquedaProducto.toLowerCase())
+            )
+            setStockOrigenFiltrado(filtrados)
+        }
+    }, [stockOrigen, busquedaProducto])
+
+    // Forzar re-render cuando almacenCentral se carga
+    useEffect(() => {
+        // Asegurar que siempre tenga el ID del almacén central
+        if (!sucursalOrigenId || sucursalOrigenId !== ALMACEN_CENTRAL_ID) {
+            form.setValue('sucursal_origen_id', ALMACEN_CENTRAL_ID)
+        }
+    }, [sucursalOrigenId, form])
+
+    async function loadAlmacenCentral() {
+        console.log('Cargando almacén central...')
+        try {
+            const data = await obtenerAlmacenCentral()
+            console.log('Almacén central obtenido:', data)
+            if (data) {
+                setAlmacenCentral(data)
+                // El ID ya está seteado en defaultValues, solo actualizar si es necesario
+                console.log('Almacén central cargado:', data.id)
+            } else {
+                // Si no existe, crear objeto con ID conocido para mostrar en UI
+                setAlmacenCentral({ id: ALMACEN_CENTRAL_ID, nombre: 'Casa Central' })
+                console.log('Usando ID por defecto del almacén central')
+            }
+        } catch (error) {
+            console.error('Error cargando almacén central:', error)
+            // Fallback: usar ID conocido
+            setAlmacenCentral({ id: ALMACEN_CENTRAL_ID, nombre: 'Casa Central' })
+        }
+    }
 
     async function loadSucursales() {
         const data = await listarSucursales()
@@ -86,10 +138,27 @@ export function TransferenciaForm() {
     async function loadStock(sucursalId: string) {
         setLoadingStock(true)
         try {
-            const data = await obtenerStockPorSucursal(sucursalId)
+            console.log('Cargando stock para sucursal:', sucursalId)
+
+            let data
+            // Si es el almacén central, mostrar TODOS los productos disponibles
+            if (sucursalId === '00000000-0000-0000-0000-000000000001') {
+                console.log('Cargando productos del almacén central')
+                data = await obtenerProductosAlmacenCentral()
+            } else {
+                console.log('Cargando stock de sucursal regular')
+                data = await obtenerStockPorSucursal(sucursalId)
+            }
+
+            console.log('Productos/stock obtenido:', data)
             setStockOrigen(data)
+            setStockOrigenFiltrado(data) // Inicialmente mostrar todos
+            if (data.length === 0) {
+                console.warn('No se encontraron productos disponibles en la sucursal seleccionada')
+            }
         } catch (error) {
-            console.error(error)
+            console.error('Error cargando stock:', error)
+            toast.error('Error al cargar productos disponibles')
         } finally {
             setLoadingStock(false)
         }
@@ -137,19 +206,23 @@ export function TransferenciaForm() {
                             name="sucursal_origen_id"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Sucursal Origen</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormLabel>Almacén Origen</FormLabel>
+                                    <Select onValueChange={field.onChange} value={field.value} disabled>
                                         <FormControl>
                                             <SelectTrigger>
-                                                <SelectValue placeholder="Seleccionar origen" />
+                                                <SelectValue placeholder={almacenCentral ? "Seleccionar almacén" : "Cargando almacén central..."} />
                                             </SelectTrigger>
                                         </FormControl>
                                         <SelectContent>
-                                            {sucursales.map((s) => (
-                                                <SelectItem key={s.id} value={s.id}>
-                                                    {s.nombre}
+                                            {almacenCentral ? (
+                                                <SelectItem value={almacenCentral.id}>
+                                                    {almacenCentral.nombre} (Almacén Central)
                                                 </SelectItem>
-                                            ))}
+                                            ) : (
+                                                <SelectItem value="loading" disabled>
+                                                    Cargando almacén central...
+                                                </SelectItem>
+                                            )}
                                         </SelectContent>
                                     </Select>
                                     <FormMessage />
@@ -170,13 +243,11 @@ export function TransferenciaForm() {
                                             </SelectTrigger>
                                         </FormControl>
                                         <SelectContent>
-                                            {sucursales
-                                                .filter(s => s.id !== sucursalOrigenId)
-                                                .map((s) => (
-                                                    <SelectItem key={s.id} value={s.id}>
-                                                        {s.nombre}
-                                                    </SelectItem>
-                                                ))}
+                                            {sucursales.map((s) => (
+                                                <SelectItem key={s.id} value={s.id}>
+                                                    {s.nombre}
+                                                </SelectItem>
+                                            ))}
                                         </SelectContent>
                                     </Select>
                                     <FormMessage />
@@ -200,15 +271,65 @@ export function TransferenciaForm() {
                     </CardContent>
                 </Card>
 
+                {/* Campo de búsqueda de productos */}
+                {sucursalOrigenId && stockOrigen.length > 5 && (
+                    <div className="relative">
+                        <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder={`Buscar productos (${stockOrigenFiltrado.length} de ${stockOrigen.length})...`}
+                            value={busquedaProducto}
+                            onChange={(e) => setBusquedaProducto(e.target.value)}
+                            className="pl-10"
+                        />
+                    </div>
+                )}
+
                 <Card>
                     <CardContent className="pt-6 space-y-4">
                         <div className="flex items-center justify-between">
-                            <h3 className="text-lg font-medium">Items a Transferir</h3>
+                            <div>
+                                <h3 className="text-lg font-medium">Items a Transferir</h3>
+                                {sucursalOrigenId && stockOrigen.length > 0 && (
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                        {busquedaProducto
+                                            ? `${stockOrigenFiltrado.length} productos encontrados`
+                                            : `${stockOrigen.length} productos disponibles`
+                                        }
+                                        {sucursalOrigenId === '00000000-0000-0000-0000-000000000001' && ' en almacén central'}
+                                    </p>
+                                )}
+                                {!almacenCentral && (
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                        🔄 Cargando almacén central...
+                                    </p>
+                                )}
+                                {almacenCentral && !sucursalOrigenId && (
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                        📦 Configurando almacén central como origen...
+                                    </p>
+                                )}
+                                {sucursalOrigenId && stockOrigen.length === 0 && !loadingStock && (
+                                    <p className="text-sm text-orange-600 mt-1">
+                                        ⚠️ {sucursalOrigenId === '00000000-0000-0000-0000-000000000001'
+                                            ? 'No hay productos disponibles en el almacén central'
+                                            : 'No hay productos disponibles en la sucursal seleccionada'
+                                        }
+                                        <br />
+                                        <span className="text-xs">
+                                            {sucursalOrigenId === '00000000-0000-0000-0000-000000000001'
+                                                ? 'Los productos deben estar en el catálogo central con lotes en almacén'
+                                                : 'Los productos deben tener lotes con stock disponible'
+                                            }
+                                        </span>
+                                    </p>
+                                )}
+                            </div>
                             <Button
                                 type="button"
                                 variant="outline"
                                 size="sm"
                                 onClick={() => append({ producto_id: '', cantidad: 0 })}
+                                disabled={!sucursalOrigenId || stockOrigenFiltrado.length === 0}
                             >
                                 <Plus className="w-4 h-4 mr-2" />
                                 Agregar Item
@@ -230,11 +351,34 @@ export function TransferenciaForm() {
                                                     </SelectTrigger>
                                                 </FormControl>
                                                 <SelectContent>
-                                                    {stockOrigen.map((item) => (
-                                                        <SelectItem key={item.producto.id} value={item.producto.id}>
-                                                            {item.producto.nombre} (Disp: {item.cantidad_total})
+                                                    {loadingStock ? (
+                                                        <SelectItem value="loading" disabled>
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                                                                Cargando productos...
+                                                            </div>
                                                         </SelectItem>
-                                                    ))}
+                                                    ) : stockOrigen.length === 0 ? (
+                                                        <SelectItem value="empty" disabled>
+                                                            {sucursalOrigenId === '00000000-0000-0000-0000-000000000001'
+                                                                ? 'No hay productos disponibles en el almacén central'
+                                                                : 'No hay productos disponibles en esta sucursal'
+                                                            }
+                                                        </SelectItem>
+                                                    ) : (
+                                                        stockOrigenFiltrado
+                                                            .sort((a, b) => a.producto.nombre.localeCompare(b.producto.nombre))
+                                                            .map((item) => (
+                                                                <SelectItem key={item.producto.id} value={item.producto.id}>
+                                                                    <div className="flex items-center justify-between w-full">
+                                                                        <span className="font-medium">{item.producto.nombre}</span>
+                                                                        <span className="text-xs text-muted-foreground ml-2">
+                                                                            {item.cantidad_total} {item.producto.unidad_medida}
+                                                                        </span>
+                                                                    </div>
+                                                                </SelectItem>
+                                                            ))
+                                                    )}
                                                 </SelectContent>
                                             </Select>
                                             <FormMessage />

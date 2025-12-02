@@ -1,0 +1,330 @@
+import { Suspense } from 'react'
+import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import {
+  Package,
+  DollarSign,
+  AlertTriangle,
+  TrendingUp,
+  Truck,
+  Calendar,
+  Clock,
+  Building2
+} from 'lucide-react'
+import Link from 'next/link'
+import { getSucursalUsuario } from '@/lib/utils'
+
+async function getSucursalData() {
+  const supabase = await createClient()
+
+  // Obtener usuario actual
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError || !user) {
+    throw new Error('Usuario no autenticado')
+  }
+
+  // Obtener sucursal del usuario
+  const sucursalId = await getSucursalUsuario(supabase, user.id)
+
+  if (!sucursalId) {
+    // Usuario no tiene sucursal asignada - redirigir a página de configuración
+    redirect('/sucursal/configuracion?mensaje=sucursal-requerida')
+  }
+
+  // Obtener información de la sucursal
+  const { data: sucursal, error: sucursalError } = await supabase
+    .from('sucursales')
+    .select('*')
+    .eq('id', sucursalId)
+    .single()
+
+  if (sucursalError) {
+    throw new Error('Error al obtener datos de sucursal')
+  }
+
+  // Obtener ventas del día
+  const hoy = new Date().toISOString().split('T')[0]
+  const { data: ventasDia, error: ventasError } = await supabase
+    .from('pedidos')
+    .select('total, estado')
+    .eq('sucursal_id', sucursalId)
+    .eq('estado', 'completado')
+    .gte('created_at', `${hoy}T00:00:00.000Z`)
+    .lte('created_at', `${hoy}T23:59:59.999Z`)
+
+  // Obtener alertas activas
+  const { data: alertas, error: alertasError } = await supabase
+    .from('alertas_stock')
+    .select('id, producto_id, cantidad_actual, umbral')
+    .eq('sucursal_id', sucursalId)
+    .eq('estado', 'pendiente')
+
+  // Obtener saldo de caja
+  const { data: caja, error: cajaError } = await supabase
+    .from('tesoreria_cajas')
+    .select('saldo_actual')
+    .eq('sucursal_id', sucursalId)
+    .eq('active', true)
+    .single()
+
+  // Obtener transferencias pendientes
+  const { data: transferencias, error: transferenciasError } = await supabase
+    .from('transferencias_stock')
+    .select('id, estado')
+    .or(`sucursal_origen_id.eq.${sucursalId},sucursal_destino_id.eq.${sucursalId}`)
+    .in('estado', ['pendiente', 'en_transito'])
+
+  return {
+    sucursal,
+    ventasDia: ventasDia || [],
+    alertas: alertas || [],
+    caja,
+    transferencias: transferencias || []
+  }
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-6">
+      {/* Header Skeleton */}
+      <div className="flex items-center justify-between">
+        <div className="space-y-2">
+          <div className="h-8 bg-muted rounded w-64 animate-pulse"></div>
+          <div className="h-4 bg-muted rounded w-96 animate-pulse"></div>
+        </div>
+      </div>
+
+      {/* Cards Skeleton */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {[...Array(4)].map((_, i) => (
+          <Card key={i} className="animate-pulse">
+            <CardHeader>
+              <div className="h-4 bg-muted rounded w-24"></div>
+            </CardHeader>
+            <CardContent>
+              <div className="h-8 bg-muted rounded w-16 mb-2"></div>
+              <div className="h-3 bg-muted rounded"></div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+export default async function SucursalDashboardPage() {
+  try {
+    const data = await getSucursalData()
+
+    const totalVentasDia = data.ventasDia.reduce((sum, venta) => sum + (venta.total || 0), 0)
+    const transferenciasPendientes = data.transferencias.filter(t => t.estado === 'pendiente').length
+
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+              <Building2 className="w-8 h-8" />
+              {data.sucursal.nombre}
+            </h1>
+            <p className="text-muted-foreground">
+              {data.sucursal.direccion && `${data.sucursal.direccion} • `}
+              {data.sucursal.telefono && `${data.sucursal.telefono}`}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" asChild>
+              <Link href="/sucursal/alerts">
+                <AlertTriangle className="w-4 h-4 mr-2" />
+                Ver Alertas ({data.alertas.length})
+              </Link>
+            </Button>
+          </div>
+        </div>
+
+        {/* Estadísticas */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {/* Ventas del Día */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Ventas del Día</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">${totalVentasDia.toFixed(2)}</div>
+              <p className="text-xs text-muted-foreground">
+                {data.ventasDia.length} pedidos completados
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Alertas Activas */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Alertas de Stock</CardTitle>
+              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">{data.alertas.length}</div>
+              <p className="text-xs text-muted-foreground">
+                Productos con stock bajo
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Estado de Caja */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Saldo en Caja</CardTitle>
+              <Package className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">
+                ${data.caja?.saldo_actual?.toFixed(2) || '0.00'}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Saldo actual
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Transferencias */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Transferencias</CardTitle>
+              <Truck className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-600">
+                {data.transferencias.length}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {transferenciasPendientes} pendientes
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Acciones Rápidas */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <Card className="hover:shadow-md transition-shadow">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Package className="w-5 h-5" />
+                Registrar Venta
+              </CardTitle>
+              <CardDescription>
+                Registra una nueva venta en la sucursal
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild className="w-full">
+                <Link href="/sucursal/ventas">
+                  Ir a Ventas
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-md transition-shadow">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <TrendingUp className="w-5 h-5" />
+                Ver Inventario
+              </CardTitle>
+              <CardDescription>
+                Consulta el stock disponible en la sucursal
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button variant="outline" asChild className="w-full">
+                <Link href="/sucursal/inventario">
+                  Ver Inventario
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-md transition-shadow">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Truck className="w-5 h-5" />
+                Gestionar Transferencias
+              </CardTitle>
+              <CardDescription>
+                Solicita o recibe transferencias de stock
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button variant="outline" asChild className="w-full">
+                <Link href="/sucursal/transferencias">
+                  Ver Transferencias
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Alertas Recientes */}
+        {data.alertas.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-red-500" />
+                Alertas de Stock Activas
+              </CardTitle>
+              <CardDescription>
+                Productos que requieren atención inmediata
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {data.alertas.slice(0, 3).map((alerta) => (
+                  <div key={alerta.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <AlertTriangle className="w-4 h-4 text-red-500" />
+                      <div>
+                        <p className="font-medium">Producto #{alerta.producto_id}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Stock: {alerta.cantidad_actual} | Umbral: {alerta.umbral}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant="destructive">Crítico</Badge>
+                  </div>
+                ))}
+                {data.alertas.length > 3 && (
+                  <Button variant="outline" asChild className="w-full">
+                    <Link href="/sucursal/alerts">
+                      Ver todas las alertas ({data.alertas.length})
+                    </Link>
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    )
+  } catch (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Error al cargar dashboard</h3>
+              <p className="text-muted-foreground">
+                {error instanceof Error ? error.message : 'Error desconocido'}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+}
