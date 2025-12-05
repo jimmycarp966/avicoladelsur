@@ -195,23 +195,45 @@ export default async function PedidoDetallePage({ params }: PedidoDetallePagePro
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
-              Cliente
+              <Users className="h-5 w-5" />
+              {pedido.cliente_id ? 'Cliente' : 'Pedido Agrupado'}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div>
-              <p className="text-xs text-muted-foreground">Nombre</p>
-              <p className="text-sm">{pedido.clientes?.nombre || 'Sin datos'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Teléfono</p>
-              <p className="text-sm">{pedido.clientes?.telefono || '-'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Zona</p>
-              <p className="text-sm">{pedido.clientes?.zona_entrega || '-'}</p>
-            </div>
+            {pedido.cliente_id ? (
+              // Pedido tradicional con un solo cliente
+              <>
+                <div>
+                  <p className="text-xs text-muted-foreground">Nombre</p>
+                  <p className="text-sm">{pedido.clientes?.nombre || 'Sin datos'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Teléfono</p>
+                  <p className="text-sm">{pedido.clientes?.telefono || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Zona</p>
+                  <p className="text-sm">{pedido.clientes?.zona_entrega || '-'}</p>
+                </div>
+              </>
+            ) : (
+              // Pedido agrupado con múltiples entregas
+              <>
+                <div className="rounded-lg bg-blue-50 border border-blue-200 p-3">
+                  <p className="text-sm text-blue-700">
+                    Este pedido agrupa múltiples entregas de diferentes clientes.
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Tipo</p>
+                  <p className="text-sm font-medium">Pedido consolidado por zona</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Entregas</p>
+                  <p className="text-sm">Ver sección "Entregas del Pedido" abajo</p>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
