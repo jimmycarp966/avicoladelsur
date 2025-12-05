@@ -18,10 +18,25 @@ interface PresupuestoDetallePageProps {
 }
 
 async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) {
+  console.log('[SERVER] PresupuestoDetalle - ID recibido:', presupuestoId)
   const supabase = await createClient()
   const result = await obtenerPresupuestoAction(presupuestoId)
+  
+  console.log('[SERVER] Resultado de obtenerPresupuestoAction:', {
+    success: result.success,
+    hasData: !!result.data,
+    error: result.error,
+    message: result.message,
+    errorCompleto: result.error
+  })
 
   if (!result.success || !result.data) {
+    console.error('[SERVER] Presupuesto no encontrado:', {
+      presupuestoId,
+      success: result.success,
+      message: result.message,
+      error: result.error
+    })
     notFound()
   }
 

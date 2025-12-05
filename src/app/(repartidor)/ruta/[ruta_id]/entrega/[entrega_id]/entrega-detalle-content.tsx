@@ -174,7 +174,7 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
   return (
     <div className="space-y-6 p-4 pb-32">
       <Button asChild variant="ghost" className="mb-2 w-fit">
-        <Link href={`/repartidor/ruta/${entrega.ruta_id}`}>
+        <Link href={`/ruta/${entrega.ruta_id}`}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Volver a la ruta
         </Link>

@@ -156,7 +156,7 @@ export function EntregaCard({ entrega, rutaId, rutaEstado }: EntregaCardProps) {
                   className="flex-1"
                   asChild
                 >
-                  <Link href={`/repartidor/ruta/${rutaId}/entrega/${entrega.id}`}>
+                  <Link href={`/ruta/${rutaId}/entrega/${entrega.id}`}>
                     <FileText className="mr-2 h-4 w-4" />
                     Gestionar
                   </Link>

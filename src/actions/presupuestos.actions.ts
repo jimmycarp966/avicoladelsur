@@ -87,13 +87,23 @@ export async function crearPresupuestoAction(formData: FormData) {
     })
 
     if (error) {
-      console.error('Error creando presupuesto:', error)
-      return { success: false, message: 'Error al crear presupuesto' }
+      console.error('[SERVER] Error creando presupuesto RPC:', error)
+      return { success: false, message: 'Error al crear presupuesto: ' + error.message }
     }
 
-    if (!result.success) {
-      return { success: false, message: result.error || 'Error en la creación del presupuesto' }
+    console.log('[SERVER] Resultado RPC crear presupuesto:', JSON.stringify(result, null, 2))
+
+    if (!result || !result.success) {
+      console.error('[SERVER] Error: result.success es false:', result)
+      return { success: false, message: result?.error || 'Error en la creación del presupuesto' }
     }
+
+    console.log('[SERVER] Presupuesto creado exitosamente:', {
+      presupuesto_id: result.presupuesto_id,
+      numero_presupuesto: result.numero_presupuesto,
+      result_keys: Object.keys(result),
+      result_completo: result
+    })
 
     // Asignar usuario vendedor y lista de precios
     const updateData: { usuario_vendedor: string; lista_precio_id?: string } = {
@@ -134,6 +144,9 @@ export async function crearPresupuestoAction(formData: FormData) {
     }
 
     revalidatePath('/ventas/presupuestos')
+    if (result.presupuesto_id) {
+      revalidatePath(`/ventas/presupuestos/${result.presupuesto_id}`)
+    }
 
     return {
       success: true,
@@ -593,9 +606,11 @@ export async function obtenerPresupuestosAction(filtros?: {
 // Acción para obtener detalle de un presupuesto
 export async function obtenerPresupuestoAction(presupuestoId: string) {
   try {
+    console.log('[SERVER] obtenerPresupuestoAction - ID recibido:', presupuestoId)
     const supabase = await createClient()
 
     // OPTIMIZADO: Una sola query con todos los joins en lugar de 7 queries separadas
+    console.log('[SERVER] Ejecutando query para obtener presupuesto...')
     const { data: presupuestoData, error: presupuestoError } = await supabase
       .from('presupuestos')
       .select(`
@@ -605,7 +620,6 @@ export async function obtenerPresupuestoAction(presupuestoId: string) {
         usuario_vendedor_obj:usuarios!presupuestos_usuario_vendedor_fkey(nombre),
         usuario_almacen_obj:usuarios!presupuestos_usuario_almacen_fkey(nombre),
         usuario_repartidor_obj:usuarios!presupuestos_usuario_repartidor_fkey(nombre),
-        pedido_convertido:pedidos(numero_pedido),
         items:presupuesto_items(
           *,
           producto:productos(*),
@@ -616,6 +630,15 @@ export async function obtenerPresupuestoAction(presupuestoId: string) {
       .single()
 
     if (presupuestoError) {
+      console.error('[SERVER] Error al obtener presupuesto de BD:', {
+        presupuestoId,
+        errorCode: presupuestoError.code,
+        errorMessage: presupuestoError.message,
+        errorDetails: presupuestoError.details,
+        errorHint: presupuestoError.hint,
+        errorCompleto: presupuestoError
+      })
+      
       // Si el error es "no encontrado", dar mensaje más claro
       if (presupuestoError.code === 'PGRST116' || presupuestoError.message?.includes('No rows')) {
         return {
@@ -644,6 +667,20 @@ export async function obtenerPresupuestoAction(presupuestoId: string) {
       .select('cantidad, expires_at, estado, producto_id')
       .eq('presupuesto_id', presupuestoId)
 
+    // Obtener pedido convertido si existe (query separada para evitar conflicto de relaciones)
+    let pedidoConvertido = null
+    if (presupuestoData.pedido_convertido_id) {
+      const { data: pedidoData } = await supabase
+        .from('pedidos')
+        .select('numero_pedido')
+        .eq('id', presupuestoData.pedido_convertido_id)
+        .single()
+      
+      if (pedidoData) {
+        pedidoConvertido = { numero_pedido: pedidoData.numero_pedido }
+      }
+    }
+
     // Construir objeto de respuesta con reservas agrupadas por producto
     const reservasPorProducto = (reservasData || []).reduce((acc: any, r: any) => {
       if (!acc[r.producto_id]) acc[r.producto_id] = []
@@ -653,6 +690,7 @@ export async function obtenerPresupuestoAction(presupuestoId: string) {
 
     const data = {
       ...presupuestoData,
+      pedido_convertido: pedidoConvertido,
       items: (presupuestoData.items || []).map((item: any) => ({
         ...item,
         reservas: reservasPorProducto[item.producto_id] || []

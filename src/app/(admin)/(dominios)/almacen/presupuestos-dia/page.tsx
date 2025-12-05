@@ -28,6 +28,23 @@ export const metadata = {
   description: 'Gestión de presupuestos para pesaje en almacén',
 }
 
+// Helper para determinar si un item es pesable
+function esItemPesable(item: any): boolean {
+  // Primero verificar el campo pesable del item
+  if (item.pesable === true) {
+    return true
+  }
+  
+  // Si no está marcado como pesable, verificar la categoría del producto
+  const categoria = item.producto?.categoria
+  if (categoria) {
+    const categoriaUpper = categoria.toUpperCase().trim()
+    return categoriaUpper === 'BALANZA'
+  }
+  
+  return false
+}
+
 async function PresupuestosDiaContent({
   searchParams,
 }: {
@@ -115,7 +132,7 @@ async function PresupuestosDiaContent({
   const totalItemsPesablesPendientesDia =
     presupuestosDelDia.reduce(
       (acc, presupuesto) =>
-        acc + (presupuesto.items?.filter((item: any) => item.pesable && !item.peso_final).length || 0),
+        acc + (presupuesto.items?.filter((item: any) => esItemPesable(item) && !item.peso_final).length || 0),
       0,
     ) || 0
 
@@ -199,14 +216,14 @@ async function PresupuestosDiaContent({
         const productoKey = item.producto?.codigo || `${item.producto?.nombre || 'producto'}-${item.id}`
         const cantidad = calcularKgItem(item)
 
-        if (item.pesable) {
+        if (esItemPesable(item)) {
           acc[key].totalKgPesables += cantidad
         }
 
         if (!acc[key].productos[productoKey]) {
           acc[key].productos[productoKey] = {
             nombre: item.producto?.nombre || 'Producto sin nombre',
-            pesable: !!item.pesable,
+            pesable: esItemPesable(item),
             totalCantidad: 0,
             presupuestosIds: new Set<string>(),
           }
@@ -674,7 +691,7 @@ async function PresupuestosDiaContent({
               <CardContent>
                 <div className="space-y-4">
                   {grupo.presupuestos.map((presupuesto: any) => {
-                    const itemsPesables = presupuesto.items?.filter((item: any) => item.pesable) || []
+                    const itemsPesables = presupuesto.items?.filter((item: any) => esItemPesable(item)) || []
                     const itemsPesados = itemsPesables.filter((item: any) => item.peso_final)
                     const totalKg = presupuesto.items?.reduce((sum: number, item: any) =>
                       sum + calcularKgItem(item), 0) || 0
@@ -768,17 +785,56 @@ async function PresupuestosDiaContent({
                                         >
                                           <div>
                                             <p className="font-medium">
-                                              {item.producto?.nombre || 'Producto'}
+                                              {(() => {
+                                                const esPesableItem = esItemPesable(item)
+                                                const estaPendienteItem = esPesableItem && !item.peso_final
+                                                
+                                                return estaPendienteItem ? (
+                                                  <>
+                                              <mark 
+                                                style={{
+                                                  backgroundColor: '#fef08a',
+                                                  padding: '2px 4px',
+                                                  borderRadius: '2px',
+                                                  boxDecorationBreak: 'clone',
+                                                  WebkitBoxDecorationBreak: 'clone',
+                                                  display: 'inline'
+                                                }}
+                                              >
+                                                {item.producto?.nombre || 'Producto'}
+                                              </mark>
                                               {item.producto?.codigo && (
-                                                <span className="text-xs text-muted-foreground ml-1">
+                                                <mark
+                                                  className="ml-1 text-xs"
+                                                  style={{
+                                                    backgroundColor: '#fef08a',
+                                                    padding: '2px 4px',
+                                                    borderRadius: '2px',
+                                                    boxDecorationBreak: 'clone',
+                                                    WebkitBoxDecorationBreak: 'clone',
+                                                    display: 'inline'
+                                                  }}
+                                                >
                                                   ({item.producto.codigo})
-                                                </span>
+                                                </mark>
                                               )}
+                                                  </>
+                                                ) : (
+                                                  <>
+                                                    {item.producto?.nombre || 'Producto'}
+                                                    {item.producto?.codigo && (
+                                                      <span className="text-xs text-muted-foreground ml-1">
+                                                        ({item.producto.codigo})
+                                                      </span>
+                                                    )}
+                                                  </>
+                                                )
+                                              })()}
                                             </p>
                                             <p className="text-xs text-muted-foreground">
-                                              {item.pesable ? 'Pesable' : 'Unidad'} • Solicitado:{' '}
-                                              {item.cantidad_solicitada ?? 0} {item.pesable ? 'kg' : 'u'}
-                                              {item.pesable && (
+                                              {esItemPesable(item) ? 'Pesable' : 'Unidad'} • Solicitado:{' '}
+                                              {item.cantidad_solicitada ?? 0} {esItemPesable(item) ? 'kg' : 'u'}
+                                              {esItemPesable(item) && (
                                                 <>
                                                   {' '}•{' '}
                                                   {item.peso_final
@@ -791,14 +847,14 @@ async function PresupuestosDiaContent({
                                           <Badge
                                             variant="outline"
                                             className={
-                                              item.pesable
+                                              esItemPesable(item)
                                                 ? item.peso_final
                                                   ? 'border-green-200 bg-green-50 text-green-700'
                                                   : 'border-yellow-200 bg-yellow-50 text-yellow-700'
                                                 : 'border-slate-200 bg-slate-50 text-slate-700'
                                             }
                                           >
-                                            {item.pesable ? (item.peso_final ? 'Pesado' : 'Pendiente') : 'Sin balanza'}
+                                            {esItemPesable(item) ? (item.peso_final ? 'Pesado' : 'Pendiente') : 'Sin balanza'}
                                           </Badge>
                                         </div>
                                       ))}
@@ -939,24 +995,62 @@ async function PresupuestosDiaContent({
                               </AccordionTrigger>
                               <AccordionContent>
                                 <div className="space-y-3 px-4 pb-4">
-                                  {presupuesto.items.map((item: any) => (
+                                  {presupuesto.items.map((item: any) => {
+                                    const esPesable = esItemPesable(item)
+                                    const estaPendiente = esPesable && !item.peso_final
+                                    
+                                    return (
                                     <div
                                       key={item.id}
                                       className="flex items-start justify-between gap-4 rounded-md border border-slate-100 bg-white/80 px-3 py-2 text-sm"
                                     >
                                       <div>
                                         <p className="font-medium">
-                                          {item.producto?.nombre || 'Producto'}
-                                          {item.producto?.codigo && (
-                                            <span className="text-xs text-muted-foreground ml-1">
-                                              ({item.producto.codigo})
-                                            </span>
+                                          {estaPendiente ? (
+                                            <>
+                                              <mark 
+                                                style={{
+                                                  backgroundColor: '#fef08a',
+                                                  padding: '2px 4px',
+                                                  borderRadius: '2px',
+                                                  boxDecorationBreak: 'clone',
+                                                  WebkitBoxDecorationBreak: 'clone',
+                                                  display: 'inline'
+                                                }}
+                                              >
+                                                {item.producto?.nombre || 'Producto'}
+                                              </mark>
+                                              {item.producto?.codigo && (
+                                                <mark
+                                                  className="ml-1 text-xs"
+                                                  style={{
+                                                    backgroundColor: '#fef08a',
+                                                    padding: '2px 4px',
+                                                    borderRadius: '2px',
+                                                    boxDecorationBreak: 'clone',
+                                                    WebkitBoxDecorationBreak: 'clone',
+                                                    display: 'inline'
+                                                  }}
+                                                >
+                                                  ({item.producto.codigo})
+                                                </mark>
+                                              )}
+                                            </>
+                                          ) : (
+                                            <>
+                                              {item.producto?.nombre || 'Producto'}
+                                              {item.producto?.codigo && (
+                                                <span className="text-xs text-muted-foreground ml-1">
+                                                  ({item.producto.codigo})
+                                                </span>
+                                              )}
+                                            </>
                                           )}
                                         </p>
                                         <p className="text-xs text-muted-foreground">
-                                          {item.pesable ? 'Pesable' : 'Unidad'} • Solicitado:{' '}
-                                          {item.cantidad_solicitada ?? 0} {item.pesable ? 'kg' : 'u'}
-                                          {item.pesable && (
+                                          {esPesable ? 'Pesable' : 'Unidad'} • Solicitado:{' '}
+                                          {item.cantidad_solicitada ?? 0} {esPesable ? 'kg' : 'u'}
+                                          {esPesable && (
                                             <>
                                               {' '}•{' '}
                                               {item.peso_final
@@ -969,17 +1063,17 @@ async function PresupuestosDiaContent({
                                       <Badge
                                         variant="outline"
                                         className={
-                                          item.pesable
+                                          esPesable
                                             ? item.peso_final
                                               ? 'border-green-200 bg-green-50 text-green-700'
                                               : 'border-yellow-200 bg-yellow-50 text-yellow-700'
                                             : 'border-slate-200 bg-slate-50 text-slate-700'
                                         }
                                       >
-                                        {item.pesable ? (item.peso_final ? 'Pesado' : 'Pendiente') : 'Sin balanza'}
+                                        {esPesable ? (item.peso_final ? 'Pesado' : 'Pendiente') : 'Sin balanza'}
                                       </Badge>
                                     </div>
-                                  ))}
+                                  )})}
                                 </div>
                               </AccordionContent>
                             </AccordionItem>

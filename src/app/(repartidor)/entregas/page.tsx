@@ -260,7 +260,7 @@ async function RepartoContent({ searchParams }: { searchParams: { fecha?: string
                         size="sm"
                         asChild
                       >
-                        <Link href={`/repartidor/ruta/${rutaId}`}>
+                        <Link href={`/ruta/${rutaId}`}>
                           <MapPin className="mr-2 h-4 w-4" />
                           Ver Hoja de Ruta
                         </Link>
@@ -344,7 +344,7 @@ async function RepartoContent({ searchParams }: { searchParams: { fecha?: string
                   {/* Acciones */}
                   <div className="flex gap-2 pt-2">
                     <Button variant="outline" size="sm" className="flex-1" asChild>
-                      <Link href={`/repartidor/ruta/${rutaId}/entrega/${entrega.id}`}>
+                      <Link href={`/ruta/${rutaId}/entrega/${entrega.id}`}>
                         <MapPin className="mr-2 h-4 w-4" />
                         Gestionar
                       </Link>
@@ -355,7 +355,7 @@ async function RepartoContent({ searchParams }: { searchParams: { fecha?: string
                         className="flex-1 bg-green-600 hover:bg-green-700"
                         asChild
                       >
-                        <Link href={`/repartidor/ruta/${rutaId}`}>
+                        <Link href={`/ruta/${rutaId}`}>
                           <CheckCircle className="mr-2 h-4 w-4" />
                           Ir a ruta
                         </Link>

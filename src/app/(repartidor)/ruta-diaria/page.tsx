@@ -174,14 +174,14 @@ export default async function RutaDiariaPage() {
                     {/* Acciones */}
                     <div className="flex gap-2 pt-2">
                       <Button asChild className="flex-1">
-                        <Link href={`/repartidor/ruta/${ruta.id}`}>
+                        <Link href={`/ruta/${ruta.id}`}>
                           <MapPin className="mr-2 h-4 w-4" />
                           Ver Ruta
                         </Link>
                       </Button>
                       {ruta.estado === 'planificada' && !ruta.checklist_inicio_id && (
                         <Button variant="outline" asChild className="flex-1">
-                          <Link href="/repartidor/checkin">
+                          <Link href="/checkin">
                             <CheckCircle className="mr-2 h-4 w-4" />
                             Check-in
                           </Link>

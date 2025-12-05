@@ -19,31 +19,31 @@ interface RepartidorBottomNavProps {
 const navigation = [
   {
     name: 'Inicio',
-    href: '/repartidor',
+    href: '/home',
     icon: Home,
     id: 'inicio',
   },
   {
     name: 'Check-in',
-    href: '/repartidor/checkin',
+    href: '/checkin',
     icon: CheckSquare,
     id: 'checkin',
   },
   {
     name: 'Ruta',
-    href: '/repartidor/ruta-diaria',
+    href: '/ruta-diaria',
     icon: MapPin,
     id: 'ruta',
   },
   {
     name: 'Entregas',
-    href: '/repartidor/entregas',
+    href: '/entregas',
     icon: Truck,
     id: 'entregas',
   },
   {
     name: 'Perfil',
-    href: '/repartidor/perfil',
+    href: '/perfil',
     icon: User,
     id: 'perfil',
   },

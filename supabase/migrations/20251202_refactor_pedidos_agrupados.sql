@@ -483,8 +483,14 @@ BEGIN
       AND pesable = true
       AND peso_final IS NOT NULL;
     
-    IF v_presupuesto.estado = 'pendiente' AND v_total_pesables > 0 AND v_pesables_pesados < v_total_pesables THEN
-        RETURN jsonb_build_object('success', false, 'error', 'Este presupuesto tiene productos balanza que deben pesarse en almacén');
+    -- Validar que todos los productos pesables estén pesados (SIEMPRE, sin importar el estado)
+    IF v_total_pesables > 0 AND v_pesables_pesados < v_total_pesables THEN
+        RETURN jsonb_build_object(
+            'success', false, 
+            'error', 
+            'No se puede convertir a pedido: todos los productos pesables deben estar pesados. Faltan ' || 
+            (v_total_pesables - v_pesables_pesados) || ' producto(s) por pesar.'
+        );
     END IF;
     
     -- Determinar turno y fecha de entrega

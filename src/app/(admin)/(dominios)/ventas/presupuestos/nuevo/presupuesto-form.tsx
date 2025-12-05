@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { DateInput } from '@/components/ui/date-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -206,17 +207,43 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
 
       const result = await crearPresupuestoAction(formData)
 
+      // Debug completo
+      console.log('[CLIENT] ===== RESULTADO CREAR PRESUPUESTO =====')
+      console.log('[CLIENT] Success:', result.success)
+      console.log('[CLIENT] Message:', result.message)
+      console.log('[CLIENT] Data completo:', result.data)
+      console.log('[CLIENT] Data keys:', result.data ? Object.keys(result.data) : 'no data')
+      
       if (result.success) {
         showToast('success', result.message || 'Presupuesto creado exitosamente')
         const presupuestoId = result.data?.presupuesto_id
+        
+        console.log('[CLIENT] Presupuesto ID extraído:', presupuestoId)
+        console.log('[CLIENT] Tipo de presupuestoId:', typeof presupuestoId)
+        
         if (presupuestoId) {
-          // Redirigir directamente, el router.refresh() se encargará de cargar los datos
-          router.push(`/ventas/presupuestos/${presupuestoId}`)
+          const url = `/ventas/presupuestos/${presupuestoId}`
+          console.log('[CLIENT] ✅ Presupuesto ID válido:', presupuestoId)
+          console.log('[CLIENT] 🔗 Redirigiendo a URL:', url)
+          
+          // Redirigir a la lista primero, luego el usuario puede hacer click en el presupuesto
+          // Esto evita problemas de timing donde el presupuesto aún no está disponible
+          showToast('success', `Presupuesto creado! Puedes verlo en la lista.`)
+          router.push('/ventas/presupuestos')
+          router.refresh()
+          
+          // Alternativa: intentar acceder directamente después de un delay
+          // setTimeout(() => {
+          //   window.location.href = url
+          // }, 2000)
         } else {
-          // Si no hay ID, redirigir a la lista de presupuestos
+          console.warn('[CLIENT] ⚠️ No se encontró presupuesto_id en result.data')
+          console.warn('[CLIENT] Result.data completo:', JSON.stringify(result.data, null, 2))
+          alert('Presupuesto creado pero no se pudo obtener el ID. Redirigiendo a lista.')
           router.push('/ventas/presupuestos')
         }
       } else {
+        console.error('[CLIENT] Error al crear presupuesto:', result)
         showToast('error', result.message || 'Error al crear presupuesto')
       }
     } catch (error: any) {
@@ -335,10 +362,11 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
 
               <div>
                 <Label htmlFor="fecha_entrega_estimada">Fecha de Entrega Estimada</Label>
-                <Input
+                <DateInput
                   id="fecha_entrega_estimada"
-                  type="date"
-                  {...register('fecha_entrega_estimada')}
+                  value={watch('fecha_entrega_estimada')}
+                  onChange={(value) => setValue('fecha_entrega_estimada', value)}
+                  placeholder="DD/MM/YYYY"
                 />
               </div>
             </div>

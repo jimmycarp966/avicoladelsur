@@ -1230,10 +1230,11 @@ Ver la guía completa en [`docs/GOOGLE_MAPS_SETUP.md`](./docs/GOOGLE_MAPS_SETUP.
 | `POST` | `/api/reparto/ubicacion` | Registrar ubicación GPS (repartidor) |
 | `GET` | `/api/reparto/ubicaciones` | Obtener últimas ubicaciones por vehículo |
 | `POST` | `/api/rutas/generar` | Generar ruta optimizada (Google o local) |
-| `GET` | `/api/rutas/:id/recorrido` | Obtener polyline e historial del día |
+| `GET` | `/api/rutas/:id/recorrido` | Obtener polyline e historial del día (enriquecido con productos y estado de pago) |
 | `POST` | `/api/rutas/:id/alerta` | Crear alerta manual |
 | `GET` | `/api/reparto/alertas` | Listar alertas (desvíos, cliente saltado) |
 | `POST` | `/api/integrations/google/directions` | Endpoint interno para Google Directions |
+| `GET` | `/api/reparto/rutas-planificadas` | Obtener rutas planificadas enriquecidas con productos y estado de pago |
 | `POST` | `/api/reparto/rutas-mock` | Generar datos mock para monitor GPS (testing/demo) |
 | `DELETE` | `/api/reparto/limpiar-mock` | Limpiar todos los datos mock del sistema |
 
@@ -1241,10 +1242,13 @@ Ver la guía completa en [`docs/GOOGLE_MAPS_SETUP.md`](./docs/GOOGLE_MAPS_SETUP.
 
 **Admin:**
 - `/reparto/monitor` - Monitor en tiempo real con mapa Google Maps
-- Visualiza vehículos activos (marcadores verdes), rutas planificadas (polilíneas verdes) y alertas (marcadores rojos)
-- Actualización automática optimizada (polling adaptativo: 10-60s según vehículos activos)
-- Pausa automática cuando la pestaña no está visible
-- Botón de actualización manual y control de pausa/reanudación
+  - Visualiza vehículos activos (marcadores verdes), rutas planificadas (polilíneas por color) y alertas (marcadores rojos)
+  - Panel lateral con números clickeables de clientes para cada ruta seleccionada
+  - Modal de vista previa con información completa del cliente y productos al hacer clic en un número
+  - Números cambian a negro cuando el cliente está entregado y cobrado
+  - Actualización automática optimizada (polling adaptativo: 10-60s según vehículos activos)
+  - Pausa automática cuando la pestaña no está visible
+  - Botón de actualización manual y control de pausa/reanudación
 - `/reparto/planificacion` - Define el plan semanal (zona + día + turno + vehículo + repartidor)
 - Controla qué rutas existen cada día y su capacidad disponible (vehículos base: Fiat Fiorino 600 kg, Toyota Hilux 1500 kg, Ford F-4000 4000 kg)
 
@@ -1360,6 +1364,19 @@ BOTPRESS_WEBHOOK_URL=https://your-botpress-webhook
 ```
 
 ## 🔧 **Actualizaciones Recientes**
+
+### **Vista Previa de Clientes en Monitor GPS (Diciembre 2025)**
+- ✅ **Panel lateral de números**: Lista clickeable de clientes con números ordenados por ruta seleccionada
+- ✅ **Modal de vista previa**: Al hacer clic en un número o marcador, se abre un modal con información completa
+  - Datos básicos del cliente (nombre, dirección, teléfono)
+  - Lista simple de productos con cantidades
+  - Estado de entrega y pago
+- ✅ **Colores dinámicos**: Los números cambian de color según estado
+  - Negro: entregado y cobrado
+  - Gris: solo entregado
+  - Color de ruta: pendiente
+- ✅ **Sincronización**: Panel lateral, mapa y modal sincronizados (al hacer clic en número, se centra el mapa)
+- ✅ **Endpoints enriquecidos**: `/api/reparto/rutas-planificadas` y `/api/rutas/[id]/recorrido` ahora incluyen productos y estado de pago
 
 ### **Migración de Leaflet a Google Maps en Repartos (Diciembre 2025)**
 - ✅ **MonitorMap.tsx migrado**: Reemplazado Leaflet por Google Maps JavaScript API

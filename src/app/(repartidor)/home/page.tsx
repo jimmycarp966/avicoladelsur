@@ -126,13 +126,13 @@ export default async function RepartidorDashboard() {
 
             <div className="flex gap-2">
               <Button asChild className="flex-1">
-                <Link href={`/repartidor/ruta/${rutaActiva.ruta_id}`}>
+                <Link href={`/ruta/${rutaActiva.ruta_id}`}>
                   <Navigation className="mr-2 h-4 w-4" />
                   Ver Ruta
                 </Link>
               </Button>
               <Button variant="outline" asChild className="flex-1">
-                <Link href={`/repartidor/ruta/${rutaActiva.ruta_id}`}>
+                <Link href={`/ruta/${rutaActiva.ruta_id}`}>
                   <CheckSquare className="mr-2 h-4 w-4" />
                   Check-in
                 </Link>

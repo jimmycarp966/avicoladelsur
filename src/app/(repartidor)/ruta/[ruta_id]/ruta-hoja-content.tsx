@@ -123,7 +123,7 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
 
     if (result.success) {
       toast.success('Ruta finalizada exitosamente')
-      router.push('/repartidor/entregas')
+      router.push('/entregas')
     } else {
       toast.error(result.error || 'Error al finalizar la ruta')
     }
@@ -366,7 +366,7 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
                         className="h-auto p-0 ml-2 text-yellow-700 underline"
                         asChild
                       >
-                        <Link href={`/repartidor/ruta/${ruta.id}/entrega/${entrega.id}`}>
+                        <Link href={`/ruta/${ruta.id}/entrega/${entrega.id}`}>
                           Registrar pago
                         </Link>
                       </Button>
@@ -444,7 +444,7 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
           </h2>
           {entregasOrdenadas.length > 0 && (
             <Button variant="outline" size="sm" asChild>
-              <Link href={`/repartidor/ruta/${ruta.id}/mapa`}>
+              <Link href={`/ruta/${ruta.id}/mapa`}>
                 <Navigation className="mr-2 h-4 w-4" />
                 Ver mapa
               </Link>

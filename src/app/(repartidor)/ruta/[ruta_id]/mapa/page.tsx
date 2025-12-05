@@ -168,7 +168,7 @@ export default async function RutaMapaPage({
           asChild
           className="text-muted-foreground hover:text-foreground"
         >
-          <Link href={`/repartidor/ruta/${ruta_id}`}>
+          <Link href={`/ruta/${ruta_id}`}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Volver a la lista
           </Link>

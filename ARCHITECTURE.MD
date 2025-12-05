@@ -24,7 +24,7 @@
 3. **App Sucursal**: POS con control de precios mayorista/minorista y auditoría automática
 4. **Bot Vendedor**: Automatización completa de pedidos vía WhatsApp con reserva stock
 5. **Planificación Semanal**: Gestión de rutas fijas por zona/día/turno/vehículo
-6. **Monitor GPS**: Tiempo real con alertas automáticas y mapa Google Maps
+6. **Monitor GPS**: Tiempo real con alertas automáticas, mapa Google Maps, panel lateral de clientes y vista previa con productos
 7. **Control de Sucursales**: Auditoría de precios, conteos físicos de stock y detección de desvíos
 
 ---
@@ -2210,7 +2210,8 @@ CREATE POLICY "repartidor_rutas_propias" ON pedidos FOR SELECT USING (
 | `POST` | `/api/rutas/generar` | Optimización de rutas |
 | `POST` | `/api/reparto/ubicacion` | GPS tracking repartidor |
 | `GET` | `/api/reparto/ubicaciones` | Ubicaciones vehículos |
-| `GET` | `/api/rutas/[id]/recorrido` | Polyline + historial |
+| `GET` | `/api/rutas/[id]/recorrido` | Polyline + historial (enriquecido con productos y estado de pago) |
+| `GET` | `/api/reparto/rutas-planificadas` | Rutas planificadas (enriquecido con productos y estado de pago) |
 | `POST` | `/api/rutas/[id]/alerta` | Alertas manuales |
 | `GET` | `/api/reparto/alertas` | Lista alertas |
 | `POST` | `/api/reparto/rutas-mock` | Generar datos mock para monitor GPS (testing/demo) |
@@ -2909,6 +2910,14 @@ Conciliación automática → Reportes CSV/PDF
 **Actualizado**: Diciembre 2025 - Sistema completo con migración a Google Maps y correcciones técnicas
 
 **Últimas actualizaciones:**
+
+- ✅ **Vista Previa de Clientes en Monitor GPS (Diciembre 2025)**
+  - Panel lateral con números clickeables de clientes por ruta seleccionada
+  - Modal de vista previa con información completa del cliente (nombre, dirección, teléfono) y lista de productos
+  - Números cambian de color dinámicamente: negro (entregado y cobrado), gris (solo entregado), color de ruta (pendiente)
+  - Sincronización entre panel lateral, mapa y modal (click en número centra el mapa)
+  - Endpoints enriquecidos: `/api/reparto/rutas-planificadas` y `/api/rutas/[id]/recorrido` incluyen productos y estado de pago
+  - Componente `MonitorMap.tsx` actualizado con estados para modal, panel lateral y colores dinámicos
 
 - ✅ **Migración de Leaflet a Google Maps en Repartos (Diciembre 2025)**
   - MonitorMap.tsx y RutaMap.tsx migrados a Google Maps JavaScript API

@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 
 export default function RepartidorPage() {
-  redirect('/repartidor/home')
+  redirect('/home')
 }
 
 

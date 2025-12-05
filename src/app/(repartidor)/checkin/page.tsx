@@ -42,12 +42,12 @@ export default async function CheckinPage() {
             </p>
             <div className="flex gap-2">
               <Button variant="outline" asChild>
-                <Link href="/repartidor/ruta-diaria">
+                <Link href="/ruta-diaria">
                   Ver Rutas del Día
                 </Link>
               </Button>
               <Button asChild>
-                <Link href="/repartidor/home">
+                <Link href="/home">
                   Ir al Inicio
                 </Link>
               </Button>
@@ -114,20 +114,20 @@ export default async function CheckinPage() {
               <div className="flex gap-2">
                 {ruta.estado === 'planificada' && (
                   <Button asChild>
-                    <Link href={`/repartidor/ruta/${ruta.id}`}>
+                    <Link href={`/ruta/${ruta.id}`}>
                       Iniciar Ruta
                     </Link>
                   </Button>
                 )}
                 {ruta.estado === 'en_curso' && (
                   <Button asChild>
-                    <Link href={`/repartidor/ruta/${ruta.id}`}>
+                    <Link href={`/ruta/${ruta.id}`}>
                       Ver Hoja de Ruta
                     </Link>
                   </Button>
                 )}
                 <Button variant="outline" asChild>
-                  <Link href="/repartidor/home">
+                  <Link href="/home">
                     Ir al Inicio
                   </Link>
                 </Button>
@@ -153,12 +153,12 @@ export default async function CheckinPage() {
           <CardContent>
             <div className="flex gap-2">
               <Button asChild>
-                <Link href={`/repartidor/ruta/${ruta.id}`}>
+                <Link href={`/ruta/${ruta.id}`}>
                   Ver Hoja de Ruta
                 </Link>
               </Button>
               <Button variant="outline" asChild>
-                <Link href="/repartidor/home">
+                <Link href="/home">
                   Ir al Inicio
                 </Link>
               </Button>
@@ -216,7 +216,7 @@ export default async function CheckinPage() {
             vehiculoId={ruta.vehiculo_id}
             onComplete={() => {
               // Redirigir a la hoja de ruta después de completar
-              window.location.href = `/repartidor/ruta/${ruta.id}`
+              window.location.href = `/ruta/${ruta.id}`
             }}
           />
         </CardContent>

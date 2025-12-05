@@ -20,12 +20,17 @@ export async function createNotification(data: {
     const { createClient } = await import('@/lib/supabase/server')
     const supabase = await createClient()
 
+    // Preparar datos para la notificación (incluir usuario_id en metadata si existe)
+    const datosNotificacion = data.metadata || {}
+    if (data.usuario_id) {
+      datosNotificacion.usuario_id = data.usuario_id
+    }
+
     const { error } = await supabase.rpc('crear_notificacion', {
       p_tipo: data.tipo,
       p_titulo: data.titulo,
       p_mensaje: data.mensaje,
-      p_datos: data.metadata || {},
-      p_usuario_id: data.usuario_id
+      p_datos: datosNotificacion
     })
 
     if (error) {

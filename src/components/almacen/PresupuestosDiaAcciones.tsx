@@ -22,7 +22,11 @@ interface Presupuesto {
   zona_id?: string | null
   cliente_id?: string | null
   fecha_entrega_estimada?: string | null
-  items?: Array<{ pesable?: boolean; peso_final?: number | null }>
+  items?: Array<{ 
+    pesable?: boolean
+    peso_final?: number | null
+    producto?: { categoria?: string }
+  }>
 }
 
 interface PresupuestosDiaAccionesProps {
@@ -39,36 +43,73 @@ export function PresupuestosDiaAcciones({
   const [isLoading, setIsLoading] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
 
-  // Filtrar presupuestos que pueden convertirse (tienen turno y zona)
-  const presupuestosConvertibles = presupuestos.filter(
-    (p) => p.turno && p.zona_id
-  )
+  // Helper para determinar si un item es pesable
+  const esItemPesable = (item: any): boolean => {
+    if (item.pesable === true) {
+      return true
+    }
+    const categoria = item.producto?.categoria
+    if (categoria) {
+      const categoriaUpper = categoria.toUpperCase().trim()
+      return categoriaUpper === 'BALANZA'
+    }
+    return false
+  }
 
   // Verificar si hay items pesables sin pesar
   const tieneItemsSinPesar = (presupuesto: Presupuesto) => {
     return presupuesto.items?.some(
-      (item) => item.pesable && !item.peso_final
+      (item) => esItemPesable(item) && !item.peso_final
     )
   }
 
+  // Filtrar presupuestos que pueden convertirse (tienen turno, zona Y todos los pesables están pesados)
+  const presupuestosConvertibles = presupuestos.filter(
+    (p) => p.turno && p.zona_id && !tieneItemsSinPesar(p)
+  )
+
   const handleConvertirMasivo = () => {
     if (presupuestosConvertibles.length === 0) {
-      showToast(
-        'error',
-        'No hay presupuestos convertibles. Todos deben tener turno y zona asignados.'
-      )
+      const sinTurnoZona = presupuestos.filter((p) => !p.turno || !p.zona_id).length
+      const conItemsSinPesar = presupuestos.filter((p) => p.turno && p.zona_id && tieneItemsSinPesar(p)).length
+      
+      if (sinTurnoZona > 0 && conItemsSinPesar > 0) {
+        showToast(
+          'error',
+          `No hay presupuestos convertibles: ${sinTurnoZona} sin turno/zona y ${conItemsSinPesar} con productos pesables sin pesar.`
+        )
+      } else if (sinTurnoZona > 0) {
+        showToast(
+          'error',
+          `No hay presupuestos convertibles: ${sinTurnoZona} presupuesto(s) no tienen turno y/o zona asignados.`
+        )
+      } else if (conItemsSinPesar > 0) {
+        showToast(
+          'error',
+          `No hay presupuestos convertibles: ${conItemsSinPesar} presupuesto(s) tienen productos pesables sin pesar. Todos los productos pesables deben estar pesados primero.`
+        )
+      } else {
+        showToast(
+          'error',
+          'No hay presupuestos convertibles.'
+        )
+      }
       return
     }
 
-    const conItemsSinPesar = presupuestosConvertibles.filter((p) =>
-      tieneItemsSinPesar(p)
-    )
+    // Verificar que todos los presupuestos convertibles no tengan items sin pesar
+    // (ya están filtrados arriba, pero verificamos por seguridad)
+    const totalPresupuestos = presupuestos.length
+    const cantidadConItemsSinPesar = presupuestos.filter((p) => 
+      p.turno && p.zona_id && tieneItemsSinPesar(p)
+    ).length
 
-    if (conItemsSinPesar.length > 0) {
+    if (cantidadConItemsSinPesar > 0) {
       showToast(
-        'warning',
-        `${conItemsSinPesar.length} presupuesto(s) tienen productos pesables sin pesar. Se convertirán de todos modos.`
+        'error',
+        `No se puede convertir: ${cantidadConItemsSinPesar} presupuesto(s) tienen productos pesables sin pesar. Todos los productos pesables deben estar pesados primero.`
       )
+      return
     }
 
     setShowConfirmDialog(true)
@@ -208,11 +249,39 @@ export function PresupuestoIndividualAccion({
   const [isLoading, setIsLoading] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
 
+  // Helper para determinar si un item es pesable
+  const esItemPesableItem = (item: any): boolean => {
+    if (item.pesable === true) {
+      return true
+    }
+    const categoria = item.producto?.categoria
+    if (categoria) {
+      const categoriaUpper = categoria.toUpperCase().trim()
+      return categoriaUpper === 'BALANZA'
+    }
+    return false
+  }
+
+  const tieneItemsSinPesarIndividual = () => {
+    return presupuesto.items?.some(
+      (item) => esItemPesableItem(item) && !item.peso_final
+    ) || false
+  }
+
   const handleConvertir = () => {
     if (!presupuesto.turno || !presupuesto.zona_id) {
       showToast(
         'error',
         'El presupuesto debe tener turno y zona asignados antes de convertir a pedido'
+      )
+      return
+    }
+
+    // Validar que todos los productos pesables estén pesados
+    if (tieneItemsSinPesarIndividual()) {
+      showToast(
+        'error',
+        'No se puede convertir a pedido: todos los productos pesables deben estar pesados primero. Usa el botón "Comenzar Pesaje" para pesarlos.'
       )
       return
     }
@@ -255,7 +324,7 @@ export function PresupuestoIndividualAccion({
     }
   }
 
-  const puedeConvertir = presupuesto.turno && presupuesto.zona_id
+  const puedeConvertir = presupuesto.turno && presupuesto.zona_id && !tieneItemsSinPesarIndividual()
 
   return (
     <>
@@ -265,8 +334,10 @@ export function PresupuestoIndividualAccion({
         size="sm"
         className="bg-green-600 hover:bg-green-700"
         title={
-          !puedeConvertir
+          !presupuesto.turno || !presupuesto.zona_id
             ? 'El presupuesto debe tener turno y zona asignados'
+            : tieneItemsSinPesarIndividual()
+            ? 'Todos los productos pesables deben estar pesados antes de convertir a pedido'
             : 'Convertir a pedido'
         }
       >
