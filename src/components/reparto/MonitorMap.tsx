@@ -11,10 +11,13 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { AlertCircle, Truck, Loader2, RefreshCw, Pause, Play, MapPin, Navigation, User, Phone, Package, Clock } from 'lucide-react'
+import { AlertCircle, Truck, Loader2, RefreshCw, Pause, Play, MapPin, Navigation, User, Phone, Package, Clock, X, DollarSign, CheckCircle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { Separator } from '@/components/ui/separator'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { getRouteColor, getColorName } from '@/lib/colors'
 import RutasSidebar from './RutasSidebar'
 import { toast } from 'sonner'
@@ -48,12 +51,16 @@ interface Alerta {
 interface ClientePunto {
   id: string
   cliente_nombre: string
-  direccion: string
+  direccion?: string
+  telefono?: string
   lat: number
   lng: number
   orden: number
   estado: 'pendiente' | 'entregado' | 'ausente' | 'saltado'
   hora_estimada?: string
+  productos?: Array<{ nombre: string; cantidad: number }>
+  pago_registrado?: boolean
+  monto_cobrado_registrado?: number
 }
 
 interface RutaData {
@@ -103,6 +110,9 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
   const [isPageHidden, setIsPageHidden] = useState(false)
   const [selectedRutaId, setSelectedRutaId] = useState<string | undefined>(undefined)
   const [googleMapsApiKeyMissing, setGoogleMapsApiKeyMissing] = useState(false)
+  const [selectedCliente, setSelectedCliente] = useState<{ cliente: ClientePunto; rutaId: string } | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [panelCollapsed, setPanelCollapsed] = useState(false)
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -187,14 +197,19 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
             const color = getRouteColor(rutaPlanificada.id)
             const ordenVisita = rutaPlanificada.orden_visita || []
 
-            // Transformar orden_visita al formato esperado
+            // Los datos ya vienen enriquecidos del endpoint, mantener todos los campos
             const ordenVisitaFormateado = ordenVisita.map((cliente: any) => ({
-              id: cliente.detalle_ruta_id || cliente.cliente_id,
+              id: cliente.id || cliente.detalle_ruta_id || cliente.cliente_id,
               orden: cliente.orden,
               lat: cliente.lat,
               lng: cliente.lng,
               cliente_nombre: cliente.cliente_nombre,
-              estado: cliente.estado_entrega || 'pendiente'
+              direccion: cliente.direccion,
+              telefono: cliente.telefono,
+              estado: cliente.estado_entrega || cliente.estado || 'pendiente',
+              productos: cliente.productos || [],
+              pago_registrado: cliente.pago_registrado || false,
+              monto_cobrado_registrado: cliente.monto_cobrado_registrado || 0,
             }))
 
             // Calcular progreso
@@ -314,15 +329,20 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
     }
   }, [])
 
-  const createClientIcon = useCallback((orden: number, color: string, estado: string) => {
+  const createClientIcon = useCallback((orden: number, color: string, estado: string, pagoRegistrado?: boolean) => {
     if (!window.google) return null
 
     // Colores por estado
     let fillColor = color
     let strokeColor = '#ffffff'
+    let textColor = '#ffffff'
 
-    if (estado === 'entregado') {
-      fillColor = '#10B981' // Verde siempre para entregados
+    // Si está entregado Y cobrado, usar negro
+    if (estado === 'entregado' && pagoRegistrado) {
+      fillColor = '#000000' // Negro
+      textColor = '#ffffff' // Texto blanco sobre negro
+    } else if (estado === 'entregado') {
+      fillColor = '#10B981' // Verde para entregado sin cobrar
     } else if (estado === 'ausente' || estado === 'problema') {
       fillColor = '#EF4444' // Rojo
     } else if (estado === 'saltado') {
@@ -333,7 +353,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
     const svg = `
       <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 30 30">
         <circle cx="15" cy="15" r="12" fill="${fillColor}" stroke="${strokeColor}" stroke-width="2"/>
-        <text x="15" y="20" font-family="Arial" font-size="14" font-weight="bold" fill="white" text-anchor="middle">${orden}</text>
+        <text x="15" y="20" font-family="Arial" font-size="14" font-weight="bold" fill="${textColor}" text-anchor="middle">${orden}</text>
       </svg>
     `
 
@@ -342,6 +362,17 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
       scaledSize: new window.google.maps.Size(30, 30),
       anchor: new window.google.maps.Point(15, 15)
     }
+  }, [])
+
+  // Función helper para determinar color del número
+  const getNumeroColor = useCallback((cliente: ClientePunto, rutaColor: string): string => {
+    if (cliente.estado === 'entregado' && cliente.pago_registrado) {
+      return '#000000' // Negro
+    }
+    if (cliente.estado === 'entregado') {
+      return '#808080' // Gris (opcional)
+    }
+    return rutaColor // Color de la ruta
   }, [])
 
   // Inicializar mapa
@@ -628,7 +659,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
         const marker = new window.google.maps.Marker({
           position,
           map: mapInstanceRef.current,
-          icon: createClientIcon(cliente.orden, ruta.color, cliente.estado),
+          icon: createClientIcon(cliente.orden, ruta.color, cliente.estado || 'pendiente', cliente.pago_registrado),
           title: `${cliente.orden}. ${cliente.cliente_nombre} ${ruta.ordenVisita.length > 10 ? '(+' + (ruta.ordenVisita.length - 10) + ' más)' : ''}`,
           opacity: opacity,
           zIndex: isSelected ? 20 : 5
@@ -655,6 +686,14 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
           infoWindowsRef.current.forEach(iw => iw.close())
           infoWindow.open(mapInstanceRef.current, marker)
           setSelectedRutaId(ruta.id)
+          // Abrir modal con información completa
+          setSelectedCliente({ cliente, rutaId: ruta.id })
+          setIsModalOpen(true)
+          // Centrar mapa en el cliente
+          if (mapInstanceRef.current) {
+            mapInstanceRef.current.setCenter(position)
+            mapInstanceRef.current.setZoom(15)
+          }
         })
 
         markersRef.current.set(`cliente-${cliente.id}`, marker)
@@ -1185,6 +1224,29 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
     setSelectedRutaId(rutaId === selectedRutaId ? undefined : rutaId)
   }
 
+  const handleClienteClick = (cliente: ClientePunto, rutaId: string) => {
+    setSelectedCliente({ cliente, rutaId })
+    setIsModalOpen(true)
+    setSelectedRutaId(rutaId)
+    
+    // Centrar mapa en el cliente
+    if (mapInstanceRef.current && cliente.lat && cliente.lng) {
+      const position = { lat: cliente.lat, lng: cliente.lng }
+      mapInstanceRef.current.setCenter(position)
+      mapInstanceRef.current.setZoom(15)
+    }
+  }
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false)
+    setSelectedCliente(null)
+  }
+
+  // Obtener clientes de la ruta seleccionada, ordenados
+  const clientesRutaSeleccionada = selectedRutaId && rutas.has(selectedRutaId)
+    ? [...rutas.get(selectedRutaId)!.ordenVisita].sort((a, b) => a.orden - b.orden)
+    : []
+
   return (
     <div className="flex flex-col lg:flex-row gap-4 h-[calc(100vh-140px)]">
       {/* Sidebar - Desktop: Left, Mobile: Top (collapsible maybe, but for now stacked) */}
@@ -1195,6 +1257,70 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
           selectedRutaId={selectedRutaId}
         />
       </div>
+
+      {/* Panel lateral de números de clientes */}
+      {selectedRutaId && clientesRutaSeleccionada.length > 0 && (
+        <div className={`w-full lg:w-64 flex-shrink-0 h-64 lg:h-full transition-all ${panelCollapsed ? 'lg:w-12' : ''}`}>
+          <Card className="h-full flex flex-col">
+            <CardHeader className="pb-3 flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-semibold">Clientes</CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setPanelCollapsed(!panelCollapsed)}
+                  className="h-6 w-6 p-0"
+                >
+                  {panelCollapsed ? (
+                    <Navigation className="h-4 w-4" />
+                  ) : (
+                    <X className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            </CardHeader>
+            {!panelCollapsed && (
+              <ScrollArea className="flex-1 px-3">
+                <div className="space-y-2 pb-4">
+                  {clientesRutaSeleccionada.map((cliente) => {
+                    const numeroColor = getNumeroColor(cliente, rutas.get(selectedRutaId)?.color || '#000000')
+                    const isEntregadoYCobrado = cliente.estado === 'entregado' && cliente.pago_registrado
+                    
+                    return (
+                      <button
+                        key={cliente.id}
+                        onClick={() => handleClienteClick(cliente, selectedRutaId)}
+                        className={`w-full p-3 rounded-lg border-2 transition-all hover:shadow-md ${
+                          isEntregadoYCobrado 
+                            ? 'border-black bg-black/5' 
+                            : cliente.estado === 'entregado'
+                            ? 'border-gray-400 bg-gray-50'
+                            : 'border-primary/20 bg-background hover:border-primary/40'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm"
+                            style={{ backgroundColor: numeroColor }}
+                          >
+                            {cliente.orden}
+                          </div>
+                          <div className="flex-1 text-left min-w-0">
+                            <p className="font-medium text-sm truncate">{cliente.cliente_nombre}</p>
+                            {isEntregadoYCobrado && (
+                              <p className="text-xs text-muted-foreground">Entregado y cobrado</p>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </ScrollArea>
+            )}
+          </Card>
+        </div>
+      )}
 
       {/* Map Container */}
       <div className="flex-1 relative rounded-xl overflow-hidden border shadow-sm">
@@ -1265,6 +1391,131 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
         {/* Map Div */}
         <div ref={mapRef} className="w-full h-full bg-muted/20" />
       </div>
+
+      {/* Modal de Vista Previa de Cliente */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-hidden flex flex-col">
+          {selectedCliente && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <span
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold"
+                    style={{ backgroundColor: getNumeroColor(selectedCliente.cliente, rutas.get(selectedCliente.rutaId)?.color || '#000000') }}
+                  >
+                    {selectedCliente.cliente.orden}
+                  </span>
+                  {selectedCliente.cliente.cliente_nombre}
+                </DialogTitle>
+                <DialogDescription>
+                  Cliente de la ruta {rutas.get(selectedCliente.rutaId)?.numero || 'N/A'}
+                </DialogDescription>
+              </DialogHeader>
+
+              <ScrollArea className="flex-1 pr-4">
+                <div className="space-y-4">
+                  {/* Información del Cliente */}
+                  <div className="space-y-2">
+                    <h4 className="font-semibold text-sm flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      Información del Cliente
+                    </h4>
+                    <div className="space-y-1 text-sm">
+                      {selectedCliente.cliente.direccion && (
+                        <div className="flex items-start gap-2">
+                          <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                          <span className="text-muted-foreground">{selectedCliente.cliente.direccion}</span>
+                        </div>
+                      )}
+                      {selectedCliente.cliente.telefono && (
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <span className="text-muted-foreground">{selectedCliente.cliente.telefono}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* Estado */}
+                  <div className="space-y-2">
+                    <h4 className="font-semibold text-sm flex items-center gap-2">
+                      <Package className="h-4 w-4" />
+                      Estado
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge
+                        variant={selectedCliente.cliente.estado === 'entregado' ? 'default' : 'secondary'}
+                        className={
+                          selectedCliente.cliente.estado === 'entregado'
+                            ? 'bg-green-600'
+                            : ''
+                        }
+                      >
+                        {selectedCliente.cliente.estado === 'entregado' ? (
+                          <>
+                            <CheckCircle className="mr-1 h-3 w-3" />
+                            Entregado
+                          </>
+                        ) : (
+                          'Pendiente'
+                        )}
+                      </Badge>
+                      {selectedCliente.cliente.pago_registrado && (
+                        <Badge variant="default" className="bg-blue-600">
+                          <DollarSign className="mr-1 h-3 w-3" />
+                          Cobrado
+                        </Badge>
+                      )}
+                      {selectedCliente.cliente.monto_cobrado_registrado && selectedCliente.cliente.monto_cobrado_registrado > 0 && (
+                        <Badge variant="outline">
+                          ${selectedCliente.cliente.monto_cobrado_registrado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* Productos */}
+                  {selectedCliente.cliente.productos && selectedCliente.cliente.productos.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-sm flex items-center gap-2">
+                        <Package className="h-4 w-4" />
+                        Productos
+                      </h4>
+                      <div className="space-y-1">
+                        {selectedCliente.cliente.productos.map((producto, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm"
+                          >
+                            <span className="font-medium">{producto.nombre}</span>
+                            <span className="text-muted-foreground">x {producto.cantidad}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {(!selectedCliente.cliente.productos || selectedCliente.cliente.productos.length === 0) && (
+                    <div className="text-sm text-muted-foreground text-center py-4">
+                      No hay productos disponibles
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+
+              <div className="flex justify-end pt-4 border-t">
+                <Button onClick={handleCloseModal} variant="outline">
+                  Cerrar
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

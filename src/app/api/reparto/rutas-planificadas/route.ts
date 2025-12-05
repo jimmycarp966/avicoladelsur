@@ -109,26 +109,101 @@ export async function GET(request: NextRequest) {
 
     console.log('✅ [DEBUG] Rutas planificadas filtradas encontradas:', rutasPlanificadas?.length || 0, rutasPlanificadas)
 
-    // Transformar datos para el frontend
-    const rutasFormateadas = rutasPlanificadas?.map(ruta => {
+    // Enriquecer orden_visita con información de productos y estado de pago
+    const rutasFormateadas = await Promise.all((rutasPlanificadas || []).map(async (ruta) => {
       console.log('🔧 [DEBUG] Formateando ruta:', {
         id: ruta.ruta_reparto_id,
         polylineLength: ruta.polyline?.length,
-        polylineValue: ruta.polyline,
-        polylineType: typeof ruta.polyline,
         ordenVisitaCount: ruta.orden_visita?.length,
         estado: ruta.estado,
-        rutaCompleta: ruta
       })
 
-      // Debug: verificar qué polyline estamos devolviendo
       const rutasReparto = Array.isArray(ruta.rutas_reparto) ? ruta.rutas_reparto[0] : ruta.rutas_reparto
-      console.log('🔧 [DEBUG] Ruta formateada:', {
-        id: ruta.ruta_reparto_id,
-        numero: rutasReparto?.numero_ruta,
-        polylineFromPlanificada: ruta.polyline?.substring(0, 50),
-        polylineLength: ruta.polyline?.length,
-        ordenVisitaLength: ruta.orden_visita?.length
+      
+      // Obtener detalles_ruta con información completa
+      const { data: detallesRuta, error: detallesError } = await supabase
+        .from('detalles_ruta')
+        .select(`
+          id,
+          orden_entrega,
+          estado_entrega,
+          pago_registrado,
+          monto_cobrado_registrado,
+          pedido:pedidos(
+            id,
+            cliente_id,
+            cliente:clientes(
+              id,
+              nombre,
+              telefono,
+              direccion
+            ),
+            detalle_pedido:detalles_pedido(
+              id,
+              cantidad,
+              producto:productos(
+                id,
+                nombre,
+                codigo
+              )
+            )
+          )
+        `)
+        .eq('ruta_id', ruta.ruta_reparto_id)
+        .order('orden_entrega', { ascending: true })
+
+      if (detallesError) {
+        console.error('Error obteniendo detalles_ruta:', detallesError)
+      }
+
+      // Crear mapa de detalles_ruta por orden_entrega para acceso rápido
+      const detallesMap = new Map()
+      detallesRuta?.forEach((detalle: any) => {
+        detallesMap.set(detalle.orden_entrega, detalle)
+      })
+
+      // Enriquecer orden_visita
+      const ordenVisitaEnriquecido = (ruta.orden_visita || []).map((cliente: any) => {
+        const detalle = detallesMap.get(cliente.orden)
+        
+        if (!detalle || !detalle.pedido) {
+          return {
+            ...cliente,
+            productos: [],
+            pago_registrado: false,
+            monto_cobrado_registrado: 0,
+            telefono: cliente.telefono || null,
+            direccion: cliente.direccion || null,
+          }
+        }
+
+        const pedido = detalle.pedido
+        const clienteData = Array.isArray(pedido.cliente) ? pedido.cliente[0] : pedido.cliente
+        
+        // Obtener productos
+        const detallesPedido = Array.isArray(pedido.detalle_pedido) 
+          ? pedido.detalle_pedido 
+          : (pedido.detalle_pedido ? [pedido.detalle_pedido] : [])
+        
+        const productos = detallesPedido.map((dp: any) => {
+          const producto = Array.isArray(dp.producto) ? dp.producto[0] : dp.producto
+          return {
+            nombre: producto?.nombre || 'Producto',
+            cantidad: dp.cantidad || 0,
+          }
+        })
+
+        return {
+          ...cliente,
+          id: detalle.id || cliente.id,
+          cliente_nombre: clienteData?.nombre || cliente.cliente_nombre,
+          telefono: clienteData?.telefono || cliente.telefono || null,
+          direccion: clienteData?.direccion || cliente.direccion || null,
+          estado_entrega: detalle.estado_entrega || cliente.estado || 'pendiente',
+          pago_registrado: detalle.pago_registrado || false,
+          monto_cobrado_registrado: detalle.monto_cobrado_registrado || 0,
+          productos: productos,
+        }
       })
 
       return {
@@ -144,13 +219,13 @@ export async function GET(request: NextRequest) {
           } : null
         })() : null,
         zona_id: ruta.zona_id,
-        polyline: ruta.polyline, // Polyline de rutas_planificadas
-        orden_visita: ruta.orden_visita || [],
+        polyline: ruta.polyline,
+        orden_visita: ordenVisitaEnriquecido,
         distancia_total_km: ruta.distancia_total_km,
         duracion_total_min: ruta.duracion_total_min,
         created_at: ruta.created_at
       }
-    }) || []
+    }))
 
     console.log('✅ [DEBUG] Rutas formateadas para envío:', rutasFormateadas.length)
 

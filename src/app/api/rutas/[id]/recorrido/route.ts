@@ -43,10 +43,18 @@ export async function GET(
       )
     }
     
-    // Obtener ruta reparto para fecha y vehículo
+    // Obtener ruta reparto para fecha, vehículo, número y repartidor
     const { data: rutaReparto, error: rutaRepartoError } = await supabase
       .from('rutas_reparto')
-      .select('fecha_ruta, vehiculo_id')
+      .select(`
+        fecha_ruta,
+        vehiculo_id,
+        numero_ruta,
+        repartidor:usuarios!rutas_reparto_repartidor_id_fkey(
+          nombre,
+          apellido
+        )
+      `)
       .eq('id', rutaId)
       .single()
     
@@ -69,11 +77,102 @@ export async function GET(
     
     if (ubicacionesError) throw ubicacionesError
     
+    // Enriquecer orden_visita con información de productos y estado de pago
+    const { data: detallesRuta, error: detallesError } = await supabase
+      .from('detalles_ruta')
+      .select(`
+        id,
+        orden_entrega,
+        estado_entrega,
+        pago_registrado,
+        monto_cobrado_registrado,
+        pedido:pedidos(
+          id,
+          numero_pedido,
+          cliente_id,
+          cliente:clientes(
+            id,
+            nombre,
+            telefono,
+            direccion
+          ),
+          detalle_pedido:detalles_pedido(
+            id,
+            cantidad,
+            producto:productos(
+              id,
+              nombre,
+              codigo
+            )
+          )
+        )
+      `)
+      .eq('ruta_id', rutaId)
+      .order('orden_entrega', { ascending: true })
+
+    // Crear mapa de detalles_ruta por orden_entrega
+    const detallesMap = new Map()
+    detallesRuta?.forEach((detalle: any) => {
+      detallesMap.set(detalle.orden_entrega, detalle)
+    })
+
+    // Enriquecer orden_visita
+    const ordenVisitaEnriquecido = (rutaPlanificada.orden_visita || []).map((cliente: any) => {
+      const detalle = detallesMap.get(cliente.orden)
+      
+      if (!detalle || !detalle.pedido) {
+        return {
+          ...cliente,
+          productos: [],
+          pago_registrado: false,
+          monto_cobrado_registrado: 0,
+          telefono: cliente.telefono || null,
+          direccion: cliente.direccion || null,
+        }
+      }
+
+      const pedido = detalle.pedido
+      const clienteData = Array.isArray(pedido.cliente) ? pedido.cliente[0] : pedido.cliente
+      
+      // Obtener productos
+      const detallesPedido = Array.isArray(pedido.detalle_pedido) 
+        ? pedido.detalle_pedido 
+        : (pedido.detalle_pedido ? [pedido.detalle_pedido] : [])
+      
+      const productos = detallesPedido.map((dp: any) => {
+        const producto = Array.isArray(dp.producto) ? dp.producto[0] : dp.producto
+        return {
+          nombre: producto?.nombre || 'Producto',
+          cantidad: dp.cantidad || 0,
+        }
+      })
+
+      return {
+        ...cliente,
+        id: detalle.id || cliente.id,
+        cliente_nombre: clienteData?.nombre || cliente.cliente_nombre,
+        telefono: clienteData?.telefono || cliente.telefono || null,
+        direccion: clienteData?.direccion || cliente.direccion || null,
+        estado_entrega: detalle.estado_entrega || cliente.estado || 'pendiente',
+        pago_registrado: detalle.pago_registrado || false,
+        monto_cobrado_registrado: detalle.monto_cobrado_registrado || 0,
+        productos: productos,
+      }
+    })
+    
+    const repartidorData = Array.isArray(rutaReparto.repartidor) 
+      ? rutaReparto.repartidor[0] 
+      : rutaReparto.repartidor
+    
     return NextResponse.json({
       success: true,
       data: {
+        numero_ruta: rutaReparto.numero_ruta || 'S/N',
+        repartidor_nombre: repartidorData 
+          ? `${repartidorData.nombre} ${repartidorData.apellido || ''}`.trim()
+          : 'Sin asignar',
         polyline: rutaPlanificada.polyline,
-        ordenVisita: rutaPlanificada.orden_visita,
+        ordenVisita: ordenVisitaEnriquecido,
         historial: ubicaciones || []
       }
     })
