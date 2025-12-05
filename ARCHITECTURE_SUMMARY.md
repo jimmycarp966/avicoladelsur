@@ -131,6 +131,7 @@ supabase/                         # Scripts SQL y migraciones
 - **Validación de Cobros**: Sistema de validación donde tesorero verifica y acredita cobros antes de afectar caja
 - **Firma Digital**: Verificación con QR y subida automática a Supabase Storage
 - **Generación de Datos Mock**: Sistema completo para crear datos de prueba (rutas, clientes, GPS) para testing del monitor GPS, optimizado para Vercel Free (10s timeout) con logs detallados
+- **Monitor GPS Avanzado**: Panel lateral con números clickeables de clientes, modal de vista previa con información completa (cliente y productos), números cambian de color según estado (negro: entregado y cobrado, gris: solo entregado)
 
 ### 💵 **Tesorería**: Control Financiero
 - **Cajas**: Por sucursal con saldos iniciales/actuales
@@ -233,7 +234,9 @@ supabase/                         # Scripts SQL y migraciones
   - Actualización automática de precios y totales
 - **Pedidos del Día**: Gestión de pedidos (módulo movido a Almacén)
   - Filtros por fecha y turno
+  - Botón "Pasar a Ruta" individual desde tabla o detalle del pedido
   - Generación de rutas diarias (automática y manual)
+  - Optimización automática del orden de clientes al asignar a ruta
 - **Conversión**: Reserva preventiva → descuento físico al convertir a pedido
 - **Movimientos de caja**: Se crean solo tras validación del tesorero, agrupados por método de pago
 - Referencias PAY-XXXXXX para seguimiento
@@ -255,6 +258,13 @@ supabase/                         # Scripts SQL y migraciones
 ---
 
 ## 🔧 **Actualizaciones Recientes**
+
+### **Vista Previa de Clientes en Monitor GPS (Diciembre 2025)**
+- ✅ **Panel lateral de números**: Lista clickeable de clientes con números ordenados por ruta seleccionada
+- ✅ **Modal de vista previa**: Información completa del cliente (nombre, dirección, teléfono) y lista de productos
+- ✅ **Colores dinámicos**: Números cambian según estado (negro: entregado y cobrado, gris: solo entregado, color de ruta: pendiente)
+- ✅ **Sincronización**: Panel lateral, mapa y modal sincronizados (click en número centra el mapa)
+- ✅ **Endpoints enriquecidos**: `/api/reparto/rutas-planificadas` y `/api/rutas/[id]/recorrido` incluyen productos y estado de pago
 
 ### **Sistema de Generación de Datos Mock para Monitor GPS (Diciembre 2025)**
 - ✅ **Función `crearRutasMockMonteros()`**: Genera datos de prueba completos (rutas, clientes, vehículos, pedidos, ubicaciones GPS)

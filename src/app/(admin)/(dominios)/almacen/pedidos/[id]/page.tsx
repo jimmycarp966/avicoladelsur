@@ -10,6 +10,7 @@ import { obtenerPedidoPorId } from '@/actions/ventas.actions'
 import { listarCajas } from '@/actions/tesoreria.actions'
 import { RegistrarPagoPedidoForm } from '@/components/forms/RegistrarPagoPedidoForm'
 import { EntregasPedido } from '@/components/pedidos/EntregasPedido'
+import { PasarARutaButton } from '@/components/pedidos/PasarARutaButton'
 
 interface PedidoDetallePageProps {
   params: { id: string }
@@ -84,6 +85,11 @@ export default async function PedidoDetallePage({ params }: PedidoDetallePagePro
               Editar
             </Link>
           </Button>
+          <PasarARutaButton
+            pedidoId={pedido.id}
+            numeroPedido={pedido.numero_pedido}
+            estado={pedido.estado}
+          />
           <Button variant="outline" asChild>
             <Link href="/tesoreria/movimientos">
               <Truck className="mr-2 h-4 w-4" />

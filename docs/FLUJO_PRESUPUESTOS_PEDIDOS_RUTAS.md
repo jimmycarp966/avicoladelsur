@@ -153,9 +153,28 @@ Vista muestra:
 - Estado: preparando, en_ruta, entregado, cancelado
 - Información de cliente, zona, turno
 ↓
-Botón "Pasar a Ruta Diaria":
-- Opción Automática: Genera rutas para todos los pedidos del turno
-- Opción Manual: Selecciona pedidos específicos
+Botones disponibles:
+- "Pasar a Ruta" (individual): Desde tabla o desde página de detalle
+  - Solo visible si estado = 'preparando'
+  - Asigna pedido a ruta planificada existente
+  - Optimiza automáticamente el orden de la ruta
+- "Pasar a Ruta Diaria" (masivo):
+  - Opción Automática: Genera rutas para todos los pedidos del turno
+  - Opción Manual: Selecciona pedidos específicos
+```
+
+#### Página de Detalle del Pedido
+```
+/almacen/pedidos/[id]
+↓
+Información completa del pedido
+↓
+Botón "Pasar a Ruta" (si estado = 'preparando'):
+- Asigna el pedido a una ruta planificada
+- Busca ruta por zona/turno/fecha
+- Si no existe, la crea según plan semanal
+- Optimiza automáticamente el orden de clientes
+- Muestra mensaje de éxito o error
 ```
 
 ### 7. Generación de Rutas Diarias
