@@ -364,6 +364,65 @@ export async function confirmarPresupuestoAction(formData: FormData) {
   }
 }
 
+// Acción para finalizar pesaje sin convertir a pedido (solo recalcula totales)
+export async function finalizarPesajeAction(formData: FormData) {
+  try {
+    const supabase = await createClient()
+
+    // Obtener usuario actual
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, message: 'Usuario no autenticado' }
+    }
+
+    // Verificar permisos (almacenista o admin)
+    const { data: usuario } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (!usuario || !['admin', 'almacenista'].includes(usuario.rol)) {
+      return { success: false, message: 'No tienes permisos para finalizar pesaje' }
+    }
+
+    // Parsear y validar datos
+    const rawData = Object.fromEntries(formData)
+    const presupuestoId = rawData.presupuesto_id as string
+
+    if (!presupuestoId) {
+      return { success: false, message: 'ID de presupuesto requerido' }
+    }
+
+    // Llamar RPC para finalizar pesaje sin convertir a pedido
+    const { data: result, error } = await supabase.rpc('fn_finalizar_pesaje_presupuesto', {
+      p_presupuesto_id: presupuestoId,
+    })
+
+    if (error) {
+      console.error('Error finalizando pesaje:', error)
+      return { success: false, message: 'Error al finalizar pesaje: ' + error.message }
+    }
+
+    if (!result.success) {
+      return { success: false, message: result.error || 'Error al finalizar pesaje' }
+    }
+
+    revalidatePath('/almacen/presupuestos-dia')
+    revalidatePath('/almacen/presupuesto/*')
+
+    return {
+      success: true,
+      message: result.message || 'Pesaje finalizado correctamente. El presupuesto seguirá disponible en Presupuestos del Día.',
+      data: result
+    }
+
+  } catch (error) {
+    console.error('Error en finalizarPesajeAction:', error)
+    return { success: false, message: 'Error interno del servidor' }
+  }
+}
+
 // Acción para convertir múltiples presupuestos (cada uno se agrega al pedido abierto de su turno/zona/fecha)
 export async function confirmarPresupuestosAgrupadosAction(formData: FormData) {
   try {

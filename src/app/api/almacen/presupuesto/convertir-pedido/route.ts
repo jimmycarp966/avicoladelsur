@@ -1,20 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { finalizarPesajeAction } from '@/actions/presupuestos.actions'
+import { confirmarPresupuestoAction } from '@/actions/presupuestos.actions'
 import { z } from 'zod'
 
-const finalizarPresupuestoSchema = z.object({
+const convertirPedidoSchema = z.object({
   presupuesto_id: z.string().uuid(),
 })
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { presupuesto_id } = finalizarPresupuestoSchema.parse(body)
+    const formData = await request.formData()
+    const presupuesto_id = formData.get('presupuesto_id') as string
 
-    const formData = new FormData()
-    formData.append('presupuesto_id', presupuesto_id)
+    if (!presupuesto_id) {
+      return NextResponse.json(
+        { success: false, message: 'ID de presupuesto requerido' },
+        { status: 400 }
+      )
+    }
 
-    const result = await finalizarPesajeAction(formData)
+    const data = convertirPedidoSchema.parse({ presupuesto_id })
+
+    const resultFormData = new FormData()
+    resultFormData.append('presupuesto_id', data.presupuesto_id)
+
+    const result = await confirmarPresupuestoAction(resultFormData)
 
     if (result.success) {
       return NextResponse.json({
@@ -30,7 +39,7 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('Error en finalizar presupuesto:', error)
+    console.error('Error en convertir a pedido:', error)
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -52,3 +61,4 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+

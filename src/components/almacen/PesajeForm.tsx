@@ -46,6 +46,7 @@ export function PesajeForm({ presupuesto, itemsPesables, presupuestoId }: Pesaje
   const router = useRouter()
   const [updatingItems, setUpdatingItems] = useState<Set<string>>(new Set())
   const [isFinalizing, setIsFinalizing] = useState(false)
+  const [isConverting, setIsConverting] = useState(false)
 
   // Helper para determinar si un item es pesable
   function esItemPesable(item: ItemPesable): boolean {
@@ -94,6 +95,7 @@ export function PesajeForm({ presupuesto, itemsPesables, presupuestoId }: Pesaje
     }
   }
 
+  // Finalizar pesaje sin convertir a pedido (solo actualiza totales, mantiene en 'en_almacen')
   const handleFinalizarPesaje = async () => {
     setIsFinalizing(true)
     try {
@@ -108,6 +110,7 @@ export function PesajeForm({ presupuesto, itemsPesables, presupuestoId }: Pesaje
       const result = await response.json()
 
       if (result.success) {
+        alert(result.message || 'Pesaje finalizado correctamente. El presupuesto seguirá disponible en Presupuestos del Día.')
         router.push('/almacen/presupuestos-dia')
       } else {
         alert(result.message || 'Error al finalizar el pesaje')
@@ -117,6 +120,41 @@ export function PesajeForm({ presupuesto, itemsPesables, presupuestoId }: Pesaje
       console.error('Error finalizando pesaje:', error)
       alert('Error de conexión')
       setIsFinalizing(false)
+    }
+  }
+
+  // Convertir a pedido y finalizar (convierte a pedido, cambia estado a 'facturado')
+  const handleConvertirAPedido = async () => {
+    setIsConverting(true)
+    try {
+      const formData = new FormData()
+      formData.append('presupuesto_id', presupuestoId)
+
+      const response = await fetch('/api/almacen/presupuesto/convertir-pedido', {
+        method: 'POST',
+        body: formData
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        alert(result.message || 'Presupuesto convertido a pedido exitosamente')
+        if (result.data?.pedido_id) {
+          router.push(`/almacen/pedidos/${result.data.pedido_id}`)
+        } else if (result.data?.numero_pedido) {
+          // Si tenemos el número de pedido, buscar el ID
+          router.push('/almacen/pedidos')
+        } else {
+          router.push('/almacen/presupuestos-dia')
+        }
+      } else {
+        alert(result.message || 'Error al convertir a pedido')
+        setIsConverting(false)
+      }
+    } catch (error) {
+      console.error('Error convirtiendo a pedido:', error)
+      alert('Error de conexión')
+      setIsConverting(false)
     }
   }
 
@@ -259,22 +297,47 @@ export function PesajeForm({ presupuesto, itemsPesables, presupuestoId }: Pesaje
               </div>
             </div>
 
-            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-              <AlertTriangle className="h-4 w-4" />
-              Al finalizar, se creará el pedido real y se descontarán las existencias del almacén.
+            <div className="space-y-2 mb-4">
+              <div className="flex items-center gap-2 text-sm text-blue-600">
+                <CheckCircle className="h-4 w-4" />
+                <span>Si solo finalizas el pesaje, el presupuesto seguirá disponible en Presupuestos del Día para convertir a pedido más tarde.</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-orange-600">
+                <AlertTriangle className="h-4 w-4" />
+                <span>Si conviertes a pedido, se creará el pedido real y se descontarán las existencias del almacén.</span>
+              </div>
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
               <Button
                 size="lg"
-                className="bg-green-600 hover:bg-green-700"
+                variant="outline"
+                className="border-green-600 text-green-600 hover:bg-green-50"
                 onClick={handleFinalizarPesaje}
-                disabled={isFinalizing}
+                disabled={isFinalizing || isConverting}
               >
                 {isFinalizing ? (
                   <>
                     <Scale className="mr-2 h-4 w-4 animate-spin" />
                     Finalizando...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Solo Finalizar Pesaje
+                  </>
+                )}
+              </Button>
+              <Button
+                size="lg"
+                className="bg-green-600 hover:bg-green-700"
+                onClick={handleConvertirAPedido}
+                disabled={isFinalizing || isConverting}
+              >
+                {isConverting ? (
+                  <>
+                    <Scale className="mr-2 h-4 w-4 animate-spin" />
+                    Convirtiendo...
                   </>
                 ) : (
                   <>
