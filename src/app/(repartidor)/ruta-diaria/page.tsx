@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Truck, MapPin, Clock, Package, CheckCircle, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
-import { getTodayArgentina } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -49,11 +48,8 @@ export default async function RutaDiariaPage() {
     )
   }
 
-  // Obtener fecha actual
-  const fechaHoy = getTodayArgentina()
-
-  // Obtener rutas del vehículo del repartidor para hoy
-  const rutasResponse = await obtenerRutasPorVehiculoAction(usuario.vehiculo_asignado, fechaHoy)
+  // Obtener todas las rutas del vehículo del repartidor (sin filtrar por fecha)
+  const rutasResponse = await obtenerRutasPorVehiculoAction(usuario.vehiculo_asignado, undefined)
   const rutas = rutasResponse.success && rutasResponse.data ? (rutasResponse.data as any[]) : []
 
   // Obtener detalles de entregas para cada ruta
@@ -88,15 +84,10 @@ export default async function RutaDiariaPage() {
     <div className="space-y-6 p-4 pb-20">
       <div className="bg-white rounded-lg border border-border p-6 shadow-sm">
         <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          Rutas del Día
+          Rutas
         </h1>
         <p className="text-muted-foreground mt-2">
-          {new Date(fechaHoy).toLocaleDateString('es-AR', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-          })}
+          Todas las rutas asignadas
         </p>
       </div>
 
@@ -106,7 +97,7 @@ export default async function RutaDiariaPage() {
             <Truck className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium">No hay rutas asignadas</h3>
             <p className="text-muted-foreground">
-              No tienes rutas asignadas para hoy. Esperando asignación por el administrador.
+              No tienes rutas asignadas. Esperando asignación por el administrador.
             </p>
           </CardContent>
         </Card>

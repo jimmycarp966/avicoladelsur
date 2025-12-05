@@ -23,14 +23,18 @@ export async function GET(request: NextRequest) {
 
     // Obtener query params
     const searchParams = request.nextUrl.searchParams
-    const fecha = searchParams.get('fecha') || new Date().toISOString().split('T')[0]
+    const fecha = searchParams.get('fecha') || null
     const zonaId = searchParams.get('zona_id') || null
 
-    // Buscar rutas de las últimas 24 horas para incluir rutas mock creadas recientemente
-    const fechaDesde = new Date(fecha)
-    fechaDesde.setDate(fechaDesde.getDate() - 1) // Un día atrás
-
-    console.log('🔍 [DEBUG] Buscando rutas planificadas desde:', fechaDesde.toISOString().split('T')[0], 'hasta:', fecha, 'zona:', zonaId)
+    // Si se proporciona fecha, buscar rutas de las últimas 24 horas para incluir rutas mock creadas recientemente
+    let fechaDesde: Date | null = null
+    if (fecha) {
+      fechaDesde = new Date(fecha)
+      fechaDesde.setDate(fechaDesde.getDate() - 1) // Un día atrás
+      console.log('🔍 [DEBUG] Buscando rutas planificadas desde:', fechaDesde.toISOString().split('T')[0], 'hasta:', fecha, 'zona:', zonaId)
+    } else {
+      console.log('🔍 [DEBUG] Buscando todas las rutas planificadas (sin filtro de fecha), zona:', zonaId)
+    }
 
     // También buscar sin filtro de fechas para debug
     const { data: todasRutasDebug, error: errorTodasDebug } = await supabase
@@ -79,9 +83,14 @@ export async function GET(request: NextRequest) {
           )
         )
       `)
-      .gte('fecha', fechaDesde.toISOString().split('T')[0]) // Desde ayer
-      .lte('fecha', fecha) // Hasta la fecha solicitada
       .eq('estado', 'en_curso')
+
+    // Filtrar por fecha solo si se proporciona
+    if (fecha && fechaDesde) {
+      query = query
+        .gte('fecha', fechaDesde.toISOString().split('T')[0]) // Desde ayer
+        .lte('fecha', fecha) // Hasta la fecha solicitada
+    }
 
     if (zonaId) {
       query = query.eq('zona_id', zonaId)

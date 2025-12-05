@@ -7,7 +7,6 @@ import { Badge } from '@/components/ui/badge'
 import { createClient } from '@/lib/supabase/server'
 import { RepartoSkeleton } from './reparto-skeleton'
 import { obtenerRutasPorVehiculoAction } from '@/actions/reparto.actions'
-import { getTodayArgentina } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,10 +41,10 @@ async function RepartoContent({ searchParams }: { searchParams: { fecha?: string
   }
 
   // Filtros
-  const fechaFiltro = searchParams.fecha || getTodayArgentina()
+  const fechaFiltro = searchParams.fecha || undefined
   const turnoFiltro = searchParams.turno || undefined
 
-  // Obtener rutas del vehículo del repartidor
+  // Obtener rutas del vehículo del repartidor (sin filtrar por fecha si no se especifica)
   const rutasResponse = await obtenerRutasPorVehiculoAction(usuario.vehiculo_asignado, fechaFiltro)
   const rutas = rutasResponse.success && rutasResponse.data ? (rutasResponse.data as any[]) : []
 
@@ -143,12 +142,14 @@ async function RepartoContent({ searchParams }: { searchParams: { fecha?: string
           <div>
             <h1 className="text-2xl font-bold">Reparto del Día</h1>
             <p className="text-muted-foreground">
-              {new Date(fechaFiltro).toLocaleDateString('es-AR', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-              })}
+              {fechaFiltro 
+                ? new Date(fechaFiltro).toLocaleDateString('es-AR', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })
+                : 'Todas las fechas'}
             </p>
           </div>
           {rutasActivas.length > 0 && (
@@ -166,14 +167,18 @@ async function RepartoContent({ searchParams }: { searchParams: { fecha?: string
           <CardContent className="p-4">
             <div className="flex items-center gap-4">
               <div className="flex-1">
-                <label className="text-sm font-medium mb-1 block">Fecha</label>
+                <label className="text-sm font-medium mb-1 block">Fecha (opcional)</label>
                 <input
                   type="date"
-                  defaultValue={fechaFiltro}
+                  defaultValue={fechaFiltro || ''}
                   className="w-full px-3 py-2 border rounded-md"
                   onChange={(e) => {
                     const params = new URLSearchParams(searchParams as any)
-                    params.set('fecha', e.target.value)
+                    if (e.target.value) {
+                      params.set('fecha', e.target.value)
+                    } else {
+                      params.delete('fecha')
+                    }
                     window.location.search = params.toString()
                   }}
                 />
