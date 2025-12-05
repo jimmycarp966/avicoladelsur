@@ -80,7 +80,7 @@ export interface Lote extends BaseEntity {
 // Pedido
 export interface Pedido extends BaseEntity {
   numero_pedido: string
-  cliente_id: string
+  cliente_id?: string | null
   usuario_vendedor?: string
   fecha_pedido: string
   fecha_entrega_estimada?: string
@@ -98,6 +98,18 @@ export interface Pedido extends BaseEntity {
   recargo_total?: number
   presupuesto_id?: string
   lista_precio_id?: string
+  // Relaciones (joins)
+  cliente?: {
+    id: string
+    nombre: string
+    telefono?: string
+    zona_entrega?: string
+  } | null
+  vendedor?: {
+    id: string
+    nombre: string
+    apellido?: string
+  } | null
 }
 
 // Detalle de Pedido
