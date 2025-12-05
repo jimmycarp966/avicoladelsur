@@ -2,7 +2,7 @@ const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
 
-const svgPath = path.join(__dirname, '../public/images/logo-avicola.svg');
+const svgPath = path.join(__dirname, '../public/images/favicon.svg');
 const outputDir = path.join(__dirname, '../public/images');
 
 const sizes = [
