@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { ArrowLeft, Edit, Truck, FileText, Printer, User, MapPin, CheckCircle, Wallet, Users, Clock } from 'lucide-react'
+import { ArrowLeft, Edit, Truck, FileText, Printer, User, MapPin, CheckCircle, Wallet, Users, Clock, Scale, Navigation } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { obtenerPedidoPorId } from '@/actions/ventas.actions'
 import { listarCajas } from '@/actions/tesoreria.actions'
@@ -58,6 +58,12 @@ export default async function PedidoDetallePage({ params }: PedidoDetallePagePro
   const saldoPendiente = Math.max(Number(pedido.total) - totalPagado, 0)
   const cuenta = pedidoResult.data.cuenta
   const estado = estadoConfig(pedido.estado)
+  
+  // Calcular peso total del pedido
+  const pesoTotal = (pedido.detalles_pedido ?? []).reduce((sum: number, item: any) => {
+    const peso = item.peso_final ?? item.cantidad ?? 0
+    return sum + Number(peso)
+  }, 0)
 
   return (
     <div className="space-y-6">
@@ -90,10 +96,18 @@ export default async function PedidoDetallePage({ params }: PedidoDetallePagePro
             numeroPedido={pedido.numero_pedido}
             estado={pedido.estado}
           />
+          {pedido.estado === 'enviado' && (
+            <Button variant="outline" asChild>
+              <Link href="/reparto/monitor">
+                <Navigation className="mr-2 h-4 w-4" />
+                Ver en Monitor
+              </Link>
+            </Button>
+          )}
           <Button variant="outline" asChild>
-            <Link href="/tesoreria/movimientos">
+            <Link href="/reparto/rutas">
               <Truck className="mr-2 h-4 w-4" />
-              Ver logística
+              Ver Rutas
             </Link>
           </Button>
         </div>
@@ -132,9 +146,18 @@ export default async function PedidoDetallePage({ params }: PedidoDetallePagePro
             Zona: {pedido.zonas?.nombre || pedido.clientes?.zona_entrega || 'N/D'}
           </div>
         </div>
-        <div className="text-right">
-          <p className="text-2xl font-bold">{formatCurrency(pedido.total)}</p>
-          <p className="text-sm text-muted-foreground">Pago: {pedido.pago_estado || 'pendiente'}</p>
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-50 border border-blue-200">
+            <Scale className="h-5 w-5 text-blue-600" />
+            <div>
+              <p className="text-xs text-blue-600 font-medium">Peso Total</p>
+              <p className="text-xl font-bold text-blue-700">{pesoTotal.toFixed(2)} kg</p>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-2xl font-bold">{formatCurrency(pedido.total)}</p>
+            <p className="text-sm text-muted-foreground">Pago: {pedido.pago_estado || 'pendiente'}</p>
+          </div>
         </div>
       </div>
 
@@ -224,6 +247,7 @@ export default async function PedidoDetallePage({ params }: PedidoDetallePagePro
               <TableRow>
                 <TableHead>Producto</TableHead>
                 <TableHead className="text-center">Cantidad</TableHead>
+                <TableHead className="text-center">Peso (kg)</TableHead>
                 <TableHead className="text-right">Precio unitario</TableHead>
                 <TableHead className="text-right">Subtotal</TableHead>
               </TableRow>
@@ -236,10 +260,20 @@ export default async function PedidoDetallePage({ params }: PedidoDetallePagePro
                     <p className="text-xs text-muted-foreground">Código: {item.productos?.codigo || '-'}</p>
                   </TableCell>
                   <TableCell className="text-center">{item.cantidad}</TableCell>
+                  <TableCell className="text-center font-medium text-blue-600">
+                    {(item.peso_final ?? item.cantidad ?? 0).toFixed(2)}
+                  </TableCell>
                   <TableCell className="text-right">{formatCurrency(item.precio_unitario)}</TableCell>
                   <TableCell className="text-right font-semibold">{formatCurrency(item.subtotal)}</TableCell>
                 </TableRow>
               ))}
+              {/* Fila de totales */}
+              <TableRow className="bg-muted/50 font-semibold">
+                <TableCell colSpan={2} className="text-right">Total:</TableCell>
+                <TableCell className="text-center text-blue-700">{pesoTotal.toFixed(2)} kg</TableCell>
+                <TableCell></TableCell>
+                <TableCell className="text-right">{formatCurrency(pedido.total)}</TableCell>
+              </TableRow>
             </TableBody>
           </Table>
         </CardContent>
