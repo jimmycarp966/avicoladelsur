@@ -1640,6 +1640,11 @@ export async function asignarPedidoARutaConVehiculo(
       }
     }
 
+    // Validar que tenemos una ruta
+    if (!rutaId) {
+      return { success: false, error: 'No se pudo crear o encontrar una ruta' }
+    }
+
     // Actualizar estado del pedido a 'enviado'
     await supabase
       .from('pedidos')
@@ -1652,7 +1657,7 @@ export async function asignarPedidoARutaConVehiculo(
 
     return {
       success: true,
-      data: { rutaId },
+      data: { rutaId: rutaId as string },
       message: `Pedido ${pedido.numero_pedido} asignado a ruta con vehículo ${vehiculo.patente}`,
     }
   } catch (error: any) {
