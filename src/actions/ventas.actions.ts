@@ -982,7 +982,7 @@ export async function obtenerPedidos(
       .select(`
         *,
         cliente:clientes(id, nombre, telefono, zona_entrega),
-        usuario_vendedor:usuarios(id, nombre, apellido)
+        vendedor:usuarios!pedidos_usuario_vendedor_fkey(id, nombre, apellido)
       `)
       .order('created_at', { ascending: false })
 
