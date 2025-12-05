@@ -3,7 +3,6 @@ import { CalcularLiquidacionesForm } from './calcular-liquidaciones-form'
 import { LiquidacionesFormSkeleton } from './liquidaciones-form-skeleton'
 
 export const dynamic = 'force-dynamic'
-
 export const metadata = {
   title: 'Calcular Liquidaciones - Avícola del Sur ERP',
   description: 'Calcular liquidaciones de sueldo mensuales para empleados',

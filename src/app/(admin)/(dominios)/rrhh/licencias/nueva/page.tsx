@@ -3,7 +3,6 @@ import { NuevaLicenciaForm } from './licencia-form'
 import { LicenciaFormSkeleton } from './licencia-form-skeleton'
 
 export const dynamic = 'force-dynamic'
-
 export const metadata = {
   title: 'Nueva Licencia - Avícola del Sur ERP',
   description: 'Crear nueva solicitud de licencia para empleado',

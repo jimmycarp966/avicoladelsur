@@ -20,6 +20,7 @@ import { PresupuestosDiaAcciones, PresupuestoIndividualAccion } from '@/componen
 import { TransferenciasDiaCard } from '@/components/almacen/TransferenciasDiaCard'
 import { obtenerTransferenciasDiaAction } from '@/actions/sucursales-transferencias.actions'
 
+export const dynamic = 'force-dynamic'
 export const revalidate = 60 // Revalida cada 60 segundos
 
 export const metadata = {

@@ -1,8 +1,8 @@
 import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
-import { NuevoProductoForm } from '@/app/(admin)/(dominios)/almacen/productos/nuevo/producto-form'
+import { ProductoForm } from '@/components/forms/ProductoForm'
 import { ProductoFormSkeleton } from '@/app/(admin)/(dominios)/almacen/productos/nuevo/producto-form-skeleton'
-// import { getProductoById } from '@/actions/almacen.actions' // TODO: Implementar cuando esté disponible
+import { obtenerProductoPorId } from '@/actions/almacen.actions'
 
 interface EditarProductoPageProps {
   params: {
@@ -21,23 +21,14 @@ export default async function EditarProductoPage({ params }: EditarProductoPageP
   const { id } = await params
   const productoId = id
 
-  // En producción, esto sería una llamada real a la base de datos
-  // const producto = await getProductoById(productoId)
-  // if (!producto) notFound()
-
-  // Datos de ejemplo para desarrollo
-  const productoEjemplo = {
-    id: productoId,
-    codigo: 'POLLO001',
-    nombre: 'Pollo Entero',
-    descripcion: 'Pollo entero fresco de granja',
-    categoria: 'Aves',
-    precio_venta: 850.00,
-    precio_costo: 700.00,
-    unidad_medida: 'kg',
-    stock_minimo: 50,
-    activo: true,
+  // Obtener el producto de la base de datos
+  const result = await obtenerProductoPorId(productoId)
+  
+  if (!result.success || !result.data) {
+    notFound()
   }
+
+  const producto = result.data
 
   return (
     <div className="space-y-6">
@@ -50,7 +41,7 @@ export default async function EditarProductoPage({ params }: EditarProductoPageP
       </div>
 
       <Suspense fallback={<ProductoFormSkeleton />}>
-        <NuevoProductoForm />
+        <ProductoForm producto={producto} />
       </Suspense>
     </div>
   )

@@ -3,7 +3,6 @@ import { MarcarAsistenciaForm } from './marcar-asistencia-form'
 import { AsistenciaFormSkeleton } from './asistencia-form-skeleton'
 
 export const dynamic = 'force-dynamic'
-
 export const metadata = {
   title: 'Marcar Asistencia - Avícola del Sur ERP',
   description: 'Registro manual de asistencia del personal',

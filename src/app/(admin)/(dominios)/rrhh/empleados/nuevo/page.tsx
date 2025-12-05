@@ -3,7 +3,6 @@ import { NuevoEmpleadoForm } from './empleado-form'
 import { EmpleadoFormSkeleton } from './empleado-form-skeleton'
 
 export const dynamic = 'force-dynamic'
-
 export const metadata = {
   title: 'Nuevo Empleado - Avícola del Sur ERP',
   description: 'Crear un nuevo empleado en el sistema RRHH',

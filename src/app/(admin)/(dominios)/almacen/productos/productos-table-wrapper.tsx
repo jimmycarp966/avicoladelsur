@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { ProductosTable } from '@/components/tables/ProductosTable'
 import { useNotificationStore } from '@/store/notificationStore'
@@ -12,27 +12,43 @@ export function ProductosTableWrapper() {
   const { showToast } = useNotificationStore()
   const [productos, setProductos] = useState<Producto[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const isMountedRef = useRef(true)
 
-  useEffect(() => {
-    loadProductos()
-  }, [])
-
-  const loadProductos = async () => {
+  // Cargar productos desde la base de datos
+  const loadProductos = useCallback(async () => {
+    if (!isMountedRef.current) return
+    
     try {
       setIsLoading(true)
       const result = await obtenerProductos()
+      
+      if (!isMountedRef.current) return
+      
       if (result.success && result.data) {
         setProductos(result.data as Producto[])
       } else {
         showToast('error', result.error || 'Error al cargar productos')
       }
     } catch (error: any) {
+      if (!isMountedRef.current) return
       console.error('Error al cargar productos:', error)
       showToast('error', 'Error al cargar productos')
     } finally {
-      setIsLoading(false)
+      if (isMountedRef.current) {
+        setIsLoading(false)
+      }
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    isMountedRef.current = true
+    loadProductos()
+
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [loadProductos])
 
   const handleView = (producto: Producto) => {
     router.push(`/almacen/productos/${producto.id}`)

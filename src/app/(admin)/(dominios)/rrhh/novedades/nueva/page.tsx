@@ -3,7 +3,6 @@ import { NuevaNovedadForm } from './novedad-form'
 import { NovedadFormSkeleton } from './novedad-form-skeleton'
 
 export const dynamic = 'force-dynamic'
-
 export const metadata = {
   title: 'Nueva Novedad - Avícola del Sur ERP',
   description: 'Crear nueva novedad para comunicación interna',

@@ -32,6 +32,7 @@ async function getEvaluaciones() {
   return data as Evaluacion[]
 }
 
+export const dynamic = 'force-dynamic'
 export default async function EvaluacionesPage() {
   const evaluaciones = await getEvaluaciones()
 

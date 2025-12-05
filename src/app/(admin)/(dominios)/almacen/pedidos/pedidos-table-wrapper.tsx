@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { PedidosTable } from '@/components/tables/PedidosTable'
 import { useNotificationStore } from '@/store/notificationStore'
@@ -21,17 +21,16 @@ export function PedidosTableWrapper() {
   const [loading, setLoading] = useState(true)
   const [showModalManual, setShowModalManual] = useState(false)
   const [isGenerandoAutomatica, setIsGenerandoAutomatica] = useState(false)
+  const isMountedRef = useRef(true)
 
   // Obtener filtros de la URL
   const fecha = searchParams.get('fecha') || getTodayArgentina()
   const turno = searchParams.get('turno')
 
   // Cargar pedidos desde la base de datos
-  useEffect(() => {
-    loadPedidos()
-  }, [fecha, turno])
-
-  const loadPedidos = async () => {
+  const loadPedidos = useCallback(async () => {
+    if (!isMountedRef.current) return
+    
     try {
       setLoading(true)
       const filtros: any = {
@@ -41,6 +40,8 @@ export function PedidosTableWrapper() {
         filtros.turno = turno
       }
       const result = await obtenerPedidos(filtros)
+      if (!isMountedRef.current) return
+      
       if (result.success && result.data) {
         setPedidos(result.data as Pedido[])
       } else {
@@ -48,13 +49,26 @@ export function PedidosTableWrapper() {
         setPedidos([])
       }
     } catch (error) {
+      if (!isMountedRef.current) return
       console.error('Error cargando pedidos:', error)
       showToast('error', 'Error al cargar pedidos')
       setPedidos([])
     } finally {
-      setLoading(false)
+      if (isMountedRef.current) {
+        setLoading(false)
+      }
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fecha, turno])
+
+  useEffect(() => {
+    isMountedRef.current = true
+    loadPedidos()
+
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [loadPedidos])
 
   const handleView = (pedido: Pedido) => {
     router.push(`/almacen/pedidos/${pedido.id}`)

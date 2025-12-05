@@ -31,6 +31,7 @@ async function getLicencias() {
   return data as Licencia[]
 }
 
+export const dynamic = 'force-dynamic'
 export default async function LicenciasPage() {
   const licencias = await getLicencias()
 

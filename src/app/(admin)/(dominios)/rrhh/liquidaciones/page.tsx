@@ -30,6 +30,7 @@ async function getLiquidaciones() {
   return data as Liquidacion[]
 }
 
+export const dynamic = 'force-dynamic'
 export default async function LiquidacionesPage() {
   const liquidaciones = await getLiquidaciones()
 

@@ -4,6 +4,7 @@ import { obtenerKpisStock, obtenerProyeccionStock, obtenerMermasPorCategoria } f
 import { createClient } from '@/lib/supabase/server'
 import { ReporteStockContent } from './reporte-stock-content'
 
+export const dynamic = 'force-dynamic'
 export const revalidate = 3600 // Revalida cada hora
 
 export default async function ReporteStockPage({

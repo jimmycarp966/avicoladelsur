@@ -32,6 +32,7 @@ async function getAdelantos() {
   return data as Adelanto[]
 }
 
+export const dynamic = 'force-dynamic'
 export default async function AdelantosPage() {
   const adelantos = await getAdelantos()
 

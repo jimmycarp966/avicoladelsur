@@ -9,6 +9,7 @@ import {
 import { createClient } from '@/lib/supabase/server'
 import { ReporteClientesContent } from './reporte-clientes-content'
 
+export const dynamic = 'force-dynamic'
 export const revalidate = 3600 // Revalida cada hora
 
 export default async function ReporteClientesPage({

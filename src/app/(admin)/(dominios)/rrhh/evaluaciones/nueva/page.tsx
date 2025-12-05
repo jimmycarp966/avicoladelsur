@@ -3,7 +3,6 @@ import { NuevaEvaluacionForm } from './evaluacion-form'
 import { EvaluacionFormSkeleton } from './evaluacion-form-skeleton'
 
 export const dynamic = 'force-dynamic'
-
 export const metadata = {
   title: 'Nueva Evaluación - Avícola del Sur ERP',
   description: 'Crear nueva evaluación de desempeño para empleado',

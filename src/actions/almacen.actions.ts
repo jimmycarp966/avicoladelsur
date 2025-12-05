@@ -877,6 +877,46 @@ export async function obtenerProductos(): Promise<ApiResponse<any[]>> {
   }
 }
 
+// Obtener producto por ID
+export async function obtenerProductoPorId(productoId: string): Promise<ApiResponse<any>> {
+  try {
+    const supabase = await createClient()
+
+    const { data: producto, error } = await supabase
+      .from('productos')
+      .select('*')
+      .eq('id', productoId)
+      .single()
+
+    if (error) throw error
+    if (!producto) {
+      return {
+        success: false,
+        error: 'Producto no encontrado',
+      }
+    }
+
+    // Normalizar valores null a valores por defecto para el formulario
+    const productoNormalizado = {
+      ...producto,
+      descripcion: producto.descripcion ?? '',
+      categoria: producto.categoria ?? '',
+      precio_costo: producto.precio_costo ?? 0,
+    }
+
+    return {
+      success: true,
+      data: productoNormalizado,
+    }
+  } catch (error: any) {
+    console.error('Error al obtener producto:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al obtener producto',
+    }
+  }
+}
+
 export async function buscarProductosPorCodigos(
   codigos: string[]
 ): Promise<ApiResponse<any[]>> {

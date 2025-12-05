@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { LotesTable } from '@/components/tables/LotesTable'
 import { useNotificationStore } from '@/store/notificationStore'
@@ -12,11 +12,14 @@ export function LotesTableWrapper() {
   const { showToast } = useNotificationStore()
   const [lotes, setLotes] = useState<Lote[]>([])
   const [loading, setLoading] = useState(true)
+  const isMountedRef = useRef(true)
 
   // Cargar lotes reales de la base de datos
-  const loadLotes = async () => {
+  const loadLotes = useCallback(async () => {
     setLoading(true)
     const result = await obtenerLotes()
+    
+    if (!isMountedRef.current) return
     
     if (result.success && result.data) {
       setLotes(result.data as Lote[])
@@ -24,11 +27,17 @@ export function LotesTableWrapper() {
       showToast('error', 'Error al cargar lotes')
     }
     setLoading(false)
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
+    isMountedRef.current = true
     loadLotes()
-  }, [showToast])
+
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [loadLotes])
 
   const handleView = (lote: Lote) => {
     router.push(`/almacen/lotes/${lote.id}`)

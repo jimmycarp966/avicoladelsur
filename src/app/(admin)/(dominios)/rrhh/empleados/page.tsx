@@ -28,6 +28,7 @@ async function getEmpleados() {
   return data as Empleado[]
 }
 
+export const dynamic = 'force-dynamic'
 export default async function EmpleadosPage() {
   const empleados = await getEmpleados()
 

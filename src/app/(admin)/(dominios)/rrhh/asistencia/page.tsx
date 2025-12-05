@@ -31,6 +31,7 @@ async function getAsistenciaHoy() {
   return data as Asistencia[]
 }
 
+export const dynamic = 'force-dynamic'
 export default async function AsistenciaPage() {
   const asistenciaHoy = await getAsistenciaHoy()
 

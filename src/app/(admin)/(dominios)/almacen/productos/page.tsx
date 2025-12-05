@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ProductosTableSkeleton } from './productos-table-skeleton'
 import { ProductosTableWrapper } from './productos-table-wrapper'
 
+export const dynamic = 'force-dynamic'
 export const revalidate = 300 // Revalida cada 5 minutos
 
 export const metadata = {

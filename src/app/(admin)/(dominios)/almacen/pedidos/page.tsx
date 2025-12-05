@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { PedidosTableSkeleton } from './pedidos-table-skeleton'
 import { PedidosTableWrapper } from './pedidos-table-wrapper'
 
+export const dynamic = 'force-dynamic'
 export const revalidate = 300 // Revalida cada 5 minutos
 
 export const metadata = {
