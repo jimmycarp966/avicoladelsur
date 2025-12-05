@@ -62,17 +62,18 @@ export function PedidosTable({ data, onView, onEdit, onDelete, onDeliver, onPrin
       },
     },
     {
-      accessorKey: 'cliente_id',
+      accessorKey: 'cliente',
       header: 'Cliente',
       cell: ({ row }) => {
-        const clienteId = row.getValue('cliente_id') as string
-        // En producción, aquí haríamos una consulta para obtener el nombre del cliente
+        const cliente = row.original.cliente as any
+        const clienteNombre = cliente?.nombre || 'Pedido agrupado'
+        const iniciales = clienteNombre.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
         return (
           <div className="flex items-center gap-2">
             <Avatar className="h-6 w-6">
-              <AvatarFallback className="text-xs">C</AvatarFallback>
+              <AvatarFallback className="text-xs">{iniciales || 'P'}</AvatarFallback>
             </Avatar>
-            <span className="text-base font-medium text-foreground">Cliente {clienteId.slice(-4)}</span>
+            <span className="text-base font-medium text-foreground">{clienteNombre}</span>
           </div>
         )
       },
