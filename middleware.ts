@@ -145,7 +145,16 @@ export async function middleware(request: NextRequest) {
   const isTesoreriaRoute = tesoreriaRoutes.some(route => pathname.startsWith(route))
 
   // Rutas de repartidor (PWA móvil)
-  const isDriverRoute = pathname.startsWith('/repartidor')
+  const driverRoutes = [
+    '/checkin',
+    '/entregas',
+    '/perfil',
+    '/ruta',
+    '/ruta-diaria',
+    '/home',
+  ]
+
+  const isDriverRoute = driverRoutes.some(route => pathname.startsWith(route))
 
   // Verificar permisos
   if (isAdminRoute && userRole !== 'admin') {
