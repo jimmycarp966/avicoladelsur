@@ -18,7 +18,8 @@ import {
   Package
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
-import { obtenerEntregasPedidoAction, obtenerResumenEntregasAction } from '@/actions/entregas.actions'
+import { obtenerEntregasPedidoAction, obtenerResumenEntregasAction, marcarEntregaEnCaminoAction, registrarCobroEntregaAction } from '@/actions/entregas.actions'
+import { useNotificationStore } from '@/store/notificationStore'
 import {
   Collapsible,
   CollapsibleContent,
@@ -106,6 +107,8 @@ export function EntregasPedido({ pedidoId }: EntregasPedidoProps) {
   const [resumen, setResumen] = useState<Resumen | null>(null)
   const [loading, setLoading] = useState(true)
   const [expandedEntregas, setExpandedEntregas] = useState<Set<string>>(new Set())
+  const [procesando, setProcesando] = useState<string | null>(null)
+  const { showToast } = useNotificationStore()
 
   useEffect(() => {
     const cargarDatos = async () => {
@@ -142,6 +145,62 @@ export function EntregasPedido({ pedidoId }: EntregasPedidoProps) {
       }
       return newSet
     })
+  }
+
+  const handleEnCamino = async (entregaId: string) => {
+    setProcesando(entregaId)
+    try {
+      const result = await marcarEntregaEnCaminoAction(entregaId)
+      if (result.success) {
+        showToast('success', result.message || 'Entrega marcada como en camino')
+        // Actualizar estado local
+        setEntregas(prev => prev.map(e => 
+          e.entrega_id === entregaId 
+            ? { ...e, estado_entrega: 'en_camino' } 
+            : e
+        ))
+      } else {
+        showToast('error', result.message || 'Error al marcar entrega')
+      }
+    } catch (error) {
+      showToast('error', 'Error al procesar la solicitud')
+    } finally {
+      setProcesando(null)
+    }
+  }
+
+  const handleRegistrarCobro = async (entrega: Entrega) => {
+    // Por ahora mostrar un prompt simple - en el futuro se puede hacer un modal
+    const monto = prompt(`Monto a cobrar (Total: $${entrega.total}):`, entrega.total.toString())
+    if (!monto) return
+
+    const metodo = prompt('Método de pago (efectivo, transferencia, etc.):', 'efectivo')
+    if (!metodo) return
+
+    setProcesando(entrega.entrega_id)
+    try {
+      const formData = new FormData()
+      formData.append('entrega_id', entrega.entrega_id)
+      formData.append('monto_cobrado', monto)
+      formData.append('metodo_pago', metodo)
+
+      const result = await registrarCobroEntregaAction(formData)
+      if (result.success) {
+        showToast('success', result.message || 'Cobro registrado')
+        // Actualizar estado local
+        setEntregas(prev => prev.map(e => 
+          e.entrega_id === entrega.entrega_id 
+            ? { ...e, estado_pago: 'pagado', monto_cobrado: parseFloat(monto), metodo_pago: metodo } 
+            : e
+        ))
+      } else {
+        showToast('error', result.message || 'Error al registrar cobro')
+      }
+    } catch (error) {
+      showToast('error', 'Error al procesar la solicitud')
+    } finally {
+      setProcesando(null)
+    }
   }
 
   if (loading) {
@@ -321,15 +380,25 @@ export function EntregasPedido({ pedidoId }: EntregasPedidoProps) {
                         </div>
                         <div className="flex gap-2">
                           {entrega.estado_entrega === 'pendiente' && (
-                            <Button size="sm" variant="outline">
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleEnCamino(entrega.entrega_id)}
+                              disabled={procesando === entrega.entrega_id}
+                            >
                               <Truck className="h-3 w-3 mr-1" />
-                              En camino
+                              {procesando === entrega.entrega_id ? 'Procesando...' : 'En camino'}
                             </Button>
                           )}
                           {entrega.estado_pago === 'pendiente' && (
-                            <Button size="sm" variant="outline">
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleRegistrarCobro(entrega)}
+                              disabled={procesando === entrega.entrega_id}
+                            >
                               <DollarSign className="h-3 w-3 mr-1" />
-                              Registrar cobro
+                              {procesando === entrega.entrega_id ? 'Procesando...' : 'Registrar cobro'}
                             </Button>
                           )}
                         </div>

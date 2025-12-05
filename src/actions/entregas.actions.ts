@@ -191,6 +191,49 @@ export async function marcarEntregaCompletadaAction(formData: FormData) {
   }
 }
 
+// Acción para marcar entrega como "en camino"
+export async function marcarEntregaEnCaminoAction(entregaId: string) {
+  try {
+    const supabase = await createClient()
+
+    // Obtener usuario actual
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, message: 'Usuario no autenticado' }
+    }
+
+    if (!entregaId) {
+      return { success: false, message: 'ID de entrega requerido' }
+    }
+
+    // Actualizar estado de entrega
+    const { error } = await supabase
+      .from('entregas')
+      .update({
+        estado_entrega: 'en_camino',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', entregaId)
+
+    if (error) {
+      console.error('Error marcando entrega en camino:', error)
+      return { success: false, message: 'Error al marcar entrega en camino' }
+    }
+
+    revalidatePath('/repartidor')
+    revalidatePath('/almacen/pedidos')
+
+    return {
+      success: true,
+      message: 'Entrega marcada como en camino'
+    }
+
+  } catch (error) {
+    console.error('Error en marcarEntregaEnCaminoAction:', error)
+    return { success: false, message: 'Error interno del servidor' }
+  }
+}
+
 // Acción para marcar entrega como fallida
 export async function marcarEntregaFallidaAction(formData: FormData) {
   try {
