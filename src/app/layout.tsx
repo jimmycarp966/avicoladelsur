@@ -16,10 +16,10 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: "/images/logo-avicola.svg", type: "image/svg+xml" },
-      { url: "/images/logo-avicola.png", sizes: "192x192", type: "image/png" },
+      { url: "/images/icon-192.png", sizes: "192x192", type: "image/png" },
     ],
     apple: [
-      { url: "/images/logo-avicola.png", sizes: "180x180", type: "image/png" },
+      { url: "/images/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
     ],
   },
   appleWebApp: {
