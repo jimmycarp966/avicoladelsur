@@ -51,8 +51,8 @@ export function sendPushNotification(
 
   try {
     const notification = new Notification(title, {
-      icon: '/logo-avicola.png',
-      badge: '/logo-avicola.png',
+      icon: '/images/logo-avicola.svg',
+      badge: '/images/logo-avicola.svg',
       ...options,
     })
 

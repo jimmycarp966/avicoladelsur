@@ -55,7 +55,7 @@ export function NotificationBell() {
                     if ('Notification' in window && Notification.permission === 'granted') {
                         new Notification(newNotification.titulo, {
                             body: newNotification.mensaje,
-                            icon: '/images/logo-avicola.png',
+                            icon: '/images/logo-avicola.svg',
                         })
                     }
                 }

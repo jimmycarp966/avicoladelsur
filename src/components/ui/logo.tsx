@@ -28,7 +28,7 @@ export function Logo({
   return (
     <div className={cn('flex items-center gap-2', className)}>
       <Image
-        src="/images/logo-avicola.png"
+        src="/images/logo-avicola.svg"
         alt="Avícola del Sur"
         width={dimensions.width}
         height={dimensions.height}
