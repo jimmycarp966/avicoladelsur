@@ -435,4 +435,34 @@ supabase/                         # Scripts SQL y migraciones
 
 ---
 
+## 🚀 Optimizaciones Técnicas (Diciembre 2025)
+
+### Solución al Problema N+1
+Se implementaron funciones RPC optimizadas para consolidar múltiples consultas en una sola llamada a la base de datos, reduciendo drásticamente la latencia y el uso de recursos.
+
+#### Principales RPCs de Optimización:
+1.  **`fn_obtener_cliente_completo(p_cliente_id)`**:
+    *   Obtiene datos del cliente.
+    *   Calcula estadísticas de pedidos (total, entregados, pendientes) en una subquery.
+    *   Obtiene saldo y límite de cuenta corriente.
+    *   Recupera listas de precios activas y vigentes.
+    *   **Resultado**: JSONB completo en <50ms.
+
+2.  **`fn_obtener_pedido_completo(p_pedido_id)`**:
+    *   Obtiene cabecera del pedido y datos del cliente.
+    *   Agrega detalles (items) con datos de productos.
+    *   Incluye historial de pagos y movimientos de caja.
+    *   Obtiene estado de cuenta corriente actual.
+    *   **Resultado**: Objeto anidado listo para UI sin round-trips adicionales.
+
+### Bot de WhatsApp: Máquina de Estados en Memoria
+Para el flujo de registro de nuevos clientes, el bot implementa una máquina de estados ligera en memoria (`RegistroClienteEstado`) que gestiona la conversación:
+
+1.  **Estados**: `esperando_nombre` → `esperando_direccion` → `esperando_localidad`.
+2.  **Persistencia Temporal**: Los datos parciales se mantienen en un `Map` en memoria (RAM).
+3.  **Expiración**: Limpieza automática de estados inactivos tras 10 minutos.
+4.  **Finalización**: Al completar, llama a `crearClienteDesdeBot` y luego `crearPresupuestoAction`.
+
+---
+
 *Resumen actualizado el Diciembre 2025 - Modelo de control para sucursales implementado + Mejoras de UX y manejo de admins*

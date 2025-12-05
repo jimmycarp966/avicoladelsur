@@ -216,10 +216,11 @@ WHERE NOT EXISTS (
 
 -- Ventas para Sucursal Alberdi
 INSERT INTO pedidos (
-    sucursal_id, cliente_id, estado, pago_estado, total, subtotal,
-    costo_total, margen_bruto_total, fecha_entrega, created_at
+    numero_pedido, sucursal_id, cliente_id, estado, pago_estado, total, subtotal,
+    costo_total, margen_bruto_total, fecha_entrega_estimada, created_at
 )
 SELECT
+    'PED-' || TO_CHAR(NOW(), 'YYYYMMDD-HH24MI') || '-' || UPPER(SUBSTRING(MD5(RANDOM()::TEXT || c.id::TEXT) FROM 1 FOR 4)),
     s.id,
     c.id,
     'completado',
@@ -266,10 +267,11 @@ WHERE s.nombre = 'Sucursal Alberdi' AND c.zona_entrega = 'Alberdi';
 
 -- Ventas para Sucursal San Martín
 INSERT INTO pedidos (
-    sucursal_id, cliente_id, estado, pago_estado, total, subtotal,
-    costo_total, margen_bruto_total, fecha_entrega, created_at
+    numero_pedido, sucursal_id, cliente_id, estado, pago_estado, total, subtotal,
+    costo_total, margen_bruto_total, fecha_entrega_estimada, created_at
 )
 SELECT
+    'PED-' || TO_CHAR(NOW(), 'YYYYMMDD-HH24MI') || '-' || UPPER(SUBSTRING(MD5(RANDOM()::TEXT || c.id::TEXT || 'SMA') FROM 1 FOR 4)),
     s.id,
     c.id,
     'completado',
@@ -316,10 +318,11 @@ WHERE s.nombre = 'Sucursal San Martín' AND c.zona_entrega = 'San Martín';
 
 -- Ventas para Sucursal Colón
 INSERT INTO pedidos (
-    sucursal_id, cliente_id, estado, pago_estado, total, subtotal,
-    costo_total, margen_bruto_total, fecha_entrega, created_at
+    numero_pedido, sucursal_id, cliente_id, estado, pago_estado, total, subtotal,
+    costo_total, margen_bruto_total, fecha_entrega_estimada, created_at
 )
 SELECT
+    'PED-' || TO_CHAR(NOW(), 'YYYYMMDD-HH24MI') || '-' || UPPER(SUBSTRING(MD5(RANDOM()::TEXT || c.id::TEXT || 'COL') FROM 1 FOR 4)),
     s.id,
     c.id,
     'completado',
@@ -366,10 +369,11 @@ WHERE s.nombre = 'Sucursal Colón' AND c.zona_entrega = 'Colón';
 
 -- Ventas para Sucursal Simoca
 INSERT INTO pedidos (
-    sucursal_id, cliente_id, estado, pago_estado, total, subtotal,
-    costo_total, margen_bruto_total, fecha_entrega, created_at
+    numero_pedido, sucursal_id, cliente_id, estado, pago_estado, total, subtotal,
+    costo_total, margen_bruto_total, fecha_entrega_estimada, created_at
 )
 SELECT
+    'PED-' || TO_CHAR(NOW(), 'YYYYMMDD-HH24MI') || '-' || UPPER(SUBSTRING(MD5(RANDOM()::TEXT || c.id::TEXT || 'SIM') FROM 1 FOR 4)),
     s.id,
     c.id,
     'completado',
@@ -451,7 +455,7 @@ AND NOT EXISTS (
 );
 
 -- Alertas resueltas (históricas)
-INSERT INTO alertas_stock (sucursal_id, producto_id, cantidad_actual, umbral, estado, created_at, updated_at)
+INSERT INTO alertas_stock (sucursal_id, producto_id, cantidad_actual, umbral, estado, created_at)
 SELECT DISTINCT
     s.id,
     p.id,
@@ -463,8 +467,7 @@ SELECT DISTINCT
     END,
     10,
     'resuelto',
-    CURRENT_DATE - INTERVAL '5 days',
-    CURRENT_DATE - INTERVAL '3 days'
+    CURRENT_DATE - INTERVAL '5 days'
 FROM sucursales s, productos p
 WHERE s.nombre IN ('Sucursal Alberdi', 'Sucursal San Martín', 'Sucursal Colón', 'Sucursal Simoca')
 AND p.codigo = 'HUEVO002'
@@ -479,18 +482,19 @@ AND NOT EXISTS (
 
 -- Transferencias para todas las sucursales
 INSERT INTO transferencias_stock (
-    sucursal_origen_id, sucursal_destino_id, estado,
+    numero_transferencia, sucursal_origen_id, sucursal_destino_id, estado,
     solicitado_por, aprobado_por, fecha_aprobacion,
-    recibido_por, fecha_recepcion, observaciones, created_at
+    recibido_por, fecha_recepcion, observaciones
 )
 SELECT
+    'TRF-' || TO_CHAR(NOW(), 'YYYYMMDD-HH24MI') || '-' || UPPER(SUBSTRING(MD5(RANDOM()::TEXT || destino.nombre::TEXT) FROM 1 FOR 4)),
     origen.id,
     destino.id,
     CASE
-        WHEN destino.nombre = 'Sucursal Alberdi' THEN 'completada'
+        WHEN destino.nombre = 'Sucursal Alberdi' THEN 'recibida'
         WHEN destino.nombre = 'Sucursal San Martín' THEN 'en_transito'
         WHEN destino.nombre = 'Sucursal Colón' THEN 'pendiente'
-        WHEN destino.nombre = 'Sucursal Simoca' THEN 'completada'
+        WHEN destino.nombre = 'Sucursal Simoca' THEN 'recibida'
     END,
     (SELECT id FROM usuarios WHERE rol = 'admin' LIMIT 1),
     CASE
@@ -516,12 +520,6 @@ SELECT
         WHEN destino.nombre = 'Sucursal San Martín' THEN 'Envío programado'
         WHEN destino.nombre = 'Sucursal Colón' THEN 'Reposición semanal de stock'
         WHEN destino.nombre = 'Sucursal Simoca' THEN 'Transferencia mensual completada'
-    END,
-    CASE
-        WHEN destino.nombre = 'Sucursal Alberdi' THEN CURRENT_DATE - INTERVAL '7 days'
-        WHEN destino.nombre = 'Sucursal San Martín' THEN CURRENT_DATE - INTERVAL '2 days'
-        WHEN destino.nombre = 'Sucursal Colón' THEN CURRENT_DATE - INTERVAL '1 day'
-        WHEN destino.nombre = 'Sucursal Simoca' THEN CURRENT_DATE - INTERVAL '10 days'
     END
 FROM sucursales origen, sucursales destino
 WHERE origen.nombre = 'Casa Central'
@@ -584,13 +582,13 @@ WHERE s.nombre IN ('Sucursal Alberdi', 'Sucursal San Martín', 'Sucursal Colón'
 
 -- Movimientos para todas las sucursales
 INSERT INTO tesoreria_movimientos (
-    caja_id, tipo, monto, concepto, metodo_pago, created_at
+    caja_id, tipo, monto, descripcion, metodo_pago, created_at
 )
 SELECT
     c.id,
     CASE WHEN tipo_mov = 'ingreso' THEN 'ingreso' ELSE 'egreso' END,
     monto,
-    concepto,
+    descripcion,
     metodo_pago,
     fecha
 FROM tesoreria_cajas c
@@ -608,7 +606,7 @@ CROSS JOIN (
         ('Sucursal Simoca', 'ingreso', 3200.00, 'Venta del día - Despensa María', 'efectivo', CURRENT_DATE - INTERVAL '1 day'),
         ('Sucursal Simoca', 'ingreso', 1850.00, 'Venta del día - Pollería Central', 'efectivo', CURRENT_DATE - INTERVAL '4 days'),
         ('Sucursal Simoca', 'egreso', 800.00, 'Gastos operativos - Combustible', 'efectivo', CURRENT_DATE - INTERVAL '3 days')
-) AS movimientos(sucursal, tipo_mov, monto, concepto, metodo_pago, fecha)
+) AS movimientos(sucursal, tipo_mov, monto, descripcion, metodo_pago, fecha)
 WHERE c.nombre = 'Caja ' || movimientos.sucursal;
 
 -- ===========================================

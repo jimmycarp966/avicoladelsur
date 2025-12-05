@@ -66,11 +66,15 @@
 - **Framework**: Next.js 15 (App Router, Server Components)
 - **Frontend**: React 19 + TypeScript + Tailwind CSS + shadcn/ui
 - **Backend**: Server Actions + Supabase (Postgres + Auth + Storage + Realtime)
+- **Base de Datos**: Supabase (PostgreSQL) con **70+ migraciones** y funciones RPC optimizadas.
+- **Backend**: Next.js Server Actions (seguridad y performance).
+- **Frontend**: React 19, Tailwind CSS, Shadcn UI.
+- **Mapas**: Google Maps JavaScript API + Directions API.
+- **Bot**: Integración nativa con Twilio/WhatsApp (sin servicios externos).
+- **Reportes**: Generación de PDF y Excel en servidor.
 - **Estado**: Zustand (solo estado global: sesión, notificaciones)
 - **Formularios**: React Hook Form + Zod validation
 - **Tablas**: TanStack Table (paginación, filtros, sorting)
-- **Mapas**: Google Maps JavaScript API (selección de ubicaciones, monitor GPS, visualización de rutas)
-- **Chatbot**: Twilio WhatsApp (procesamiento directo)
 - **PDF**: pdfkit + Supabase Storage
 - **GPS**: Navigator API + polling cada 5s
 - **Optimización**: Google Directions API + fallback local

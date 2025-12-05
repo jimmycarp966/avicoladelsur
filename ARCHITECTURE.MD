@@ -193,6 +193,31 @@ Muestra en dashboard → Casa central revisa
 
 ---
 
+---
+
+## 🧩 Modelo de Pedidos Agrupados (Arquitectura Core)
+
+Para optimizar la logística y la facturación, el sistema implementa un modelo de **Pedidos Agrupados**:
+
+### Concepto: "Pedido = Ruta"
+*   **Antes**: 1 Presupuesto = 1 Pedido.
+*   **Ahora**: 1 Pedido es un contenedor ("bucket") que agrupa todos los presupuestos de un mismo **Turno + Zona + Fecha**.
+*   **Entregas**: Los presupuestos individuales se convierten en `entregas` dentro de ese pedido maestro.
+
+### Funcionamiento:
+1.  **Agrupación Automática**:
+    *   Si un cliente hace 3 compras en la mañana (10:00, 11:00, 12:00), todas se suman al mismo **Pedido del Día**.
+    *   El repartidor recibe una sola hoja de ruta consolidada.
+2.  **Cierre de Pedido**:
+    *   El pedido permanece "Abierto" para recibir más items hasta el **Horario de Corte** (05:00 AM para Mañana, 15:00 PM para Tarde).
+    *   Al pasar el corte, se "Cierra" y pasa a Logística.
+3.  **Ventajas**:
+    *   Evita duplicidad de visitas al mismo cliente.
+    *   Simplifica la facturación (1 factura por turno).
+    *   Optimiza la carga del camión.
+
+---
+
 ## 🏢 Dominios de Negocio
 
 ### 1️⃣ Dominio: Almacén (WMS - Warehouse Management System) ✅ COMPLETO
@@ -404,7 +429,17 @@ Muestra en dashboard → Casa central revisa
 - ✅ **Referencias de Pago**: Genera automáticamente código de referencia (formato: `PAY-YYYYMMDD-XXXXXX`) para pedidos con pago diferido
 - ✅ **Instrucciones para Repartidores**: Incluye monto y referencia de pago en mensajes de confirmación
 - ✅ **Registro de Reclamos**: Implementado (Schemas, API y Acciones)
+- ✅ **Registro de Clientes**: Máquina de estados en memoria para flujo conversacional (Nombre → Dirección → Localidad)
 - 🚧 **Notificaciones Push**: En desarrollo (Implementado solo para Balanza IoT)
+
+**Máquina de Estados (Registro de Clientes):**
+El bot gestiona el alta de nuevos clientes mediante un flujo conversacional persistido en memoria RAM (`Map<telefono, estado>`):
+1.  **Inicio**: Usuario desconocido envía mensaje.
+2.  **Estado 1**: `esperando_nombre` (Valida > 1 palabra).
+3.  **Estado 2**: `esperando_direccion` (Valida longitud).
+4.  **Estado 3**: `esperando_localidad` (Selección numérica de lista dinámica).
+5.  **Cierre**: Crea cliente + Cuenta Corriente + Presupuesto inicial.
+*Nota: Los estados expiran automáticamente tras 10 minutos de inactividad.*
 
 **Sistema de Lotes (WMS Profesional):**
 
@@ -1442,6 +1477,25 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- ✅ **Nueva migración**: `20251128_modulo_sucursales.sql` con funciones RPC
+
+### **Detalle de Optimizaciones RPC (16/12/2025)**
+Para resolver problemas de rendimiento (N+1) en listados grandes, se implementaron funciones que retornan estructuras JSONB completas:
+
+1.  **`fn_obtener_cliente_completo`**:
+    *   **Antes**: 1 query cliente + 1 query estadísticas + 1 query cuenta + 1 query listas.
+    *   **Ahora**: 1 llamada RPC (<50ms).
+    *   **Uso**: Ficha de cliente, validación en bot.
+
+2.  **`fn_obtener_pedido_completo`**:
+    *   **Antes**: 1 query pedido + 1 query cliente + N queries items + N queries productos.
+    *   **Ahora**: 1 llamada RPC con `jsonb_build_object` y `jsonb_agg`.
+    *   **Uso**: Detalle de pedido, impresión de comprobantes.
+
+3.  **`fn_kpis_ventas` (Materialized View)**:
+    *   Pre-calcula totales de venta, ticket promedio y ranking.
+    *   Se actualiza vía `pg_cron` o trigger.
+    *   Permite dashboards instantáneos sin recálculo en tiempo real.
 -- Nota: Ver /supabase/migrations/20251204_reportes_ventas.sql para funciones adicionales:
 -- - fn_kpis_ventas(): KPIs principales de ventas
 -- - fn_ventas_por_periodo(): Agrupación por día/semana/mes/trimestre  

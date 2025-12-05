@@ -67,11 +67,37 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    console.log('✅ [DEBUG] Ubicaciones encontradas:', ubicaciones?.length || 0)
+    // Agrupar por vehículo y obtener la última ubicación de cada uno
+    const ubicacionesPorVehiculo = new Map<string, any>()
+    
+    ubicaciones?.forEach((ubicacion: any) => {
+      const vehiculoId = ubicacion.vehiculo_id
+      const usuario = Array.isArray(ubicacion.usuarios) ? ubicacion.usuarios[0] : ubicacion.usuarios
+      const vehiculo = Array.isArray(ubicacion.vehiculos) ? ubicacion.vehiculos[0] : ubicacion.vehiculos
+      
+      // Si no existe o esta es más reciente, actualizar
+      const existente = ubicacionesPorVehiculo.get(vehiculoId)
+      if (!existente || new Date(ubicacion.created_at) > new Date(existente.created_at)) {
+        ubicacionesPorVehiculo.set(vehiculoId, {
+          vehiculo_id: vehiculoId,
+          repartidor_id: ubicacion.repartidor_id,
+          repartidor_nombre: usuario ? `${usuario.nombre} ${usuario.apellido}`.trim() : 'Repartidor',
+          lat: ubicacion.lat,
+          lng: ubicacion.lng,
+          created_at: ubicacion.created_at,
+          patente: vehiculo?.patente || 'N/A'
+        })
+      }
+    })
+
+    // Convertir Map a Array
+    const ubicacionesFormateadas = Array.from(ubicacionesPorVehiculo.values())
+
+    console.log('✅ [DEBUG] Ubicaciones encontradas:', ubicaciones?.length || 0, 'Últimas por vehículo:', ubicacionesFormateadas.length)
 
     return NextResponse.json({
       success: true,
-      data: ubicaciones || []
+      data: ubicacionesFormateadas
     })
   } catch (error: any) {
     console.error('Error al obtener ubicaciones:', error)
