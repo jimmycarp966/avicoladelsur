@@ -297,7 +297,11 @@ export function PresupuestoIndividualAccion({
       const formData = new FormData()
       formData.append('presupuesto_id', presupuesto.id)
 
+      console.log('🔍 DEBUG Frontend - Convirtiendo presupuesto:', presupuesto.id, presupuesto)
+
       const result = await confirmarPresupuestoAction(formData)
+
+      console.log('🔍 DEBUG Frontend - Resultado:', JSON.stringify(result, null, 2))
 
       if (result.success) {
         showToast(
@@ -314,10 +318,17 @@ export function PresupuestoIndividualAccion({
           }
         }
       } else {
-        showToast('error', result.message || 'Error al convertir presupuesto')
+        console.error('❌ DEBUG Frontend - Error:', result)
+        // Mostrar el mensaje de error completo
+        const errorMsg = result.message || 'Error al convertir presupuesto'
+        showToast('error', errorMsg)
+        // También mostrar debug info si existe
+        if ((result as any).debug) {
+          console.error('❌ DEBUG Info:', (result as any).debug)
+        }
       }
     } catch (error: any) {
-      console.error('Error convirtiendo presupuesto:', error)
+      console.error('❌ DEBUG Frontend - Excepción:', error)
       showToast('error', 'Error al convertir presupuesto: ' + error.message)
     } finally {
       setIsLoading(false)

@@ -252,20 +252,47 @@ export async function confirmarPresupuestoAction(formData: FormData) {
       caja_id: rawData.caja_id || undefined,
     })
 
+    // DEBUG: Obtener datos del presupuesto antes de convertir
+    const { data: presupuestoDebug } = await supabase
+      .from('presupuestos')
+      .select('id, numero_presupuesto, turno, zona_id, fecha_entrega_estimada, estado')
+      .eq('id', data.presupuesto_id)
+      .single()
+    
+    console.log('🔍 DEBUG confirmarPresupuestoAction - Presupuesto:', JSON.stringify(presupuestoDebug, null, 2))
+
     // Llamar RPC para convertir presupuesto a pedido
+    console.log('🔍 DEBUG - Llamando fn_convertir_presupuesto_a_pedido con:', {
+      p_presupuesto_id: data.presupuesto_id,
+      p_user_id: user.id,
+      p_caja_id: data.caja_id,
+    })
+
     const { data: result, error } = await supabase.rpc('fn_convertir_presupuesto_a_pedido', {
       p_presupuesto_id: data.presupuesto_id,
       p_user_id: user.id,
       p_caja_id: data.caja_id,
     })
 
+    console.log('🔍 DEBUG - Resultado RPC:', JSON.stringify(result, null, 2))
+    console.log('🔍 DEBUG - Error RPC:', error ? JSON.stringify(error, null, 2) : 'null')
+
     if (error) {
-      console.error('Error convirtiendo presupuesto:', error)
-      return { success: false, message: 'Error al convertir presupuesto a pedido' }
+      console.error('❌ Error convirtiendo presupuesto:', error)
+      return { 
+        success: false, 
+        message: `Error al convertir presupuesto: ${error.message || error.code || 'Error desconocido'}`,
+        debug: { error, presupuesto: presupuestoDebug }
+      }
     }
 
-    if (!result.success) {
-      return { success: false, message: result.error || 'Error en la conversión del presupuesto' }
+    if (!result || !result.success) {
+      console.error('❌ RPC devolvió error:', result?.error)
+      return { 
+        success: false, 
+        message: result?.error || 'Error en la conversión del presupuesto',
+        debug: { result, presupuesto: presupuestoDebug }
+      }
     }
 
     // Crear factura interna desde el pedido generado
