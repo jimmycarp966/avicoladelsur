@@ -1495,6 +1495,175 @@ export async function asignarPedidoARutaDesdeAlmacen(
   }
 }
 
+// Asignar pedido a ruta con vehículo específico (sin validar capacidad)
+export async function asignarPedidoARutaConVehiculo(
+  pedidoId: string,
+  vehiculoId: string
+): Promise<ApiResponse<{ rutaId: string }>> {
+  try {
+    const supabase = await createClient()
+
+    // Obtener pedido y validar estado
+    const { data: pedido, error: pedidoError } = await supabase
+      .from('pedidos')
+      .select('id, numero_pedido, estado, fecha_entrega_estimada, turno, zona_id')
+      .eq('id', pedidoId)
+      .single()
+
+    if (pedidoError || !pedido) {
+      return { success: false, error: 'Pedido no encontrado' }
+    }
+
+    if (pedido.estado !== 'preparando') {
+      return {
+        success: false,
+        error: `Solo se pueden asignar a ruta pedidos en estado "preparando" (actual: ${pedido.estado})`,
+      }
+    }
+
+    // Obtener vehículo
+    const { data: vehiculo, error: vehiculoError } = await supabase
+      .from('vehiculos')
+      .select('id, patente')
+      .eq('id', vehiculoId)
+      .eq('activo', true)
+      .single()
+
+    if (vehiculoError || !vehiculo) {
+      return { success: false, error: 'Vehículo no encontrado o inactivo' }
+    }
+
+    // Obtener un repartidor (el asignado al vehículo o cualquier activo)
+    let repartidorId: string | null = null
+    
+    const { data: repartidorVehiculo } = await supabase
+      .from('usuarios')
+      .select('id')
+      .eq('vehiculo_asignado', vehiculoId)
+      .eq('rol', 'repartidor')
+      .eq('activo', true)
+      .single()
+    
+    if (repartidorVehiculo) {
+      repartidorId = repartidorVehiculo.id
+    } else {
+      const { data: repartidorAny } = await supabase
+        .from('usuarios')
+        .select('id')
+        .eq('rol', 'repartidor')
+        .eq('activo', true)
+        .limit(1)
+        .single()
+      
+      if (repartidorAny) {
+        repartidorId = repartidorAny.id
+      }
+    }
+
+    if (!repartidorId) {
+      return { success: false, error: 'No hay repartidores activos disponibles' }
+    }
+
+    const fechaRuta = pedido.fecha_entrega_estimada || new Date().toISOString().split('T')[0]
+    const turno = pedido.turno || 'mañana'
+
+    // Buscar ruta existente para el mismo vehículo, fecha, turno y zona
+    let rutaId: string | null = null
+
+    const { data: rutaExistente } = await supabase
+      .from('rutas_reparto')
+      .select('id')
+      .eq('vehiculo_id', vehiculoId)
+      .eq('fecha_ruta', fechaRuta)
+      .eq('turno', turno)
+      .eq('zona_id', pedido.zona_id)
+      .in('estado', ['planificada', 'en_curso'])
+      .limit(1)
+      .single()
+
+    if (rutaExistente) {
+      rutaId = rutaExistente.id
+    } else {
+      // Crear nueva ruta
+      const { data: numeroRuta } = await supabase.rpc('obtener_siguiente_numero_ruta')
+      
+      const { data: nuevaRuta, error: rutaError } = await supabase
+        .from('rutas_reparto')
+        .insert({
+          numero_ruta: numeroRuta || `R-${Date.now()}`,
+          vehiculo_id: vehiculoId,
+          repartidor_id: repartidorId,
+          fecha_ruta: fechaRuta,
+          turno: turno,
+          zona_id: pedido.zona_id,
+          estado: 'planificada',
+        })
+        .select('id')
+        .single()
+
+      if (rutaError || !nuevaRuta) {
+        return { success: false, error: 'Error al crear la ruta: ' + (rutaError?.message || '') }
+      }
+
+      rutaId = nuevaRuta.id
+    }
+
+    // Verificar si el pedido ya está en una ruta
+    const { data: detalleExistente } = await supabase
+      .from('detalles_ruta')
+      .select('id')
+      .eq('pedido_id', pedidoId)
+      .single()
+
+    if (!detalleExistente) {
+      // Agregar pedido a la ruta
+      const { data: maxOrden } = await supabase
+        .from('detalles_ruta')
+        .select('orden_entrega')
+        .eq('ruta_id', rutaId)
+        .order('orden_entrega', { ascending: false })
+        .limit(1)
+        .single()
+
+      const orden = (maxOrden?.orden_entrega || 0) + 1
+
+      const { error: detalleError } = await supabase
+        .from('detalles_ruta')
+        .insert({
+          ruta_id: rutaId,
+          pedido_id: pedidoId,
+          orden_entrega: orden,
+        })
+
+      if (detalleError) {
+        return { success: false, error: 'Error al agregar pedido a la ruta: ' + detalleError.message }
+      }
+    }
+
+    // Actualizar estado del pedido a 'enviado'
+    await supabase
+      .from('pedidos')
+      .update({ estado: 'enviado', updated_at: new Date().toISOString() })
+      .eq('id', pedidoId)
+
+    revalidatePath('/(admin)/(dominios)/reparto/rutas')
+    revalidatePath('/(admin)/(dominios)/almacen/pedidos')
+    revalidatePath(`/(admin)/(dominios)/almacen/pedidos/${pedidoId}`)
+
+    return {
+      success: true,
+      data: { rutaId },
+      message: `Pedido ${pedido.numero_pedido} asignado a ruta con vehículo ${vehiculo.patente}`,
+    }
+  } catch (error: any) {
+    console.error('Error en asignarPedidoARutaConVehiculo:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al asignar pedido a ruta',
+    }
+  }
+}
+
 // Asignar transferencia a una ruta desde almacén
 export async function asignarTransferenciaARutaDesdeAlmacen(
   transferenciaId: string

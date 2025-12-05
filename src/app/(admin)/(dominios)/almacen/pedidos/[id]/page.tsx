@@ -11,6 +11,7 @@ import { listarCajas } from '@/actions/tesoreria.actions'
 import { RegistrarPagoPedidoForm } from '@/components/forms/RegistrarPagoPedidoForm'
 import { EntregasPedido } from '@/components/pedidos/EntregasPedido'
 import { PasarARutaButton } from '@/components/pedidos/PasarARutaButton'
+import { AsignarVehiculoSelect } from '@/components/pedidos/AsignarVehiculoSelect'
 
 interface PedidoDetallePageProps {
   params: { id: string }
@@ -244,12 +245,33 @@ export default async function PedidoDetallePage({ params }: PedidoDetallePagePro
               Logística
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
-            <p>Repartidor asignado: {pedido.repartidor || 'Sin asignar'}</p>
-            <p>Vehículo: {pedido.vehiculo || 'Sin asignar'}</p>
-            <Badge variant={estado.variant} className={estado.color}>
-              {estado.label}
-            </Badge>
+          <CardContent className="space-y-4">
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Estado:</span>
+                <Badge variant={estado.variant} className={estado.color}>
+                  {estado.label}
+                </Badge>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Repartidor:</span>
+                <span>{pedido.repartidor || 'Sin asignar'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Vehículo:</span>
+                <span>{pedido.vehiculo || 'Sin asignar'}</span>
+              </div>
+            </div>
+            
+            {/* Selector de vehículo si está en preparando */}
+            {pedido.estado === 'preparando' && (
+              <AsignarVehiculoSelect
+                pedidoId={pedido.id}
+                numeroPedido={pedido.numero_pedido}
+                estado={pedido.estado}
+                pesoTotal={pesoTotal}
+              />
+            )}
           </CardContent>
         </Card>
       </div>
