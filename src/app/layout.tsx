@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { Providers } from "@/components/providers";
 import { GoogleMapsScript } from "@/components/providers/google-maps-script";
@@ -12,6 +12,28 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Avícola del Sur ERP",
   description: "Sistema de Gestión Integral para Avícola del Sur",
+  manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/images/logo-avicola.svg", type: "image/svg+xml" },
+      { url: "/images/logo-avicola.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: [
+      { url: "/images/logo-avicola.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Avícola ERP",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#2F7058",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({

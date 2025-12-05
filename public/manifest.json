@@ -1,0 +1,30 @@
+{
+  "name": "Avícola del Sur ERP",
+  "short_name": "Avícola ERP",
+  "description": "Sistema de Gestión Integral para Avícola del Sur",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2F7058",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/images/logo-avicola.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/images/logo-avicola.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/images/logo-avicola.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
+
