@@ -25,36 +25,21 @@ async function RutaMapaContent({ rutaId }: { rutaId: string }) {
     )
   }
 
-  const { data: ruta, error } = await supabase
+  // Obtener ruta básica primero
+  const { data: rutaBasica, error: rutaError } = await supabase
     .from('rutas_reparto')
     .select(
       `
         *,
         repartidor:usuarios!rutas_reparto_repartidor_id_fkey(id, nombre, apellido),
         vehiculo:vehiculos(patente, marca, modelo, capacidad_kg),
-        zona:zonas(nombre),
-        detalles_ruta (
-          id,
-          orden_entrega,
-          estado_entrega,
-          coordenadas_entrega,
-          pedido:pedidos(
-            id,
-            numero_pedido,
-            cliente:clientes(
-              id,
-              nombre,
-              direccion,
-              coordenadas
-            )
-          )
-        )
+        zona:zonas(nombre)
       `,
     )
     .eq('id', rutaId)
     .single()
 
-  if (error || !ruta) {
+  if (rutaError || !rutaBasica) {
     return (
       <Card className="p-6 text-center">
         <CardContent>Error al cargar la ruta</CardContent>
@@ -62,12 +47,118 @@ async function RutaMapaContent({ rutaId }: { rutaId: string }) {
     )
   }
 
-  if (ruta.repartidor_id !== user.id) {
+  if (rutaBasica.repartidor_id !== user.id) {
     return (
       <Card className="p-6 text-center">
         <CardContent>Esta ruta no está asignada a tu usuario</CardContent>
       </Card>
     )
+  }
+
+  // Obtener detalles de ruta básicos
+  const { data: detallesRutaRaw, error: detallesError } = await supabase
+    .from('detalles_ruta')
+    .select(`
+      id,
+      orden_entrega,
+      estado_entrega,
+      coordenadas_entrega,
+      pedido_id,
+      pedido:pedidos(
+        id,
+        numero_pedido,
+        cliente_id
+      )
+    `)
+    .eq('ruta_id', rutaId)
+    .order('orden_entrega', { ascending: true })
+
+  if (detallesError) {
+    console.error('Error obteniendo detalles de ruta:', detallesError)
+  }
+
+  // Para cada detalle, obtener el cliente (desde pedido o desde entregas) y convertir coordenadas
+  const detallesConCliente = await Promise.all(
+    (detallesRutaRaw || []).map(async (detalle: any) => {
+      let clienteData = null
+      let coordenadasCliente = null
+
+      // Si el pedido tiene cliente_id, obtener cliente directamente
+      if (detalle.pedido?.cliente_id) {
+        const { data: cliente, error: clienteError } = await supabase
+          .from('clientes')
+          .select('id, nombre, direccion, ST_AsGeoJSON(coordenadas)::jsonb as coordenadas')
+          .eq('id', detalle.pedido.cliente_id)
+          .single()
+
+        if (!clienteError && cliente) {
+          clienteData = cliente
+          // Convertir coordenadas PostGIS si existen
+          const coords = (cliente as any).coordenadas
+          if (coords) {
+            if (coords && typeof coords === 'object' && 'type' in coords && coords.type === 'Point' && Array.isArray(coords.coordinates)) {
+              const [lng, lat] = coords.coordinates
+              coordenadasCliente = { lat, lng }
+            } else if (coords && typeof coords === 'object' && 'lat' in coords && 'lng' in coords) {
+              coordenadasCliente = coords
+            }
+          }
+        }
+      } else {
+        // Si el pedido no tiene cliente_id, buscar en entregas
+        const { data: entregas, error: entregasError } = await supabase
+          .from('entregas')
+          .select(`
+            cliente_id,
+            coordenadas,
+            cliente:clientes(
+              id,
+              nombre,
+              direccion,
+              ST_AsGeoJSON(coordenadas)::jsonb as coordenadas
+            )
+          `)
+          .eq('pedido_id', detalle.pedido_id)
+          .limit(1)
+          .single()
+
+        if (!entregasError && entregas) {
+          // Usar cliente desde entregas
+          // cliente viene como array en relaciones de Supabase
+          const entregasAny = entregas as any
+          const clienteFromEntrega = Array.isArray(entregasAny.cliente) ? entregasAny.cliente[0] : entregasAny.cliente
+          if (clienteFromEntrega) {
+            clienteData = clienteFromEntrega
+            // Convertir coordenadas desde entregas o desde cliente
+            const coords = (entregas as any).coordenadas || (clienteFromEntrega as any).coordenadas
+            if (coords) {
+              if (coords && typeof coords === 'object' && 'type' in coords && coords.type === 'Point' && Array.isArray(coords.coordinates)) {
+                const [lng, lat] = coords.coordinates
+                coordenadasCliente = { lat, lng }
+              } else if (coords && typeof coords === 'object' && 'lat' in coords && 'lng' in coords) {
+                coordenadasCliente = coords
+              }
+            }
+          }
+        }
+      }
+
+      return {
+        ...detalle,
+        pedido: {
+          ...detalle.pedido,
+          cliente: clienteData ? {
+            ...clienteData,
+            coordenadas: coordenadasCliente,
+          } : null,
+        },
+      }
+    })
+  )
+
+  const ruta = {
+    ...rutaBasica,
+    detalles_ruta: detallesConCliente,
   }
 
   const puedeTrackear = ruta.estado === 'en_curso'

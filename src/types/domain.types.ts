@@ -176,6 +176,7 @@ export interface RutaReparto extends BaseEntity {
   vehiculo_id: string
   repartidor_id: string
   fecha_ruta: string
+  fecha_planificada?: string // Alias común para fecha_ruta
   turno?: 'mañana' | 'tarde'
   zona_id?: string
   estado: string
@@ -188,6 +189,23 @@ export interface RutaReparto extends BaseEntity {
   observaciones?: string
   checklist_inicio_id?: string
   checklist_fin_id?: string
+  // Relaciones (joins)
+  repartidor?: {
+    id: string
+    nombre: string
+    apellido?: string
+  } | null
+  vehiculo?: {
+    id: string
+    patente: string
+    marca?: string
+    modelo?: string
+    capacidad_kg?: number
+  } | null
+  zona?: {
+    id: string
+    nombre: string
+  } | null
 }
 
 // Detalle de Ruta

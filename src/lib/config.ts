@@ -27,6 +27,52 @@ export const config = {
     },
     returnToBase: true,
   },
+  googleCloud: {
+    projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
+    region: process.env.GOOGLE_CLOUD_REGION || 'southamerica-east1',
+    serviceAccount: {
+      // Base64 encoded JSON (producción) o ruta al archivo (desarrollo)
+      base64: process.env.GOOGLE_CLOUD_SERVICE_ACCOUNT_BASE64,
+      path: process.env.GOOGLE_CLOUD_SERVICE_ACCOUNT_PATH,
+    },
+    maps: {
+      apiKey: process.env.GOOGLE_MAPS_API_KEY,
+      fleetRoutingApiKey: process.env.GOOGLE_MAPS_FLEET_ROUTING_API_KEY,
+    },
+    optimization: {
+      enabled: process.env.GOOGLE_OPTIMIZATION_API_ENABLED === 'true',
+    },
+    dialogflow: {
+      projectId: process.env.GOOGLE_DIALOGFLOW_PROJECT_ID,
+      agentId: process.env.GOOGLE_DIALOGFLOW_AGENT_ID,
+      languageCode: process.env.GOOGLE_DIALOGFLOW_LANGUAGE_CODE || 'es-AR',
+    },
+    speechToText: {
+      enabled: process.env.GOOGLE_SPEECH_TO_TEXT_ENABLED === 'true',
+      languageCode: process.env.GOOGLE_SPEECH_TO_TEXT_LANGUAGE_CODE || 'es-AR',
+    },
+    documentAI: {
+      projectId: process.env.GOOGLE_DOCUMENT_AI_PROJECT_ID,
+      location: process.env.GOOGLE_DOCUMENT_AI_LOCATION || 'us',
+      processors: {
+        facturas: process.env.GOOGLE_DOCUMENT_AI_PROCESSOR_ID_FACTURAS,
+        remitos: process.env.GOOGLE_DOCUMENT_AI_PROCESSOR_ID_REMITOS,
+      },
+    },
+    vertexAI: {
+      enabled: process.env.GOOGLE_VERTEX_AI_ENABLED === 'true',
+      location: process.env.GOOGLE_VERTEX_AI_LOCATION || 'us-central1',
+    },
+    automl: {
+      enabled: process.env.GOOGLE_AUTOML_ENABLED === 'true',
+      location: process.env.GOOGLE_AUTOML_LOCATION || 'us-central1',
+    },
+    gemini: {
+      apiKey: process.env.GOOGLE_GEMINI_API_KEY,
+      model: process.env.GOOGLE_GEMINI_MODEL || 'gemini-pro',
+      location: process.env.GOOGLE_GEMINI_LOCATION || 'us-central1',
+    },
+  },
 }
 
 // Roles del sistema

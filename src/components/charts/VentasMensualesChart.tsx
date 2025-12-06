@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import {
   Area,
   AreaChart,
@@ -10,24 +11,22 @@ import {
 } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatCurrency } from '@/lib/utils'
-
-// Datos de ejemplo - en producción vendrían de la base de datos
-const data = [
-  { mes: 'Ene', ventas: 45000, pedidos: 120 },
-  { mes: 'Feb', ventas: 52000, pedidos: 135 },
-  { mes: 'Mar', ventas: 48000, pedidos: 128 },
-  { mes: 'Abr', ventas: 61000, pedidos: 156 },
-  { mes: 'May', ventas: 55000, pedidos: 142 },
-  { mes: 'Jun', ventas: 67000, pedidos: 168 },
-  { mes: 'Jul', ventas: 72000, pedidos: 178 },
-  { mes: 'Ago', ventas: 69000, pedidos: 172 },
-  { mes: 'Sep', ventas: 75000, pedidos: 185 },
-  { mes: 'Oct', ventas: 78000, pedidos: 192 },
-  { mes: 'Nov', ventas: 82000, pedidos: 201 },
-  { mes: 'Dic', ventas: 85000, pedidos: 210 },
-]
+import { obtenerVentasMensuales } from '@/actions/dashboard.actions'
 
 export function VentasMensualesChart() {
+  const [data, setData] = useState<Array<{ mes: string; ventas: number; pedidos: number }>>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchData() {
+      const result = await obtenerVentasMensuales()
+      if (result.success && result.data) {
+        setData(result.data)
+      }
+      setLoading(false)
+    }
+    fetchData()
+  }, [])
   return (
     <Card>
       <CardHeader>
@@ -37,7 +36,16 @@ export function VentasMensualesChart() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={300}>
+        {loading ? (
+          <div className="flex items-center justify-center h-[300px]">
+            <p className="text-muted-foreground">Cargando datos...</p>
+          </div>
+        ) : data.length === 0 ? (
+          <div className="flex items-center justify-center h-[300px]">
+            <p className="text-muted-foreground">No hay datos disponibles</p>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={300}>
           <AreaChart data={data}>
             <defs>
               <linearGradient id="ventasGradient" x1="0" y1="0" x2="0" y2="1">
@@ -87,6 +95,7 @@ export function VentasMensualesChart() {
             />
           </AreaChart>
         </ResponsiveContainer>
+        )}
       </CardContent>
     </Card>
   )

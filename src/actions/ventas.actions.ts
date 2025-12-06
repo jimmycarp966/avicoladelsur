@@ -919,6 +919,109 @@ export async function crearReclamoBot(
   }
 }
 
+// Obtener reclamos con filtros
+export async function obtenerReclamos(
+  filtros?: {
+    search?: string
+    cliente_id?: string
+    pedido_id?: string
+    tipo_reclamo?: string
+    estado?: string
+    prioridad?: string
+    origen?: string
+    fecha_desde?: string
+    fecha_hasta?: string
+    usuario_asignado?: string
+    page?: number
+    limit?: number
+  }
+): Promise<ApiResponse> {
+  try {
+    const supabase = await createClient()
+
+    let query = supabase
+      .from('reclamos')
+      .select(`
+        *,
+        cliente:clientes(id, nombre, telefono, codigo),
+        pedido:pedidos(id, numero_pedido),
+        usuario_asignado_obj:usuarios!reclamos_usuario_asignado_fkey(id, nombre, apellido)
+      `)
+      .order('created_at', { ascending: false })
+
+    // Aplicar filtros
+    if (filtros?.estado) {
+      query = query.eq('estado', filtros.estado)
+    }
+    if (filtros?.cliente_id) {
+      query = query.eq('cliente_id', filtros.cliente_id)
+    }
+    if (filtros?.pedido_id) {
+      query = query.eq('pedido_id', filtros.pedido_id)
+    }
+    if (filtros?.tipo_reclamo) {
+      query = query.eq('tipo_reclamo', filtros.tipo_reclamo)
+    }
+    if (filtros?.prioridad) {
+      query = query.eq('prioridad', filtros.prioridad)
+    }
+    if (filtros?.origen) {
+      query = query.eq('origen', filtros.origen)
+    }
+    if (filtros?.usuario_asignado) {
+      query = query.eq('usuario_asignado', filtros.usuario_asignado)
+    }
+    if (filtros?.fecha_desde) {
+      query = query.gte('created_at', filtros.fecha_desde)
+    }
+    if (filtros?.fecha_hasta) {
+      query = query.lte('created_at', filtros.fecha_hasta)
+    }
+    if (filtros?.search) {
+      // Búsqueda en múltiples campos
+      const searchTerm = `%${filtros.search}%`
+      query = query.or(`numero_reclamo.ilike.${searchTerm},descripcion.ilike.${searchTerm}`)
+    }
+
+    // Paginación
+    const page = filtros?.page || 1
+    const limit = filtros?.limit || 50
+    const from = (page - 1) * limit
+    const to = from + limit - 1
+
+    query = query.range(from, to)
+
+    const { data, error } = await query
+
+    if (error) throw error
+
+    // Obtener total para paginación
+    const { count } = await supabase
+      .from('reclamos')
+      .select('*', { count: 'exact', head: true })
+
+    const total = count || 0
+    const pages = Math.ceil(total / limit)
+    
+    return {
+      success: true,
+      data: data || [],
+      pagination: {
+        total,
+        page,
+        limit,
+        pages,
+      },
+    }
+  } catch (error: any) {
+    devError('Error al obtener reclamos:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al obtener reclamos',
+    }
+  }
+}
+
 // Actualizar estado de reclamo
 export async function actualizarEstadoReclamo(
   reclamoId: string,

@@ -13,7 +13,7 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Logo } from '@/components/ui/logo'
 import { NotificationBell } from '@/components/layout/NotificationBell'
-import { Menu, LogOut } from 'lucide-react'
+import { Menu, LogOut, HelpCircle } from 'lucide-react'
 import type { Usuario } from '@/types/domain.types'
 
 interface AdminHeaderProps {
@@ -58,6 +58,20 @@ export function AdminHeader({ user, onMenuClick, onLogout }: AdminHeaderProps) {
 
         {/* Panel derecho */}
         <div className="flex items-center gap-x-3">
+          {/* Botón de ayuda - Atajos de teclado */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-white hover:bg-white/10 h-9 w-9"
+            onClick={() => {
+              const event = new CustomEvent('show-keyboard-shortcuts')
+              window.dispatchEvent(event)
+            }}
+            title="Atajos de teclado (F12)"
+          >
+            <HelpCircle className="h-5 w-5" />
+          </Button>
+
           {/* Notificaciones con real-time */}
           <div className="text-white [&_button]:text-white [&_button:hover]:bg-white/10">
             <NotificationBell />

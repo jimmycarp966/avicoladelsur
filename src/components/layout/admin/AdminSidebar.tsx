@@ -31,11 +31,8 @@ interface AdminSidebarProps {
 
 // Función para obtener badges dinámicos - versión cliente
 function getBadges(): {[key: string]: number} {
-  // Por ahora retornamos valores por defecto
   // En producción, esto debería venir de una API route
-  return {
-    sucursales_alerts: 3 // Valor hardcodeado para demo
-  }
+  return {}
 }
 
 const navigation = [
@@ -69,6 +66,7 @@ const navigation = [
       { name: 'Clientes', href: '/ventas/clientes' },
       { name: 'Listas de Precios', href: '/ventas/listas-precios' },
       { name: 'Facturas', href: '/ventas/facturas' },
+      { name: 'Reclamos', href: '/ventas/reclamos' },
     ],
   },
   {

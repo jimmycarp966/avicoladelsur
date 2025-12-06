@@ -111,6 +111,66 @@ async function getPedidoStatus(pedidoNumero: string) {
   return pedido
 }
 
+async function getReclamoStatus(numeroReclamo: string) {
+  const supabase = await createClient()
+
+  const { data: reclamo, error } = await supabase
+    .from('reclamos')
+    .select(`
+      id,
+      numero_reclamo,
+      estado,
+      tipo_reclamo,
+      descripcion,
+      prioridad,
+      fecha_creacion,
+      created_at,
+      fecha_resolucion,
+      solucion,
+      clientes (
+        nombre
+      ),
+      pedido:pedidos (
+        numero_pedido
+      )
+    `)
+    .eq('numero_reclamo', numeroReclamo.toUpperCase())
+    .single()
+
+  if (error && error.code !== 'PGRST116') {
+    console.error('Error getting reclamo status:', error)
+    return null
+  }
+
+  return reclamo
+}
+
+async function getReclamosCliente(clienteId: string) {
+  const supabase = await createClient()
+
+  const { data: reclamos, error } = await supabase
+    .from('reclamos')
+    .select(`
+      id,
+      numero_reclamo,
+      estado,
+      tipo_reclamo,
+      descripcion,
+      fecha_creacion,
+      created_at
+    `)
+    .eq('cliente_id', clienteId)
+    .order('fecha_creacion', { ascending: false })
+    .limit(10)
+
+  if (error) {
+    console.error('Error getting reclamos cliente:', error)
+    return []
+  }
+
+  return reclamos || []
+}
+
 async function getCuentaCorriente(clienteId: string) {
   const supabase = await createClient()
   const { data, error } = await supabase
@@ -142,6 +202,20 @@ interface RegistroClienteEstado {
 
 const registroClientesPendientes = new Map<string, RegistroClienteEstado>()
 
+// ===========================================
+// SISTEMA DE ESTADO DE CREACIÓN DE RECLAMOS
+// ===========================================
+
+interface ReclamoEstado {
+  estado: 'esperando_tipo' | 'esperando_descripcion' | 'esperando_pedido'
+  tipo_reclamo?: string
+  descripcion?: string
+  pedido_id?: string
+  timestamp: number
+}
+
+const reclamosPendientes = new Map<string, ReclamoEstado>()
+
 // Limpiar estados expirados (10 minutos)
 function limpiarEstadosExpirados() {
   const ahora = Date.now()
@@ -150,6 +224,12 @@ function limpiarEstadosExpirados() {
   for (const [phone, estado] of registroClientesPendientes.entries()) {
     if (ahora - estado.timestamp > timeout) {
       registroClientesPendientes.delete(phone)
+    }
+  }
+
+  for (const [phone, estado] of reclamosPendientes.entries()) {
+    if (ahora - estado.timestamp > timeout) {
+      reclamosPendientes.delete(phone)
     }
   }
 }
@@ -379,6 +459,154 @@ Por favor intenta crear un nuevo presupuesto escribiendo el código y cantidad.`
     default:
       return null
   }
+}
+
+// Función para procesar respuesta del flujo de creación de reclamo
+async function procesarReclamo(phoneNumber: string, mensaje: string): Promise<string | null> {
+  const estado = reclamosPendientes.get(phoneNumber)
+  if (!estado) return null
+
+  const cliente = await findClienteByPhone(phoneNumber)
+  if (!cliente) {
+    reclamosPendientes.delete(phoneNumber)
+    return '❌ No se encontró tu perfil. Por favor contacta con ventas.'
+  }
+
+  switch (estado.estado) {
+    case 'esperando_tipo': {
+      const tiposReclamo: Record<string, string> = {
+        '1': 'producto_dañado',
+        '2': 'entrega_tardia',
+        '3': 'cantidad_erronea',
+        '4': 'producto_equivocado',
+        '5': 'precio_incorrecto',
+        '6': 'calidad_deficiente',
+        '7': 'empaque_dañado',
+        '8': 'otro'
+      }
+
+      const tipoSeleccionado = tiposReclamo[mensaje.trim()]
+      if (!tipoSeleccionado) {
+        return `❌ Opción inválida. Por favor responde con un número del 1 al 8.`
+      }
+
+      estado.tipo_reclamo = tipoSeleccionado
+      estado.estado = 'esperando_descripcion'
+      estado.timestamp = Date.now()
+
+      return `📝 *Paso 2 de 3*
+
+Ahora describe el problema con detalle:
+
+Ejemplo: *"El producto llegó en mal estado, con el empaque roto y algunos productos dañados"*`
+    }
+
+    case 'esperando_descripcion': {
+      if (mensaje.trim().length < 10) {
+        return `❌ La descripción es muy corta. Por favor describe el problema con más detalle (mínimo 10 caracteres).`
+      }
+
+      estado.descripcion = mensaje.trim()
+      estado.estado = 'esperando_pedido'
+      estado.timestamp = Date.now()
+
+      return `📦 *Paso 3 de 3* (Opcional)
+
+¿Este reclamo está relacionado con un pedido específico?
+
+Responde con el número de pedido (ej: *PED-20250101-000001*) o escribe *no* para continuar sin pedido.`
+    }
+
+    case 'esperando_pedido': {
+      let pedidoId: string | undefined
+
+      if (mensaje.toLowerCase() !== 'no' && mensaje.toLowerCase() !== 'n') {
+        // Buscar pedido por número
+        const supabase = await createClient()
+        const numeroPedido = mensaje.trim().toUpperCase()
+        const { data: pedido } = await supabase
+          .from('pedidos')
+          .select('id')
+          .eq('numero_pedido', numeroPedido)
+          .eq('cliente_id', cliente.id)
+          .single()
+
+        if (pedido) {
+          pedidoId = pedido.id
+        } else {
+          return `❌ No se encontró el pedido *${numeroPedido}* asociado a tu cuenta.\n\nEscribe *no* para continuar sin pedido o proporciona otro número de pedido.`
+        }
+      }
+
+      // Crear reclamo
+      const params: any = {
+        cliente_id: cliente.id,
+        tipo_reclamo: estado.tipo_reclamo!,
+        descripcion: estado.descripcion!,
+        prioridad: 'media',
+        origen: 'whatsapp'
+      }
+
+      if (pedidoId) {
+        params.pedido_id = pedidoId
+      }
+
+      const result = await crearReclamoBot(params)
+
+      reclamosPendientes.delete(phoneNumber)
+
+      if (result.success && result.data) {
+        // Obtener número de reclamo creado
+        const supabase = await createClient()
+        const { data: reclamoCreado } = await supabase
+          .from('reclamos')
+          .select('numero_reclamo')
+          .eq('id', result.data.reclamoId)
+          .single()
+
+        const numeroReclamo = reclamoCreado?.numero_reclamo || 'REC-' + Date.now()
+
+        return `✅ *¡Reclamo registrado exitosamente!*
+
+📋 Número de reclamo: *${numeroReclamo}*
+📝 Tipo: ${estado.tipo_reclamo?.replace('_', ' ')}
+📅 Fecha: ${new Date().toLocaleDateString('es-AR')}
+
+Nuestro equipo revisará tu reclamo y te contactará pronto.
+
+Para consultar el estado de tu reclamo:
+*reclamo ${numeroReclamo}*`
+      } else {
+        return `❌ Error al registrar el reclamo: ${result.error || 'Error desconocido'}\n\nPor favor intenta nuevamente o contacta con ventas.`
+      }
+    }
+
+    default:
+      return null
+  }
+}
+
+// Función para iniciar flujo de creación de reclamo
+function iniciarReclamo(phoneNumber: string) {
+  reclamosPendientes.set(phoneNumber, {
+    estado: 'esperando_tipo',
+    timestamp: Date.now()
+  })
+
+  return `📋 *Registro de Reclamo*
+
+Por favor selecciona el tipo de reclamo:
+
+1️⃣ Producto dañado
+2️⃣ Entrega tardía
+3️⃣ Cantidad errónea
+4️⃣ Producto equivocado
+5️⃣ Precio incorrecto
+6️⃣ Calidad deficiente
+7️⃣ Empaque dañado
+8️⃣ Otro
+
+Responde con el número de la opción (1-8):`
 }
 
 // Manejador principal del webhook
@@ -799,6 +1027,35 @@ async function handleTwilioWebhook(formData: FormData) {
       }
     }
 
+    // Verificar si hay un reclamo en proceso
+    const reclamoEnProceso = reclamosPendientes.get(phoneNumber)
+    if (reclamoEnProceso) {
+      // Permitir cancelar o ver menú incluso durante creación de reclamo
+      if (bodyLower === 'cancelar' || bodyLower === 'cancel' || bodyLower.includes('menu') || bodyLower.includes('ayuda')) {
+        reclamosPendientes.delete(phoneNumber)
+        // Continuar con el flujo normal
+      } else {
+        // Procesar respuesta del reclamo
+        const resultadoReclamo = await procesarReclamo(phoneNumber, body)
+        if (resultadoReclamo) {
+          responseMessage = resultadoReclamo
+          // Retornar respuesta inmediatamente
+          return new Response(
+            `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Message>${responseMessage.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</Message>
+</Response>`,
+            {
+              status: 200,
+              headers: {
+                'Content-Type': 'text/xml',
+              },
+            }
+          )
+        }
+      }
+    }
+
     // Verificar horario de atención (excepto para consultas)
     const horario = isHorarioAtencion()
     if (!horario.abierto && !bodyLower.includes('estado') && !bodyLower.includes('consulta')) {
@@ -818,7 +1075,8 @@ async function handleTwilioWebhook(formData: FormData) {
 1️⃣ Ver productos disponibles
 2️⃣ Crear presupuesto
 3️⃣ Consultar estado de pedidos
-4️⃣ Consultar saldo pendiente
+4️⃣ Registrar reclamo
+5️⃣ Consultar saldo pendiente
 
 📝 *Responde con el número* de la opción que deseas.
 
@@ -885,7 +1143,28 @@ Para ver los productos disponibles, escribe *1* o *productos*`
       responseMessage = '🚧 Consulta de pedidos en desarrollo.\n\nPronto podrás consultar el estado de tus pedidos.'
     }
     else if (body === '4' || bodyLower === 'opcion 4') {
-      responseMessage = '🚧 Registro de reclamos en desarrollo.\n\nPronto podrás registrar reclamos desde aquí.'
+      const cliente = await findClienteByPhone(phoneNumber)
+      if (!cliente) {
+        responseMessage = '❌ No se encontró tu perfil. Por favor contacta con ventas para registrarte.'
+      } else {
+        responseMessage = iniciarReclamo(phoneNumber)
+      }
+    }
+    else if (body === '5' || bodyLower === 'opcion 5') {
+      const cliente = await findClienteByPhone(phoneNumber)
+      if (!cliente) {
+        responseMessage = '❌ No encontramos tu cuenta. Comunícate con un asesor.'
+      } else {
+        const cuenta = await getCuentaCorriente(cliente.id)
+        const saldo = Number(cuenta?.saldo || 0)
+        if (saldo > 0) {
+          responseMessage = `📄 *Estado de cuenta*\n\nCliente: ${cliente.nombre}\nSaldo pendiente: *$${saldo.toFixed(
+            2
+          )}*\n\nPuedes abonar al repartidor o solicitar un link de pago respondiendo *pagar*.`
+        } else {
+          responseMessage = '✅ No registras deudas pendientes. ¡Gracias por estar al día!'
+        }
+      }
     }
     // Confirmación de pedido
     else if (bodyLower === 'si' || bodyLower === 'sí' || bodyLower === 'confirmar' || bodyLower === 'confirmo') {
@@ -1459,9 +1738,105 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
         }
       }
     }
-    // Comando: Reclamo
-    else if (bodyLower.includes('reclamo')) {
-      responseMessage = '🚧 Registro de reclamos en desarrollo. Pronto disponible.'
+    // Comando: Reclamo - Ver estado de reclamo específico
+    else if (bodyLower.startsWith('reclamo ') && bodyLower.length > 8) {
+      const numeroReclamo = body.substring(8).trim().toUpperCase()
+      const reclamo = await getReclamoStatus(numeroReclamo)
+
+      if (!reclamo) {
+        responseMessage = `❌ No se encontró el reclamo *${numeroReclamo}*.\n\nVerifica el número e intenta nuevamente.`
+      } else {
+        const estadosEmoji: Record<string, string> = {
+          abierto: '🟡',
+          investigando: '🔵',
+          resuelto: '✅',
+          cerrado: '⚫'
+        }
+
+        const estadosTexto: Record<string, string> = {
+          abierto: 'Abierto',
+          investigando: 'En investigación',
+          resuelto: 'Resuelto',
+          cerrado: 'Cerrado'
+        }
+
+        const reclamoData = reclamo as any
+        const emoji = estadosEmoji[reclamoData.estado] || '📋'
+        const estadoTexto = estadosTexto[reclamoData.estado] || reclamoData.estado
+
+        const tiposTexto: Record<string, string> = {
+          producto_dañado: 'Producto Dañado',
+          entrega_tardia: 'Entrega Tardía',
+          cantidad_erronea: 'Cantidad Errónea',
+          producto_equivocado: 'Producto Equivocado',
+          precio_incorrecto: 'Precio Incorrecto',
+          calidad_deficiente: 'Calidad Deficiente',
+          empaque_dañado: 'Empaque Dañado',
+          otro: 'Otro'
+        }
+
+        responseMessage = `${emoji} *Estado de Reclamo*
+
+📋 Número: *${reclamoData.numero_reclamo}*
+🔄 Estado: *${estadoTexto}*
+📝 Tipo: ${tiposTexto[reclamoData.tipo_reclamo] || reclamoData.tipo_reclamo}
+📅 Fecha: ${new Date(reclamoData.created_at || reclamoData.fecha_creacion).toLocaleDateString('es-AR')}
+📄 Descripción: ${reclamoData.descripcion?.substring(0, 100) || ''}${reclamoData.descripcion?.length > 100 ? '...' : ''}`
+
+        const pedido = Array.isArray(reclamoData.pedido) ? reclamoData.pedido[0] : reclamoData.pedido
+        if (pedido) {
+          responseMessage += `\n📦 Pedido relacionado: *${pedido.numero_pedido}*`
+        }
+
+        if (reclamoData.fecha_resolucion) {
+          responseMessage += `\n✅ Resuelto: ${new Date(reclamoData.fecha_resolucion).toLocaleDateString('es-AR')}`
+        }
+
+        if (reclamoData.solucion) {
+          responseMessage += `\n\n💬 Solución:\n${reclamoData.solucion}`
+        }
+      }
+    }
+    // Comando: Mis Reclamos
+    else if (bodyLower.includes('mis reclamos') || bodyLower === 'reclamos') {
+      const cliente = await findClienteByPhone(phoneNumber)
+      if (!cliente) {
+        responseMessage = '❌ No se encontró tu perfil.'
+      } else {
+        const clienteId = (cliente as { id: string }).id
+        if (!clienteId) {
+          responseMessage = '❌ No se encontró tu perfil.'
+        } else {
+          const reclamos = await getReclamosCliente(clienteId)
+
+          if (reclamos.length === 0) {
+            responseMessage = '📋 No tienes reclamos registrados.\n\nPara crear un reclamo, escribe: *reclamo*'
+          } else {
+            responseMessage = `📋 *Tus reclamos:*\n\n`
+            reclamos.forEach((r: any) => {
+              const estadosEmoji: Record<string, string> = {
+                abierto: '🟡',
+                investigando: '🔵',
+                resuelto: '✅',
+                cerrado: '⚫'
+              }
+              const emoji = estadosEmoji[r.estado] || '📋'
+              responseMessage += `${emoji} *${r.numero_reclamo}*\n`
+              responseMessage += `   Estado: ${r.estado} | ${new Date(r.created_at).toLocaleDateString('es-AR')}\n\n`
+            })
+            responseMessage += `Para ver detalles de un reclamo:\n*reclamo REC-XXXXX*`
+          }
+        }
+      }
+    }
+    // Comando: Nuevo Reclamo
+    else if (bodyLower === 'reclamo' || bodyLower === 'nuevo reclamo' || bodyLower.includes('crear reclamo')) {
+      const cliente = await findClienteByPhone(phoneNumber)
+      if (!cliente) {
+        responseMessage = '❌ No se encontró tu perfil. Por favor contacta con ventas para registrarte.'
+      } else {
+        responseMessage = iniciarReclamo(phoneNumber)
+      }
     }
     // Mensaje no reconocido
     else {
@@ -1473,6 +1848,9 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
    • *[CODIGO] [CANTIDAD]* - Crear presupuesto
       Ejemplo: *POLLO001 5*
    • *estado PRES-XXXXX* - Consultar presupuesto
+   • *reclamo* - Crear nuevo reclamo
+   • *mis reclamos* - Ver tus reclamos
+   • *reclamo REC-XXXXX* - Consultar reclamo
    • *deuda* - Ver saldo pendiente
 
 📞 Si necesitas ayuda personalizada, contacta a tu vendedor.`

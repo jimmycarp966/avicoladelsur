@@ -29,27 +29,14 @@ export async function GET(
 
     const rutaId = id
     
-    // Obtener ruta planificada con polyline
-    const { data: rutaPlanificada, error: rutaError } = await supabase
-      .from('rutas_planificadas')
-      .select('polyline, orden_visita, ruta_reparto_id')
-      .eq('ruta_reparto_id', rutaId)
-      .single()
-    
-    if (rutaError || !rutaPlanificada) {
-      return NextResponse.json(
-        { success: false, error: 'Ruta planificada no encontrada' },
-        { status: 404 }
-      )
-    }
-    
-    // Obtener ruta reparto para fecha, vehículo, número y repartidor
+    // Obtener ruta reparto primero para verificar que existe
     const { data: rutaReparto, error: rutaRepartoError } = await supabase
       .from('rutas_reparto')
       .select(`
         fecha_ruta,
         vehiculo_id,
         numero_ruta,
+        estado,
         repartidor:usuarios!rutas_reparto_repartidor_id_fkey(
           nombre,
           apellido
@@ -65,6 +52,65 @@ export async function GET(
       )
     }
     
+    // Obtener ruta planificada con polyline (puede no existir si la ruta no tiene pedidos o no se optimizó)
+    const { data: rutaPlanificada, error: rutaError } = await supabase
+      .from('rutas_planificadas')
+      .select('polyline, orden_visita, ruta_reparto_id')
+      .eq('ruta_reparto_id', rutaId)
+      .maybeSingle()
+    
+    // Verificar si la ruta tiene pedidos asignados
+    const { data: detallesRutaCheck, error: detallesCheckError } = await supabase
+      .from('detalles_ruta')
+      .select('id')
+      .eq('ruta_id', rutaId)
+      .limit(1)
+    
+    const tienePedidos = detallesRutaCheck && detallesRutaCheck.length > 0
+    const tieneOptimizacion = rutaPlanificada && !rutaError
+    
+    // Si no tiene pedidos, devolver respuesta exitosa con datos vacíos
+    if (!tienePedidos) {
+      const repartidorData = Array.isArray(rutaReparto.repartidor) 
+        ? rutaReparto.repartidor[0] 
+        : rutaReparto.repartidor
+      
+      return NextResponse.json({
+        success: true,
+        data: {
+          numero_ruta: rutaReparto.numero_ruta || 'S/N',
+          repartidor_nombre: repartidorData 
+            ? `${repartidorData.nombre} ${repartidorData.apellido || ''}`.trim()
+            : 'Sin asignar',
+          polyline: '',
+          ordenVisita: [],
+          historial: [],
+          mensaje: 'Esta ruta no tiene pedidos asignados aún'
+        }
+      })
+    }
+    
+    // Si tiene pedidos pero no optimización, devolver respuesta con mensaje informativo
+    if (!tieneOptimizacion) {
+      const repartidorData = Array.isArray(rutaReparto.repartidor) 
+        ? rutaReparto.repartidor[0] 
+        : rutaReparto.repartidor
+      
+      return NextResponse.json({
+        success: true,
+        data: {
+          numero_ruta: rutaReparto.numero_ruta || 'S/N',
+          repartidor_nombre: repartidorData 
+            ? `${repartidorData.nombre} ${repartidorData.apellido || ''}`.trim()
+            : 'Sin asignar',
+          polyline: '',
+          ordenVisita: [],
+          historial: [],
+          mensaje: 'Esta ruta tiene pedidos asignados pero aún no se ha optimizado. Asigna pedidos desde Almacén para generar la ruta optimizada.'
+        }
+      })
+    }
+    
     // Obtener ubicaciones históricas del día para el vehículo
     const fecha = rutaReparto.fecha_ruta
     const { data: ubicaciones, error: ubicacionesError } = await supabase
@@ -78,7 +124,7 @@ export async function GET(
     if (ubicacionesError) throw ubicacionesError
     
     // Enriquecer orden_visita con información de productos y estado de pago
-    const { data: detallesRuta, error: detallesError } = await supabase
+    const { data: detallesRutaCompleta, error: detallesError } = await supabase
       .from('detalles_ruta')
       .select(`
         id,
@@ -112,7 +158,7 @@ export async function GET(
 
     // Crear mapa de detalles_ruta por orden_entrega
     const detallesMap = new Map()
-    detallesRuta?.forEach((detalle: any) => {
+    detallesRutaCompleta?.forEach((detalle: any) => {
       detallesMap.set(detalle.orden_entrega, detalle)
     })
 

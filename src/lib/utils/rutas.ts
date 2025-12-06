@@ -43,12 +43,28 @@ export function parsePolyline(polyline?: string | null): LatLngTuple[] {
 
 /**
  * Normaliza cualquier representación de coordenadas a un objeto { lat, lng }
+ * Soporta múltiples formatos:
+ * - { lat, lng }
+ * - GeoJSON Point: { type: 'Point', coordinates: [lng, lat] }
+ * - String: "lat,lng" o "SRID=4326;POINT(lng lat)"
+ * - PostGIS geometry object (puede venir como objeto con propiedades internas)
  */
 export function normalizeCoordinates(
   coords: any
 ): { lat: number; lng: number } | null {
-  if (!coords) return null
+  if (!coords) {
+    console.log('🗺️ [normalizeCoordinates] Coordenadas vacías o null')
+    return null
+  }
 
+  console.log('🗺️ [normalizeCoordinates] Procesando coordenadas:', {
+    coords,
+    tipo: typeof coords,
+    esArray: Array.isArray(coords),
+    keys: typeof coords === 'object' && coords !== null ? Object.keys(coords) : null,
+  })
+
+  // Formato objeto con lat/lng
   if (
     typeof coords === 'object' &&
     coords !== null &&
@@ -58,20 +74,58 @@ export function normalizeCoordinates(
     const lat = typeof coords.lat === 'string' ? Number(coords.lat) : coords.lat
     const lng = typeof coords.lng === 'string' ? Number(coords.lng) : coords.lng
     if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      console.log('✅ [normalizeCoordinates] Formato {lat, lng} detectado:', { lat, lng })
       return { lat, lng }
     }
+    console.log('⚠️ [normalizeCoordinates] Formato {lat, lng} inválido:', { lat, lng })
     return null
   }
 
-  if (typeof coords === 'string' && coords.includes(',')) {
-    const [latStr, lngStr] = coords.split(',')
-    const lat = Number(latStr)
-    const lng = Number(lngStr)
+  // Formato GeoJSON Point (PostGIS devuelve [lng, lat])
+  if (
+    typeof coords === 'object' &&
+    coords !== null &&
+    'type' in coords &&
+    coords.type === 'Point' &&
+    Array.isArray(coords.coordinates) &&
+    coords.coordinates.length === 2
+  ) {
+    const [lng, lat] = coords.coordinates
     if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      console.log('✅ [normalizeCoordinates] Formato GeoJSON Point detectado:', { lat, lng })
+      return { lat, lng }
+    }
+    console.log('⚠️ [normalizeCoordinates] Formato GeoJSON Point inválido:', coords.coordinates)
+    return null
+  }
+
+  // Formato string simple "lat,lng"
+  if (typeof coords === 'string' && coords.includes(',')) {
+    // Intentar parsear formato EWKT primero: "SRID=4326;POINT(lng lat)"
+    const ewktMatch = coords.match(/POINT\(([^)]+)\)/)
+    if (ewktMatch) {
+      const parts = ewktMatch[1].trim().split(/\s+/)
+      const lngStr = parts[0]
+      const latStr = parts[1] || parts[0]
+      const lat = Number(latStr)
+      const lng = Number(lngStr)
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        console.log('✅ [normalizeCoordinates] Formato EWKT detectado:', { lat, lng })
+        return { lat, lng }
+      }
+    }
+    
+    // Formato simple "lat,lng"
+    const [latStr, lngStr] = coords.split(',')
+    const lat = Number(latStr?.trim())
+    const lng = Number(lngStr?.trim())
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      console.log('✅ [normalizeCoordinates] Formato string "lat,lng" detectado:', { lat, lng })
       return { lat, lng }
     }
   }
 
+  console.log('⚠️ [normalizeCoordinates] Formato no reconocido:', coords)
   return null
 }
 

@@ -15,10 +15,11 @@ export default async function RutaDetallePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams?: { tab?: string }
+  searchParams?: Promise<{ tab?: string }>
 }) {
   const { id } = await params
-  const activeTab = searchParams?.tab === 'mapa' ? 'mapa' : 'lista'
+  const resolvedSearchParams = await searchParams
+  const activeTab = resolvedSearchParams?.tab === 'mapa' ? 'mapa' : 'lista'
 
   const supabase = await createClient()
   const {
@@ -39,30 +40,70 @@ export default async function RutaDetallePage({
     return <div className="p-6">No tienes permisos para ver esta ruta.</div>
   }
 
-  const { data: ruta, error } = await supabase
-    .from('rutas_reparto')
-    .select(
-      `
-        *,
-        repartidor:usuarios!rutas_reparto_repartidor_id_fkey(nombre, apellido, telefono),
-        vehiculo:vehiculos(patente, marca, modelo, capacidad_kg),
-        zona:zonas(nombre),
-        tesorero_validador:usuarios!rutas_reparto_tesorero_validador_id_fkey(nombre, apellido),
-        detalles_ruta (
-          id,
-          orden_entrega,
-          estado_entrega,
-          coordenadas_entrega,
-          fecha_hora_entrega,
-          pago_registrado,
-          metodo_pago_registrado,
-          monto_cobrado_registrado,
-          pago_validado,
-          pedido:pedidos(
-            id,
-            numero_pedido,
-            total,
-            pago_estado,
+  // Obtener detalles de ruta con información completa
+  // Primero obtener los detalles básicos
+  const { data: detallesRutaRaw, error: detallesError } = await supabase
+    .from('detalles_ruta')
+    .select(`
+      id,
+      orden_entrega,
+      estado_entrega,
+      coordenadas_entrega,
+      fecha_hora_entrega,
+      pago_registrado,
+      metodo_pago_registrado,
+      monto_cobrado_registrado,
+      pago_validado,
+      pedido_id,
+      pedido:pedidos(
+        id,
+        numero_pedido,
+        total,
+        pago_estado,
+        cliente_id
+      )
+    `)
+    .eq('ruta_id', id)
+    .order('orden_entrega', { ascending: true })
+
+  if (detallesError) {
+    console.error('Error obteniendo detalles de ruta:', detallesError)
+  }
+
+  // Para cada detalle, obtener el cliente (desde pedido o desde entregas)
+  const detallesConCliente = await Promise.all(
+    (detallesRutaRaw || []).map(async (detalle: any) => {
+      let clienteData = null
+      let coordenadasCliente = null
+
+      // Si el pedido tiene cliente_id, obtener cliente directamente
+      if (detalle.pedido?.cliente_id) {
+        const { data: cliente, error: clienteError } = await supabase
+          .from('clientes')
+          .select('id, nombre, direccion, telefono, coordenadas')
+          .eq('id', detalle.pedido.cliente_id)
+          .single()
+
+        if (!clienteError && cliente) {
+          clienteData = cliente
+          // Convertir coordenadas PostGIS si existen
+          if (cliente.coordenadas) {
+            const coords = cliente.coordenadas
+            if (coords && typeof coords === 'object' && 'type' in coords && coords.type === 'Point' && Array.isArray(coords.coordinates)) {
+              const [lng, lat] = coords.coordinates
+              coordenadasCliente = { lat, lng }
+            } else if (coords && typeof coords === 'object' && 'lat' in coords && 'lng' in coords) {
+              coordenadasCliente = coords
+            }
+          }
+        }
+      } else {
+        // Si el pedido no tiene cliente_id, buscar en entregas
+        const { data: entregas, error: entregasError } = await supabase
+          .from('entregas')
+          .select(`
+            cliente_id,
+            coordenadas,
             cliente:clientes(
               id,
               nombre,
@@ -70,14 +111,58 @@ export default async function RutaDetallePage({
               telefono,
               coordenadas
             )
-          )
-        )
-      `,
-    )
+          `)
+          .eq('pedido_id', detalle.pedido_id)
+          .limit(1)
+          .single()
+
+        if (!entregasError && entregas) {
+          // Usar cliente desde entregas
+          // cliente viene como array en relaciones de Supabase
+          const clienteFromEntrega = Array.isArray(entregas.cliente) ? entregas.cliente[0] : entregas.cliente
+          if (clienteFromEntrega) {
+            clienteData = clienteFromEntrega
+            // Convertir coordenadas desde entregas o desde cliente
+            const coords = entregas.coordenadas || clienteFromEntrega.coordenadas
+            if (coords) {
+              if (coords && typeof coords === 'object' && 'type' in coords && coords.type === 'Point' && Array.isArray(coords.coordinates)) {
+                const [lng, lat] = coords.coordinates
+                coordenadasCliente = { lat, lng }
+              } else if (coords && typeof coords === 'object' && 'lat' in coords && 'lng' in coords) {
+                coordenadasCliente = coords
+              }
+            }
+          }
+        }
+      }
+
+      return {
+        ...detalle,
+        pedido: {
+          ...detalle.pedido,
+          cliente: clienteData ? {
+            ...clienteData,
+            coordenadas: coordenadasCliente,
+          } : null,
+        },
+      }
+    })
+  )
+
+  // Obtener ruta básica con relaciones
+  const { data: rutaBasica, error: rutaError } = await supabase
+    .from('rutas_reparto')
+    .select(`
+      *,
+      repartidor:usuarios!rutas_reparto_repartidor_id_fkey(nombre, apellido, telefono),
+      vehiculo:vehiculos(patente, marca, modelo, capacidad_kg),
+      zona:zonas(nombre),
+      tesorero_validador:usuarios!rutas_reparto_tesorero_validador_id_fkey(nombre, apellido)
+    `)
     .eq('id', id)
     .single()
 
-  if (error || !ruta) {
+  if (rutaError || !rutaBasica) {
     return (
       <Card className="m-6">
         <CardContent className="p-6 text-center text-muted-foreground">
@@ -86,6 +171,86 @@ export default async function RutaDetallePage({
       </Card>
     )
   }
+
+  const rutaData = {
+    ...rutaBasica,
+    detalles_ruta: detallesConCliente,
+  }
+
+  console.log('🗺️ [RutaDetallePage] Datos raw de Supabase:', {
+    totalDetalles: rutaData.detalles_ruta?.length || 0,
+    primerDetalle: rutaData.detalles_ruta?.[0],
+    estructuraCompleta: JSON.stringify(rutaData.detalles_ruta?.[0], null, 2),
+  })
+
+  console.log('🗺️ [RutaDetallePage] Datos raw de Supabase:', {
+    totalDetalles: rutaData.detalles_ruta?.length || 0,
+    primerDetalle: rutaData.detalles_ruta?.[0],
+    estructuraCompleta: JSON.stringify(rutaData.detalles_ruta?.[0], null, 2),
+  })
+
+  // Convertir coordenadas PostGIS a formato JSON si es necesario
+  const ruta = {
+    ...rutaData,
+    detalles_ruta: rutaData.detalles_ruta?.map((detalle: any) => {
+      if (detalle.pedido?.cliente?.coordenadas) {
+        const coords = detalle.pedido.cliente.coordenadas
+        
+        // Log para debug
+        console.log('🗺️ [RutaDetallePage] Coordenadas raw del cliente:', {
+          detalleId: detalle.id,
+          clienteNombre: detalle.pedido.cliente.nombre,
+          coordenadasRaw: coords,
+          tipo: typeof coords,
+          esArray: Array.isArray(coords),
+          tieneType: coords && typeof coords === 'object' && 'type' in coords,
+          type: coords && typeof coords === 'object' && 'type' in coords ? coords.type : null,
+        })
+        
+        // Si es un objeto GeoJSON Point de PostGIS, convertir a { lat, lng }
+        if (coords && typeof coords === 'object' && 'type' in coords && coords.type === 'Point' && Array.isArray(coords.coordinates)) {
+          const [lng, lat] = coords.coordinates
+          console.log('✅ [RutaDetallePage] Coordenadas convertidas:', { lat, lng })
+          return {
+            ...detalle,
+            pedido: {
+              ...detalle.pedido,
+              cliente: {
+                ...detalle.pedido.cliente,
+                coordenadas: { lat, lng },
+              },
+            },
+          }
+        }
+        
+        // Si ya está en formato { lat, lng }, mantenerlo
+        if (coords && typeof coords === 'object' && 'lat' in coords && 'lng' in coords) {
+          console.log('✅ [RutaDetallePage] Coordenadas ya en formato correcto:', coords)
+          return detalle
+        }
+      } else {
+        console.log('⚠️ [RutaDetallePage] Entrega sin coordenadas:', {
+          detalleId: detalle.id,
+          detalleCompleto: detalle,
+          tienePedido: !!detalle.pedido,
+          pedidoId: detalle.pedido?.id,
+          tieneCliente: !!detalle.pedido?.cliente,
+          clienteId: detalle.pedido?.cliente?.id,
+          clienteNombre: detalle.pedido?.cliente?.nombre,
+          clienteCompleto: detalle.pedido?.cliente,
+        })
+      }
+      return detalle
+    }),
+  }
+  
+  console.log('🗺️ [RutaDetallePage] Ruta procesada:', {
+    totalEntregas: ruta.detalles_ruta?.length || 0,
+    entregasConCoordenadas: ruta.detalles_ruta?.filter((d: any) => 
+      d.pedido?.cliente?.coordenadas && 
+      (typeof d.pedido.cliente.coordenadas === 'object' && ('lat' in d.pedido.cliente.coordenadas || 'type' in d.pedido.cliente.coordenadas))
+    ).length || 0,
+  })
 
   const fechaLegible = new Date(ruta.fecha_ruta).toLocaleDateString('es-AR', {
     weekday: 'long',

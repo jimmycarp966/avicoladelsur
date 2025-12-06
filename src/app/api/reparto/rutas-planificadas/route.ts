@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     const fecha = searchParams.get('fecha') || null
     const zonaId = searchParams.get('zona_id') || null
 
-    // Si se proporciona fecha, buscar rutas de las últimas 24 horas para incluir rutas mock creadas recientemente
+    // Si se proporciona fecha, buscar rutas de las últimas 24 horas
     let fechaDesde: Date | null = null
     if (fecha) {
       fechaDesde = new Date(fecha)
@@ -129,8 +129,8 @@ export async function GET(request: NextRequest) {
 
       const rutasReparto = Array.isArray(ruta.rutas_reparto) ? ruta.rutas_reparto[0] : ruta.rutas_reparto
       
-      // Obtener detalles_ruta con información completa
-      const { data: detallesRuta, error: detallesError } = await supabase
+      // Obtener detalles_ruta básicos primero
+      const { data: detallesRutaRaw, error: detallesError } = await supabase
         .from('detalles_ruta')
         .select(`
           id,
@@ -138,15 +138,10 @@ export async function GET(request: NextRequest) {
           estado_entrega,
           pago_registrado,
           monto_cobrado_registrado,
+          pedido_id,
           pedido:pedidos(
             id,
             cliente_id,
-            cliente:clientes(
-              id,
-              nombre,
-              telefono,
-              direccion
-            ),
             detalle_pedido:detalles_pedido(
               id,
               cantidad,
@@ -165,9 +160,57 @@ export async function GET(request: NextRequest) {
         console.error('Error obteniendo detalles_ruta:', detallesError)
       }
 
+      // Para cada detalle, obtener el cliente (desde pedido o desde entregas)
+      const detallesConCliente = await Promise.all(
+        (detallesRutaRaw || []).map(async (detalle: any) => {
+          let clienteData = null
+
+          // Si el pedido tiene cliente_id, obtener cliente directamente
+          if (detalle.pedido?.cliente_id) {
+            const { data: cliente, error: clienteError } = await supabase
+              .from('clientes')
+              .select('id, nombre, telefono, direccion')
+              .eq('id', detalle.pedido.cliente_id)
+              .single()
+
+            if (!clienteError && cliente) {
+              clienteData = cliente
+            }
+          } else {
+            // Si el pedido no tiene cliente_id, buscar en entregas
+            const { data: entregas, error: entregasError } = await supabase
+              .from('entregas')
+              .select(`
+                cliente_id,
+                cliente:clientes(
+                  id,
+                  nombre,
+                  telefono,
+                  direccion
+                )
+              `)
+              .eq('pedido_id', detalle.pedido_id)
+              .limit(1)
+              .single()
+
+            if (!entregasError && entregas?.cliente) {
+              clienteData = entregas.cliente
+            }
+          }
+
+          return {
+            ...detalle,
+            pedido: {
+              ...detalle.pedido,
+              cliente: clienteData,
+            },
+          }
+        })
+      )
+
       // Crear mapa de detalles_ruta por orden_entrega para acceso rápido
       const detallesMap = new Map()
-      detallesRuta?.forEach((detalle: any) => {
+      detallesConCliente?.forEach((detalle: any) => {
         detallesMap.set(detalle.orden_entrega, detalle)
       })
 

@@ -1,26 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AlertTriangle, Info, Megaphone, Package, CheckCircle, Clock, TrendingDown, Plus } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
-import type { NovedadRRHH } from '@/types/domain.types'
-
-interface AlertaStock {
-  id: string
-  producto: {
-    id: string
-    nombre: string
-    codigo: string
-  }
-  cantidadActual: number
-  umbral: number
-  estado: 'pendiente' | 'en_transito' | 'resuelto'
-  fechaCreacion: string
-}
+import Link from 'next/link'
 
 interface AvisosProps {
   scope: 'admin' | 'sucursal' | 'rrhh'
@@ -46,49 +33,33 @@ export function Avisos({ scope, sucursalId, className = '' }: AvisosProps) {
   const [avisos, setAvisos] = useState<AvisoItem[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Simulación de datos - en producción vendrían de props o hooks
-  const mockNovedades: AvisoItem[] = [
-    {
-      id: '1',
-      tipo: 'novedad',
-      titulo: 'Cambio de horario de verano',
-      mensaje: 'A partir del próximo lunes, el horario de atención cambia a 8:00-17:00',
-      prioridad: 'alta',
-      fecha: new Date().toISOString(),
-      activo: true
-    }
-  ]
+  useEffect(() => {
+    async function fetchAvisos() {
+      try {
+        const params = new URLSearchParams()
+        if (sucursalId) params.append('sucursal_id', sucursalId)
+        params.append('scope', scope)
 
-  const mockAlertasStock: AvisoItem[] = [
-    {
-      id: '2',
-      tipo: 'alerta_stock',
-      titulo: 'Stock bajo: Pollo Entero',
-      mensaje: 'Quedan solo 3 kg de Pollo Entero. Umbral: 5 kg',
-      prioridad: 'urgente',
-      fecha: new Date().toISOString(),
-      activo: true,
-      metadata: {
-        producto: { nombre: 'Pollo Entero', codigo: 'POL001' },
-        cantidadActual: 3,
-        umbral: 5
+        const response = await fetch(`/api/avisos?${params.toString()}`)
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success && data.data) {
+            setAvisos(data.data)
+          }
+        }
+      } catch (error) {
+        console.error('Error al obtener avisos:', error)
+      } finally {
+        setLoading(false)
       }
     }
-  ]
+
+    fetchAvisos()
+  }, [scope, sucursalId])
 
   // Filtrar avisos según scope
   const getAvisosFiltrados = () => {
-    let allAvisos: AvisoItem[] = []
-
-    if (scope === 'rrhh' || scope === 'admin') {
-      allAvisos = allAvisos.concat(mockNovedades)
-    }
-
-    if (scope === 'sucursal' || scope === 'admin') {
-      allAvisos = allAvisos.concat(mockAlertasStock)
-    }
-
-    return allAvisos.filter(aviso => aviso.activo)
+    return avisos.filter(aviso => aviso.activo)
   }
 
   const avisosFiltrados = getAvisosFiltrados()
@@ -210,21 +181,27 @@ export function Avisos({ scope, sucursalId, className = '' }: AvisosProps) {
         <div className="mt-4 pt-4 border-t">
           {scope === 'sucursal' && (
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="flex-1">
-                <Package className="w-4 h-4 mr-2" />
-                Ver Alertas Stock
+              <Button variant="outline" size="sm" className="flex-1" asChild>
+                <Link href="/sucursal/alerts">
+                  <Package className="w-4 h-4 mr-2" />
+                  Ver Alertas Stock
+                </Link>
               </Button>
-              <Button variant="outline" size="sm" className="flex-1">
-                <Megaphone className="w-4 h-4 mr-2" />
-                Ver Novedades
+              <Button variant="outline" size="sm" className="flex-1" asChild>
+                <Link href="/sucursal/novedades">
+                  <Megaphone className="w-4 h-4 mr-2" />
+                  Ver Novedades
+                </Link>
               </Button>
             </div>
           )}
 
           {scope === 'rrhh' && (
-            <Button variant="outline" size="sm" className="w-full">
-              <Plus className="w-4 h-4 mr-2" />
-              Crear Novedad
+            <Button variant="outline" size="sm" className="w-full" asChild>
+              <Link href="/rrhh/novedades/nueva">
+                <Plus className="w-4 h-4 mr-2" />
+                Crear Novedad
+              </Link>
             </Button>
           )}
 

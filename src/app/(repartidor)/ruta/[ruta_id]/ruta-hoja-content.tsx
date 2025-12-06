@@ -75,7 +75,9 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
     return true
   })
 
-  const puedeIniciar = ruta.estado === 'planificada' && ruta.checklist_inicio_id
+  // Permitir iniciar rutas en estado 'planificada' o 'en_curso' (rutas iniciadas desde almacén)
+  // El botón aparecerá si tiene checklist_inicio_id completado
+  const puedeIniciar = (ruta.estado === 'planificada' || ruta.estado === 'en_curso') && ruta.checklist_inicio_id
   const puedeFinalizar = ruta.estado === 'en_curso' && 
     entregasPendientes === 0 && 
     entregasSinEstadoPago.length === 0 &&

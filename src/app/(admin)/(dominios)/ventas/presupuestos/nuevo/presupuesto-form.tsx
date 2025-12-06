@@ -18,8 +18,11 @@ import { obtenerListasClienteAction, obtenerPrecioProductoAction } from '@/actio
 import { useNotificationStore } from '@/store/notificationStore'
 import { formatCurrency } from '@/lib/utils'
 import { useDebounce } from '@/lib/hooks/useDebounce'
+import { useFocusField } from '@/lib/hooks/useFocusField'
+import { useFormContextShortcuts } from '@/lib/hooks/useFormContextShortcuts'
+import { KeyboardHintCompact } from '@/components/ui/keyboard-hint'
 import { ProductoItemRow } from './producto-item-row'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
 const crearPresupuestoSchema = z.object({
   cliente_id: z.string().uuid('Debes seleccionar un cliente'),
@@ -52,6 +55,7 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
   const [clienteDropdownOpen, setClienteDropdownOpen] = useState(false)
   const [listasCliente, setListasCliente] = useState<Array<{ id: string; lista_precio: { id: string; nombre: string; codigo: string } }>>([])
   const [cargandoListas, setCargandoListas] = useState(false)
+  const agregarProductoButtonRef = useRef<HTMLButtonElement>(null)
 
   const {
     register,
@@ -93,6 +97,76 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
     return clientes.find(c => c.id === watchedCliente)
   }, [clientes, watchedCliente])
 
+  // Atajos contextuales para el formulario
+  useFormContextShortcuts({
+    shortcuts: [
+      {
+        key: 'c',
+        fieldId: 'cliente_id',
+        description: 'Enfocar Cliente',
+        action: () => {
+          const element = document.getElementById('cliente_id')
+          if (element) {
+            element.click()
+            setTimeout(() => {
+              const searchInput = document.querySelector('[role="listbox"] input[type="text"]')
+              if (searchInput instanceof HTMLInputElement) {
+                searchInput.focus()
+                searchInput.select()
+              }
+            }, 150)
+          }
+        },
+      },
+      {
+        key: 'p',
+        fieldId: 'producto_0',
+        description: 'Enfocar primer Producto',
+        action: () => {
+          // Buscar el primer campo de producto disponible
+          const firstProductSelect = document.querySelector('[data-product-index="0"]') as HTMLElement
+          if (firstProductSelect) {
+            firstProductSelect.click()
+            setTimeout(() => {
+              const searchInput = document.querySelector('[role="listbox"] input[type="text"]')
+              if (searchInput instanceof HTMLInputElement) {
+                searchInput.focus()
+                searchInput.select()
+              }
+            }, 150)
+          }
+        },
+      },
+      {
+        key: 'a',
+        description: 'Agregar Producto',
+        action: () => {
+          agregarProductoButtonRef.current?.click()
+        },
+      },
+      {
+        key: 'l',
+        fieldId: 'lista_precio_id',
+        description: 'Enfocar Lista de Precios',
+      },
+      {
+        key: 'f',
+        fieldId: 'fecha_entrega_estimada',
+        description: 'Enfocar Fecha de Entrega',
+      },
+      {
+        key: 'z',
+        fieldId: 'zona_id',
+        description: 'Enfocar Zona de Entrega',
+      },
+      {
+        key: 'o',
+        fieldId: 'observaciones',
+        description: 'Enfocar Observaciones',
+      },
+    ],
+  })
+
   // Cargar listas del cliente cuando se selecciona un cliente
   useEffect(() => {
     const cargarListas = async () => {
@@ -124,14 +198,17 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
         if (item.producto_id) {
           const precioResult = await obtenerPrecioProductoAction(watchedListaPrecio, item.producto_id)
           if (precioResult.success && precioResult.data) {
-            setValue(`items.${i}.precio_unit_est`, precioResult.data.precio)
+            setValue(`items.${i}.precio_unit_est`, precioResult.data.precio, { 
+              shouldValidate: true,
+              shouldDirty: true 
+            })
           }
         }
       }
     }
 
     actualizarPrecios()
-  }, [watchedListaPrecio, setValue])
+  }, [watchedListaPrecio, setValue, watchedItems])
 
   // Memoizar handleProductoChange
   const handleProductoChange = useCallback(async (index: number, productoId: string) => {
@@ -142,13 +219,19 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
     if (watchedListaPrecio) {
       const precioResult = await obtenerPrecioProductoAction(watchedListaPrecio, productoId)
       if (precioResult.success && precioResult.data) {
-        setValue(`items.${index}.precio_unit_est`, precioResult.data.precio)
+        setValue(`items.${index}.precio_unit_est`, precioResult.data.precio, { 
+          shouldValidate: true,
+          shouldDirty: true 
+        })
         return
       }
     }
 
     // Fallback a precio_venta del producto
-    setValue(`items.${index}.precio_unit_est`, producto.precio_venta)
+    setValue(`items.${index}.precio_unit_est`, producto.precio_venta, { 
+      shouldValidate: true,
+      shouldDirty: true 
+    })
   }, [productos, setValue, watchedListaPrecio])
 
   // Memoizar función para filtrar productos
@@ -175,8 +258,45 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
 
   // Memoizar addItem
   const addItem = useCallback(() => {
+    const newIndex = fields.length
     append({ producto_id: '', cantidad_solicitada: 1, precio_unit_est: 0 })
-  }, [append])
+    
+    // Enfocar el select del producto recién agregado después de que React lo renderice
+    // Usar múltiples intentos para asegurar que funcione
+    const focusProductSelect = (attempts = 0) => {
+      if (attempts > 10) return // Máximo 10 intentos
+      
+      const nuevoProductoSelect = document.getElementById(`producto_${newIndex}`) as HTMLElement
+      if (nuevoProductoSelect) {
+        // Si hay un input con foco que no es el que queremos, quitarlo
+        const activeElement = document.activeElement as HTMLElement
+        if (activeElement && 'name' in activeElement && (activeElement as HTMLInputElement).name === `items.${newIndex}.cantidad_solicitada`) {
+          activeElement.blur()
+        }
+        
+        // Enfocar el select
+        nuevoProductoSelect.focus()
+        nuevoProductoSelect.click()
+        
+        // Esperar a que se abra el dropdown y luego enfocar el input de búsqueda
+        setTimeout(() => {
+          const searchInput = document.querySelector('[role="listbox"] input[type="text"]') as HTMLInputElement
+          if (searchInput) {
+            searchInput.focus()
+            searchInput.select()
+          }
+        }, 250)
+      } else {
+        // Si no se encuentra, intentar de nuevo después de un breve delay
+        setTimeout(() => focusProductSelect(attempts + 1), 50)
+      }
+    }
+    
+    // Iniciar el proceso después de que React renderice
+    requestAnimationFrame(() => {
+      setTimeout(() => focusProductSelect(), 100)
+    })
+  }, [append, fields.length])
 
   // Memoizar removeItem
   const removeItem = useCallback((index: number) => {
@@ -266,7 +386,10 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <Label htmlFor="cliente_id">Cliente *</Label>
+            <Label htmlFor="cliente_id" className="flex items-center gap-2">
+              Cliente *
+              <KeyboardHintCompact shortcut="C" />
+            </Label>
             <Select
               value={watchedCliente || ''}
               onValueChange={(value) => {
@@ -342,12 +465,15 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
           {clienteSeleccionado && (
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <Label>Zona de Entrega</Label>
+                <Label htmlFor="zona_id" className="flex items-center gap-2">
+                  Zona de Entrega
+                  <KeyboardHintCompact shortcut="Z" />
+                </Label>
                 <Select
                   value={watch('zona_id') || ''}
                   onValueChange={(value) => setValue('zona_id', value)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="zona_id">
                     <SelectValue placeholder="Selecciona una zona" />
                   </SelectTrigger>
                   <SelectContent>
@@ -361,7 +487,10 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
               </div>
 
               <div>
-                <Label htmlFor="fecha_entrega_estimada">Fecha de Entrega Estimada</Label>
+                <Label htmlFor="fecha_entrega_estimada" className="flex items-center gap-2">
+                  Fecha de Entrega Estimada
+                  <KeyboardHintCompact shortcut="F" />
+                </Label>
                 <DateInput
                   id="fecha_entrega_estimada"
                   value={watch('fecha_entrega_estimada')}
@@ -374,7 +503,10 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
 
           {clienteSeleccionado && (
             <div>
-              <Label htmlFor="lista_precio_id">Lista de Precios</Label>
+              <Label htmlFor="lista_precio_id" className="flex items-center gap-2">
+                Lista de Precios
+                <KeyboardHintCompact shortcut="L" />
+              </Label>
               <Select
                 value={watch('lista_precio_id') || ''}
                 onValueChange={(value) => {
@@ -435,6 +567,7 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
               watch={watch}
               setValue={setValue}
               register={register}
+              control={control}
               watchedItem={watchedItems?.[index]}
             />
           ))}
@@ -443,9 +576,16 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
             <p className="text-sm text-red-500">{errors.items.root.message}</p>
           )}
 
-          <Button type="button" variant="outline" onClick={addItem} className="w-full">
+          <Button 
+            ref={agregarProductoButtonRef}
+            type="button" 
+            variant="outline" 
+            onClick={addItem} 
+            className="w-full"
+          >
             <Plus className="mr-2 h-4 w-4" />
             Agregar Producto
+            <KeyboardHintCompact shortcut="A" className="ml-auto" />
           </Button>
         </CardContent>
       </Card>
@@ -453,10 +593,14 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
       {/* Observaciones */}
       <Card>
         <CardHeader>
-          <CardTitle>Observaciones</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            Observaciones
+            <KeyboardHintCompact shortcut="O" />
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <Textarea
+            id="observaciones"
             {...register('observaciones')}
             rows={4}
             placeholder="Agregar notas o instrucciones especiales..."

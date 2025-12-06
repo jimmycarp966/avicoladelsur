@@ -61,7 +61,8 @@ async function RepartoContent({ searchParams }: { searchParams: { fecha?: string
   // Obtener detalles de ruta con información completa
   const rutaIds = rutasActivas.map((r: any) => r.id)
   
-  const { data: detallesRuta } = rutaIds.length > 0
+  // Obtener detalles básicos primero
+  const { data: detallesRutaRaw } = rutaIds.length > 0
     ? await supabase
         .from('detalles_ruta')
         .select(`
@@ -69,18 +70,14 @@ async function RepartoContent({ searchParams }: { searchParams: { fecha?: string
           orden_entrega,
           estado_entrega,
           ruta_id,
+          pedido_id,
           pedido:pedidos(
             id,
             numero_pedido,
             total,
             turno,
             zona_id,
-            cliente:clientes(
-              nombre,
-              telefono,
-              direccion,
-              zona_entrega
-            ),
+            cliente_id,
             pago_estado,
             instrucciones_repartidor
           ),
@@ -98,7 +95,56 @@ async function RepartoContent({ searchParams }: { searchParams: { fecha?: string
         .order('orden_entrega')
     : { data: [] }
 
-  const entregas = detallesRuta?.map((detalle: any) => ({
+  // Para cada detalle, obtener el cliente (desde pedido o desde entregas)
+  const detallesConCliente = await Promise.all(
+    (detallesRutaRaw || []).map(async (detalle: any) => {
+      let clienteData = null
+
+      // Si el pedido tiene cliente_id, obtener cliente directamente
+      if (detalle.pedido?.cliente_id) {
+        const { data: cliente, error: clienteError } = await supabase
+          .from('clientes')
+          .select('id, nombre, telefono, direccion, zona_entrega')
+          .eq('id', detalle.pedido.cliente_id)
+          .single()
+
+        if (!clienteError && cliente) {
+          clienteData = cliente
+        }
+      } else {
+        // Si el pedido no tiene cliente_id, buscar en entregas
+        const { data: entregas, error: entregasError } = await supabase
+          .from('entregas')
+          .select(`
+            cliente_id,
+            cliente:clientes(
+              id,
+              nombre,
+              telefono,
+              direccion,
+              zona_entrega
+            )
+          `)
+          .eq('pedido_id', detalle.pedido_id)
+          .limit(1)
+          .single()
+
+        if (!entregasError && entregas?.cliente) {
+          clienteData = entregas.cliente
+        }
+      }
+
+      return {
+        ...detalle,
+        pedido: {
+          ...detalle.pedido,
+          cliente: clienteData,
+        },
+      }
+    })
+  )
+
+  const entregas = detallesConCliente.map((detalle: any) => ({
     id: detalle.id,
     pedido_id: detalle.pedido?.id,
     numero_pedido: detalle.pedido?.numero_pedido,
@@ -112,7 +158,7 @@ async function RepartoContent({ searchParams }: { searchParams: { fecha?: string
     estado: detalle.estado_entrega,
     turno: detalle.ruta?.turno,
     zona: detalle.pedido?.cliente?.zona_entrega
-  })) || []
+  }))
 
   // Estadísticas
   const totalEntregas = entregas.length

@@ -123,6 +123,13 @@ export default function RutaMap({
         throw new Error(data.error || 'No se pudo cargar el recorrido')
       }
       const data: RecorridoResponse = await res.json()
+      console.log('🗺️ [RutaMap] Datos recibidos del endpoint:', {
+        success: data.success,
+        tieneData: !!data.data,
+        ordenVisita: data.data?.ordenVisita?.length || 0,
+        polyline: data.data?.polyline?.substring(0, 50) || 'vacío',
+        mensaje: (data.data as any)?.mensaje,
+      })
       if (data.success && data.data) {
         setPolylinePoints(parsePolyline(data.data.polyline))
         if (Array.isArray(data.data.ordenVisita)) {
@@ -205,23 +212,59 @@ export default function RutaMap({
   }, [ordenVisita])
 
   const markers = useMemo(() => {
+    console.log('🗺️ [RutaMap] Procesando entregas para marcadores:', {
+      totalEntregas: entregas.length,
+      ordenVisitaSize: ordenVisitaLookup.size,
+    })
+
     const sorted = [...entregas].sort(
       (a, b) => (a.orden_entrega || 0) - (b.orden_entrega || 0),
     )
 
-    return sorted
+    const markersResult = sorted
       .map(entrega => {
+        // Intentar obtener coordenadas de múltiples fuentes
         let coords =
           normalizeCoordinates(entrega.coordenadas_entrega) ||
           normalizeCoordinates(entrega.pedido?.cliente?.coordenadas)
 
+        // Debug: Log para ver qué formato tienen las coordenadas
+        if (!coords) {
+          console.log('🗺️ [RutaMap] Entrega sin coordenadas:', {
+            entregaId: entrega.id,
+            entregaCompleta: entrega,
+            tienePedido: !!entrega.pedido,
+            pedidoId: entrega.pedido?.id,
+            tieneCliente: !!entrega.pedido?.cliente,
+            clienteId: entrega.pedido?.cliente?.id,
+            clienteNombre: entrega.pedido?.cliente?.nombre,
+            coordenadasEntrega: entrega.coordenadas_entrega,
+            coordenadasCliente: entrega.pedido?.cliente?.coordenadas,
+            tipoCoordenadasCliente: typeof entrega.pedido?.cliente?.coordenadas,
+            esArray: Array.isArray(entrega.pedido?.cliente?.coordenadas),
+            estructuraCompleta: JSON.stringify(entrega, null, 2),
+          })
+        } else {
+          console.log('✅ [RutaMap] Entrega con coordenadas:', {
+            entregaId: entrega.id,
+            clienteNombre: entrega.pedido?.cliente?.nombre,
+            coords,
+          })
+        }
+
+        // Si no hay coordenadas en la entrega, buscar en ordenVisita
         if (!coords && ordenVisitaLookup.size > 0) {
           const fallback = ordenVisitaLookup.get(entrega.id)
           if (fallback && Number.isFinite(fallback.lat) && Number.isFinite(fallback.lng)) {
             coords = { lat: fallback.lat, lng: fallback.lng }
+            console.log('✅ [RutaMap] Coordenadas encontradas en ordenVisita:', {
+              entregaId: entrega.id,
+              coords,
+            })
           }
         }
 
+        // Si aún no hay coordenadas, retornar null (se filtrará)
         if (!coords) return null
 
         return {
@@ -233,7 +276,29 @@ export default function RutaMap({
         }
       })
       .filter((marker): marker is NonNullable<typeof marker> => Boolean(marker))
+
+    console.log('🗺️ [RutaMap] Marcadores finales:', {
+      total: markersResult.length,
+      marcadores: markersResult.map(m => ({
+        id: m.id,
+        order: m.order,
+        cliente: m.pedido?.cliente?.nombre,
+        coords: m.coords,
+      })),
+    })
+
+    return markersResult
   }, [entregas, ordenVisitaLookup])
+
+  // Contar entregas sin coordenadas para mostrar mensaje informativo
+  const entregasSinCoordenadas = useMemo(() => {
+    return entregas.filter(entrega => {
+      const coords =
+        normalizeCoordinates(entrega.coordenadas_entrega) ||
+        normalizeCoordinates(entrega.pedido?.cliente?.coordenadas)
+      return !coords
+    }).length
+  }, [entregas])
 
   const mapCenter = useMemo(() => {
     if (gpsPosition) {
@@ -611,19 +676,55 @@ export default function RutaMap({
           </div>
         )}
 
+        {!error && !loading && mapsLoaded && markers.length === 0 && entregas.length > 0 && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-yellow-50/90 text-yellow-900 p-4 text-center">
+            <MapPin className="h-6 w-6 mb-2" />
+            <p className="font-medium">No hay coordenadas disponibles</p>
+            <p className="text-sm opacity-80 mt-1">
+              {entregasSinCoordenadas > 0
+                ? `${entregasSinCoordenadas} de ${entregas.length} entregas no tienen coordenadas asignadas. Asigna coordenadas a los clientes para verlos en el mapa.`
+                : 'Las entregas asignadas no tienen coordenadas. Asigna coordenadas a los clientes para verlos en el mapa.'}
+            </p>
+          </div>
+        )}
+
+        {!error && !loading && mapsLoaded && entregas.length === 0 && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-blue-50/90 text-blue-900 p-4 text-center">
+            <MapPin className="h-6 w-6 mb-2" />
+            <p className="font-medium">Ruta sin entregas</p>
+            <p className="text-sm opacity-80 mt-1">
+              Esta ruta no tiene pedidos asignados aún. Asigna pedidos desde Almacén para verlos en el mapa.
+            </p>
+          </div>
+        )}
+
         <div ref={mapRef} style={{ height: '100%', width: '100%' }} />
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1">
-            <span className="inline-block h-2 w-2 rounded-full bg-[#2d6a4f]" />
-            <span>Ruta optimizada</span>
-          </div>
+          {markers.length > 0 && (
+            <div className="flex items-center gap-1">
+              <span className="inline-block h-2 w-2 rounded-full bg-[#2d6a4f]" />
+              <span>{markers.length} cliente{markers.length !== 1 ? 's' : ''} en el mapa</span>
+            </div>
+          )}
+          {polylinePoints.length > 0 && (
+            <div className="flex items-center gap-1">
+              <span className="inline-block h-2 w-2 rounded-full bg-[#2d6a4f]" />
+              <span>Ruta optimizada</span>
+            </div>
+          )}
           {historialPoints.length > 1 && (
             <div className="flex items-center gap-1">
               <span className="inline-block h-2 w-2 rounded-full bg-[#0ea5e9]" />
               <span>Recorrido histórico</span>
+            </div>
+          )}
+          {entregasSinCoordenadas > 0 && (
+            <div className="flex items-center gap-1 text-yellow-600">
+              <AlertCircle className="h-3 w-3" />
+              <span>{entregasSinCoordenadas} sin coordenadas</span>
             </div>
           )}
         </div>

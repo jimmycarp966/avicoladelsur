@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -17,6 +17,9 @@ import { GoogleMapSelector } from '@/components/ui/google-map-selector'
 import Link from 'next/link'
 import { clienteSchema, type ClienteFormData } from '@/lib/schemas/clientes.schema'
 import { useNotificationStore } from '@/store/notificationStore'
+import { useFormShortcuts } from '@/lib/hooks/useFormShortcuts'
+import { useFormContextShortcuts } from '@/lib/hooks/useFormContextShortcuts'
+import { KeyboardHintCompact } from '@/components/ui/keyboard-hint'
 import {
   obtenerListasClienteAction,
   obtenerListasPreciosAction,
@@ -48,6 +51,7 @@ export function ClienteForm({ cliente, zonas = [], onSuccess }: ClienteFormProps
   const { showToast } = useNotificationStore()
   const [isLoading, setIsLoading] = useState(false)
   const isEditing = !!cliente
+  const submitButtonRef = useRef<HTMLButtonElement>(null)
   const [listasAsignadas, setListasAsignadas] = useState<Array<{ 
     id: string
     lista_precio: { id: string; nombre: string; codigo: string; tipo: string }
@@ -94,6 +98,19 @@ export function ClienteForm({ cliente, zonas = [], onSuccess }: ClienteFormProps
 
   const activo = watch('activo')
   const tipoCliente = watch('tipo_cliente')
+
+  // Atajos contextuales para campos del formulario
+  useFormContextShortcuts({
+    shortcuts: [
+      { key: 'c', fieldId: 'codigo', description: 'Código' },
+      { key: 'n', fieldId: 'nombre', description: 'Nombre' },
+      { key: 't', fieldId: 'telefono', description: 'Teléfono' },
+      { key: 'w', fieldId: 'whatsapp', description: 'WhatsApp' },
+      { key: 'e', fieldId: 'email', description: 'Email' },
+      { key: 'd', fieldId: 'direccion', description: 'Dirección' },
+      { key: 'z', fieldId: 'zona_entrega', description: 'Zona de Entrega' },
+    ],
+  })
 
   // Cargar listas asignadas cuando se edita un cliente
   useEffect(() => {
@@ -194,6 +211,12 @@ export function ClienteForm({ cliente, zonas = [], onSuccess }: ClienteFormProps
     }
   }
 
+  // Atajos de teclado para formulario (después de declarar onSubmit)
+  useFormShortcuts({
+    onSubmit: handleSubmit(onSubmit),
+    submitButtonRef,
+  })
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       {/* Información básica */}
@@ -206,7 +229,10 @@ export function ClienteForm({ cliente, zonas = [], onSuccess }: ClienteFormProps
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="codigo">Código *</Label>
+            <Label htmlFor="codigo" className="flex items-center gap-2">
+              Código *
+              <KeyboardHintCompact shortcut="C" />
+            </Label>
             <Input
               id="codigo"
               placeholder="Ej: 115, CLI-001"
@@ -223,7 +249,10 @@ export function ClienteForm({ cliente, zonas = [], onSuccess }: ClienteFormProps
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="nombre">Nombre *</Label>
+            <Label htmlFor="nombre" className="flex items-center gap-2">
+              Nombre *
+              <KeyboardHintCompact shortcut="N" />
+            </Label>
             <Input
               id="nombre"
               placeholder="Nombre completo del cliente"
@@ -293,7 +322,10 @@ export function ClienteForm({ cliente, zonas = [], onSuccess }: ClienteFormProps
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="telefono">Teléfono</Label>
+              <Label htmlFor="telefono" className="flex items-center gap-2">
+                Teléfono
+                <KeyboardHintCompact shortcut="T" />
+              </Label>
               <Input
                 id="telefono"
                 placeholder="+5491123456789"
@@ -306,7 +338,10 @@ export function ClienteForm({ cliente, zonas = [], onSuccess }: ClienteFormProps
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="whatsapp">WhatsApp</Label>
+              <Label htmlFor="whatsapp" className="flex items-center gap-2">
+                WhatsApp
+                <KeyboardHintCompact shortcut="W" />
+              </Label>
               <Input
                 id="whatsapp"
                 placeholder="+5491123456789"
@@ -320,7 +355,10 @@ export function ClienteForm({ cliente, zonas = [], onSuccess }: ClienteFormProps
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email" className="flex items-center gap-2">
+              Email
+              <KeyboardHintCompact shortcut="E" />
+            </Label>
             <Input
               id="email"
               type="email"
@@ -345,7 +383,10 @@ export function ClienteForm({ cliente, zonas = [], onSuccess }: ClienteFormProps
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="zona_entrega">Zona de Entrega</Label>
+            <Label htmlFor="zona_entrega" className="flex items-center gap-2">
+              Zona de Entrega
+              <KeyboardHintCompact shortcut="Z" />
+            </Label>
             <Select value={watch('zona_entrega') || 'none'} onValueChange={(value) => setValue('zona_entrega', value === 'none' ? '' : value)}>
               <SelectTrigger disabled={isLoading}>
                 <SelectValue placeholder="Seleccionar zona..." />
@@ -378,7 +419,10 @@ export function ClienteForm({ cliente, zonas = [], onSuccess }: ClienteFormProps
 
           {/* Campo de dirección (solo lectura, actualizado por el mapa) */}
           <div className="space-y-2">
-            <Label htmlFor="direccion">Dirección Completa</Label>
+            <Label htmlFor="direccion" className="flex items-center gap-2">
+              Dirección Completa
+              <KeyboardHintCompact shortcut="D" />
+            </Label>
             <Textarea
               id="direccion"
               placeholder="La dirección se actualizará automáticamente al seleccionar una ubicación en el mapa"
@@ -511,7 +555,12 @@ export function ClienteForm({ cliente, zonas = [], onSuccess }: ClienteFormProps
           </Link>
         </Button>
 
-        <Button type="submit" disabled={isLoading} className="bg-primary hover:bg-primary/90 shadow-sm w-full sm:w-auto order-1 sm:order-2">
+        <Button 
+          ref={submitButtonRef}
+          type="submit" 
+          disabled={isLoading} 
+          className="bg-primary hover:bg-primary/90 shadow-sm w-full sm:w-auto order-1 sm:order-2"
+        >
           {isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

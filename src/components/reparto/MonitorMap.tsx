@@ -165,7 +165,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
         if (u.ruta_activa_id) rutasActivasIds.add(u.ruta_activa_id)
       })
 
-      // 2.5 Cargar rutas planificadas (para rutas mock) - buscar de las últimas 24 horas
+      // 2.5 Cargar rutas planificadas - buscar de las últimas 24 horas
       const fechaActual = fecha || new Date().toISOString().split('T')[0]
       const fechaParam = fechaActual
       const ayer = new Date(fechaActual)
@@ -179,7 +179,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
       // 3. Procesar rutas
       const nuevasRutas = new Map<string, RutaData>()
 
-      // Primero procesar rutas planificadas (rutas mock)
+      // Primero procesar rutas planificadas
       if (rutasPlanificadasRes.ok) {
         const rutasPlanificadasData = await rutasPlanificadasRes.json()
         console.log('🔍 [DEBUG] Respuesta rutas planificadas:', rutasPlanificadasData)

@@ -132,6 +132,12 @@ supabase/                         # Scripts SQL y migraciones
 - **Firma Digital**: Verificación con QR y subida automática a Supabase Storage
 - **Generación de Datos Mock**: Sistema completo para crear datos de prueba (rutas, clientes, GPS) para testing del monitor GPS, optimizado para Vercel Free (10s timeout) con logs detallados
 - **Monitor GPS Avanzado**: Panel lateral con números clickeables de clientes, modal de vista previa con información completa (cliente y productos), números cambian de color según estado (negro: entregado y cobrado, gris: solo entregado)
+- **Visualización Mejorada**: RutasTable muestra nombre/apellido del repartidor y patente/marca/modelo del vehículo (no IDs)
+- **Cálculo Automático de Peso**: Trigger SQL recalcula `peso_total_kg` automáticamente al modificar pedidos en la ruta
+- **Sincronización de Métricas**: Al optimizar ruta, se actualizan `distancia_estimada_km` y `tiempo_estimado_min` en `rutas_reparto`
+- **Obtención de Clientes Mejorada**: Sistema obtiene clientes desde `entregas` cuando pedido no tiene `cliente_id` (modelo agrupado)
+- **Conversión PostGIS**: Función mejorada para convertir coordenadas PostGIS (GeoJSON Point) a formato `{lat, lng}` para mapas
+- **Flujo de Iniciar Ruta**: Pedidos "Enviados" desde almacén crean rutas con estado `'en_curso'` automáticamente, visibles inmediatamente para repartidor
 
 ### 💵 **Tesorería**: Control Financiero
 - **Cajas**: Por sucursal con saldos iniciales/actuales

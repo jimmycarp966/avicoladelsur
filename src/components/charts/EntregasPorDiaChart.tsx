@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import {
   Bar,
   BarChart,
@@ -9,19 +10,22 @@ import {
   YAxis,
 } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-
-// Datos de ejemplo - en producción vendrían de la base de datos
-const data = [
-  { dia: 'Lun', entregas: 12, km: 45 },
-  { dia: 'Mar', entregas: 15, km: 52 },
-  { dia: 'Mié', entregas: 18, km: 48 },
-  { dia: 'Jue', entregas: 14, km: 41 },
-  { dia: 'Vie', entregas: 22, km: 67 },
-  { dia: 'Sáb', entregas: 8, km: 28 },
-  { dia: 'Dom', entregas: 3, km: 12 },
-]
+import { obtenerEntregasPorDia } from '@/actions/dashboard.actions'
 
 export function EntregasPorDiaChart() {
+  const [data, setData] = useState<Array<{ dia: string; entregas: number; km: number }>>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchData() {
+      const result = await obtenerEntregasPorDia()
+      if (result.success && result.data) {
+        setData(result.data)
+      }
+      setLoading(false)
+    }
+    fetchData()
+  }, [])
   return (
     <Card>
       <CardHeader>
@@ -31,7 +35,16 @@ export function EntregasPorDiaChart() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={300}>
+        {loading ? (
+          <div className="flex items-center justify-center h-[300px]">
+            <p className="text-muted-foreground">Cargando datos...</p>
+          </div>
+        ) : data.length === 0 ? (
+          <div className="flex items-center justify-center h-[300px]">
+            <p className="text-muted-foreground">No hay datos disponibles</p>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={300}>
           <BarChart data={data}>
             <XAxis
               dataKey="dia"
@@ -78,18 +91,21 @@ export function EntregasPorDiaChart() {
             />
           </BarChart>
         </ResponsiveContainer>
+        )}
 
         {/* Leyenda */}
-        <div className="flex justify-center gap-6 mt-4">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded" style={{ backgroundColor: '#2D5A27' }} />
-            <span className="text-sm text-gray-600">Entregas</span>
+        {data.length > 0 && (
+          <div className="flex justify-center gap-6 mt-4">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded" style={{ backgroundColor: '#2D5A27' }} />
+              <span className="text-sm text-gray-600">Entregas</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded" style={{ backgroundColor: '#F4C430' }} />
+              <span className="text-sm text-gray-600">Kilómetros</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded" style={{ backgroundColor: '#F4C430' }} />
-            <span className="text-sm text-gray-600">Kilómetros</span>
-          </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   )

@@ -2911,6 +2911,17 @@ Conciliación automática → Reportes CSV/PDF
 
 **Últimas actualizaciones:**
 
+- ✅ **Mejoras en Gestión de Rutas y Visualización (Diciembre 2025)**
+  - Visualización mejorada: RutasTable muestra nombre/apellido del repartidor y patente/marca/modelo del vehículo (no IDs)
+  - Cálculo automático de peso total: Trigger SQL `trg_recalcular_peso_ruta` recalcula `peso_total_kg` automáticamente al modificar pedidos
+  - Sincronización de métricas: Al optimizar ruta, se actualizan `distancia_estimada_km` y `tiempo_estimado_min` en `rutas_reparto`
+  - Obtención mejorada de clientes: Sistema obtiene clientes desde tabla `entregas` cuando pedido no tiene `cliente_id` (modelo agrupado)
+  - Conversión PostGIS mejorada: Función `normalizeCoordinates()` maneja GeoJSON Point, EWKT y formatos simples
+  - Flujo de iniciar ruta: Pedidos "Enviados" desde almacén crean rutas con estado `'en_curso'` automáticamente
+  - Función `iniciarRuta()` inteligente: Verifica estado actual - si ya está en `'en_curso'`, solo actualiza `updated_at`
+  - Migración SQL: `20251218_calcular_peso_total_rutas.sql` con función y trigger
+  - Archivos actualizados: RutasTable, ruta-optimizer, utils/rutas, páginas de admin/repartidor, endpoints API
+
 - ✅ **Vista Previa de Clientes en Monitor GPS (Diciembre 2025)**
   - Panel lateral con números clickeables de clientes por ruta seleccionada
   - Modal de vista previa con información completa del cliente (nombre, dirección, teléfono) y lista de productos

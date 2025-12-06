@@ -1,7 +1,7 @@
 'use client'
 
 import { memo, useMemo } from 'react'
-import { UseFormRegister, UseFormSetValue, UseFormWatch } from 'react-hook-form'
+import { UseFormRegister, UseFormSetValue, UseFormWatch, Controller, Control } from 'react-hook-form'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -23,6 +23,7 @@ interface ProductoItemRowProps {
   watch: UseFormWatch<any>
   setValue: UseFormSetValue<any>
   register: UseFormRegister<any>
+  control: Control<any>
   watchedItem?: any
 }
 
@@ -39,6 +40,7 @@ const ProductoItemRow = memo(function ProductoItemRow({
   watch,
   setValue,
   register,
+  control,
   watchedItem,
 }: ProductoItemRowProps) {
   const debouncedSearch = useDebounce(productoSearch, 300)
@@ -54,9 +56,9 @@ const ProductoItemRow = memo(function ProductoItemRow({
   }, [productos, debouncedSearch])
 
   return (
-    <div className="grid gap-4 md:grid-cols-12 p-4 border rounded-lg">
+    <div className="grid gap-4 md:grid-cols-12 p-4 border rounded-lg" data-product-index={index}>
       <div className="md:col-span-5">
-        <Label>Producto *</Label>
+        <Label htmlFor={`producto_${index}`}>Producto *</Label>
         <div className="relative">
           <Select
             value={watchedItem?.producto_id || ''}
@@ -66,7 +68,11 @@ const ProductoItemRow = memo(function ProductoItemRow({
               onProductoSearchChange('')
             }}
           >
-            <SelectTrigger className={errors?.producto_id ? 'border-red-500' : ''}>
+            <SelectTrigger 
+              id={`producto_${index}`}
+              data-product-index={index}
+              className={errors?.producto_id ? 'border-red-500' : ''}
+            >
               <SelectValue placeholder="Buscar por código o nombre..." />
             </SelectTrigger>
             <SelectContent className="max-h-[300px]">
@@ -134,12 +140,24 @@ const ProductoItemRow = memo(function ProductoItemRow({
 
       <div className="md:col-span-3">
         <Label>Precio Unit. *</Label>
-        <Input
-          type="number"
-          step="0.01"
-          min="0.01"
-          {...register(`items.${index}.precio_unit_est`, { valueAsNumber: true })}
-          className={errors?.precio_unit_est ? 'border-red-500' : ''}
+        <Controller
+          name={`items.${index}.precio_unit_est`}
+          control={control}
+          rules={{ required: true, min: 0.01 }}
+          render={({ field }) => (
+            <Input
+              type="number"
+              step="0.01"
+              min="0.01"
+              {...field}
+              value={field.value || ''}
+              onChange={(e) => {
+                const value = parseFloat(e.target.value) || 0
+                field.onChange(value)
+              }}
+              className={errors?.precio_unit_est ? 'border-red-500' : ''}
+            />
+          )}
         />
         {errors?.precio_unit_est && (
           <p className="text-sm text-red-500 mt-1">{errors.precio_unit_est.message}</p>

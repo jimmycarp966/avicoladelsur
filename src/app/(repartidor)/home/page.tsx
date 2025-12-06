@@ -1,5 +1,6 @@
 import { getCurrentUser } from '@/actions/auth.actions'
 import { obtenerRutaActiva } from '@/actions/reparto.actions'
+import { obtenerMetricasRepartidor } from '@/actions/dashboard.actions'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -37,6 +38,15 @@ export default async function RepartidorDashboard() {
 
   const rutaActivaResponse = await obtenerRutaActiva(user.id)
   const rutaActiva = rutaActivaResponse.success ? rutaActivaResponse.data : null
+
+  // Obtener métricas del repartidor
+  const metricasResult = await obtenerMetricasRepartidor(user.id)
+  const metricas = metricasResult.success ? metricasResult.data! : {
+    eficiencia: 0,
+    puntuacionGeneral: 0,
+    tiempoPromedioEntrega: 0,
+    combustibleAhorrado: 0,
+  }
 
   let entregasHoy: Array<{
     id: string
@@ -237,7 +247,7 @@ export default async function RepartidorDashboard() {
         <Card className="border-t-[4px] border-t-warning">
           <CardContent className="p-4 text-center">
             <div className="text-3xl font-bold text-warning mb-2">
-              85%
+              {metricas.eficiencia}%
             </div>
             <div className="text-sm text-muted-foreground font-medium">Eficiencia</div>
           </CardContent>
@@ -260,7 +270,7 @@ export default async function RepartidorDashboard() {
               <CardTitle className="text-base font-semibold text-foreground">Puntuación General</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold text-success mb-2">9.2/10</div>
+              <div className="text-4xl font-bold text-success mb-2">{metricas.puntuacionGeneral.toFixed(1)}/10</div>
               <p className="text-sm text-muted-foreground font-medium">
                 Basado en entregas y eficiencia
               </p>
@@ -272,7 +282,7 @@ export default async function RepartidorDashboard() {
               <CardTitle className="text-base font-semibold text-foreground">Tiempo Promedio</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold text-info mb-2">24 min</div>
+              <div className="text-4xl font-bold text-info mb-2">{metricas.tiempoPromedioEntrega} min</div>
               <p className="text-sm text-muted-foreground font-medium">
                 Por entrega completada
               </p>
@@ -284,7 +294,7 @@ export default async function RepartidorDashboard() {
               <CardTitle className="text-base font-semibold text-foreground">Combustible Ahorrado</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold text-success mb-2">12%</div>
+              <div className="text-4xl font-bold text-success mb-2">{metricas.combustibleAhorrado}%</div>
               <p className="text-sm text-muted-foreground font-medium">
                 Vs rutas no optimizadas
               </p>

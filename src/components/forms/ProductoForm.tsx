@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -14,6 +14,9 @@ import { ArrowLeft, Loader2, Save } from 'lucide-react'
 import Link from 'next/link'
 import { productoSchema, type ProductoFormData } from '@/lib/schemas/productos.schema'
 import { useNotificationStore } from '@/store/notificationStore'
+import { useFormShortcuts } from '@/lib/hooks/useFormShortcuts'
+import { useFormContextShortcuts } from '@/lib/hooks/useFormContextShortcuts'
+import { KeyboardHintCompact } from '@/components/ui/keyboard-hint'
 // import { crearProducto } from '@/actions/almacen.actions' // TODO: Implementar cuando esté disponible
 
 interface ProductoFormProps {
@@ -37,6 +40,7 @@ export function ProductoForm({ producto, onSuccess }: ProductoFormProps) {
   const { showToast } = useNotificationStore()
   const [isLoading, setIsLoading] = useState(false)
   const isEditing = !!producto
+  const submitButtonRef = useRef<HTMLButtonElement>(null)
 
   const {
     register,
@@ -71,6 +75,20 @@ export function ProductoForm({ producto, onSuccess }: ProductoFormProps) {
 
   const activo = watch('activo')
 
+  // Atajos contextuales para campos del formulario
+  useFormContextShortcuts({
+    shortcuts: [
+      { key: 'c', fieldId: 'codigo', description: 'Código' },
+      { key: 'n', fieldId: 'nombre', description: 'Nombre' },
+      { key: 'd', fieldId: 'descripcion', description: 'Descripción' },
+      { key: 'g', fieldId: 'categoria', description: 'Categoría' },
+      { key: 'v', fieldId: 'precio_venta', description: 'Precio Venta' },
+      { key: 'o', fieldId: 'precio_costo', description: 'Precio Costo' },
+      { key: 'u', fieldId: 'unidad_medida', description: 'Unidad de Medida' },
+      { key: 's', fieldId: 'stock_minimo', description: 'Stock Mínimo' },
+    ],
+  })
+
   const onSubmit = async (data: ProductoFormData) => {
     try {
       setIsLoading(true)
@@ -100,6 +118,12 @@ export function ProductoForm({ producto, onSuccess }: ProductoFormProps) {
     }
   }
 
+  // Atajos de teclado para formulario (después de declarar onSubmit)
+  useFormShortcuts({
+    onSubmit: handleSubmit(onSubmit),
+    submitButtonRef,
+  })
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       {/* Información básica */}
@@ -113,7 +137,10 @@ export function ProductoForm({ producto, onSuccess }: ProductoFormProps) {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="codigo">Código *</Label>
+              <Label htmlFor="codigo" className="flex items-center gap-2">
+                Código *
+                <KeyboardHintCompact shortcut="C" />
+              </Label>
               <Input
                 id="codigo"
                 placeholder="Ej: POLLO001"
@@ -126,7 +153,10 @@ export function ProductoForm({ producto, onSuccess }: ProductoFormProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="categoria">Categoría</Label>
+              <Label htmlFor="categoria" className="flex items-center gap-2">
+                Categoría
+                <KeyboardHintCompact shortcut="G" />
+              </Label>
               <Input
                 id="categoria"
                 placeholder="Ej: Aves, Huevos, etc."
@@ -140,7 +170,10 @@ export function ProductoForm({ producto, onSuccess }: ProductoFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="nombre">Nombre *</Label>
+            <Label htmlFor="nombre" className="flex items-center gap-2">
+              Nombre *
+              <KeyboardHintCompact shortcut="N" />
+            </Label>
             <Input
               id="nombre"
               placeholder="Nombre del producto"
@@ -153,7 +186,10 @@ export function ProductoForm({ producto, onSuccess }: ProductoFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="descripcion">Descripción</Label>
+            <Label htmlFor="descripcion" className="flex items-center gap-2">
+              Descripción
+              <KeyboardHintCompact shortcut="D" />
+            </Label>
             <Textarea
               id="descripcion"
               placeholder="Descripción detallada del producto"
@@ -179,7 +215,10 @@ export function ProductoForm({ producto, onSuccess }: ProductoFormProps) {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="precio_venta">Precio de Venta *</Label>
+              <Label htmlFor="precio_venta" className="flex items-center gap-2">
+                Precio de Venta *
+                <KeyboardHintCompact shortcut="V" />
+              </Label>
               <Input
                 id="precio_venta"
                 type="number"
@@ -195,7 +234,10 @@ export function ProductoForm({ producto, onSuccess }: ProductoFormProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="precio_costo">Precio de Costo</Label>
+              <Label htmlFor="precio_costo" className="flex items-center gap-2">
+                Precio de Costo
+                <KeyboardHintCompact shortcut="O" />
+              </Label>
               <Input
                 id="precio_costo"
                 type="number"
@@ -211,7 +253,10 @@ export function ProductoForm({ producto, onSuccess }: ProductoFormProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="unidad_medida">Unidad de Medida *</Label>
+              <Label htmlFor="unidad_medida" className="flex items-center gap-2">
+                Unidad de Medida *
+                <KeyboardHintCompact shortcut="U" />
+              </Label>
               <select
                 id="unidad_medida"
                 {...register('unidad_medida')}
@@ -244,7 +289,10 @@ export function ProductoForm({ producto, onSuccess }: ProductoFormProps) {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="stock_minimo">Stock Mínimo *</Label>
+              <Label htmlFor="stock_minimo" className="flex items-center gap-2">
+                Stock Mínimo *
+                <KeyboardHintCompact shortcut="S" />
+              </Label>
               <Input
                 id="stock_minimo"
                 type="number"
@@ -280,7 +328,12 @@ export function ProductoForm({ producto, onSuccess }: ProductoFormProps) {
           </Link>
         </Button>
 
-        <Button type="submit" disabled={isLoading} className="bg-primary hover:bg-primary/90 shadow-sm">
+        <Button 
+          ref={submitButtonRef}
+          type="submit" 
+          disabled={isLoading} 
+          className="bg-primary hover:bg-primary/90 shadow-sm"
+        >
           {isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

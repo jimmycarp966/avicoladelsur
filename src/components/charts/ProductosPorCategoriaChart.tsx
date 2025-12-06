@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import {
   Cell,
   Pie,
@@ -8,16 +9,22 @@ import {
   Tooltip,
 } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-
-// Datos de ejemplo - en producción vendrían de la base de datos
-const data = [
-  { name: 'Aves', value: 45, color: '#2F7058' },
-  { name: 'Huevos', value: 25, color: '#FCDE8D' },
-  { name: 'Procesados', value: 20, color: '#D9EBC6' },
-  { name: 'Otros', value: 10, color: '#CB3433' },
-]
+import { obtenerProductosPorCategoria } from '@/actions/dashboard.actions'
 
 export function ProductosPorCategoriaChart() {
+  const [data, setData] = useState<Array<{ name: string; value: number; color: string }>>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchData() {
+      const result = await obtenerProductosPorCategoria()
+      if (result.success && result.data) {
+        setData(result.data)
+      }
+      setLoading(false)
+    }
+    fetchData()
+  }, [])
   return (
     <Card>
       <CardHeader>
@@ -27,7 +34,16 @@ export function ProductosPorCategoriaChart() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={300}>
+        {loading ? (
+          <div className="flex items-center justify-center h-[300px]">
+            <p className="text-muted-foreground">Cargando datos...</p>
+          </div>
+        ) : data.length === 0 ? (
+          <div className="flex items-center justify-center h-[300px]">
+            <p className="text-muted-foreground">No hay datos disponibles</p>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={300}>
           <PieChart>
             <Pie
               data={data}
@@ -58,21 +74,24 @@ export function ProductosPorCategoriaChart() {
             />
           </PieChart>
         </ResponsiveContainer>
+        )}
 
         {/* Leyenda */}
-        <div className="grid grid-cols-2 gap-4 mt-4">
-          {data.map((item) => (
-            <div key={item.name} className="flex items-center gap-2">
-              <div
-                className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: item.color }}
-              />
-              <span className="text-sm text-gray-600">
-                {item.name}: {item.value}%
-              </span>
-            </div>
-          ))}
-        </div>
+        {data.length > 0 && (
+          <div className="grid grid-cols-2 gap-4 mt-4">
+            {data.map((item) => (
+              <div key={item.name} className="flex items-center gap-2">
+                <div
+                  className="w-3 h-3 rounded-full"
+                  style={{ backgroundColor: item.color }}
+                />
+                <span className="text-sm text-gray-600">
+                  {item.name}: {item.value}%
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   )

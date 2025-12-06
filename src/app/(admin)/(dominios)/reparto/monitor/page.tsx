@@ -6,7 +6,6 @@
 
 import MonitorMap from '@/components/reparto/MonitorMap'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import GenerarRutasMockButton from '@/components/reparto/GenerarRutasMockButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,7 +19,6 @@ export default function MonitorRepartoPage() {
             Visualiza vehículos en tiempo real, rutas optimizadas y alertas de desvío
           </p>
         </div>
-        <GenerarRutasMockButton />
       </div>
 
       <div className="h-[calc(100vh-140px)]">

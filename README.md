@@ -18,6 +18,7 @@
 - ⚡ **Optimizaciones de Rendimiento**: Caché inteligente, revalidación estratégica, queries optimizadas, índices de BD
 - 🎯 **Pedidos Agrupados**: Sistema único donde pedidos agrupan múltiples entregas por turno/zona/fecha
 - 🏢 **Control de Sucursales**: Modelo completo de control mayorista/minorista con auditoría de precios, conteos físicos de stock y detección automática de desvíos
+- 🤖 **Google Cloud AI Services**: Integración completa con Dialogflow, Speech-to-Text, Document AI, Vertex AI, AutoML y Gemini para predicciones inteligentes, procesamiento de documentos y análisis avanzado
 
 ## 🚀 Inicio Rápido
 
@@ -1364,6 +1365,26 @@ BOTPRESS_WEBHOOK_URL=https://your-botpress-webhook
 ```
 
 ## 🔧 **Actualizaciones Recientes**
+
+### **Mejoras en Gestión de Rutas y Visualización (Diciembre 2025)**
+- ✅ **Visualización mejorada de rutas**: RutasTable ahora muestra nombre y apellido del repartidor y patente/marca/modelo del vehículo en lugar de IDs
+- ✅ **Cálculo automático de peso total**: Trigger SQL que recalcula automáticamente `peso_total_kg` de rutas cuando se agregan/modifican/eliminan pedidos
+- ✅ **Sincronización de métricas**: Al optimizar una ruta, se actualizan automáticamente `distancia_estimada_km` y `tiempo_estimado_min` en `rutas_reparto`
+- ✅ **Obtención mejorada de clientes**: Sistema actualizado para obtener clientes desde tabla `entregas` cuando el pedido no tiene `cliente_id` directamente (modelo de pedidos agrupados)
+- ✅ **Conversión de coordenadas PostGIS**: Función `normalizeCoordinates()` mejorada para convertir correctamente coordenadas PostGIS (GeoJSON Point) a formato `{lat, lng}` para mapas
+- ✅ **Flujo de iniciar ruta desde almacén**: Cuando un pedido pasa a estado "Enviado" desde almacén, la ruta se crea automáticamente con estado `'en_curso'` y es visible inmediatamente para el repartidor
+- ✅ **Iniciar ruta inteligente**: Función `iniciarRuta()` ahora verifica el estado actual - si ya está en `'en_curso'`, solo actualiza `updated_at` sin cambiar el estado
+- ✅ **Migración SQL**: `20251218_calcular_peso_total_rutas.sql` con función `fn_recalcular_peso_ruta()` y trigger automático
+- ✅ **Archivos actualizados**: 
+  - `src/components/tables/RutasTable.tsx` - Visualización mejorada
+  - `src/lib/services/ruta-optimizer.ts` - Sincronización de métricas
+  - `src/lib/utils/rutas.ts` - Conversión de coordenadas mejorada
+  - `src/app/(admin)/(dominios)/reparto/rutas/[id]/page.tsx` - Obtención de clientes mejorada
+  - `src/app/(repartidor)/entregas/page.tsx` - Obtención de clientes mejorada
+  - `src/app/(repartidor)/ruta/[ruta_id]/page.tsx` - Obtención de clientes mejorada
+  - `src/app/(repartidor)/ruta/[ruta_id]/mapa/page.tsx` - Obtención de clientes mejorada
+  - `src/app/api/reparto/rutas-planificadas/route.ts` - Obtención de clientes mejorada
+  - `src/actions/reparto.actions.ts` - Flujo de iniciar ruta mejorado
 
 ### **Vista Previa de Clientes en Monitor GPS (Diciembre 2025)**
 - ✅ **Panel lateral de números**: Lista clickeable de clientes con números ordenados por ruta seleccionada

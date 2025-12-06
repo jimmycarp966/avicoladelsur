@@ -51,7 +51,8 @@ export function RutasTable({ data, onView, onEdit, onDelete, onStart, onComplete
         <SortableHeader column={column}>Fecha</SortableHeader>
       ),
       cell: ({ row }) => {
-        const fecha = row.getValue('fecha_planificada') as string
+        const ruta = row.original
+        const fecha = ruta.fecha_planificada || ruta.fecha_ruta
         return (
           <div className="text-base text-foreground font-medium">
             {formatDate(fecha)}
@@ -63,14 +64,30 @@ export function RutasTable({ data, onView, onEdit, onDelete, onStart, onComplete
       accessorKey: 'repartidor_id',
       header: 'Repartidor',
       cell: ({ row }) => {
-        const repartidorId = row.getValue('repartidor_id') as string
-        // En producción, aquí haríamos una consulta para obtener el nombre del repartidor
+        const ruta = row.original
+        const repartidor = ruta.repartidor
+        const repartidorId = ruta.repartidor_id
+        
+        if (repartidor) {
+          const nombreCompleto = `${repartidor.nombre}${repartidor.apellido ? ' ' + repartidor.apellido : ''}`
+          const iniciales = `${repartidor.nombre.charAt(0)}${repartidor.apellido ? repartidor.apellido.charAt(0) : ''}`.toUpperCase()
+          return (
+            <div className="flex items-center gap-2">
+              <Avatar className="h-6 w-6">
+                <AvatarFallback className="text-xs">{iniciales}</AvatarFallback>
+              </Avatar>
+              <span className="text-base font-medium text-foreground">{nombreCompleto}</span>
+            </div>
+          )
+        }
+        
+        // Fallback si no hay datos relacionados
         return (
           <div className="flex items-center gap-2">
             <Avatar className="h-6 w-6">
               <AvatarFallback className="text-xs">R</AvatarFallback>
             </Avatar>
-            <span className="text-base font-medium text-foreground">Repartidor {repartidorId}</span>
+            <span className="text-base font-medium text-muted-foreground">ID: {repartidorId.substring(0, 8)}...</span>
           </div>
         )
       },
@@ -79,14 +96,29 @@ export function RutasTable({ data, onView, onEdit, onDelete, onStart, onComplete
       accessorKey: 'vehiculo_id',
       header: 'Vehículo',
       cell: ({ row }) => {
-        const vehiculoId = row.getValue('vehiculo_id') as string
-        // En producción, aquí haríamos una consulta para obtener la patente del vehículo
+        const ruta = row.original
+        const vehiculo = ruta.vehiculo
+        const vehiculoId = ruta.vehiculo_id
+        
+        if (vehiculo) {
+          const displayName = vehiculo.patente || `${vehiculo.marca || ''} ${vehiculo.modelo || ''}`.trim() || 'Sin patente'
+          return (
+            <div className="flex items-center gap-2">
+              <div className="p-1 bg-blue-100 rounded">
+                <Truck className="h-3 w-3 text-blue-600" />
+              </div>
+              <span className="text-base font-medium text-foreground">{displayName}</span>
+            </div>
+          )
+        }
+        
+        // Fallback si no hay datos relacionados
         return (
           <div className="flex items-center gap-2">
             <div className="p-1 bg-blue-100 rounded">
               <Truck className="h-3 w-3 text-blue-600" />
             </div>
-            <span className="text-base font-medium text-foreground">Vehículo {vehiculoId}</span>
+            <span className="text-base font-medium text-muted-foreground">ID: {vehiculoId.substring(0, 8)}...</span>
           </div>
         )
       },
