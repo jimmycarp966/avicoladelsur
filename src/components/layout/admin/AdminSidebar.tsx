@@ -21,6 +21,9 @@ import {
   Tag,
   Receipt,
   Building2,
+  Sparkles,
+  Brain,
+  FileSearch,
 } from 'lucide-react'
 import type { Usuario } from '@/types/domain.types'
 
@@ -54,6 +57,7 @@ const navigation = [
       { name: 'Pedidos', href: '/almacen/pedidos' },
       { name: 'Transferencias', href: '/sucursales/transferencias' },
       { name: 'Recepción', href: '/almacen/recepcion' },
+      { name: 'Documentos IA', href: '/almacen/documentos' },
     ],
   },
   {
@@ -94,6 +98,17 @@ const navigation = [
       { name: 'Tesoro', href: '/tesoreria/tesoro' },
       { name: 'Gastos', href: '/tesoreria/gastos' },
       { name: 'Por Sucursal', href: '/tesoreria/sucursales' },
+    ],
+  },
+  {
+    name: 'IA',
+    href: '/dashboard/predicciones',
+    icon: Sparkles,
+    roles: ['admin'],
+    children: [
+      { name: 'Predicciones', href: '/dashboard/predicciones' },
+      { name: 'Reportes IA', href: '/reportes/ia' },
+      { name: 'Documentos IA', href: '/almacen/documentos' },
     ],
   },
   {
