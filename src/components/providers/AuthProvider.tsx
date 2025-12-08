@@ -100,8 +100,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
         .eq('id', userId)
         .single()
 
-      if (error || !data.activo) {
+      if (error) {
         console.error('Error fetching user data:', error)
+        return null
+      }
+
+      if (!data) {
+        console.error('User data not found for ID:', userId)
+        return null
+      }
+
+      if (!data.activo) {
+        console.error('User is inactive:', userId)
         return null
       }
 
@@ -149,56 +159,76 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const login = async (email: string, password: string) => {
     try {
       setLoading(true)
+      console.log('Iniciando login para:', email)
 
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
-      if (error) throw error
-
-      if (data.user) {
-        const userData = await fetchUserData(data.user.id)
-
-        if (!userData) {
-          await supabase.auth.signOut()
-          throw new Error('Usuario no encontrado en el sistema')
-        }
-
-        if (!userData.activo) {
-          await supabase.auth.signOut()
-          throw new Error('Usuario inactivo. Contacte al administrador.')
-        }
-
-        setUser(userData)
-        setSession(data.user)
-
-        // Redirigir según rol
-        let redirectTo = '/'
-        switch (userData.rol) {
-          case 'admin':
-            redirectTo = '/dashboard'
-            break
-          case 'vendedor':
-            redirectTo = '/almacen/pedidos'
-            break
-          case 'repartidor':
-            redirectTo = '/home'
-            break
-          case 'almacenista':
-            redirectTo = '/almacen/productos'
-            break
-        }
-
-        showToast('success', `Bienvenido ${userData.nombre}`)
-        router.push(redirectTo)
+      if (error) {
+        console.error('Error en signInWithPassword:', error)
+        throw error
       }
-    } catch (error: any) {
-      console.error('Login error:', error)
-      showToast('error', error.message || 'Error en el inicio de sesión')
-      throw error
-    } finally {
+
+      if (!data.user) {
+        console.error('No se obtuvo usuario de auth')
+        throw new Error('Error en la autenticación')
+      }
+
+      console.log('Usuario autenticado, obteniendo datos del usuario...', data.user.id)
+      const userData = await fetchUserData(data.user.id)
+
+      if (!userData) {
+        console.error('Usuario no encontrado en tabla usuarios, cerrando sesión...')
+        await supabase.auth.signOut()
+        throw new Error('Usuario no encontrado en el sistema. Verifica que el usuario esté sincronizado con Supabase Auth.')
+      }
+
+      if (!userData.activo) {
+        console.error('Usuario inactivo, cerrando sesión...')
+        await supabase.auth.signOut()
+        throw new Error('Usuario inactivo. Contacte al administrador.')
+      }
+
+      console.log('Usuario encontrado, estableciendo sesión...', userData)
+      setUser(userData)
+      setSession(data.user)
+
+      // Redirigir según rol
+      let redirectTo = '/'
+      switch (userData.rol) {
+        case 'admin':
+          redirectTo = '/dashboard'
+          break
+        case 'vendedor':
+          redirectTo = '/almacen/pedidos'
+          break
+        case 'repartidor':
+          redirectTo = '/home'
+          break
+        case 'almacenista':
+          redirectTo = '/almacen/productos'
+          break
+      }
+
+      console.log('Redirigiendo a:', redirectTo)
+      showToast('success', `Bienvenido ${userData.nombre}`)
+      
+      // Asegurar que el loading se desactive antes de redirigir
       setLoading(false)
+      
+      // Usar setTimeout para dar tiempo a que se actualice el estado antes de redirigir
+      setTimeout(() => {
+        router.push(redirectTo)
+        router.refresh()
+      }, 100)
+    } catch (error: any) {
+      console.error('Login error completo:', error)
+      const errorMessage = error.message || 'Error en el inicio de sesión'
+      showToast('error', errorMessage)
+      setLoading(false)
+      throw error
     }
   }
 

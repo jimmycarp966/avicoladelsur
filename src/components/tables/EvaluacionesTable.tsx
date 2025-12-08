@@ -4,7 +4,15 @@ import { ColumnDef } from '@tanstack/react-table'
 import { DataTable, SortableHeader, StatusBadge } from '@/components/ui/data-table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Edit, Eye, Send, Star } from 'lucide-react'
+import { Edit, Eye, Send, Star, MoreHorizontal } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { formatDate } from '@/lib/utils'
 import type { Evaluacion } from '@/types/domain.types'
 
@@ -166,38 +174,36 @@ export function EvaluacionesTable({ evaluaciones, onView, onEdit, onSend }: Eval
       cell: ({ row }) => {
         const evaluacion = row.original
         return (
-          <div className="flex items-center gap-2">
-            {onView && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onView(evaluacion)}
-                className="h-8 w-8 p-0"
-              >
-                <Eye className="h-4 w-4" />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Abrir menú</span>
+                <MoreHorizontal className="h-4 w-4" />
               </Button>
-            )}
-            {onEdit && evaluacion.estado === 'borrador' && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onEdit(evaluacion)}
-                className="h-8 w-8 p-0"
-              >
-                <Edit className="h-4 w-4" />
-              </Button>
-            )}
-            {onSend && (evaluacion.estado === 'borrador' || evaluacion.estado === 'enviada') && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onSend(evaluacion)}
-                className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700"
-              >
-                <Send className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {onView && (
+                <DropdownMenuItem onClick={() => onView(evaluacion)}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  Ver detalles
+                </DropdownMenuItem>
+              )}
+              {onEdit && evaluacion.estado === 'borrador' && (
+                <DropdownMenuItem onClick={() => onEdit(evaluacion)}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Editar
+                </DropdownMenuItem>
+              )}
+              {onSend && (evaluacion.estado === 'borrador' || evaluacion.estado === 'enviada') && (
+                <DropdownMenuItem onClick={() => onSend(evaluacion)}>
+                  <Send className="mr-2 h-4 w-4" />
+                  Enviar
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         )
       },
     },

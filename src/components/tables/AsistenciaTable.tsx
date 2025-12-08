@@ -4,7 +4,14 @@ import { ColumnDef } from '@tanstack/react-table'
 import { DataTable, SortableHeader, StatusBadge } from '@/components/ui/data-table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Edit, Clock, AlertTriangle, CheckCircle } from 'lucide-react'
+import { Edit, Clock, AlertTriangle, CheckCircle, MoreHorizontal } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { formatDate, formatTime } from '@/lib/utils'
 import type { Asistencia } from '@/types/domain.types'
 
@@ -177,18 +184,23 @@ export function AsistenciaTable({ asistencia, onEdit }: AsistenciaTableProps) {
       cell: ({ row }) => {
         const asistencia = row.original
         return (
-          <div className="flex items-center gap-2">
-            {onEdit && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onEdit(asistencia)}
-                className="h-8 w-8 p-0"
-              >
-                <Edit className="h-4 w-4" />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Abrir menú</span>
+                <MoreHorizontal className="h-4 w-4" />
               </Button>
-            )}
-          </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+              {onEdit && (
+                <DropdownMenuItem onClick={() => onEdit(asistencia)}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Editar
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         )
       },
     },

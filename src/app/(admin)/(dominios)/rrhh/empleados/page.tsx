@@ -1,36 +1,124 @@
-import { Suspense } from 'react'
-import { createClient } from '@/lib/supabase/server'
+'use client'
+
+import { Suspense, useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { EmpleadosTable } from '@/components/tables/EmpleadosTable'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import Link from 'next/link'
+import { eliminarEmpleadoAction } from '@/actions/rrhh.actions'
+import { useNotificationStore } from '@/store/notificationStore'
+import { createClient } from '@/lib/supabase/client'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import type { Empleado } from '@/types/domain.types'
 
-async function getEmpleados() {
-  const supabase = await createClient()
+export default function EmpleadosPage() {
+  const router = useRouter()
+  const { showToast } = useNotificationStore()
+  const [empleados, setEmpleados] = useState<Empleado[]>([])
+  const [loading, setLoading] = useState(true)
+  const [empleadoToDelete, setEmpleadoToDelete] = useState<Empleado | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
-  const { data, error } = await supabase
-    .from('rrhh_empleados')
-    .select(`
-      *,
-      usuario:usuarios(id, nombre, apellido, email),
-      sucursal:sucursales(id, nombre),
-      categoria:rrhh_categorias(id, nombre, sueldo_basico)
-    `)
-    .eq('activo', true)
-    .order('created_at', { ascending: false })
+  useEffect(() => {
+    const loadEmpleados = async () => {
+      try {
+        const supabase = createClient()
+        const { data, error } = await supabase
+          .from('rrhh_empleados')
+          .select(`
+            *,
+            usuario:usuarios(id, nombre, apellido, email),
+            sucursal:sucursales(id, nombre),
+            categoria:rrhh_categorias(id, nombre, sueldo_basico)
+          `)
+          .eq('activo', true)
+          .order('created_at', { ascending: false })
 
-  if (error) {
-    console.error('Error fetching empleados:', error)
-    return []
+        if (error) {
+          console.error('Error fetching empleados:', error)
+          showToast('error', 'Error al cargar empleados', 'Error')
+        } else {
+          setEmpleados(data as Empleado[])
+        }
+      } catch (error) {
+        console.error('Error loading empleados:', error)
+        showToast('error', 'Error al cargar empleados', 'Error')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadEmpleados()
+  }, [showToast])
+
+  const handleView = (empleado: Empleado) => {
+    router.push(`/rrhh/empleados/${empleado.id}`)
   }
 
-  return data as Empleado[]
-}
+  const handleEdit = (empleado: Empleado) => {
+    router.push(`/rrhh/empleados/${empleado.id}/editar`)
+  }
 
-export const dynamic = 'force-dynamic'
-export default async function EmpleadosPage() {
-  const empleados = await getEmpleados()
+  const handleDelete = (empleado: Empleado) => {
+    setEmpleadoToDelete(empleado)
+  }
+
+  const confirmDelete = async () => {
+    if (!empleadoToDelete) return
+
+    setIsDeleting(true)
+    try {
+      const result = await eliminarEmpleadoAction(empleadoToDelete.id)
+      
+      if (result.success) {
+        showToast('success', result.message || 'Empleado eliminado exitosamente', 'Éxito')
+        setEmpleados(empleados.filter(e => e.id !== empleadoToDelete.id))
+        setEmpleadoToDelete(null)
+      } else {
+        showToast('error', result.error || 'Error al eliminar empleado', 'Error')
+      }
+    } catch (error: any) {
+      console.error('Error deleting empleado:', error)
+      showToast('error', 'Error al eliminar empleado', 'Error')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const handleCall = (empleado: Empleado) => {
+    if (empleado.telefono_personal) {
+      window.location.href = `tel:${empleado.telefono_personal}`
+    }
+  }
+
+  const handleEmail = (empleado: Empleado) => {
+    if (empleado.usuario?.email) {
+      window.location.href = `mailto:${empleado.usuario.email}`
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Empleados</h1>
+            <p className="text-gray-600 mt-1">Cargando...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -121,11 +209,50 @@ export default async function EmpleadosPage() {
       {/* Tabla de empleados */}
       <div className="bg-white rounded-lg border border-gray-200">
         <div className="p-6">
-          <Suspense fallback={<div>Cargando empleados...</div>}>
-            <EmpleadosTable empleados={empleados} />
-          </Suspense>
+          <EmpleadosTable 
+            empleados={empleados}
+            onView={handleView}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onCall={handleCall}
+            onEmail={handleEmail}
+          />
         </div>
       </div>
+
+      {/* Dialog de confirmación para eliminar */}
+      <AlertDialog open={!!empleadoToDelete} onOpenChange={(open) => !open && setEmpleadoToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará permanentemente el empleado{' '}
+              <strong>
+                {empleadoToDelete?.usuario?.nombre} {empleadoToDelete?.usuario?.apellido}
+              </strong>
+              {empleadoToDelete?.legajo && ` (Legajo: ${empleadoToDelete.legajo})`}.
+              {empleadoToDelete && (
+                <>
+                  <br /><br />
+                  <span className="text-amber-600 font-semibold">
+                    ⚠️ Nota: Solo se puede eliminar si no tiene registros de asistencia o adelantos.
+                  </span>
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeleting ? 'Eliminando...' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

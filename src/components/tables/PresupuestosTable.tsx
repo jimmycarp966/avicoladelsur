@@ -13,8 +13,17 @@ import {
   ShoppingCart,
   AlertTriangle,
   Scale,
-  RefreshCw
+  RefreshCw,
+  MoreHorizontal
 } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import type { Database } from '@/types/database.types'
 
@@ -180,83 +189,62 @@ export function PresupuestosTable({
 
         return (
           <div className="flex items-center gap-1">
-            {onView && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onView(presupuesto)}
-                className="h-8 w-8 p-0"
-              >
-                <Eye className="h-4 w-4" />
-              </Button>
-            )}
-
-            {estado === 'pendiente' && onEdit && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onEdit(presupuesto)}
-                className="h-8 w-8 p-0"
-              >
-                <Edit className="h-4 w-4" />
-              </Button>
-            )}
-
-            {estado === 'pendiente' && onRecalculate && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onRecalculate(presupuesto)}
-                className="h-8 w-8 p-0 text-purple-600 hover:text-purple-700"
-                title="Recalcular presupuesto"
-              >
-                <RefreshCw className="h-4 w-4" />
-              </Button>
-            )}
-
-            {estado === 'pendiente' && onSendToWarehouse && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onSendToWarehouse(presupuesto)}
-                className="h-8 w-8 p-0 text-blue-600 hover:text-blue-700"
-                title="Enviar a Almacén"
-              >
-                <Package className="h-4 w-4" />
-              </Button>
-            )}
-
-            {estado === 'en_almacen' && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => window.open(`/almacen/presupuesto/${presupuesto.id}/pesaje`, '_blank')}
-                className="h-8 w-8 p-0 text-orange-600 hover:text-orange-700"
-                title="Ir a Pesaje"
-              >
-                <Scale className="h-4 w-4" />
-              </Button>
-            )}
-
-            {estado === 'en_almacen' && onConvertToOrder && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onConvertToOrder(presupuesto)}
-                className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
-                title="Convertir a Pedido"
-              >
-                <ShoppingCart className="h-4 w-4" />
-              </Button>
-            )}
-
             {/* Badge para items pesables */}
             {presupuesto.items?.some((item: any) => item.pesable) && (
-              <Badge variant="outline" className="text-xs">
+              <Badge variant="outline" className="text-xs mr-1">
                 <Scale className="h-3 w-3 mr-1" />
                 BALANZA
               </Badge>
             )}
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="h-8 w-8 p-0">
+                  <span className="sr-only">Abrir menú</span>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {onView && (
+                  <DropdownMenuItem onClick={() => onView(presupuesto)}>
+                    <Eye className="mr-2 h-4 w-4" />
+                    Ver detalles
+                  </DropdownMenuItem>
+                )}
+                {estado === 'pendiente' && onEdit && (
+                  <DropdownMenuItem onClick={() => onEdit(presupuesto)}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    Editar
+                  </DropdownMenuItem>
+                )}
+                {estado === 'pendiente' && onRecalculate && (
+                  <DropdownMenuItem onClick={() => onRecalculate(presupuesto)}>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Recalcular
+                  </DropdownMenuItem>
+                )}
+                {estado === 'pendiente' && onSendToWarehouse && (
+                  <DropdownMenuItem onClick={() => onSendToWarehouse(presupuesto)}>
+                    <Package className="mr-2 h-4 w-4" />
+                    Enviar a Almacén
+                  </DropdownMenuItem>
+                )}
+                {estado === 'en_almacen' && (
+                  <DropdownMenuItem onClick={() => window.open(`/almacen/presupuesto/${presupuesto.id}/pesaje`, '_blank')}>
+                    <Scale className="mr-2 h-4 w-4" />
+                    Ir a Pesaje
+                  </DropdownMenuItem>
+                )}
+                {estado === 'en_almacen' && onConvertToOrder && (
+                  <DropdownMenuItem onClick={() => onConvertToOrder(presupuesto)}>
+                    <ShoppingCart className="mr-2 h-4 w-4" />
+                    Convertir a Pedido
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         )
       },

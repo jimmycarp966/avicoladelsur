@@ -5,7 +5,15 @@ import { DataTable, SortableHeader, StatusBadge } from '@/components/ui/data-tab
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Edit, Trash2, Eye, Phone, Mail } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Edit, Trash2, Eye, Phone, Mail, MoreHorizontal } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import type { Empleado } from '@/types/domain.types'
 
@@ -134,58 +142,55 @@ export function EmpleadosTable({ empleados, onView, onEdit, onDelete, onCall, on
       cell: ({ row }) => {
         const empleado = row.original
         return (
-          <div className="flex items-center gap-2">
-            {onView && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onView(empleado)}
-                className="h-8 w-8 p-0"
-              >
-                <Eye className="h-4 w-4" />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Abrir menú</span>
+                <MoreHorizontal className="h-4 w-4" />
               </Button>
-            )}
-            {onEdit && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onEdit(empleado)}
-                className="h-8 w-8 p-0"
-              >
-                <Edit className="h-4 w-4" />
-              </Button>
-            )}
-            {onCall && empleado.telefono_personal && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onCall(empleado)}
-                className="h-8 w-8 p-0"
-              >
-                <Phone className="h-4 w-4" />
-              </Button>
-            )}
-            {onEmail && empleado.usuario?.email && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onEmail(empleado)}
-                className="h-8 w-8 p-0"
-              >
-                <Mail className="h-4 w-4" />
-              </Button>
-            )}
-            {onDelete && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onDelete(empleado)}
-                className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {onView && (
+                <DropdownMenuItem onClick={() => onView(empleado)}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  Ver detalles
+                </DropdownMenuItem>
+              )}
+              {onEdit && (
+                <DropdownMenuItem onClick={() => onEdit(empleado)}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Editar
+                </DropdownMenuItem>
+              )}
+              {(onCall || onEmail) && <DropdownMenuSeparator />}
+              {onCall && empleado.telefono_personal && (
+                <DropdownMenuItem onClick={() => onCall(empleado)}>
+                  <Phone className="mr-2 h-4 w-4" />
+                  Llamar
+                </DropdownMenuItem>
+              )}
+              {onEmail && empleado.usuario?.email && (
+                <DropdownMenuItem onClick={() => onEmail(empleado)}>
+                  <Mail className="mr-2 h-4 w-4" />
+                  Enviar email
+                </DropdownMenuItem>
+              )}
+              {onDelete && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => onDelete(empleado)}
+                    className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Eliminar
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         )
       },
     },

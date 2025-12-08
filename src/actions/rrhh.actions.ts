@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { devError } from '@/lib/utils/logger'
 import type { ApiResponse } from '@/types/api.types'
+import type { Empleado } from '@/types/domain.types'
 
 // ===========================================
 // RRHH - ACCIONES DEL SERVIDOR
@@ -128,12 +129,51 @@ export async function crearEmpleadoAction(
       // Por ahora, asumimos que si está en la tabla usuarios y está activo, tiene cuenta de auth
     }
 
+    // Limpiar campos de fecha vacíos (convertir "" a null/undefined)
+    const cleanedData: any = {
+      ...empleadoData,
+      activo: empleadoData.activo ?? true,
+    }
+    
+    // IMPORTANTE: Eliminar nombre y apellido - estos campos NO deben enviarse al crear
+    // El nombre y apellido del empleado vienen del usuario vinculado (usuario_id)
+    // Solo se usan si el empleado NO tiene usuario_id asignado
+    delete cleanedData.nombre
+    delete cleanedData.apellido
+    
+    // Validar que fecha_ingreso no esté vacío (es requerido)
+    if (!cleanedData.fecha_ingreso || cleanedData.fecha_ingreso === '' || cleanedData.fecha_ingreso === null) {
+      return {
+        success: false,
+        error: 'La fecha de ingreso es requerida',
+      }
+    }
+    
+    // Convertir fecha_nacimiento vacía a undefined
+    if (cleanedData.fecha_nacimiento === '' || cleanedData.fecha_nacimiento === null || cleanedData.fecha_nacimiento === undefined) {
+      delete cleanedData.fecha_nacimiento
+    }
+    
+    // Limpiar otros campos opcionales vacíos
+    const optionalFields = ['legajo', 'dni', 'cuil', 'domicilio', 'telefono_personal', 
+                            'contacto_emergencia', 'telefono_emergencia', 'obra_social', 
+                            'numero_afiliado', 'banco', 'cbu', 'numero_cuenta', 'usuario_id',
+                            'sucursal_id', 'categoria_id']
+    
+    optionalFields.forEach(field => {
+      if (cleanedData[field] === '' || cleanedData[field] === null || cleanedData[field] === undefined) {
+        delete cleanedData[field]
+      }
+    })
+    
+    // Limpiar sueldo_actual si es 0 o null (opcional)
+    if (cleanedData.sueldo_actual === 0 || cleanedData.sueldo_actual === null || cleanedData.sueldo_actual === undefined) {
+      delete cleanedData.sueldo_actual
+    }
+
     const { data, error } = await supabase
       .from('rrhh_empleados')
-      .insert({
-        ...empleadoData,
-        activo: empleadoData.activo ?? true,
-      })
+      .insert(cleanedData)
       .select('id')
       .single()
 
@@ -240,9 +280,54 @@ export async function actualizarEmpleadoAction(
       }
     }
 
+    // Limpiar campos de fecha vacíos (convertir "" a null/undefined)
+    const cleanedData: any = { ...empleadoData }
+    
+    // IMPORTANTE: Manejar nombre y apellido correctamente
+    // El nombre y apellido del empleado vienen del usuario vinculado (usuario_id)
+    // Solo se usan si el empleado NO tiene usuario_id asignado
+    
+    // Si se está asignando un usuario_id, limpiar nombre y apellido del empleado
+    // porque el nombre debe venir del usuario vinculado, no de campos directos
+    if (cleanedData.usuario_id) {
+      cleanedData.nombre = null
+      cleanedData.apellido = null
+    } else {
+      // Si no se está asignando usuario_id, eliminar estos campos para que no se actualicen
+      delete cleanedData.nombre
+      delete cleanedData.apellido
+    }
+    
+    // Convertir fechas vacías a undefined (no se actualizan si están vacías)
+    // fecha_ingreso puede ser opcional en actualización, pero si viene vacío no se actualiza
+    if (cleanedData.fecha_ingreso === '' || cleanedData.fecha_ingreso === null || cleanedData.fecha_ingreso === undefined) {
+      delete cleanedData.fecha_ingreso
+    }
+    
+    if (cleanedData.fecha_nacimiento === '' || cleanedData.fecha_nacimiento === null || cleanedData.fecha_nacimiento === undefined) {
+      delete cleanedData.fecha_nacimiento
+    }
+    
+    // Limpiar otros campos opcionales vacíos
+    const optionalFields = ['legajo', 'dni', 'cuil', 'domicilio', 'telefono_personal', 
+                            'contacto_emergencia', 'telefono_emergencia', 'obra_social', 
+                            'numero_afiliado', 'banco', 'cbu', 'numero_cuenta', 'usuario_id',
+                            'sucursal_id', 'categoria_id']
+    
+    optionalFields.forEach(field => {
+      if (cleanedData[field] === '' || cleanedData[field] === null || cleanedData[field] === undefined) {
+        delete cleanedData[field]
+      }
+    })
+    
+    // Limpiar sueldo_actual si es 0 o null (opcional)
+    if (cleanedData.sueldo_actual === 0 || cleanedData.sueldo_actual === null || cleanedData.sueldo_actual === undefined) {
+      delete cleanedData.sueldo_actual
+    }
+
     const { data, error } = await supabase
       .from('rrhh_empleados')
-      .update(empleadoData)
+      .update(cleanedData)
       .eq('id', empleadoId)
       .select('id')
       .single()
@@ -324,6 +409,49 @@ export async function eliminarEmpleadoAction(empleadoId: string): Promise<ApiRes
     }
   } catch (error) {
     devError('Error en eliminarEmpleado:', error)
+    return {
+      success: false,
+      error: 'Error interno del servidor',
+    }
+  }
+}
+
+export async function obtenerEmpleadoPorIdAction(empleadoId: string): Promise<ApiResponse<Empleado>> {
+  try {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+      .from('rrhh_empleados')
+      .select(`
+        *,
+        usuario:usuarios(id, nombre, apellido, email),
+        sucursal:sucursales(id, nombre),
+        categoria:rrhh_categorias(id, nombre, sueldo_basico)
+      `)
+      .eq('id', empleadoId)
+      .single()
+
+    if (error) {
+      devError('Error al obtener empleado:', error)
+      return {
+        success: false,
+        error: 'Error al obtener empleado: ' + error.message,
+      }
+    }
+
+    if (!data) {
+      return {
+        success: false,
+        error: 'Empleado no encontrado',
+      }
+    }
+
+    return {
+      success: true,
+      data: data as Empleado,
+    }
+  } catch (error) {
+    devError('Error en obtenerEmpleadoPorId:', error)
     return {
       success: false,
       error: 'Error interno del servidor',

@@ -4,6 +4,15 @@ import { useEffect, useState } from 'react'
 import { ColumnDef } from '@tanstack/react-table'
 import { DataTable, SortableHeader } from '@/components/ui/data-table'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Eye, FileText, MoreHorizontal } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 
@@ -20,7 +29,12 @@ interface Factura {
   estado: string
 }
 
-export function FacturasTable() {
+interface FacturasTableProps {
+  onView?: (factura: Factura) => void
+  onPrint?: (factura: Factura) => void
+}
+
+export function FacturasTable({ onView, onPrint }: FacturasTableProps = {}) {
   const [facturas, setFacturas] = useState<Factura[]>([])
 
   useEffect(() => {
@@ -116,6 +130,38 @@ export function FacturasTable() {
         const estado = row.getValue('estado') as string
         const variant = estado === 'anulada' ? 'destructive' : 'default'
         return <Badge variant={variant}>{estado}</Badge>
+      },
+    },
+    {
+      id: 'actions',
+      header: 'Acciones',
+      cell: ({ row }) => {
+        const factura = row.original
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Abrir menú</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+              {onView && (
+                <DropdownMenuItem onClick={() => onView(factura)}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  Ver detalles
+                </DropdownMenuItem>
+              )}
+              {onPrint && (
+                <DropdownMenuItem onClick={() => onPrint(factura)}>
+                  <FileText className="mr-2 h-4 w-4" />
+                  Imprimir
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )
       },
     },
   ]

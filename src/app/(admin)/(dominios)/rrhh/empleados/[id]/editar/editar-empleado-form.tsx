@@ -14,18 +14,25 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowLeft, Loader2, Save } from 'lucide-react'
 import Link from 'next/link'
 import { empleadoSchema, type EmpleadoFormData } from '@/lib/schemas/rrhh.schema'
-import { crearEmpleadoAction, obtenerSucursalesActivasAction, obtenerUsuariosConAuthAction } from '@/actions/rrhh.actions'
+import { actualizarEmpleadoAction, obtenerSucursalesActivasAction, obtenerUsuariosConAuthAction } from '@/actions/rrhh.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 import { createClient } from '@/lib/supabase/client'
-import type { Usuario, Sucursal, CategoriaEmpleado } from '@/types/domain.types'
+import type { Empleado, Usuario, Sucursal, CategoriaEmpleado } from '@/types/domain.types'
 
-export function NuevoEmpleadoForm() {
+interface EditarEmpleadoFormProps {
+  empleado: Empleado
+  sucursales: Sucursal[]
+  usuarios: Usuario[]
+  categorias: CategoriaEmpleado[]
+}
+
+export function EditarEmpleadoForm({ empleado, sucursales: initialSucursales, usuarios: initialUsuarios, categorias: initialCategorias }: EditarEmpleadoFormProps) {
   const router = useRouter()
   const { showToast } = useNotificationStore()
   const [isLoading, setIsLoading] = useState(false)
-  const [usuarios, setUsuarios] = useState<Usuario[]>([])
-  const [sucursales, setSucursales] = useState<Sucursal[]>([])
-  const [categorias, setCategorias] = useState<CategoriaEmpleado[]>([])
+  const [usuarios, setUsuarios] = useState<Usuario[]>(initialUsuarios)
+  const [sucursales, setSucursales] = useState<Sucursal[]>(initialSucursales)
+  const [categorias, setCategorias] = useState<CategoriaEmpleado[]>(initialCategorias)
 
   const {
     register,
@@ -36,20 +43,38 @@ export function NuevoEmpleadoForm() {
   } = useForm<EmpleadoFormData>({
     resolver: zodResolver(empleadoSchema),
     defaultValues: {
-      activo: true,
+      usuario_id: empleado.usuario_id || undefined,
+      sucursal_id: empleado.sucursal_id || undefined,
+      categoria_id: empleado.categoria_id || undefined,
+      legajo: empleado.legajo || '',
+      fecha_ingreso: empleado.fecha_ingreso ? empleado.fecha_ingreso.split('T')[0] : '',
+      fecha_nacimiento: empleado.fecha_nacimiento ? empleado.fecha_nacimiento.split('T')[0] : '',
+      dni: empleado.dni || '',
+      cuil: empleado.cuil || '',
+      domicilio: empleado.domicilio || '',
+      telefono_personal: empleado.telefono_personal || '',
+      contacto_emergencia: empleado.contacto_emergencia || '',
+      telefono_emergencia: empleado.telefono_emergencia || '',
+      obra_social: empleado.obra_social || '',
+      numero_afiliado: empleado.numero_afiliado || '',
+      banco: empleado.banco || '',
+      cbu: empleado.cbu || '',
+      numero_cuenta: empleado.numero_cuenta || '',
+      sueldo_actual: empleado.sueldo_actual || undefined,
+      activo: empleado.activo ?? true,
     },
   })
 
-  // Cargar datos de referencia
+  // Cargar datos de referencia actualizados
   useEffect(() => {
     const loadReferenceData = async () => {
       try {
         const supabase = createClient()
 
-        // Cargar usuarios activos con cuenta de autenticación usando acción del servidor
+        // Cargar usuarios activos con cuenta de autenticación
         const usuariosResult = await obtenerUsuariosConAuthAction()
         if (usuariosResult.success && usuariosResult.data) {
-          // Cargar empleados que ya tienen usuario asignado
+          // Incluir el usuario actual del empleado si existe
           const { data: empleadosConUsuario } = await supabase
             .from('rrhh_empleados')
             .select('usuario_id')
@@ -58,60 +83,40 @@ export function NuevoEmpleadoForm() {
           if (empleadosConUsuario) {
             const usados = new Set(
               empleadosConUsuario
+                .filter(e => e.usuario_id !== empleado.usuario_id)
                 .map((e) => e.usuario_id)
                 .filter(Boolean)
             )
-            // Filtrar usuarios que ya están vinculados a un empleado
-            setUsuarios(usuariosResult.data.filter((u) => !usados.has(u.id)) as Usuario[])
+            // Filtrar usuarios que ya están vinculados a otro empleado, pero incluir el actual
+            setUsuarios(usuariosResult.data.filter((u) => !usados.has(u.id) || u.id === empleado.usuario_id) as Usuario[])
           } else {
             setUsuarios(usuariosResult.data as Usuario[])
           }
-        } else {
-          console.error('Error al cargar usuarios:', usuariosResult.error)
-          showToast(
-            'error',
-            usuariosResult.error || 'No se pudieron cargar los usuarios.',
-            'Error al cargar datos'
-          )
         }
 
-        // Cargar sucursales activas usando acción del servidor (evita problemas de RLS)
+        // Cargar sucursales activas
         const sucursalesResult = await obtenerSucursalesActivasAction()
         if (sucursalesResult.success && sucursalesResult.data) {
           setSucursales(sucursalesResult.data as Sucursal[])
-        } else {
-          console.error('Error al cargar sucursales:', sucursalesResult.error)
-          showToast(
-            'error',
-            sucursalesResult.error || 'No se pudieron cargar las sucursales. Verifica que tengas permisos de administrador.',
-            'Error al cargar datos'
-          )
         }
 
         // Cargar categorías activas
-        const { data: categoriasData, error: categoriasError } = await supabase
+        const { data: categoriasData } = await supabase
           .from('rrhh_categorias')
           .select('*')
           .eq('activo', true)
           .order('nombre')
 
-        if (categoriasError) {
-          console.error('Error al cargar categorías:', categoriasError)
-        } else if (categoriasData) {
+        if (categoriasData) {
           setCategorias(categoriasData)
         }
       } catch (error) {
-        console.error('Error general al cargar datos de referencia:', error)
-        showToast(
-          'error',
-          'Error al cargar los datos del formulario. Por favor, recarga la página.',
-          'Error'
-        )
+        console.error('Error al cargar datos de referencia:', error)
       }
     }
 
     loadReferenceData()
-  }, [showToast])
+  }, [empleado.usuario_id])
 
   const onSubmit = async (data: EmpleadoFormData) => {
     try {
@@ -120,19 +125,17 @@ export function NuevoEmpleadoForm() {
       // Limpiar campos vacíos antes de enviar
       const cleanedData: any = { ...data }
       
-      // IMPORTANTE: Eliminar nombre y apellido del objeto - estos campos NO deben enviarse
-      // El nombre y apellido del empleado vienen del usuario vinculado, no se crean directamente
+      // IMPORTANTE: Eliminar nombre y apellido del objeto - estos campos NO deben actualizarse desde el formulario
+      // El nombre y apellido del empleado vienen del usuario vinculado, no se editan directamente
       delete cleanedData.nombre
       delete cleanedData.apellido
       
-      // Validar que fecha_ingreso no esté vacío (es requerido)
+      // Convertir fechas vacías a undefined
+      // fecha_ingreso: si viene vacío, no se actualiza (se elimina del objeto)
       if (!cleanedData.fecha_ingreso || cleanedData.fecha_ingreso === '' || cleanedData.fecha_ingreso === null) {
-        showToast('error', 'La fecha de ingreso es requerida', 'Error de validación')
-        setIsLoading(false)
-        return
+        delete cleanedData.fecha_ingreso
       }
       
-      // Convertir fecha_nacimiento vacía a undefined
       if (!cleanedData.fecha_nacimiento || cleanedData.fecha_nacimiento === '' || cleanedData.fecha_nacimiento === null) {
         delete cleanedData.fecha_nacimiento
       }
@@ -154,27 +157,27 @@ export function NuevoEmpleadoForm() {
         delete cleanedData.sueldo_actual
       }
 
-      const result = await crearEmpleadoAction(cleanedData)
+      const result = await actualizarEmpleadoAction(empleado.id, cleanedData)
 
       if (result.success) {
         showToast(
           'success',
-          result.message || 'El empleado ha sido creado exitosamente',
-          'Empleado creado'
+          result.message || 'El empleado ha sido actualizado exitosamente',
+          'Empleado actualizado'
         )
-        router.push('/rrhh/empleados')
+        router.push(`/rrhh/empleados/${empleado.id}`)
       } else {
         showToast(
           'error',
           result.error || 'Ha ocurrido un error inesperado',
-          'Error al crear empleado'
+          'Error al actualizar empleado'
         )
       }
     } catch (error) {
       console.error('Error en onSubmit:', error)
       showToast(
         'error',
-        'Ha ocurrido un error inesperado al crear el empleado',
+        'Ha ocurrido un error inesperado al actualizar el empleado',
         'Error inesperado'
       )
     } finally {
@@ -187,9 +190,9 @@ export function NuevoEmpleadoForm() {
       {/* Botón volver */}
       <div className="mb-6">
         <Button variant="ghost" asChild className="mb-4">
-          <Link href="/rrhh/empleados">
+          <Link href={`/rrhh/empleados/${empleado.id}`}>
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Volver a Empleados
+            Volver a Detalles
           </Link>
         </Button>
       </div>
@@ -212,7 +215,7 @@ export function NuevoEmpleadoForm() {
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <Label htmlFor="usuario_id">Usuario del Sistema</Label>
-                  <span className="text-xs text-muted-foreground" title="Vincula este empleado con un usuario existente del sistema para que pueda iniciar sesión. Si el empleado aún no tiene usuario, puedes crearlo primero en la sección de Usuarios.">
+                  <span className="text-xs text-muted-foreground" title="Vincula este empleado con un usuario existente del sistema para que pueda iniciar sesión.">
                     (ℹ️)
                   </span>
                 </div>
@@ -233,8 +236,7 @@ export function NuevoEmpleadoForm() {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Opcional: Vincula este empleado con un usuario existente que tenga cuenta de autenticación (puede iniciar sesión). 
-                  Solo se muestran usuarios que están sincronizados con Supabase Auth.
+                  Opcional: Vincula este empleado con un usuario existente que tenga cuenta de autenticación.
                 </p>
                 {errors.usuario_id && (
                   <p className="text-sm text-red-600">{errors.usuario_id.message}</p>
@@ -399,14 +401,6 @@ export function NuevoEmpleadoForm() {
                     )}
                   </SelectContent>
                 </Select>
-                {sucursales.length === 0 && (
-                  <p className="text-xs text-amber-600">
-                    ⚠️ No se encontraron sucursales activas. Verifica que tengas permisos de administrador o que existan sucursales creadas.
-                  </p>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  El empleado solo podrá ver datos de esta sucursal asignada (inventario, ventas, etc.).
-                </p>
                 {errors.sucursal_id && (
                   <p className="text-sm text-red-600">{errors.sucursal_id.message}</p>
                 )}
@@ -566,12 +560,12 @@ export function NuevoEmpleadoForm() {
             {isLoading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Creando...
+                Guardando...
               </>
             ) : (
               <>
                 <Save className="w-4 h-4 mr-2" />
-                Crear Empleado
+                Guardar Cambios
               </>
             )}
           </Button>
@@ -580,3 +574,4 @@ export function NuevoEmpleadoForm() {
     </div>
   )
 }
+

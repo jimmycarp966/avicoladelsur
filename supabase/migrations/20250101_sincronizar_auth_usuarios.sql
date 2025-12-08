@@ -9,36 +9,68 @@ CREATE OR REPLACE FUNCTION sync_user_from_auth()
 RETURNS TRIGGER AS $$
 BEGIN
     -- Insertar o actualizar en tabla usuarios cuando se crea/actualiza en auth.users
-    INSERT INTO usuarios (
-        id,
-        email,
-        nombre,
-        apellido,
-        rol,
-        activo,
-        created_at,
-        updated_at
-    )
-    VALUES (
-        NEW.id,
-        NEW.email,
-        COALESCE(NEW.raw_user_meta_data->>'nombre', split_part(NEW.email, '@', 1)),
-        NEW.raw_user_meta_data->>'apellido',
-        COALESCE(NEW.raw_user_meta_data->>'rol', 'vendedor'),
-        COALESCE((NEW.raw_user_meta_data->>'activo')::boolean, true),
-        NEW.created_at,
-        NEW.updated_at
-    )
-    ON CONFLICT (id) DO UPDATE
-    SET
-        email = EXCLUDED.email,
-        nombre = COALESCE(EXCLUDED.nombre, usuarios.nombre),
-        apellido = COALESCE(EXCLUDED.apellido, usuarios.apellido),
-        updated_at = EXCLUDED.updated_at;
+    -- SECURITY DEFINER permite que la función se ejecute con permisos del propietario
+    -- y puede bypass RLS si se configura correctamente
+    
+    -- Intentar insertar/actualizar con manejo de errores
+    BEGIN
+        INSERT INTO usuarios (
+            id,
+            email,
+            nombre,
+            apellido,
+            rol,
+            activo,
+            created_at,
+            updated_at
+        )
+        VALUES (
+            NEW.id,
+            NEW.email,
+            COALESCE(NEW.raw_user_meta_data->>'nombre', split_part(NEW.email, '@', 1)),
+            NEW.raw_user_meta_data->>'apellido',
+            COALESCE(NEW.raw_user_meta_data->>'rol', 'vendedor'),
+            COALESCE((NEW.raw_user_meta_data->>'activo')::boolean, true),
+            NEW.created_at,
+            NEW.updated_at
+        )
+        ON CONFLICT (id) DO UPDATE
+        SET
+            email = EXCLUDED.email,
+            nombre = COALESCE(EXCLUDED.nombre, usuarios.nombre),
+            apellido = COALESCE(EXCLUDED.apellido, usuarios.apellido),
+            updated_at = EXCLUDED.updated_at;
+    EXCEPTION
+        WHEN insufficient_privilege THEN
+            -- Si falla por RLS, intentar con SET LOCAL para deshabilitar RLS temporalmente
+            PERFORM set_config('row_security', 'off', false);
+            INSERT INTO usuarios (
+                id, email, nombre, apellido, rol, activo, created_at, updated_at
+            )
+            VALUES (
+                NEW.id, NEW.email,
+                COALESCE(NEW.raw_user_meta_data->>'nombre', split_part(NEW.email, '@', 1)),
+                NEW.raw_user_meta_data->>'apellido',
+                COALESCE(NEW.raw_user_meta_data->>'rol', 'vendedor'),
+                COALESCE((NEW.raw_user_meta_data->>'activo')::boolean, true),
+                NEW.created_at, NEW.updated_at
+            )
+            ON CONFLICT (id) DO UPDATE
+            SET email = EXCLUDED.email,
+                nombre = COALESCE(EXCLUDED.nombre, usuarios.nombre),
+                apellido = COALESCE(EXCLUDED.apellido, usuarios.apellido),
+                updated_at = EXCLUDED.updated_at;
+            PERFORM set_config('row_security', 'on', false);
+    END;
     
     RETURN NEW;
+EXCEPTION
+    WHEN OTHERS THEN
+        -- Log del error pero no fallar la creación del usuario en auth
+        RAISE WARNING 'Error en sync_user_from_auth para usuario %: %', NEW.email, SQLERRM;
+        RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Trigger que se ejecuta cuando se crea un usuario en auth.users
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;

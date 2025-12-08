@@ -4,7 +4,15 @@ import { ColumnDef } from '@tanstack/react-table'
 import { DataTable, SortableHeader, StatusBadge } from '@/components/ui/data-table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Eye, CheckCircle, XCircle, DollarSign, Package } from 'lucide-react'
+import { Eye, CheckCircle, XCircle, DollarSign, Package, MoreHorizontal } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { formatDate } from '@/lib/utils'
 import type { Adelanto } from '@/types/domain.types'
 
@@ -192,38 +200,42 @@ export function AdelantosTable({ adelantos, onView, onApprove, onReject }: Adela
       cell: ({ row }) => {
         const adelanto = row.original
         return (
-          <div className="flex items-center gap-2">
-            {onView && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onView(adelanto)}
-                className="h-8 w-8 p-0"
-              >
-                <Eye className="h-4 w-4" />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Abrir menú</span>
+                <MoreHorizontal className="h-4 w-4" />
               </Button>
-            )}
-            {onApprove && !adelanto.aprobado && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onApprove(adelanto)}
-                className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
-              >
-                <CheckCircle className="h-4 w-4" />
-              </Button>
-            )}
-            {onReject && !adelanto.aprobado && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onReject(adelanto)}
-                className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-              >
-                <XCircle className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {onView && (
+                <DropdownMenuItem onClick={() => onView(adelanto)}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  Ver detalles
+                </DropdownMenuItem>
+              )}
+              {onApprove && !adelanto.aprobado && (
+                <DropdownMenuItem onClick={() => onApprove(adelanto)}>
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  Aprobar
+                </DropdownMenuItem>
+              )}
+              {onReject && !adelanto.aprobado && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => onReject(adelanto)}
+                    className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                  >
+                    <XCircle className="mr-2 h-4 w-4" />
+                    Rechazar
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         )
       },
     },

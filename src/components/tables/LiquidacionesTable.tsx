@@ -4,7 +4,15 @@ import { ColumnDef } from '@tanstack/react-table'
 import { DataTable, SortableHeader, StatusBadge } from '@/components/ui/data-table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Edit, Eye, CheckCircle, DollarSign } from 'lucide-react'
+import { Edit, Eye, CheckCircle, DollarSign, MoreHorizontal } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { formatDate } from '@/lib/utils'
 import type { Liquidacion } from '@/types/domain.types'
 
@@ -152,48 +160,42 @@ export function LiquidacionesTable({ liquidaciones, onView, onEdit, onApprove, o
       cell: ({ row }) => {
         const liquidacion = row.original
         return (
-          <div className="flex items-center gap-2">
-            {onView && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onView(liquidacion)}
-                className="h-8 w-8 p-0"
-              >
-                <Eye className="h-4 w-4" />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Abrir menú</span>
+                <MoreHorizontal className="h-4 w-4" />
               </Button>
-            )}
-            {onEdit && liquidacion.estado === 'borrador' && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onEdit(liquidacion)}
-                className="h-8 w-8 p-0"
-              >
-                <Edit className="h-4 w-4" />
-              </Button>
-            )}
-            {onApprove && (liquidacion.estado === 'borrador' || liquidacion.estado === 'calculada') && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onApprove(liquidacion)}
-                className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
-              >
-                <CheckCircle className="h-4 w-4" />
-              </Button>
-            )}
-            {onPay && liquidacion.estado === 'aprobada' && !liquidacion.pagado && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onPay(liquidacion)}
-                className="h-8 w-8 p-0 text-purple-600 hover:text-purple-700"
-              >
-                <DollarSign className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {onView && (
+                <DropdownMenuItem onClick={() => onView(liquidacion)}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  Ver detalles
+                </DropdownMenuItem>
+              )}
+              {onEdit && liquidacion.estado === 'borrador' && (
+                <DropdownMenuItem onClick={() => onEdit(liquidacion)}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Editar
+                </DropdownMenuItem>
+              )}
+              {onApprove && (liquidacion.estado === 'borrador' || liquidacion.estado === 'calculada') && (
+                <DropdownMenuItem onClick={() => onApprove(liquidacion)}>
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  Aprobar
+                </DropdownMenuItem>
+              )}
+              {onPay && liquidacion.estado === 'aprobada' && !liquidacion.pagado && (
+                <DropdownMenuItem onClick={() => onPay(liquidacion)}>
+                  <DollarSign className="mr-2 h-4 w-4" />
+                  Marcar como pagada
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         )
       },
     },
