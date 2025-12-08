@@ -293,7 +293,7 @@ export default function HandGestureDemo() {
     };
 
     return (
-        <div className="relative w-full h-screen bg-gradient-to-b from-[#0E131B] to-[#152419] overflow-hidden text-[#F5F7F9] font-sans select-none">
+        <div className="fixed inset-0 w-full h-full bg-gradient-to-b from-[#0E131B] to-[#152419] overflow-hidden text-[#F5F7F9] font-sans select-none z-[50]">
             {/* 3D Scene */}
             <div className="absolute inset-0 z-0 cursor-move">
                 <Canvas shadows camera={{ position: [0, 0, 8], fov: 45 }}>
@@ -313,7 +313,7 @@ export default function HandGestureDemo() {
             {/* UI Overlay */}
             <div className="absolute inset-0 z-20 pointer-events-none p-6 md:p-12 flex flex-col justify-between">
                 {/* Header */}
-                <div className="flex justify-between items-start">
+                <div className="flex justify-between items-start pointer-events-auto">
                     <div>
                         <motion.div
                             layoutId="logo"
@@ -356,7 +356,7 @@ export default function HandGestureDemo() {
                     {!permissionGranted && (
                         <motion.div
                             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                            className="absolute inset-0 flex items-center justify-center pointer-events-auto bg-black/60 backdrop-blur-sm z-50"
+                            className="fixed inset-0 flex items-center justify-center pointer-events-auto bg-black/80 backdrop-blur-md z-[100]"
                         >
                             <div className="bg-neutral-900 border border-neutral-800 p-8 rounded-2xl max-w-md w-full text-center shadow-2xl relative overflow-hidden group">
                                 <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -374,9 +374,12 @@ export default function HandGestureDemo() {
                                 <p className="text-[#9ca3af] mb-8 font-light">{status}</p>
 
                                 <button
-                                    onClick={enableCam}
+                                    onClick={() => {
+                                        console.log("Button clicked!");
+                                        enableCam();
+                                    }}
                                     disabled={!isLoaded || status.includes("Solicitando")}
-                                    className="w-full bg-[#2F7058] hover:bg-[#3d8a6f] text-white disabled:opacity-50 disabled:cursor-not-allowed font-bold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#2F7058]/20"
+                                    className="w-full cursor-pointer bg-[#2F7058] hover:bg-[#3d8a6f] text-white disabled:opacity-50 disabled:cursor-not-allowed font-bold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#2F7058]/20 active:scale-95 z-50 relative"
                                 >
                                     {isLoaded ? "INICIAR EXPERIENCIA" : "CARGANDO MODELOS..."}
                                 </button>
@@ -391,7 +394,7 @@ export default function HandGestureDemo() {
                         initial={{ opacity: 0, y: 50 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.5 }}
-                        className="grid grid-cols-3 gap-4"
+                        className="grid grid-cols-3 gap-4 pointer-events-auto"
                     >
                         <InstructionCard
                             icon={<Grab className="text-[#CB3433]" />}
