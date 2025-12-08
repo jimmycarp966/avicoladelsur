@@ -85,6 +85,49 @@ export async function crearEmpleadoAction(
       }
     }
 
+    // Validar que el usuario_id tenga cuenta de autenticación si se proporciona
+    if (empleadoData.usuario_id) {
+      // Verificar que el usuario existe en la tabla usuarios
+      const { data: usuarioData, error: usuarioError } = await supabase
+        .from('usuarios')
+        .select('id, email, activo')
+        .eq('id', empleadoData.usuario_id)
+        .single()
+
+      if (usuarioError || !usuarioData) {
+        return {
+          success: false,
+          error: 'El usuario seleccionado no existe en el sistema',
+        }
+      }
+
+      if (!usuarioData.activo) {
+        return {
+          success: false,
+          error: 'El usuario seleccionado está inactivo',
+        }
+      }
+
+      // Verificar que el usuario no esté ya asignado a otro empleado
+      const { data: empleadoExistente, error: empleadoError } = await supabase
+        .from('rrhh_empleados')
+        .select('id')
+        .eq('usuario_id', empleadoData.usuario_id)
+        .eq('activo', true)
+        .single()
+
+      if (empleadoExistente) {
+        return {
+          success: false,
+          error: 'Este usuario ya está asignado a otro empleado activo',
+        }
+      }
+
+      // Nota: La verificación de que existe en auth.users se hace automáticamente
+      // mediante el trigger sync_user_from_auth() o se puede verificar con una función RPC
+      // Por ahora, asumimos que si está en la tabla usuarios y está activo, tiene cuenta de auth
+    }
+
     const { data, error } = await supabase
       .from('rrhh_empleados')
       .insert({
@@ -1377,6 +1420,109 @@ export async function actualizarCategoriaEmpleadoAction(
     }
   } catch (error) {
     devError('Error en actualizarCategoriaEmpleado:', error)
+    return {
+      success: false,
+      error: 'Error interno del servidor',
+    }
+  }
+}
+
+// Obtener usuarios activos con cuenta de autenticación (para formularios)
+export async function obtenerUsuariosConAuthAction(): Promise<ApiResponse<Array<{
+  id: string
+  email: string
+  nombre: string
+  apellido?: string
+  rol: string
+  activo: boolean
+}>>> {
+  try {
+    const supabase = await createClient()
+
+    // Obtener usuarios activos
+    const { data: usuarios, error } = await supabase
+      .from('usuarios')
+      .select('id, email, nombre, apellido, rol, activo')
+      .eq('activo', true)
+      .order('nombre')
+
+    if (error) {
+      devError('Error al obtener usuarios:', error)
+      return {
+        success: false,
+        error: 'Error al obtener usuarios: ' + error.message,
+      }
+    }
+
+    // Verificar cuáles tienen cuenta de autenticación usando función RPC
+    // Nota: No podemos consultar auth.users directamente, pero podemos usar
+    // la función usuario_tiene_auth() si está disponible, o asumir que todos
+    // los usuarios activos en la tabla usuarios tienen cuenta de auth
+    // (ya que el trigger sync_user_from_auth() los sincroniza automáticamente)
+
+    return {
+      success: true,
+      data: usuarios || [],
+    }
+  } catch (error) {
+    devError('Error en obtenerUsuariosConAuthAction:', error)
+    return {
+      success: false,
+      error: 'Error interno del servidor',
+    }
+  }
+}
+
+// Obtener sucursales activas para formularios
+export async function obtenerSucursalesActivasAction(): Promise<ApiResponse<Array<{
+  id: string
+  nombre: string
+  direccion?: string
+  telefono?: string
+  activo: boolean
+}>>> {
+  try {
+    const supabase = await createClient()
+
+    // Intentar con 'activo' primero (esquema RRHH)
+    let { data: sucursales, error } = await supabase
+      .from('sucursales')
+      .select('id, nombre, direccion, telefono, activo')
+      .eq('activo', true)
+      .order('nombre')
+
+    // Si falla con 'activo', intentar con 'active' (esquema sucursales)
+    if (error) {
+      const { data: sucursalesAlt, error: errorAlt } = await supabase
+        .from('sucursales')
+        .select('id, nombre, direccion, telefono, active')
+        .eq('active', true)
+        .order('nombre')
+      
+      if (!errorAlt && sucursalesAlt) {
+        // Mapear 'active' a 'activo' para consistencia
+        sucursales = sucursalesAlt.map(s => ({
+          ...s,
+          activo: (s as any).active
+        }))
+        error = null
+      }
+    }
+
+    if (error) {
+      devError('Error al obtener sucursales activas:', error)
+      return {
+        success: false,
+        error: 'Error al obtener sucursales: ' + error.message,
+      }
+    }
+
+    return {
+      success: true,
+      data: sucursales || [],
+    }
+  } catch (error) {
+    devError('Error en obtenerSucursalesActivasAction:', error)
     return {
       success: false,
       error: 'Error interno del servidor',

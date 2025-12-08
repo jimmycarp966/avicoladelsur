@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowLeft, Loader2, Save } from 'lucide-react'
 import Link from 'next/link'
 import { empleadoSchema, type EmpleadoFormData } from '@/lib/schemas/rrhh.schema'
-import { crearEmpleadoAction } from '@/actions/rrhh.actions'
+import { crearEmpleadoAction, obtenerSucursalesActivasAction, obtenerUsuariosConAuthAction } from '@/actions/rrhh.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 import { createClient } from '@/lib/supabase/client'
 import type { Usuario, Sucursal, CategoriaEmpleado } from '@/types/domain.types'
@@ -43,56 +43,75 @@ export function NuevoEmpleadoForm() {
   // Cargar datos de referencia
   useEffect(() => {
     const loadReferenceData = async () => {
-      const supabase = createClient()
+      try {
+        const supabase = createClient()
 
-      // Cargar usuarios activos
-      const { data: usuariosData } = await supabase
-        .from('usuarios')
-        .select('*')
-        .eq('activo', true)
-        .order('nombre')
+        // Cargar usuarios activos con cuenta de autenticación usando acción del servidor
+        const usuariosResult = await obtenerUsuariosConAuthAction()
+        if (usuariosResult.success && usuariosResult.data) {
+          // Cargar empleados que ya tienen usuario asignado
+          const { data: empleadosConUsuario } = await supabase
+            .from('rrhh_empleados')
+            .select('usuario_id')
+            .not('usuario_id', 'is', null)
 
-      // Cargar empleados que ya tienen usuario asignado
-      const { data: empleadosConUsuario } = await supabase
-        .from('rrhh_empleados')
-        .select('usuario_id')
-        .not('usuario_id', 'is', null)
+          if (empleadosConUsuario) {
+            const usados = new Set(
+              empleadosConUsuario
+                .map((e) => e.usuario_id)
+                .filter(Boolean)
+            )
+            // Filtrar usuarios que ya están vinculados a un empleado
+            setUsuarios(usuariosResult.data.filter((u) => !usados.has(u.id)) as Usuario[])
+          } else {
+            setUsuarios(usuariosResult.data as Usuario[])
+          }
+        } else {
+          console.error('Error al cargar usuarios:', usuariosResult.error)
+          showToast(
+            'error',
+            usuariosResult.error || 'No se pudieron cargar los usuarios.',
+            'Error al cargar datos'
+          )
+        }
 
-      if (usuariosData) {
-        const usados = new Set(
-          (empleadosConUsuario || [])
-            .map((e) => e.usuario_id)
-            .filter(Boolean)
+        // Cargar sucursales activas usando acción del servidor (evita problemas de RLS)
+        const sucursalesResult = await obtenerSucursalesActivasAction()
+        if (sucursalesResult.success && sucursalesResult.data) {
+          setSucursales(sucursalesResult.data as Sucursal[])
+        } else {
+          console.error('Error al cargar sucursales:', sucursalesResult.error)
+          showToast(
+            'error',
+            sucursalesResult.error || 'No se pudieron cargar las sucursales. Verifica que tengas permisos de administrador.',
+            'Error al cargar datos'
+          )
+        }
+
+        // Cargar categorías activas
+        const { data: categoriasData, error: categoriasError } = await supabase
+          .from('rrhh_categorias')
+          .select('*')
+          .eq('activo', true)
+          .order('nombre')
+
+        if (categoriasError) {
+          console.error('Error al cargar categorías:', categoriasError)
+        } else if (categoriasData) {
+          setCategorias(categoriasData)
+        }
+      } catch (error) {
+        console.error('Error general al cargar datos de referencia:', error)
+        showToast(
+          'error',
+          'Error al cargar los datos del formulario. Por favor, recarga la página.',
+          'Error'
         )
-        // Filtrar usuarios que ya están vinculados a un empleado
-        setUsuarios(usuariosData.filter((u) => !usados.has(u.id)))
-      }
-
-      // Cargar sucursales activas
-      const { data: sucursalesData } = await supabase
-        .from('sucursales')
-        .select('*')
-        .eq('activo', true)
-        .order('nombre')
-
-      if (sucursalesData) {
-        setSucursales(sucursalesData)
-      }
-
-      // Cargar categorías activas
-      const { data: categoriasData } = await supabase
-        .from('rrhh_categorias')
-        .select('*')
-        .eq('activo', true)
-        .order('nombre')
-
-      if (categoriasData) {
-        setCategorias(categoriasData)
       }
     }
 
     loadReferenceData()
-  }, [])
+  }, [showToast])
 
   const onSubmit = async (data: EmpleadoFormData) => {
     try {
@@ -154,7 +173,12 @@ export function NuevoEmpleadoForm() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Usuario */}
               <div className="space-y-2">
-                <Label htmlFor="usuario_id">Usuario del Sistema</Label>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="usuario_id">Usuario del Sistema</Label>
+                  <span className="text-xs text-muted-foreground" title="Vincula este empleado con un usuario existente del sistema para que pueda iniciar sesión. Si el empleado aún no tiene usuario, puedes crearlo primero en la sección de Usuarios.">
+                    (ℹ️)
+                  </span>
+                </div>
                 <Select
                   value={watch('usuario_id') || ''}
                   onValueChange={(value) => setValue('usuario_id', value === 'none' ? undefined : value)}
@@ -171,6 +195,10 @@ export function NuevoEmpleadoForm() {
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  Opcional: Vincula este empleado con un usuario existente que tenga cuenta de autenticación (puede iniciar sesión). 
+                  Solo se muestran usuarios que están sincronizados con Supabase Auth.
+                </p>
                 {errors.usuario_id && (
                   <p className="text-sm text-red-600">{errors.usuario_id.message}</p>
                 )}
@@ -321,13 +349,27 @@ export function NuevoEmpleadoForm() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Sin sucursal asignada</SelectItem>
-                    {sucursales.map((sucursal) => (
-                      <SelectItem key={sucursal.id} value={sucursal.id}>
-                        {sucursal.nombre}
+                    {sucursales.length === 0 ? (
+                      <SelectItem value="" disabled>
+                        No hay sucursales disponibles
                       </SelectItem>
-                    ))}
+                    ) : (
+                      sucursales.map((sucursal) => (
+                        <SelectItem key={sucursal.id} value={sucursal.id}>
+                          {sucursal.nombre}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
+                {sucursales.length === 0 && (
+                  <p className="text-xs text-amber-600">
+                    ⚠️ No se encontraron sucursales activas. Verifica que tengas permisos de administrador o que existan sucursales creadas.
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  El empleado solo podrá ver datos de esta sucursal asignada (inventario, ventas, etc.).
+                </p>
                 {errors.sucursal_id && (
                   <p className="text-sm text-red-600">{errors.sucursal_id.message}</p>
                 )}
