@@ -1,4 +1,4 @@
-import { obtenerResumenTesoreria, listarCajas, obtenerRutasPendientesValidacion } from '@/actions/tesoreria.actions'
+import { obtenerResumenTesoreriaAction, listarCajasAction, obtenerRutasPendientesValidacionAction } from '@/actions/tesoreria.actions'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
@@ -8,9 +8,9 @@ export const revalidate = 300 // Revalida cada 5 minutos
 
 export default async function TesoreriaPage() {
   const [resumen, cajas, rutasPendientes] = await Promise.all([
-    obtenerResumenTesoreria(),
-    listarCajas(),
-    obtenerRutasPendientesValidacion(),
+    obtenerResumenTesoreriaAction(),
+    listarCajasAction(),
+    obtenerRutasPendientesValidacionAction(),
   ])
   
   const rutasPendientesCount = rutasPendientes.success ? rutasPendientes.data?.length || 0 : 0

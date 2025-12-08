@@ -93,11 +93,11 @@ export function ProductoForm({ producto, onSuccess }: ProductoFormProps) {
     try {
       setIsLoading(true)
 
-      const { crearProducto, actualizarProducto } = await import('@/actions/almacen.actions')
+      const { crearProductoAction, actualizarProductoAction } = await import('@/actions/almacen.actions')
       
       const result = isEditing
-        ? await actualizarProducto(producto.id, data)
-        : await crearProducto(data)
+        ? await actualizarProductoAction(producto.id, data)
+        : await crearProductoAction(data)
 
       if (!result.success) {
         throw new Error(result.error || 'Error al guardar producto')

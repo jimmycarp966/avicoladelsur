@@ -1,11 +1,11 @@
-import { listarCajas } from '@/actions/tesoreria.actions'
+import { listarCajasAction } from '@/actions/tesoreria.actions'
 import { CajaForm } from '@/components/forms/CajaForm'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 export const revalidate = 300 // Revalida cada 5 minutos
 
 export default async function CajasPage() {
-  const cajas = await listarCajas()
+  const cajas = await listarCajasAction()
 
   return (
     <div className="space-y-6">

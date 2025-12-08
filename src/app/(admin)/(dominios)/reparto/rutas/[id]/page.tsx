@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import RutaMap from '@/components/reparto/RutaMap'
-import { iniciarRuta, finalizarRuta } from '@/actions/reparto.actions'
+import { iniciarRutaAction, finalizarRutaAction } from '@/actions/reparto.actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -273,14 +273,14 @@ export default async function RutaDetallePage({
     pagosPorMetodo[metodo] = (pagosPorMetodo[metodo] || 0) + Number(detalle.monto_cobrado_registrado)
   })
 
-  const iniciarRutaAction = async () => {
+  const handleIniciarRuta = async () => {
     'use server'
-    await iniciarRuta(ruta.id)
+    await iniciarRutaAction(ruta.id)
   }
 
-  const finalizarRutaAction = async () => {
+  const handleFinalizarRuta = async () => {
     'use server'
-    await finalizarRuta(ruta.id)
+    await finalizarRutaAction(ruta.id)
   }
 
   return (
@@ -294,7 +294,10 @@ export default async function RutaDetallePage({
         </Button>
 
         <div className="flex items-center gap-2">
-          <form action={iniciarRutaAction}>
+          <form action={async () => {
+            'use server'
+            await iniciarRutaAction(id)
+          }}>
             <Button
               type="submit"
               variant="secondary"
@@ -304,7 +307,10 @@ export default async function RutaDetallePage({
             </Button>
           </form>
 
-          <form action={finalizarRutaAction}>
+          <form action={async () => {
+            'use server'
+            await finalizarRutaAction(id)
+          }}>
             <Button
               type="submit"
               variant="default"

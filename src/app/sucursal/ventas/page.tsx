@@ -72,6 +72,7 @@ async function getVentasData(sidParam?: string) {
       productosDisponibles: [],
       clientes: [],
       cajas: [],
+      listasPrecios: [],
       estadisticas: {
         ventasDia: 0,
         totalVentasDia: 0,
@@ -135,6 +136,13 @@ async function getVentasData(sidParam?: string) {
     .eq('sucursal_id', sucursalIdFinal)
     .eq('active', true)
 
+  // Obtener listas de precios activas
+  const { data: listasPrecios, error: listasError } = await supabase
+    .from('listas_precios')
+    .select('id, codigo, nombre, tipo, margen_ganancia, vigencia_activa, fecha_vigencia_desde, fecha_vigencia_hasta')
+    .eq('activa', true)
+    .order('tipo')
+
   // Mejorar manejo de errores con mensajes específicos
   if (ventasError) {
     console.error('Error al obtener ventas:', ventasError)
@@ -151,6 +159,10 @@ async function getVentasData(sidParam?: string) {
   if (cajasError) {
     console.error('Error al obtener cajas:', cajasError)
     throw new Error(`Error al obtener cajas: ${cajasError.message}`)
+  }
+  if (listasError) {
+    console.error('Error al obtener listas de precios:', listasError)
+    // No es crítico, continuar sin listas
   }
 
   // Agrupar productos por ID único
@@ -200,6 +212,15 @@ async function getVentasData(sidParam?: string) {
     productosDisponibles: Object.values(productosAgrupados) as ProductoDisponible[],
     clientes: clientes || [] as Cliente[],
     cajas: cajas || [] as Caja[],
+    listasPrecios: (listasPrecios || []).filter(lista => {
+      // Filtrar por vigencia si está activada
+      if (lista.vigencia_activa) {
+        const desdeValida = !lista.fecha_vigencia_desde || lista.fecha_vigencia_desde <= hoy
+        const hastaValida = !lista.fecha_vigencia_hasta || lista.fecha_vigencia_hasta >= hoy
+        return desdeValida && hastaValida
+      }
+      return true
+    }),
     estadisticas,
     sucursalId: sucursalIdFinal,
     esAdmin,

@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowLeft, Loader2, Save } from 'lucide-react'
 import Link from 'next/link'
 import { empleadoSchema, type EmpleadoFormData } from '@/lib/schemas/rrhh.schema'
-import { crearEmpleado } from '@/actions/rrhh.actions'
+import { crearEmpleadoAction } from '@/actions/rrhh.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 import { createClient } from '@/lib/supabase/client'
 import type { Usuario, Sucursal, CategoriaEmpleado } from '@/types/domain.types'
@@ -45,15 +45,27 @@ export function NuevoEmpleadoForm() {
     const loadReferenceData = async () => {
       const supabase = createClient()
 
-      // Cargar usuarios disponibles (sin empleado asignado)
+      // Cargar usuarios activos
       const { data: usuariosData } = await supabase
         .from('usuarios')
         .select('*')
         .eq('activo', true)
         .order('nombre')
 
+      // Cargar empleados que ya tienen usuario asignado
+      const { data: empleadosConUsuario } = await supabase
+        .from('rrhh_empleados')
+        .select('usuario_id')
+        .not('usuario_id', 'is', null)
+
       if (usuariosData) {
-        setUsuarios(usuariosData)
+        const usados = new Set(
+          (empleadosConUsuario || [])
+            .map((e) => e.usuario_id)
+            .filter(Boolean)
+        )
+        // Filtrar usuarios que ya están vinculados a un empleado
+        setUsuarios(usuariosData.filter((u) => !usados.has(u.id)))
       }
 
       // Cargar sucursales activas
@@ -86,7 +98,7 @@ export function NuevoEmpleadoForm() {
     try {
       setIsLoading(true)
 
-      const result = await crearEmpleado(data)
+      const result = await crearEmpleadoAction(data)
 
       if (result.success) {
         showToast(

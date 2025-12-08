@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { EditarLoteForm } from './editar-lote-form'
-import { obtenerLotes } from '@/actions/almacen.actions'
+import { obtenerLotesAction } from '@/actions/almacen.actions'
 import { createClient } from '@/lib/supabase/server'
 import { Loader2 } from 'lucide-react'
 

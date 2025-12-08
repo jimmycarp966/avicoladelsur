@@ -9,7 +9,7 @@ import {
   Tooltip,
 } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { obtenerProductosPorCategoria } from '@/actions/dashboard.actions'
+import { obtenerProductosPorCategoriaAction } from '@/actions/dashboard.actions'
 
 export function ProductosPorCategoriaChart() {
   const [data, setData] = useState<Array<{ name: string; value: number; color: string }>>([])
@@ -17,7 +17,7 @@ export function ProductosPorCategoriaChart() {
 
   useEffect(() => {
     async function fetchData() {
-      const result = await obtenerProductosPorCategoria()
+      const result = await obtenerProductosPorCategoriaAction()
       if (result.success && result.data) {
         setData(result.data)
       }

@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
+import { devError, devLog } from '@/lib/utils/logger'
 import {
   listaPrecioSchema,
   precioProductoSchema,
@@ -36,8 +37,8 @@ export async function obtenerListasPreciosAction(filtros?: {
     const { data, error } = await query
 
     if (error) {
-      console.error('Error obteniendo listas de precios:', error)
-      return { success: false, message: 'Error al obtener listas de precios' }
+      devError('Error obteniendo listas de precios:', error)
+      return { success: false, error: 'Error al obtener listas de precios' }
     }
 
     // Filtrar por vigencia si está activada
@@ -62,8 +63,8 @@ export async function obtenerListasPreciosAction(filtros?: {
 
     return { success: true, data: listasValidas }
   } catch (error) {
-    console.error('Error en obtenerListasPreciosAction:', error)
-    return { success: false, message: 'Error interno del servidor' }
+    devError('Error en obtenerListasPreciosAction:', error)
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
 
@@ -75,8 +76,8 @@ export async function obtenerListaPrecioAction(listaPrecioId: string): Promise<A
     // Verificar permisos del usuario primero
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      console.error('Error de autenticación:', userError)
-      return { success: false, message: 'Usuario no autenticado' }
+      devError('Error de autenticación:', userError)
+      return { success: false, error: 'Usuario no autenticado' }
     }
 
     // Verificar rol del usuario
@@ -87,11 +88,11 @@ export async function obtenerListaPrecioAction(listaPrecioId: string): Promise<A
       .single()
 
     if (rolError || !usuario) {
-      console.error('Error obteniendo rol del usuario:', rolError)
-      return { success: false, message: 'Error obteniendo información del usuario' }
+      devError('Error obteniendo rol del usuario:', rolError)
+      return { success: false, error: 'Error obteniendo información del usuario' }
     }
 
-    console.log('Usuario actual:', { id: user.id, rol: usuario.rol })
+    devLog('Usuario actual:', { id: user.id, rol: usuario.rol })
 
     const { data, error } = await supabase
       .from('listas_precios')
@@ -100,17 +101,17 @@ export async function obtenerListaPrecioAction(listaPrecioId: string): Promise<A
       .single()
 
     if (error) {
-      console.error('Error obteniendo lista de precios:', error)
-      console.error('Código de error:', error.code)
-      console.error('Mensaje de error:', error.message)
-      console.error('Detalles del error:', error.details)
-      return { success: false, message: `Error al obtener lista de precios: ${error.message || 'Error desconocido'}` }
+      devError('Error obteniendo lista de precios:', error)
+      devError('Código de error:', error.code)
+      devError('Mensaje de error:', error.message)
+      devError('Detalles del error:', error.details)
+      return { success: false, error: `Error al obtener lista de precios: ${error.message || 'Error desconocido'}` }
     }
 
     return { success: true, data }
   } catch (error) {
-    console.error('Error en obtenerListaPrecioAction:', error)
-    return { success: false, message: 'Error interno del servidor' }
+    devError('Error en obtenerListaPrecioAction:', error)
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
 
@@ -122,7 +123,7 @@ export async function crearListaPrecioAction(formData: FormData): Promise<ApiRes
     // Verificar permisos (solo admin)
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return { success: false, message: 'Usuario no autenticado' }
+      return { success: false, error: 'Usuario no autenticado' }
     }
 
     const { data: usuario } = await supabase
@@ -132,7 +133,7 @@ export async function crearListaPrecioAction(formData: FormData): Promise<ApiRes
       .single()
 
     if (!usuario || usuario.rol !== 'admin') {
-      return { success: false, message: 'No tienes permisos para crear listas de precios' }
+      return { success: false, error: 'No tienes permisos para crear listas de precios' }
     }
 
     // Validar datos
@@ -154,18 +155,18 @@ export async function crearListaPrecioAction(formData: FormData): Promise<ApiRes
       .single()
 
     if (error) {
-      console.error('Error creando lista de precios:', error)
-      return { success: false, message: 'Error al crear lista de precios' }
+      devError('Error creando lista de precios:', error)
+      return { success: false, error: 'Error al crear lista de precios' }
     }
 
     revalidatePath('/ventas/listas-precios')
     return { success: true, data: lista, message: 'Lista de precios creada exitosamente' }
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return { success: false, message: error.issues[0].message }
+      return { success: false, error: error.issues[0].message }
     }
-    console.error('Error en crearListaPrecioAction:', error)
-    return { success: false, message: 'Error interno del servidor' }
+    devError('Error en crearListaPrecioAction:', error)
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
 
@@ -180,7 +181,7 @@ export async function actualizarListaPrecioAction(
     // Verificar permisos (solo admin)
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return { success: false, message: 'Usuario no autenticado' }
+      return { success: false, error: 'Usuario no autenticado' }
     }
 
     const { data: usuario } = await supabase
@@ -190,7 +191,7 @@ export async function actualizarListaPrecioAction(
       .single()
 
     if (!usuario || usuario.rol !== 'admin') {
-      return { success: false, message: 'No tienes permisos para actualizar listas de precios' }
+      return { success: false, error: 'No tienes permisos para actualizar listas de precios' }
     }
 
     // Validar datos
@@ -212,8 +213,8 @@ export async function actualizarListaPrecioAction(
       .eq('id', listaPrecioId)
 
     if (error) {
-      console.error('Error actualizando lista de precios:', error)
-      return { success: false, message: 'Error al actualizar lista de precios' }
+      devError('Error actualizando lista de precios:', error)
+      return { success: false, error: 'Error al actualizar lista de precios' }
     }
 
     revalidatePath('/ventas/listas-precios')
@@ -221,10 +222,10 @@ export async function actualizarListaPrecioAction(
     return { success: true, message: 'Lista de precios actualizada exitosamente' }
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return { success: false, message: error.issues[0].message }
+      return { success: false, error: error.issues[0].message }
     }
-    console.error('Error en actualizarListaPrecioAction:', error)
-    return { success: false, message: 'Error interno del servidor' }
+    devError('Error en actualizarListaPrecioAction:', error)
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
 
@@ -244,8 +245,8 @@ export async function obtenerListasClienteAction(clienteId: string): Promise<Api
       .order('prioridad', { ascending: true })
 
     if (error) {
-      console.error('Error obteniendo listas del cliente:', error)
-      return { success: false, message: 'Error al obtener listas del cliente' }
+      devError('Error obteniendo listas del cliente:', error)
+      return { success: false, error: 'Error al obtener listas del cliente' }
     }
 
     // Filtrar listas que no están vigentes (si tienen vigencia activada)
@@ -272,8 +273,8 @@ export async function obtenerListasClienteAction(clienteId: string): Promise<Api
 
     return { success: true, data: listasValidas }
   } catch (error) {
-    console.error('Error en obtenerListasClienteAction:', error)
-    return { success: false, message: 'Error interno del servidor' }
+    devError('Error en obtenerListasClienteAction:', error)
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
 
@@ -288,7 +289,7 @@ export async function asignarListaClienteAction(
     // Verificar permisos (solo admin)
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return { success: false, message: 'Usuario no autenticado' }
+      return { success: false, error: 'Usuario no autenticado' }
     }
 
     const { data: usuario } = await supabase
@@ -298,7 +299,7 @@ export async function asignarListaClienteAction(
       .single()
 
     if (!usuario || usuario.rol !== 'admin') {
-      return { success: false, message: 'No tienes permisos para asignar listas' }
+      return { success: false, error: 'No tienes permisos para asignar listas' }
     }
 
     // Validar que no exceda el límite de 2 listas
@@ -309,7 +310,7 @@ export async function asignarListaClienteAction(
       .eq('activa', true)
 
     if (listasExistentes && listasExistentes.length >= 2) {
-      return { success: false, message: 'El cliente ya tiene 2 listas activas' }
+      return { success: false, error: 'El cliente ya tiene 2 listas activas' }
     }
 
     // Verificar si ya existe la asignación
@@ -328,7 +329,7 @@ export async function asignarListaClienteAction(
         .eq('id', existe.id)
 
       if (error) {
-        return { success: false, message: 'Error al activar lista' }
+        return { success: false, error: 'Error al activar lista' }
       }
     } else {
       // Crear nueva asignación
@@ -345,16 +346,16 @@ export async function asignarListaClienteAction(
         })
 
       if (error) {
-        console.error('Error asignando lista:', error)
-        return { success: false, message: 'Error al asignar lista' }
+        devError('Error asignando lista:', error)
+        return { success: false, error: 'Error al asignar lista' }
       }
     }
 
     revalidatePath(`/ventas/clientes/${clienteId}`)
     return { success: true, message: 'Lista asignada exitosamente' }
   } catch (error) {
-    console.error('Error en asignarListaClienteAction:', error)
-    return { success: false, message: 'Error interno del servidor' }
+    devError('Error en asignarListaClienteAction:', error)
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
 
@@ -369,7 +370,7 @@ export async function desasignarListaClienteAction(
     // Verificar permisos (solo admin)
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return { success: false, message: 'Usuario no autenticado' }
+      return { success: false, error: 'Usuario no autenticado' }
     }
 
     const { data: usuario } = await supabase
@@ -379,7 +380,7 @@ export async function desasignarListaClienteAction(
       .single()
 
     if (!usuario || usuario.rol !== 'admin') {
-      return { success: false, message: 'No tienes permisos para desasignar listas' }
+      return { success: false, error: 'No tienes permisos para desasignar listas' }
     }
 
     // No permitir desasignar listas automáticas
@@ -391,7 +392,7 @@ export async function desasignarListaClienteAction(
       .single()
 
     if (asignacion?.es_automatica) {
-      return { success: false, message: 'No se puede desasignar una lista automática' }
+      return { success: false, error: 'No se puede desasignar una lista automática' }
     }
 
     const { error } = await supabase
@@ -401,15 +402,15 @@ export async function desasignarListaClienteAction(
       .eq('lista_precio_id', listaPrecioId)
 
     if (error) {
-      console.error('Error desasignando lista:', error)
-      return { success: false, message: 'Error al desasignar lista' }
+      devError('Error desasignando lista:', error)
+      return { success: false, error: 'Error al desasignar lista' }
     }
 
     revalidatePath(`/ventas/clientes/${clienteId}`)
     return { success: true, message: 'Lista desasignada exitosamente' }
   } catch (error) {
-    console.error('Error en desasignarListaClienteAction:', error)
-    return { success: false, message: 'Error interno del servidor' }
+    devError('Error en desasignarListaClienteAction:', error)
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
 
@@ -427,7 +428,7 @@ export async function obtenerPrecioProductoAction(
     })
 
     if (error) {
-      console.error('Error obteniendo precio:', error)
+      devError('Error obteniendo precio:', error)
       // Fallback a precio_venta del producto
       const { data: producto } = await supabase
         .from('productos')
@@ -443,8 +444,8 @@ export async function obtenerPrecioProductoAction(
 
     return { success: true, data: { precio: data || 0 } }
   } catch (error) {
-    console.error('Error en obtenerPrecioProductoAction:', error)
-    return { success: false, message: 'Error interno del servidor' }
+    devError('Error en obtenerPrecioProductoAction:', error)
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
 
@@ -456,8 +457,8 @@ export async function obtenerPreciosListaAction(listaPrecioId: string): Promise<
     // Verificar permisos del usuario primero
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      console.error('Error de autenticación:', userError)
-      return { success: false, message: 'Usuario no autenticado' }
+      devError('Error de autenticación:', userError)
+      return { success: false, error: 'Usuario no autenticado' }
     }
 
     // Verificar rol del usuario
@@ -468,11 +469,11 @@ export async function obtenerPreciosListaAction(listaPrecioId: string): Promise<
       .single()
 
     if (rolError || !usuario) {
-      console.error('Error obteniendo rol del usuario:', rolError)
-      return { success: false, message: 'Error obteniendo información del usuario' }
+      devError('Error obteniendo rol del usuario:', rolError)
+      return { success: false, error: 'Error obteniendo información del usuario' }
     }
 
-    console.log('Usuario actual para precios:', { id: user.id, rol: usuario.rol })
+    devLog('Usuario actual para precios:', { id: user.id, rol: usuario.rol })
 
     const { data, error } = await supabase
       .from('precios_productos')
@@ -485,17 +486,17 @@ export async function obtenerPreciosListaAction(listaPrecioId: string): Promise<
       .order('producto(nombre)', { ascending: true })
 
     if (error) {
-      console.error('Error obteniendo precios de lista:', error)
-      console.error('Código de error:', error.code)
-      console.error('Mensaje de error:', error.message)
-      console.error('Detalles del error:', error.details)
-      return { success: false, message: `Error al obtener precios: ${error.message || 'Error desconocido'}` }
+      devError('Error obteniendo precios de lista:', error)
+      devError('Código de error:', error.code)
+      devError('Mensaje de error:', error.message)
+      devError('Detalles del error:', error.details)
+      return { success: false, error: `Error al obtener precios: ${error.message || 'Error desconocido'}` }
     }
 
     return { success: true, data }
   } catch (error) {
-    console.error('Error en obtenerPreciosListaAction:', error)
-    return { success: false, message: 'Error interno del servidor' }
+    devError('Error en obtenerPreciosListaAction:', error)
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
 
@@ -508,7 +509,7 @@ export async function diagnosticarListasPreciosAction(): Promise<ApiResponse> {
     // Verificar autenticación
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return { success: false, message: 'Usuario no autenticado', data: { userError } }
+      return { success: false, error: 'Usuario no autenticado', data: { userError } }
     }
 
     // Verificar rol
@@ -519,7 +520,7 @@ export async function diagnosticarListasPreciosAction(): Promise<ApiResponse> {
       .single()
 
     if (rolError || !usuario) {
-      return { success: false, message: 'Error obteniendo rol', data: { rolError } }
+      return { success: false, error: 'Error obteniendo rol', data: { rolError } }
     }
 
     const diagnostico = {
@@ -559,8 +560,8 @@ export async function diagnosticarListasPreciosAction(): Promise<ApiResponse> {
 
     return { success: true, data: diagnostico }
   } catch (error) {
-    console.error('Error en diagnóstico:', error)
-    return { success: false, message: 'Error en diagnóstico', data: { error } }
+    devError('Error en diagnóstico:', error)
+    return { success: false, error: 'Error en diagnóstico', data: { error } }
   }
 }
 
@@ -572,7 +573,7 @@ export async function guardarPrecioProductoAction(formData: FormData): Promise<A
     // Verificar permisos (solo admin)
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return { success: false, message: 'Usuario no autenticado' }
+      return { success: false, error: 'Usuario no autenticado' }
     }
 
     const { data: usuario } = await supabase
@@ -582,7 +583,7 @@ export async function guardarPrecioProductoAction(formData: FormData): Promise<A
       .single()
 
     if (!usuario || usuario.rol !== 'admin') {
-      return { success: false, message: 'No tienes permisos para modificar precios' }
+      return { success: false, error: 'No tienes permisos para modificar precios' }
     }
 
     // Validar datos
@@ -619,16 +620,16 @@ export async function guardarPrecioProductoAction(formData: FormData): Promise<A
         .eq('id', precioExistente.id)
 
       if (error) {
-        console.error('Error actualizando precio:', error)
-        return { success: false, message: 'Error al actualizar precio' }
+        devError('Error actualizando precio:', error)
+        return { success: false, error: 'Error al actualizar precio' }
       }
     } else {
       // Crear nuevo precio
       const { error } = await supabase.from('precios_productos').insert(data)
 
       if (error) {
-        console.error('Error creando precio:', error)
-        return { success: false, message: 'Error al crear precio' }
+        devError('Error creando precio:', error)
+        return { success: false, error: 'Error al crear precio' }
       }
     }
 
@@ -636,10 +637,10 @@ export async function guardarPrecioProductoAction(formData: FormData): Promise<A
     return { success: true, message: 'Precio guardado exitosamente' }
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return { success: false, message: error.issues[0].message }
+      return { success: false, error: error.issues[0].message }
     }
-    console.error('Error en guardarPrecioProductoAction:', error)
-    return { success: false, message: 'Error interno del servidor' }
+    devError('Error en guardarPrecioProductoAction:', error)
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
 

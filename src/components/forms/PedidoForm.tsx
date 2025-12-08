@@ -12,19 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, Loader2, Save, Plus, Trash2, Search } from 'lucide-react'
 import Link from 'next/link'
-import { crearPedidoSchema } from '@/lib/schemas/pedidos.schema'
-
-type CrearPedidoFormData = {
-  cliente_id: string
-  items: {
-    producto_id: string
-    cantidad: number
-    precio_unitario?: number
-  }[]
-  fecha_entrega_estimada?: string
-  descuento: number
-  observaciones?: string
-}
+import { crearPedidoSchema, type CrearPedidoFormData } from '@/lib/schemas/pedidos.schema'
 import { useNotificationStore } from '@/store/notificationStore'
 import { formatCurrency } from '@/lib/utils'
 
@@ -61,8 +49,8 @@ export function PedidoForm({ pedido, onSuccess }: PedidoFormProps) {
   useEffect(() => {
     const fetchClientes = async () => {
       try {
-        const { obtenerClientes } = await import('@/actions/ventas.actions')
-        const result = await obtenerClientes()
+        const { obtenerClientesAction } = await import('@/actions/ventas.actions')
+        const result = await obtenerClientesAction()
         if (result.success && result.data) {
           setClientes(Array.isArray(result.data) ? result.data : [])
         }
@@ -73,8 +61,8 @@ export function PedidoForm({ pedido, onSuccess }: PedidoFormProps) {
 
     const fetchProductos = async () => {
       try {
-        const { obtenerProductos } = await import('@/actions/almacen.actions')
-        const result = await obtenerProductos()
+        const { obtenerProductosAction } = await import('@/actions/almacen.actions')
+        const result = await obtenerProductosAction()
         if (result.success && result.data) {
           setProductos(Array.isArray(result.data) ? result.data : [])
         }
@@ -95,18 +83,22 @@ export function PedidoForm({ pedido, onSuccess }: PedidoFormProps) {
     setValue,
     formState: { errors },
   } = useForm<CrearPedidoFormData>({
-    // resolver: zodResolver(crearPedidoSchema), // TODO: Habilitar validación Zod
+    resolver: zodResolver(crearPedidoSchema) as any,
     defaultValues: pedido ? {
       cliente_id: pedido.cliente_id,
-      fecha_entrega_estimada: pedido.fecha_entrega_estimada ? pedido.fecha_entrega_estimada.split('T')[0] : '',
+      fecha_entrega_estimada: pedido.fecha_entrega_estimada ? pedido.fecha_entrega_estimada.split('T')[0] : undefined,
       descuento: 0,
-      observaciones: pedido.observaciones || '',
-      items: pedido.items || [{ producto_id: '', cantidad: 1, precio_unitario: 0 }],
+      observaciones: pedido.observaciones || undefined,
+      items: pedido.items?.map(item => ({
+        producto_id: item.producto_id,
+        cantidad: item.cantidad,
+        precio_unitario: item.precio_unitario,
+      })) || [{ producto_id: '', cantidad: 1 }],
     } : {
-      fecha_entrega_estimada: '',
+      fecha_entrega_estimada: undefined,
       descuento: 0,
-      observaciones: '',
-      items: [{ producto_id: '', cantidad: 1, precio_unitario: 0 }],
+      observaciones: undefined,
+      items: [{ producto_id: '', cantidad: 1 }],
     },
   })
 
@@ -198,9 +190,9 @@ export function PedidoForm({ pedido, onSuccess }: PedidoFormProps) {
         return
       }
 
-      const { crearPedido } = await import('@/actions/ventas.actions')
+      const { crearPedidoAction } = await import('@/actions/ventas.actions')
       
-      const result = await crearPedido({
+      const result = await crearPedidoAction({
         cliente_id: data.cliente_id,
         items: data.items.map(item => ({
           producto_id: item.producto_id,

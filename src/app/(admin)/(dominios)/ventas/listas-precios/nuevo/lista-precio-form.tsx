@@ -70,7 +70,7 @@ export function ListaPrecioForm() {
         showToast('success', result.message || 'Lista de precios creada exitosamente')
         router.push(`/ventas/listas-precios/${result.data?.id || ''}`)
       } else {
-        showToast('error', result.message || 'Error al crear lista de precios')
+        showToast('error', result.error || 'Error al crear lista de precios')
       }
     } catch (error: any) {
       console.error('Error creando lista de precios:', error)

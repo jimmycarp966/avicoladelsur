@@ -3,7 +3,7 @@ import { obtenerKpisVentas } from '@/actions/reportes.actions'
 import { obtenerKpisStock } from '@/actions/reportes-stock.actions'
 import { obtenerKpisReparto } from '@/actions/reportes-reparto.actions'
 import { obtenerKpisTesoreria } from '@/actions/reportes-tesoreria.actions'
-import { obtenerResumenTesoreria } from '@/actions/tesoreria.actions'
+import { obtenerResumenTesoreriaAction } from '@/actions/tesoreria.actions'
 import { createClient } from '@/lib/supabase/server'
 import { subDays, format } from 'date-fns'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -46,7 +46,7 @@ export default async function ReportesPage() {
     obtenerKpisStock(filtros),
     obtenerKpisReparto(filtros),
     obtenerKpisTesoreria(filtros),
-    obtenerResumenTesoreria(),
+    obtenerResumenTesoreriaAction(),
   ])
 
   const kpisVentas = kpisVentasResult.data || {}

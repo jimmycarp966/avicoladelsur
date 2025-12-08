@@ -32,7 +32,7 @@ export default function ValidarSemanaButton({ semanaInicio }: ValidarSemanaButto
         setValidacion(result.data)
         setDialogOpen(true)
       } else {
-        toast.error(result?.message || 'Error al validar la semana')
+        toast.error(result?.error || 'Error al validar la semana')
       }
     })
   }

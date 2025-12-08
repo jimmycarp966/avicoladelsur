@@ -1,6 +1,6 @@
 import { getCurrentUser } from '@/actions/auth.actions'
-import { obtenerRutaActiva } from '@/actions/reparto.actions'
-import { obtenerMetricasRepartidor } from '@/actions/dashboard.actions'
+import { obtenerRutaActivaAction } from '@/actions/reparto.actions'
+import { obtenerMetricasRepartidorAction } from '@/actions/dashboard.actions'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -36,11 +36,11 @@ export default async function RepartidorDashboard() {
     )
   }
 
-  const rutaActivaResponse = await obtenerRutaActiva(user.id)
+  const rutaActivaResponse = await obtenerRutaActivaAction(user.id)
   const rutaActiva = rutaActivaResponse.success ? rutaActivaResponse.data : null
 
   // Obtener métricas del repartidor
-  const metricasResult = await obtenerMetricasRepartidor(user.id)
+  const metricasResult = await obtenerMetricasRepartidorAction(user.id)
   const metricas = metricasResult.success ? metricasResult.data! : {
     eficiencia: 0,
     puntuacionGeneral: 0,

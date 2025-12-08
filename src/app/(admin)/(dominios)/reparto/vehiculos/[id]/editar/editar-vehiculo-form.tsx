@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Loader2, Save } from 'lucide-react'
-import { actualizarVehiculo, obtenerVehiculoPorId } from '@/actions/reparto.actions'
+import { actualizarVehiculoAction, obtenerVehiculoPorIdAction } from '@/actions/reparto.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 import type { Vehiculo } from '@/types/domain.types'
 
@@ -61,7 +61,7 @@ export function EditarVehiculoForm({ vehiculoId }: EditarVehiculoFormProps) {
   const loadVehiculo = async () => {
     try {
       setIsLoadingData(true)
-      const result = await obtenerVehiculoPorId(vehiculoId)
+      const result = await obtenerVehiculoPorIdAction(vehiculoId)
       if (result.success && result.data) {
         const data = result.data as Vehiculo
         setVehiculo(data)
@@ -91,7 +91,7 @@ export function EditarVehiculoForm({ vehiculoId }: EditarVehiculoFormProps) {
     try {
       setIsLoading(true)
 
-      const result = await actualizarVehiculo(vehiculoId, {
+      const result = await actualizarVehiculoAction(vehiculoId, {
         patente: data.patente,
         marca: data.marca,
         modelo: data.modelo,

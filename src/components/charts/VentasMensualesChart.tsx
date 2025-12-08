@@ -11,7 +11,7 @@ import {
 } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatCurrency } from '@/lib/utils'
-import { obtenerVentasMensuales } from '@/actions/dashboard.actions'
+import { obtenerVentasMensualesAction } from '@/actions/dashboard.actions'
 
 export function VentasMensualesChart() {
   const [data, setData] = useState<Array<{ mes: string; ventas: number; pedidos: number }>>([])
@@ -19,7 +19,7 @@ export function VentasMensualesChart() {
 
   useEffect(() => {
     async function fetchData() {
-      const result = await obtenerVentasMensuales()
+      const result = await obtenerVentasMensualesAction()
       if (result.success && result.data) {
         setData(result.data)
       }

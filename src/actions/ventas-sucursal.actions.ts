@@ -14,16 +14,20 @@ export interface ItemVentaSucursal {
   precioUnitario?: number
 }
 
+export interface PagoMetodo {
+  metodoPago: 'efectivo' | 'transferencia' | 'tarjeta' | 'mercado_pago' | 'cuenta_corriente'
+  monto: number
+}
+
 export interface RegistrarVentaSucursalParams {
   sucursalId: string
-  clienteId: string
+  clienteId?: string // Opcional para venta genérica
   listaPrecioId: string
   items: ItemVentaSucursal[]
+  cajaId?: string // Opcional
   pago?: {
-    estado: 'pagado' | 'pendiente' | 'parcial'
-    metodoPago?: string
-    monto?: number
-  }
+    pagos: PagoMetodo[] // Multipago: array de métodos
+  } | PagoMetodo // Compatibilidad: un solo pago
 }
 
 export interface VentaSucursalResult {
@@ -123,18 +127,38 @@ export async function registrarVentaSucursalConControlAction(
       precio_unitario: item.precioUnitario
     }))
 
-    // Llamar a la función RPC
+    // Preparar pagos (soporte para multipago)
+    let pagoJson = null
+    if (params.pago) {
+      // Si es array de pagos (multipago)
+      if ('pagos' in params.pago && Array.isArray(params.pago.pagos)) {
+        pagoJson = {
+          pagos: params.pago.pagos.map(p => ({
+            metodo_pago: p.metodoPago,
+            monto: p.monto
+          }))
+        }
+      } 
+      // Si es un solo pago (compatibilidad)
+      else if ('metodoPago' in params.pago) {
+        pagoJson = {
+          pagos: [{
+            metodo_pago: params.pago.metodoPago,
+            monto: params.pago.monto
+          }]
+        }
+      }
+    }
+
+    // Llamar a la función RPC actualizada
     const { data, error } = await supabase.rpc('fn_registrar_venta_sucursal', {
       p_sucursal_id: params.sucursalId,
-      p_cliente_id: params.clienteId,
+      p_cliente_id: params.clienteId || null, // Puede ser NULL
       p_usuario_id: userData.id,
       p_lista_precio_id: params.listaPrecioId,
       p_items: itemsJson,
-      p_pago: params.pago ? {
-        estado: params.pago.estado,
-        metodo_pago: params.pago.metodoPago,
-        monto: params.pago.monto
-      } : null
+      p_pago: pagoJson,
+      p_caja_id: params.cajaId || null
     })
 
     if (error) {
@@ -689,6 +713,102 @@ export async function obtenerPrecioProductoAction(
     return {
       success: true,
       data: { precio: data || 0 }
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: `Error interno: ${error instanceof Error ? error.message : 'Error desconocido'}`
+    }
+  }
+}
+
+/**
+ * Valida el límite de crédito de un cliente
+ */
+export async function validarLimiteCreditoAction(
+  clienteId: string,
+  monto: number
+): Promise<ApiResponse<{
+  permiteVenta: boolean
+  saldoActual: number
+  limiteCredito: number
+  saldoDespues: number
+  excede: boolean
+  bloqueado: boolean
+}>> {
+  try {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase.rpc('fn_validar_limite_credito', {
+      p_cliente_id: clienteId,
+      p_monto: monto
+    })
+
+    if (error) {
+      return { success: false, error: `Error al validar crédito: ${error.message}` }
+    }
+
+    if (!data.success) {
+      return { success: false, error: data.error || 'Error al validar crédito' }
+    }
+
+    return {
+      success: true,
+      data: {
+        permiteVenta: data.permite_venta as boolean,
+        saldoActual: Number(data.saldo_actual),
+        limiteCredito: Number(data.limite_credito),
+        saldoDespues: Number(data.saldo_despues || 0),
+        excede: data.excede as boolean,
+        bloqueado: data.bloqueado as boolean || false,
+      }
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: `Error interno: ${error instanceof Error ? error.message : 'Error desconocido'}`
+    }
+  }
+}
+
+/**
+ * Obtiene información de crédito del cliente
+ */
+export async function obtenerInfoCreditoClienteAction(
+  clienteId: string
+): Promise<ApiResponse<{
+  saldo: number
+  limiteCredito: number
+  bloqueado: boolean
+}>> {
+  try {
+    const supabase = await createClient()
+
+    // Obtener cliente
+    const { data: cliente, error: clienteError } = await supabase
+      .from('clientes')
+      .select('id, bloqueado_por_deuda, limite_credito')
+      .eq('id', clienteId)
+      .single()
+
+    if (clienteError || !cliente) {
+      return { success: false, error: 'Cliente no encontrado' }
+    }
+
+    // Obtener saldo de cuenta corriente
+    const { data: cuenta, error: cuentaError } = await supabase
+      .from('cuentas_corrientes')
+      .select('saldo, limite_credito')
+      .eq('cliente_id', clienteId)
+      .single()
+
+    return {
+      success: true,
+      data: {
+        saldo: cuenta?.saldo || 0,
+        limiteCredito: cuenta?.limite_credito || cliente.limite_credito || 0,
+        bloqueado: cliente.bloqueado_por_deuda || false,
+      }
     }
   } catch (error) {
     return {

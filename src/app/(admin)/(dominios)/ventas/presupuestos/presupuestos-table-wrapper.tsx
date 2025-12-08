@@ -53,9 +53,9 @@ export function PresupuestosTableWrapper() {
         }
       } else {
         // Solo mostrar error si hay un problema real
-        console.error('Error obteniendo presupuestos:', result.message, result.error)
+        console.error('Error obteniendo presupuestos:', result.error)
         // Mostrar mensaje más detallado si está disponible
-        const errorMessage = result.error?.message || result.message || 'Error al cargar presupuestos'
+        const errorMessage = typeof result.error === 'string' ? result.error : 'Error al cargar presupuestos'
         showToast('error', errorMessage)
       }
     } catch (error) {
@@ -82,11 +82,11 @@ export function PresupuestosTableWrapper() {
       const result = await enviarPresupuestoAlmacenAction(presupuesto.id)
 
       if (result.success) {
-        showToast('success', result.message)
+        showToast('success', result.message || 'Operación exitosa')
         // Recargar la lista
         await loadPresupuestos()
       } else {
-        showToast('error', result.message)
+        showToast('error', result.error || 'Error al cargar presupuestos')
       }
     } catch (error) {
       console.error('Error enviando presupuesto a almacén:', error)
@@ -105,7 +105,7 @@ export function PresupuestosTableWrapper() {
         showToast('success', result.message || 'Stock reservado exitosamente')
         await loadPresupuestos()
       } else {
-        showToast('error', result.message || 'Error al reservar stock')
+        showToast('error', result.error || 'Error al reservar stock')
       }
     } catch (error) {
       console.error('Error reservando stock:', error)
@@ -133,7 +133,7 @@ export function PresupuestosTableWrapper() {
           router.push(`/almacen/pedidos/${result.data.pedido_id}`)
         }
       } else {
-        showToast('error', result.message || 'Error al convertir presupuesto')
+        showToast('error', result.error || 'Error al convertir presupuesto')
       }
     } catch (error) {
       console.error('Error convirtiendo presupuesto:', error)
@@ -150,7 +150,7 @@ export function PresupuestosTableWrapper() {
         // Recargar la lista
         await loadPresupuestos()
       } else {
-        showToast('error', result.message || 'Error al recalcular presupuesto')
+        showToast('error', result.error || 'Error al recalcular presupuesto')
       }
     } catch (error) {
       console.error('Error recalculando presupuesto:', error)

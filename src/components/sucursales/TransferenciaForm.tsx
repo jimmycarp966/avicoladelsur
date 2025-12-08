@@ -23,7 +23,7 @@ import {
     SelectValue,
 } from '@/components/ui/select'
 import { Card, CardContent } from '@/components/ui/card'
-import { crearTransferenciaAction, listarSucursales, obtenerAlmacenCentral, obtenerStockPorSucursal, obtenerProductosAlmacenCentral } from '@/actions/sucursales-transferencias.actions'
+import { crearTransferenciaAction, listarSucursalesAction, obtenerAlmacenCentralAction, obtenerStockPorSucursalAction, obtenerProductosAlmacenCentralAction } from '@/actions/sucursales-transferencias.actions'
 import { toast } from 'sonner'
 import { Loader2, Plus, Trash2, Search } from 'lucide-react'
 
@@ -112,7 +112,7 @@ export function TransferenciaForm() {
     async function loadAlmacenCentral() {
         console.log('Cargando almacén central...')
         try {
-            const data = await obtenerAlmacenCentral()
+            const data = await obtenerAlmacenCentralAction()
             console.log('Almacén central obtenido:', data)
             if (data) {
                 setAlmacenCentral(data)
@@ -131,7 +131,7 @@ export function TransferenciaForm() {
     }
 
     async function loadSucursales() {
-        const data = await listarSucursales()
+        const data = await listarSucursalesAction()
         setSucursales(data)
     }
 
@@ -144,10 +144,10 @@ export function TransferenciaForm() {
             // Si es el almacén central, mostrar TODOS los productos disponibles
             if (sucursalId === '00000000-0000-0000-0000-000000000001') {
                 console.log('Cargando productos del almacén central')
-                data = await obtenerProductosAlmacenCentral()
+                data = await obtenerProductosAlmacenCentralAction()
             } else {
                 console.log('Cargando stock de sucursal regular')
-                data = await obtenerStockPorSucursal(sucursalId)
+                data = await obtenerStockPorSucursalAction(sucursalId)
             }
 
             console.log('Productos/stock obtenido:', data)

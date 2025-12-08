@@ -6,6 +6,7 @@ import { generateRutaOptimizada } from '@/lib/services/ruta-optimizer'
 import { getNowArgentina, getTodayArgentina } from '@/lib/utils'
 import { optimizeRouteLocal, generateSimplePolyline, haversineDistance } from '@/lib/rutas/local-optimizer'
 import { config } from '@/lib/config'
+import { devError, devWarn } from '@/lib/utils/logger'
 import type {
   CrearVehiculoParams,
   ChecklistVehiculoParams,
@@ -16,7 +17,7 @@ import type {
 } from '@/types/api.types'
 
 // Crear vehículo
-export async function crearVehiculo(
+export async function crearVehiculoAction(
   params: CrearVehiculoParams
 ): Promise<ApiResponse<{ vehiculoId: string }>> {
   try {
@@ -43,7 +44,7 @@ export async function crearVehiculo(
       message: 'Vehículo creado exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al crear vehículo:', error)
+    devError('Error al crear vehículo:', error)
     return {
       success: false,
       error: error.message || 'Error al crear vehículo',
@@ -52,7 +53,7 @@ export async function crearVehiculo(
 }
 
 // Registrar checklist de vehículo
-export async function registrarChecklistVehiculo(
+export async function registrarChecklistVehiculoAction(
   params: ChecklistVehiculoParams
 ): Promise<ApiResponse<{ checklistId: string }>> {
   try {
@@ -85,7 +86,7 @@ export async function registrarChecklistVehiculo(
       message: 'Checklist de vehículo registrado exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al registrar checklist:', error)
+    devError('Error al registrar checklist:', error)
     return {
       success: false,
       error: error.message || 'Error al registrar checklist de vehículo',
@@ -94,7 +95,7 @@ export async function registrarChecklistVehiculo(
 }
 
 // Crear ruta
-export async function crearRuta(
+export async function crearRutaAction(
   params: CrearRutaParams
 ): Promise<ApiResponse<{ rutaId: string }>> {
   try {
@@ -158,7 +159,7 @@ export async function crearRuta(
       message: 'Ruta creada exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al crear ruta:', error)
+    devError('Error al crear ruta:', error)
     return {
       success: false,
       error: error.message || 'Error al crear ruta',
@@ -264,7 +265,7 @@ export async function actualizarRuta(
       message: 'Ruta actualizada exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al actualizar ruta:', error)
+    devError('Error al actualizar ruta:', error)
     return {
       success: false,
       error: error.message || 'Error al actualizar ruta',
@@ -362,7 +363,7 @@ export async function asignarPedidosARuta(
       message: 'Pedidos asignados a ruta exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al asignar pedidos a ruta:', error)
+    devError('Error al asignar pedidos a ruta:', error)
     return {
       success: false,
       error: error.message || 'Error al asignar pedidos a ruta',
@@ -371,7 +372,7 @@ export async function asignarPedidosARuta(
 }
 
 // Iniciar ruta
-export async function iniciarRuta(
+export async function iniciarRutaAction(
   rutaId: string
 ): Promise<ApiResponse> {
   try {
@@ -438,7 +439,7 @@ export async function iniciarRuta(
       error: `No se puede iniciar una ruta en estado "${ruta.estado}"`,
     }
   } catch (error: any) {
-    console.error('Error al iniciar ruta:', error)
+    devError('Error al iniciar ruta:', error)
     return {
       success: false,
       error: error.message || 'Error al iniciar ruta',
@@ -447,7 +448,7 @@ export async function iniciarRuta(
 }
 
 // Finalizar ruta (con checklist fin)
-export async function finalizarRuta(
+export async function finalizarRutaAction(
   rutaId: string,
   checklistFinId?: string
 ): Promise<ApiResponse> {
@@ -507,7 +508,7 @@ export async function finalizarRuta(
       message: 'Ruta finalizada exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al finalizar ruta:', error)
+    devError('Error al finalizar ruta:', error)
     return {
       success: false,
       error: error.message || 'Error al finalizar ruta',
@@ -572,7 +573,7 @@ export async function registrarDevolucionAction(formData: FormData): Promise<Api
       message: 'Devolución registrada exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al registrar devolución:', error)
+    devError('Error al registrar devolución:', error)
     return {
       success: false,
       error: error.message || 'Error al registrar devolución',
@@ -581,7 +582,7 @@ export async function registrarDevolucionAction(formData: FormData): Promise<Api
 }
 
 // Obtener ruta por ID
-export async function obtenerRutaPorId(rutaId: string): Promise<ApiResponse<any>> {
+export async function obtenerRutaPorIdAction(rutaId: string): Promise<ApiResponse<any>> {
   try {
     const supabase = await createClient()
 
@@ -614,7 +615,7 @@ export async function obtenerRutaPorId(rutaId: string): Promise<ApiResponse<any>
       data: ruta,
     }
   } catch (error: any) {
-    console.error('Error al obtener ruta:', error)
+    devError('Error al obtener ruta:', error)
     return {
       success: false,
       error: error.message || 'Error al obtener ruta',
@@ -663,7 +664,7 @@ export async function obtenerRutasPorVehiculoAction(
       message: 'Rutas obtenidas exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al obtener rutas por vehículo:', error)
+    devError('Error al obtener rutas por vehículo:', error)
     return {
       success: false,
       error: error.message || 'Error al obtener rutas',
@@ -702,7 +703,7 @@ export async function actualizarEstadoEntrega(
       message: 'Estado de entrega actualizado exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al actualizar estado de entrega:', error)
+    devError('Error al actualizar estado de entrega:', error)
     return {
       success: false,
       error: error.message || 'Error al actualizar estado de entrega',
@@ -711,7 +712,7 @@ export async function actualizarEstadoEntrega(
 }
 
 // Validar entrega (usa función RPC)
-export async function validarEntrega(
+export async function validarEntregaAction(
   params: ValidacionEntregaParams
 ): Promise<ApiResponse> {
   try {
@@ -737,7 +738,7 @@ export async function validarEntrega(
       message: 'Entrega validada exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al validar entrega:', error)
+    devError('Error al validar entrega:', error)
     return {
       success: false,
       error: error.message || 'Error al validar entrega',
@@ -746,7 +747,7 @@ export async function validarEntrega(
 }
 
 // Obtener ruta activa del repartidor
-export async function obtenerRutaActiva(
+export async function obtenerRutaActivaAction(
   repartidorId: string
 ): Promise<ApiResponse<RutaActivaResponse | null>> {
   try {
@@ -805,7 +806,7 @@ export async function obtenerRutaActiva(
       },
     }
   } catch (error: any) {
-    console.error('Error al obtener ruta activa:', error)
+    devError('Error al obtener ruta activa:', error)
     return {
       success: false,
       error: error.message || 'Error al obtener ruta activa',
@@ -814,7 +815,7 @@ export async function obtenerRutaActiva(
 }
 
 // Eliminar vehículo (DELETE real)
-export async function eliminarVehiculo(
+export async function eliminarVehiculoAction(
   vehiculoId: string
 ): Promise<ApiResponse> {
   try {
@@ -868,7 +869,7 @@ export async function eliminarVehiculo(
       message: 'Vehículo eliminado exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al eliminar vehículo:', error)
+    devError('Error al eliminar vehículo:', error)
     return {
       success: false,
       error: error.message || 'Error al eliminar vehículo',
@@ -877,7 +878,7 @@ export async function eliminarVehiculo(
 }
 
 // Crear mantenimiento de vehículo
-export async function crearMantenimientoVehiculo(
+export async function crearMantenimientoVehiculoAction(
   vehiculoId: string,
   data: {
     tipo: string
@@ -939,7 +940,7 @@ export async function crearMantenimientoVehiculo(
       message: 'Mantenimiento registrado exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al crear mantenimiento:', error)
+    devError('Error al crear mantenimiento:', error)
     return {
       success: false,
       error: error.message || 'Error al crear mantenimiento',
@@ -948,7 +949,7 @@ export async function crearMantenimientoVehiculo(
 }
 
 // Obtener vehículos (solo activos)
-export async function obtenerVehiculos(): Promise<ApiResponse<any[]>> {
+export async function obtenerVehiculosAction(): Promise<ApiResponse<any[]>> {
   try {
     const supabase = await createClient()
 
@@ -965,7 +966,7 @@ export async function obtenerVehiculos(): Promise<ApiResponse<any[]>> {
       data: data || [],
     }
   } catch (error: any) {
-    console.error('Error al obtener vehículos:', error)
+    devError('Error al obtener vehículos:', error)
     return {
       success: false,
       error: error.message || 'Error al obtener vehículos',
@@ -974,7 +975,7 @@ export async function obtenerVehiculos(): Promise<ApiResponse<any[]>> {
 }
 
 // Cancelar ruta (solo rutas planificadas)
-export async function cancelarRuta(rutaId: string): Promise<ApiResponse> {
+export async function cancelarRutaAction(rutaId: string): Promise<ApiResponse> {
   try {
     const supabase = await createClient()
 
@@ -1041,7 +1042,7 @@ export async function cancelarRuta(rutaId: string): Promise<ApiResponse> {
       message: 'Ruta cancelada exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al cancelar ruta:', error)
+    devError('Error al cancelar ruta:', error)
     return {
       success: false,
       error: error.message || 'Error al cancelar ruta',
@@ -1050,7 +1051,7 @@ export async function cancelarRuta(rutaId: string): Promise<ApiResponse> {
 }
 
 // Obtener vehículo por ID
-export async function obtenerVehiculoPorId(
+export async function obtenerVehiculoPorIdAction(
   vehiculoId: string
 ): Promise<ApiResponse<any>> {
   try {
@@ -1076,7 +1077,7 @@ export async function obtenerVehiculoPorId(
       data,
     }
   } catch (error: any) {
-    console.error('Error al obtener vehículo:', error)
+    devError('Error al obtener vehículo:', error)
     return {
       success: false,
       error: error.message || 'Error al obtener vehículo',
@@ -1085,7 +1086,7 @@ export async function obtenerVehiculoPorId(
 }
 
 // Actualizar vehículo
-export async function actualizarVehiculo(
+export async function actualizarVehiculoAction(
   vehiculoId: string,
   params: Partial<CrearVehiculoParams>
 ): Promise<ApiResponse> {
@@ -1156,7 +1157,7 @@ export async function actualizarVehiculo(
       message: 'Vehículo actualizado exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al actualizar vehículo:', error)
+    devError('Error al actualizar vehículo:', error)
     return {
       success: false,
       error: error.message || 'Error al actualizar vehículo',
@@ -1165,7 +1166,7 @@ export async function actualizarVehiculo(
 }
 
 // Obtener rutas
-export async function obtenerRutas(): Promise<ApiResponse<any[]>> {
+export async function obtenerRutasAction(): Promise<ApiResponse<any[]>> {
   try {
     const supabase = await createClient()
 
@@ -1196,7 +1197,7 @@ export async function obtenerRutas(): Promise<ApiResponse<any[]>> {
       data: data || [],
     }
   } catch (error: any) {
-    console.error('Error al obtener rutas:', error)
+    devError('Error al obtener rutas:', error)
     return {
       success: false,
       error: error.message || 'Error al obtener rutas',
@@ -1205,7 +1206,7 @@ export async function obtenerRutas(): Promise<ApiResponse<any[]>> {
 }
 
 // Generar ruta diaria automática
-export async function generarRutaDiariaAutomatica(
+export async function generarRutaDiariaAutomaticaAction(
   fecha: string,
   turno: string
 ): Promise<ApiResponse<{ rutasCreadas: number; rutasIds: string[] }>> {
@@ -1276,7 +1277,7 @@ export async function generarRutaDiariaAutomatica(
           )
 
           if (asignacionError) {
-            console.error(
+            devError(
               `Error asignando pedido ${pedido.numero_pedido}:`,
               asignacionError
             )
@@ -1297,7 +1298,7 @@ export async function generarRutaDiariaAutomatica(
                   usarGoogle: true,
                 })
               } catch (optError) {
-                console.error(
+                devError(
                   `Error optimizando ruta ${rutaId}:`,
                   optError
                 )
@@ -1306,7 +1307,7 @@ export async function generarRutaDiariaAutomatica(
           }
         }
       } catch (error: any) {
-        console.error(`Error procesando zona ${zonaId}:`, error)
+        devError(`Error procesando zona ${zonaId}:`, error)
       }
     }
 
@@ -1326,7 +1327,7 @@ export async function generarRutaDiariaAutomatica(
       message: `Se crearon ${rutasCreadas} ruta(s) diaria(s) exitosamente`,
     }
   } catch (error: any) {
-    console.error('Error generando ruta diaria automática:', error)
+    devError('Error generando ruta diaria automática:', error)
     return {
       success: false,
       error: error.message || 'Error al generar ruta diaria automática',
@@ -1335,7 +1336,7 @@ export async function generarRutaDiariaAutomatica(
 }
 
 // Generar ruta diaria manual
-export async function generarRutaDiariaManual(
+export async function generarRutaDiariaManualAction(
   pedidosIds: string[],
   fecha: string,
   zonaId: string,
@@ -1429,7 +1430,7 @@ export async function generarRutaDiariaManual(
         usarGoogle: true,
       })
     } catch (optError) {
-      console.error('Error optimizando ruta:', optError)
+      devError('Error optimizando ruta:', optError)
       // No fallar si la optimización falla
     }
 
@@ -1442,7 +1443,7 @@ export async function generarRutaDiariaManual(
       message: `Ruta creada exitosamente con ${pedidos.length} pedido(s)`,
     }
   } catch (error: any) {
-    console.error('Error generando ruta diaria manual:', error)
+    devError('Error generando ruta diaria manual:', error)
     return {
       success: false,
       error: error.message || 'Error al generar ruta diaria manual',
@@ -1552,7 +1553,7 @@ export async function asignarPedidoARutaDesdeAlmacen(
       message: `Pedido ${pedido.numero_pedido} asignado a ruta e iniciado exitosamente`,
     }
   } catch (error: any) {
-    console.error('Error en asignarPedidoARutaDesdeAlmacen:', error)
+    devError('Error en asignarPedidoARutaDesdeAlmacen:', error)
     return {
       success: false,
       error: error.message || 'Error al asignar pedido a ruta',
@@ -1726,7 +1727,7 @@ export async function asignarPedidoARutaConVehiculo(
       message: `Pedido ${pedido.numero_pedido} asignado a ruta con vehículo ${vehiculo.patente}`,
     }
   } catch (error: any) {
-    console.error('Error en asignarPedidoARutaConVehiculo:', error)
+    devError('Error en asignarPedidoARutaConVehiculo:', error)
     return {
       success: false,
       error: error.message || 'Error al asignar pedido a ruta',
@@ -1892,7 +1893,7 @@ export async function asignarTransferenciaARutaDesdeAlmacen(
       })
 
     if (detalleError) {
-      console.warn('No se pudo agregar detalle de ruta para transferencia:', detalleError)
+      devWarn('No se pudo agregar detalle de ruta para transferencia:', detalleError)
       // No fallamos, la transferencia ya fue asignada
     }
 
@@ -1906,7 +1907,7 @@ export async function asignarTransferenciaARutaDesdeAlmacen(
       message: `Transferencia ${transferencia.numero_transferencia} asignada a ruta exitosamente`,
     }
   } catch (error: any) {
-    console.error('Error en asignarTransferenciaARutaDesdeAlmacen:', error)
+    devError('Error en asignarTransferenciaARutaDesdeAlmacen:', error)
     return {
       success: false,
       error: error.message || 'Error al asignar transferencia a ruta',

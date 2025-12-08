@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { registrarRetiroTesoroAction, registrarDepositoBancarioAction } from '@/actions/tesoreria.actions'
-import { registrarGasto } from '@/actions/gastos.actions'
+import { registrarGastoAction } from '@/actions/gastos.actions'
 import { toast } from 'sonner'
 import { getTodayArgentina } from '@/lib/utils'
 
@@ -60,7 +60,7 @@ export function TesoroForm({ categorias }: TesoroFormProps) {
           setDescripcion('')
           router.refresh()
         } else {
-          toast.error(result.message || 'Error al registrar retiro')
+          toast.error(result.error || 'Error al registrar retiro')
         }
       } else if (action === 'gasto') {
         // Registrar gasto desde tesoro
@@ -70,7 +70,7 @@ export function TesoroForm({ categorias }: TesoroFormProps) {
           return
         }
 
-        const result = await registrarGasto({
+        const result = await registrarGastoAction({
           categoria_id: categoriaId,
           monto: parseFloat(monto),
           descripcion: descripcion || undefined,
@@ -116,7 +116,7 @@ export function TesoroForm({ categorias }: TesoroFormProps) {
           setNumeroTransaccion('')
           router.refresh()
         } else {
-          toast.error(result.message || 'Error al registrar depósito')
+          toast.error(result.error || 'Error al registrar depósito')
         }
       }
     } catch (error) {

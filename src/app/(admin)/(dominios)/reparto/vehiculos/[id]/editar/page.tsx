@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { EditarVehiculoForm } from './editar-vehiculo-form'
-import { obtenerVehiculoPorId } from '@/actions/reparto.actions'
+import { obtenerVehiculoPorIdAction } from '@/actions/reparto.actions'
 import { Loader2 } from 'lucide-react'
 
 interface EditarVehiculoPageProps {
@@ -21,7 +21,7 @@ export const metadata = {
 }
 
 async function EditarVehiculoContent({ vehiculoId }: { vehiculoId: string }) {
-  const result = await obtenerVehiculoPorId(vehiculoId)
+  const result = await obtenerVehiculoPorIdAction(vehiculoId)
 
   if (!result.success || !result.data) {
     notFound()

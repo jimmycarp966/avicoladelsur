@@ -55,9 +55,9 @@ export function MantenimientoVehiculoForm({ vehiculoId }: MantenimientoVehiculoF
     try {
       setIsLoading(true)
 
-      const { crearMantenimientoVehiculo } = await import('@/actions/reparto.actions')
+      const { crearMantenimientoVehiculoAction } = await import('@/actions/reparto.actions')
       
-      const result = await crearMantenimientoVehiculo(vehiculoId, {
+      const result = await crearMantenimientoVehiculoAction(vehiculoId, {
         tipo: data.tipo_mantenimiento,
         descripcion: data.descripcion,
         costo: data.costo_estimado,

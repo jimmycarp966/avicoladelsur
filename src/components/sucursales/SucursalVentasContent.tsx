@@ -49,11 +49,20 @@ interface Estadisticas {
   clientesDisponibles: number
 }
 
+interface ListaPrecio {
+  id: string
+  codigo: string
+  nombre: string
+  tipo: string
+  margen_ganancia: number | null
+}
+
 interface VentasData {
   ventasDia: VentaDia[]
   productosDisponibles: ProductoDisponible[]
   clientes: Cliente[]
   cajas: Caja[]
+  listasPrecios?: ListaPrecio[]
   estadisticas: Estadisticas
   sucursalId: string
 }
@@ -151,6 +160,7 @@ export function SucursalVentasContent({ data }: { data: VentasData }) {
             productos={data.productosDisponibles}
             clientes={data.clientes}
             cajas={data.cajas}
+            listasPrecios={data.listasPrecios || []}
             sucursalId={data.sucursalId}
           />
         </CardContent>

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { VehiculosTable } from '@/components/tables/VehiculosTable'
 import { useNotificationStore } from '@/store/notificationStore'
-import { obtenerVehiculos, eliminarVehiculo } from '@/actions/reparto.actions'
+import { obtenerVehiculosAction, eliminarVehiculoAction } from '@/actions/reparto.actions'
 import type { Vehiculo } from '@/types/domain.types'
 
 export function VehiculosTableWrapper() {
@@ -20,7 +20,7 @@ export function VehiculosTableWrapper() {
   const loadVehiculos = async () => {
     try {
       setIsLoading(true)
-      const result = await obtenerVehiculos()
+      const result = await obtenerVehiculosAction()
       if (result.success && result.data) {
         setVehiculos(result.data as Vehiculo[])
       } else {
@@ -45,7 +45,7 @@ export function VehiculosTableWrapper() {
   const handleDelete = async (vehiculo: Vehiculo) => {
     if (confirm(`¿Estás seguro de que quieres eliminar el vehículo ${vehiculo.patente}?`)) {
       try {
-        const result = await eliminarVehiculo(vehiculo.id)
+        const result = await eliminarVehiculoAction(vehiculo.id)
         if (result.success) {
           await loadVehiculos()
           showToast('success', result.message || `Vehículo ${vehiculo.patente} eliminado exitosamente`)

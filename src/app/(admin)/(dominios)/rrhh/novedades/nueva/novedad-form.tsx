@@ -14,7 +14,7 @@ import { Switch } from '@/components/ui/switch'
 import { ArrowLeft, Loader2, Save, Megaphone, Users, Building } from 'lucide-react'
 import Link from 'next/link'
 import { novedadRRHHSchema, type NovedadRRHHFormData } from '@/lib/schemas/rrhh.schema'
-import { crearNovedad } from '@/actions/rrhh.actions'
+import { crearNovedadAction } from '@/actions/rrhh.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 import { createClient } from '@/lib/supabase/client'
 import type { Sucursal, CategoriaEmpleado } from '@/types/domain.types'
@@ -90,7 +90,7 @@ export function NuevaNovedadForm() {
     try {
       setIsLoading(true)
 
-      const result = await crearNovedad(data)
+      const result = await crearNovedadAction(data)
 
       if (result.success) {
         showToast(

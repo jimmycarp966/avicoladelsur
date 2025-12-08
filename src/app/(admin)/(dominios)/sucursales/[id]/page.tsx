@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { obtenerInventarioSucursalAction } from '@/actions/sucursales.actions'
-import { listarTransferencias } from '@/actions/sucursales-transferencias.actions'
+import { listarTransferenciasAction } from '@/actions/sucursales-transferencias.actions'
 
 interface PageProps {
     params: Promise<{
@@ -45,7 +45,7 @@ async function getInventario(id: string) {
 }
 
 async function getTransferencias(id: string) {
-    const data = await listarTransferencias(id)
+    const data = await listarTransferenciasAction(id)
     return data.slice(0, 5) // Últimas 5
 }
 

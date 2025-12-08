@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
 import { ProductoForm } from '@/components/forms/ProductoForm'
 import { ProductoFormSkeleton } from '@/app/(admin)/(dominios)/almacen/productos/nuevo/producto-form-skeleton'
-import { obtenerProductoPorId } from '@/actions/almacen.actions'
+import { obtenerProductoPorIdAction } from '@/actions/almacen.actions'
 
 interface EditarProductoPageProps {
   params: {
@@ -22,7 +22,7 @@ export default async function EditarProductoPage({ params }: EditarProductoPageP
   const productoId = id
 
   // Obtener el producto de la base de datos
-  const result = await obtenerProductoPorId(productoId)
+  const result = await obtenerProductoPorIdAction(productoId)
   
   if (!result.success || !result.data) {
     notFound()

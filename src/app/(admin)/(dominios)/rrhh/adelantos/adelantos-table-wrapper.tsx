@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AdelantosTable } from '@/components/tables/AdelantosTable'
-import { aprobarAdelanto, rechazarAdelanto } from '@/actions/rrhh.actions'
+import { aprobarAdelantoAction, rechazarAdelantoAction } from '@/actions/rrhh.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 import { getCurrentUser } from '@/actions/auth.actions'
 import type { Adelanto } from '@/types/domain.types'
@@ -27,7 +27,7 @@ export function AdelantosTableWrapper({ adelantos }: AdelantosTableWrapperProps)
         return
       }
 
-      const result = await aprobarAdelanto(adelanto.id, user.id)
+      const result = await aprobarAdelantoAction(adelanto.id, user.id)
 
       if (result.success) {
         showToast('success', result.message || 'Adelanto aprobado exitosamente', 'Adelanto aprobado')
@@ -51,7 +51,7 @@ export function AdelantosTableWrapper({ adelantos }: AdelantosTableWrapperProps)
     try {
       setLoadingId(adelanto.id)
 
-      const result = await rechazarAdelanto(adelanto.id)
+      const result = await rechazarAdelantoAction(adelanto.id)
 
       if (result.success) {
         showToast('success', result.message || 'Adelanto rechazado exitosamente', 'Adelanto rechazado')

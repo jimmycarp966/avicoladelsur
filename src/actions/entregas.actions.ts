@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
+import { devError } from '@/lib/utils/logger'
 
 // Schemas de validación
 const registrarCobroEntregaSchema = z.object({
@@ -30,15 +31,15 @@ export async function obtenerEntregasPedidoAction(pedidoId: string) {
     })
 
     if (error) {
-      console.error('Error obteniendo entregas:', error)
-      return { success: false, message: 'Error al obtener entregas del pedido' }
+      devError('Error obteniendo entregas:', error)
+      return { success: false, error: 'Error al obtener entregas del pedido' }
     }
 
     return { success: true, data }
 
   } catch (error) {
     console.error('Error en obtenerEntregasPedidoAction:', error)
-    return { success: false, message: 'Error interno del servidor' }
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
 
@@ -63,15 +64,15 @@ export async function obtenerEntregaAction(entregaId: string) {
       .single()
 
     if (error) {
-      console.error('Error obteniendo entrega:', error)
-      return { success: false, message: 'Error al obtener entrega' }
+      devError('Error obteniendo entrega:', error)
+      return { success: false, error: 'Error al obtener entrega' }
     }
 
     return { success: true, data }
 
   } catch (error) {
     console.error('Error en obtenerEntregaAction:', error)
-    return { success: false, message: 'Error interno del servidor' }
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
 
@@ -83,7 +84,7 @@ export async function registrarCobroEntregaAction(formData: FormData) {
     // Obtener usuario actual
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return { success: false, message: 'Usuario no autenticado' }
+      return { success: false, error: 'Usuario no autenticado' }
     }
 
     // Parsear y validar datos
@@ -109,12 +110,12 @@ export async function registrarCobroEntregaAction(formData: FormData) {
     })
 
     if (error) {
-      console.error('Error registrando cobro:', error)
-      return { success: false, message: 'Error al registrar cobro' }
+      devError('Error registrando cobro:', error)
+      return { success: false, error: 'Error al registrar cobro' }
     }
 
     if (!result.success) {
-      return { success: false, message: result.error || 'Error en el registro del cobro' }
+      return { success: false, error: result.error || 'Error en el registro del cobro' }
     }
 
     revalidatePath('/repartidor')
@@ -130,9 +131,9 @@ export async function registrarCobroEntregaAction(formData: FormData) {
   } catch (error) {
     console.error('Error en registrarCobroEntregaAction:', error)
     if (error instanceof z.ZodError) {
-      return { success: false, message: 'Datos inválidos: ' + error.issues[0].message }
+      return { success: false, error: 'Datos inválidos: ' + error.issues[0].message }
     }
-    return { success: false, message: 'Error interno del servidor' }
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
 
@@ -144,7 +145,7 @@ export async function marcarEntregaCompletadaAction(formData: FormData) {
     // Obtener usuario actual
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return { success: false, message: 'Usuario no autenticado' }
+      return { success: false, error: 'Usuario no autenticado' }
     }
 
     // Parsear y validar datos
@@ -163,12 +164,12 @@ export async function marcarEntregaCompletadaAction(formData: FormData) {
     })
 
     if (error) {
-      console.error('Error marcando entrega:', error)
-      return { success: false, message: 'Error al marcar entrega como completada' }
+      devError('Error marcando entrega:', error)
+      return { success: false, error: 'Error al marcar entrega como completada' }
     }
 
     if (!result.success) {
-      return { success: false, message: result.error || 'Error al completar entrega' }
+      return { success: false, error: result.error || 'Error al completar entrega' }
     }
 
     revalidatePath('/repartidor')
@@ -185,9 +186,9 @@ export async function marcarEntregaCompletadaAction(formData: FormData) {
   } catch (error) {
     console.error('Error en marcarEntregaCompletadaAction:', error)
     if (error instanceof z.ZodError) {
-      return { success: false, message: 'Datos inválidos: ' + error.issues[0].message }
+      return { success: false, error: 'Datos inválidos: ' + error.issues[0].message }
     }
-    return { success: false, message: 'Error interno del servidor' }
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
 
@@ -199,11 +200,11 @@ export async function marcarEntregaEnCaminoAction(entregaId: string) {
     // Obtener usuario actual
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return { success: false, message: 'Usuario no autenticado' }
+      return { success: false, error: 'Usuario no autenticado' }
     }
 
     if (!entregaId) {
-      return { success: false, message: 'ID de entrega requerido' }
+      return { success: false, error: 'ID de entrega requerido' }
     }
 
     // Actualizar estado de entrega
@@ -216,8 +217,8 @@ export async function marcarEntregaEnCaminoAction(entregaId: string) {
       .eq('id', entregaId)
 
     if (error) {
-      console.error('Error marcando entrega en camino:', error)
-      return { success: false, message: 'Error al marcar entrega en camino' }
+      devError('Error marcando entrega en camino:', error)
+      return { success: false, error: 'Error al marcar entrega en camino' }
     }
 
     revalidatePath('/repartidor')
@@ -230,7 +231,7 @@ export async function marcarEntregaEnCaminoAction(entregaId: string) {
 
   } catch (error) {
     console.error('Error en marcarEntregaEnCaminoAction:', error)
-    return { success: false, message: 'Error interno del servidor' }
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
 
@@ -242,14 +243,14 @@ export async function marcarEntregaFallidaAction(formData: FormData) {
     // Obtener usuario actual
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return { success: false, message: 'Usuario no autenticado' }
+      return { success: false, error: 'Usuario no autenticado' }
     }
 
     const entregaId = formData.get('entrega_id') as string
     const notas = formData.get('notas') as string
 
     if (!entregaId) {
-      return { success: false, message: 'ID de entrega requerido' }
+      return { success: false, error: 'ID de entrega requerido' }
     }
 
     // Actualizar estado de entrega
@@ -263,8 +264,8 @@ export async function marcarEntregaFallidaAction(formData: FormData) {
       .eq('id', entregaId)
 
     if (error) {
-      console.error('Error marcando entrega fallida:', error)
-      return { success: false, message: 'Error al marcar entrega como fallida' }
+      devError('Error marcando entrega fallida:', error)
+      return { success: false, error: 'Error al marcar entrega como fallida' }
     }
 
     revalidatePath('/repartidor')
@@ -277,7 +278,7 @@ export async function marcarEntregaFallidaAction(formData: FormData) {
 
   } catch (error) {
     console.error('Error en marcarEntregaFallidaAction:', error)
-    return { success: false, message: 'Error interno del servidor' }
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
 
@@ -292,8 +293,8 @@ export async function obtenerResumenEntregasAction(pedidoId: string) {
       .eq('pedido_id', pedidoId)
 
     if (error) {
-      console.error('Error obteniendo resumen:', error)
-      return { success: false, message: 'Error al obtener resumen' }
+      devError('Error obteniendo resumen:', error)
+      return { success: false, error: 'Error al obtener resumen' }
     }
 
     const resumen = {
@@ -311,7 +312,7 @@ export async function obtenerResumenEntregasAction(pedidoId: string) {
 
   } catch (error) {
     console.error('Error en obtenerResumenEntregasAction:', error)
-    return { success: false, message: 'Error interno del servidor' }
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
 
@@ -323,7 +324,7 @@ export async function validarCobrosEntregasAction(formData: FormData) {
     // Obtener usuario actual
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return { success: false, message: 'Usuario no autenticado' }
+      return { success: false, error: 'Usuario no autenticado' }
     }
 
     // Verificar permisos (admin o tesorero)
@@ -334,14 +335,14 @@ export async function validarCobrosEntregasAction(formData: FormData) {
       .single()
 
     if (!usuario || !['admin'].includes(usuario.rol)) {
-      return { success: false, message: 'No tienes permisos para validar cobros' }
+      return { success: false, error: 'No tienes permisos para validar cobros' }
     }
 
     const pedidoId = formData.get('pedido_id') as string
     const observaciones = formData.get('observaciones') as string
 
     if (!pedidoId) {
-      return { success: false, message: 'ID de pedido requerido' }
+      return { success: false, error: 'ID de pedido requerido' }
     }
 
     // Marcar todas las entregas del pedido como validadas
@@ -355,8 +356,8 @@ export async function validarCobrosEntregasAction(formData: FormData) {
       .neq('estado_pago', 'pendiente')
 
     if (error) {
-      console.error('Error validando cobros:', error)
-      return { success: false, message: 'Error al validar cobros' }
+      devError('Error validando cobros:', error)
+      return { success: false, error: 'Error al validar cobros' }
     }
 
     // Actualizar pedido con observaciones de validación
@@ -378,7 +379,7 @@ export async function validarCobrosEntregasAction(formData: FormData) {
 
   } catch (error) {
     console.error('Error en validarCobrosEntregasAction:', error)
-    return { success: false, message: 'Error interno del servidor' }
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
 
@@ -417,8 +418,8 @@ export async function obtenerPedidosPendientesValidacionAction() {
       .order('fecha_entrega_estimada', { ascending: false })
 
     if (error) {
-      console.error('Error obteniendo pedidos:', error)
-      return { success: false, message: 'Error al obtener pedidos' }
+      devError('Error obteniendo pedidos:', error)
+      return { success: false, error: 'Error al obtener pedidos' }
     }
 
     // Filtrar pedidos que tienen entregas con pagos no validados
@@ -440,7 +441,7 @@ export async function obtenerPedidosPendientesValidacionAction() {
 
   } catch (error) {
     console.error('Error en obtenerPedidosPendientesValidacionAction:', error)
-    return { success: false, message: 'Error interno del servidor' }
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
 

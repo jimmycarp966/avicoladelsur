@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { devError } from '@/lib/utils/logger'
 import type { ApiResponse, RegistrarGastoParams } from '@/types/api.types'
 
 interface GastosFilters {
@@ -11,19 +12,19 @@ interface GastosFilters {
   afectaCaja?: boolean
 }
 
-export async function listarCategoriasGasto(): Promise<ApiResponse<any[]>> {
+export async function listarCategoriasGastoAction(): Promise<ApiResponse<any[]>> {
   try {
     const supabase = await createClient()
     const { data, error } = await supabase.from('gastos_categorias').select('*').order('nombre')
     if (error) throw error
     return { success: true, data: data ?? [] }
   } catch (error: any) {
-    console.error('listarCategoriasGasto', error)
+    devError('listarCategoriasGasto', error)
     return { success: false, error: error.message || 'No se pudieron obtener las categorías' }
   }
 }
 
-export async function crearCategoriaGasto(nombre: string, descripcion?: string): Promise<ApiResponse> {
+export async function crearCategoriaGastoAction(nombre: string, descripcion?: string): Promise<ApiResponse> {
   try {
     const supabase = await createClient()
     const { error } = await supabase.from('gastos_categorias').insert({
@@ -39,12 +40,12 @@ export async function crearCategoriaGasto(nombre: string, descripcion?: string):
       message: 'Categoría creada correctamente',
     }
   } catch (error: any) {
-    console.error('crearCategoriaGasto', error)
+    devError('crearCategoriaGasto', error)
     return { success: false, error: error.message || 'No se pudo crear la categoría' }
   }
 }
 
-export async function registrarGasto(data: RegistrarGastoParams): Promise<ApiResponse<{ gastoId: string }>> {
+export async function registrarGastoAction(data: RegistrarGastoParams): Promise<ApiResponse<{ gastoId: string }>> {
   try {
     const supabase = await createClient()
     const {
@@ -79,12 +80,12 @@ export async function registrarGasto(data: RegistrarGastoParams): Promise<ApiRes
       message: 'Gasto registrado correctamente',
     }
   } catch (error: any) {
-    console.error('registrarGasto', error)
+    devError('registrarGasto', error)
     return { success: false, error: error.message || 'No se pudo registrar el gasto' }
   }
 }
 
-export async function listarGastos(filtros: GastosFilters = {}): Promise<ApiResponse<any[]>> {
+export async function listarGastosAction(filtros: GastosFilters = {}): Promise<ApiResponse<any[]>> {
   try {
     const supabase = await createClient()
     let query = supabase
@@ -127,7 +128,7 @@ export async function listarGastos(filtros: GastosFilters = {}): Promise<ApiResp
       data: data ?? [],
     }
   } catch (error: any) {
-    console.error('listarGastos', error)
+    devError('listarGastos', error)
     return { success: false, error: error.message || 'No se pudieron obtener los gastos' }
   }
 }

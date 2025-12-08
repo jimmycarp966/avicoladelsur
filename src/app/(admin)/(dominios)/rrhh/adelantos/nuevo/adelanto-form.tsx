@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowLeft, Loader2, Save, DollarSign, Package } from 'lucide-react'
 import Link from 'next/link'
 import { adelantoSchema, type AdelantoFormData } from '@/lib/schemas/rrhh.schema'
-import { crearAdelanto } from '@/actions/rrhh.actions'
+import { crearAdelantoAction } from '@/actions/rrhh.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 import { createClient } from '@/lib/supabase/client'
 import type { Empleado, Producto } from '@/types/domain.types'
@@ -107,7 +107,7 @@ export function NuevoAdelantoForm() {
         }
       }
 
-      const result = await crearAdelanto(data)
+      const result = await crearAdelantoAction(data)
 
       if (result.success) {
         showToast(

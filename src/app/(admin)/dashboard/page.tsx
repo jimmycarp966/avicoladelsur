@@ -1,5 +1,5 @@
 import { getCurrentUser } from '@/actions/auth.actions'
-import { obtenerMetricasDashboard, obtenerActividadReciente, obtenerMetricasRendimiento } from '@/actions/dashboard.actions'
+import { obtenerMetricasDashboardAction, obtenerActividadRecienteAction, obtenerMetricasRendimientoAction } from '@/actions/dashboard.actions'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -21,7 +21,7 @@ import {
   Fuel
 } from 'lucide-react'
 import Link from 'next/link'
-import { obtenerMetricasEficienciaRutas } from '@/actions/dashboard.actions'
+import { obtenerMetricasEficienciaRutasAction } from '@/actions/dashboard.actions'
 
 export const revalidate = 30 // Revalida cada 30 segundos
 
@@ -30,10 +30,10 @@ export default async function AdminDashboard() {
 
   // Obtener métricas reales de la base de datos
   const [metricasResult, actividadResult, rendimientoResult, eficienciaRutasResult] = await Promise.all([
-    obtenerMetricasDashboard(),
-    obtenerActividadReciente(),
-    obtenerMetricasRendimiento(),
-    obtenerMetricasEficienciaRutas(),
+    obtenerMetricasDashboardAction(),
+    obtenerActividadRecienteAction(),
+    obtenerMetricasRendimientoAction(),
+    obtenerMetricasEficienciaRutasAction(),
   ])
 
   const metrics = metricasResult.success ? metricasResult.data! : {

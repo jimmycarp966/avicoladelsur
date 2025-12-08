@@ -23,7 +23,7 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { toast } from 'sonner'
-import { iniciarRuta, finalizarRuta } from '@/actions/reparto.actions'
+import { iniciarRutaAction, finalizarRutaAction } from '@/actions/reparto.actions'
 import { ChecklistInicioForm } from './checklist-inicio-form'
 import { ChecklistFinForm } from './checklist-fin-form'
 import { EntregaCard } from './entrega-card'
@@ -91,7 +91,7 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
     }
 
     setLoading(true)
-    const result = await iniciarRuta(ruta.id)
+    const result = await iniciarRutaAction(ruta.id)
     setLoading(false)
 
     if (result.success) {
@@ -120,7 +120,7 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
     }
 
     setLoading(true)
-    const result = await finalizarRuta(ruta.id, ruta.checklist_fin_id)
+    const result = await finalizarRutaAction(ruta.id, ruta.checklist_fin_id)
     setLoading(false)
 
     if (result.success) {

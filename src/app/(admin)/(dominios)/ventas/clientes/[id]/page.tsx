@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { ArrowLeft, Edit, User, Phone, Mail, MapPin, MessageCircle, ShoppingCart, DollarSign, FileText } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { obtenerClientePorId } from '@/actions/ventas.actions'
+import { obtenerClientePorIdAction } from '@/actions/ventas.actions'
 
 interface ClienteDetallePageProps {
   params: {
@@ -26,7 +26,7 @@ export default async function ClienteDetallePage({ params }: ClienteDetallePageP
   const clienteId = id
 
   // Obtener cliente real de la base de datos
-  const result = await obtenerClientePorId(clienteId)
+  const result = await obtenerClientePorIdAction(clienteId)
 
   if (!result.success || !result.data) {
     notFound()

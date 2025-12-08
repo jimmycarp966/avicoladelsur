@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { useNotificationStore } from '@/store/notificationStore'
 import { getNowArgentina } from '@/lib/utils'
+import { devError } from '@/lib/utils/logger'
 import type {
   IngresarMercaderiaParams,
   MovimientoStockParams,
@@ -14,7 +15,7 @@ import type {
 import type { ProductoFormData } from '@/lib/schemas/productos.schema'
 
 // Ingreso de mercadería
-export async function ingresarMercaderia(
+export async function ingresarMercaderiaAction(
   params: IngresarMercaderiaParams
 ): Promise<ApiResponse<{ loteId: string }>> {
   try {
@@ -54,7 +55,7 @@ export async function ingresarMercaderia(
       message: 'Mercadería ingresada exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al ingresar mercadería:', error)
+    devError('Error al ingresar mercadería:', error)
     return {
       success: false,
       error: error.message || 'Error al ingresar mercadería',
@@ -63,7 +64,7 @@ export async function ingresarMercaderia(
 }
 
 // Actualizar lote
-export async function actualizarLote(
+export async function actualizarLoteAction(
   loteId: string,
   updates: Partial<IngresarMercaderiaParams>
 ): Promise<ApiResponse> {
@@ -87,7 +88,7 @@ export async function actualizarLote(
       message: 'Lote actualizado exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al actualizar lote:', error)
+    devError('Error al actualizar lote:', error)
     return {
       success: false,
       error: error.message || 'Error al actualizar lote',
@@ -96,7 +97,7 @@ export async function actualizarLote(
 }
 
 // Registrar checklist de calidad
-export async function registrarChecklistCalidad(
+export async function registrarChecklistCalidadAction(
   params: ChecklistCalidadParams
 ): Promise<ApiResponse> {
   try {
@@ -125,7 +126,7 @@ export async function registrarChecklistCalidad(
       message: 'Checklist de calidad registrado exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al registrar checklist:', error)
+    devError('Error al registrar checklist:', error)
     return {
       success: false,
       error: error.message || 'Error al registrar checklist',
@@ -134,7 +135,7 @@ export async function registrarChecklistCalidad(
 }
 
 // Obtener stock disponible
-export async function obtenerStockDisponible(
+export async function obtenerStockDisponibleAction(
   productoId: string
 ): Promise<ApiResponse<StockDisponibleResponse>> {
   try {
@@ -171,7 +172,7 @@ export async function obtenerStockDisponible(
       },
     }
   } catch (error: any) {
-    console.error('Error al obtener stock:', error)
+    devError('Error al obtener stock:', error)
     return {
       success: false,
       error: error.message || 'Error al obtener stock disponible',
@@ -180,7 +181,7 @@ export async function obtenerStockDisponible(
 }
 
 // Ajustar stock
-export async function ajustarStock(
+export async function ajustarStockAction(
   params: MovimientoStockParams
 ): Promise<ApiResponse> {
   try {
@@ -255,7 +256,7 @@ export async function ajustarStock(
       message: 'Stock ajustado exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al ajustar stock:', error)
+    devError('Error al ajustar stock:', error)
     return {
       success: false,
       error: error.message || 'Error al ajustar stock',
@@ -264,7 +265,7 @@ export async function ajustarStock(
 }
 
 // Obtener lote por ID
-export async function obtenerLotePorId(loteId: string): Promise<ApiResponse<any>> {
+export async function obtenerLotePorIdAction(loteId: string): Promise<ApiResponse<any>> {
   try {
     const supabase = await createClient()
 
@@ -290,7 +291,7 @@ export async function obtenerLotePorId(loteId: string): Promise<ApiResponse<any>
       data: lote,
     }
   } catch (error: any) {
-    console.error('Error al obtener lote:', error)
+    devError('Error al obtener lote:', error)
     return {
       success: false,
       error: error.message || 'Error al obtener lote',
@@ -299,7 +300,7 @@ export async function obtenerLotePorId(loteId: string): Promise<ApiResponse<any>
 }
 
 // Obtener todos los lotes
-export async function obtenerLotes(): Promise<ApiResponse> {
+export async function obtenerLotesAction(): Promise<ApiResponse> {
   try {
     const supabase = await createClient()
 
@@ -323,7 +324,7 @@ export async function obtenerLotes(): Promise<ApiResponse> {
       data: lotes,
     }
   } catch (error: any) {
-    console.error('Error al obtener lotes:', error)
+    devError('Error al obtener lotes:', error)
     return {
       success: false,
       error: error.message || 'Error al obtener lotes',
@@ -332,7 +333,7 @@ export async function obtenerLotes(): Promise<ApiResponse> {
 }
 
 // Reservar stock para picking
-export async function reservarStockPicking(
+export async function reservarStockPickingAction(
   pedidoId: string
 ): Promise<ApiResponse> {
   try {
@@ -372,7 +373,7 @@ export async function reservarStockPicking(
       message: 'Stock reservado para picking exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al reservar stock:', error)
+    devError('Error al reservar stock:', error)
     return {
       success: false,
       error: error.message || 'Error al reservar stock para picking',
@@ -445,7 +446,7 @@ export async function registrarRecepcionIngresoAction(formData: FormData): Promi
       message: 'Recepción de ingreso registrada exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al registrar recepción ingreso:', error)
+    devError('Error al registrar recepción ingreso:', error)
     return {
       success: false,
       error: error.message || 'Error al registrar recepción',
@@ -515,7 +516,7 @@ export async function registrarRecepcionEgresoAction(formData: FormData): Promis
       message: 'Recepción de egreso registrada exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al registrar recepción egreso:', error)
+    devError('Error al registrar recepción egreso:', error)
     return {
       success: false,
       error: error.message || 'Error al registrar recepción',
@@ -578,7 +579,7 @@ export async function obtenerPresupuestosPorZonaFechaAction(
       },
     }
   } catch (error: any) {
-    console.error('Error al obtener presupuestos por zona/fecha:', error)
+    devError('Error al obtener presupuestos por zona/fecha:', error)
     return {
       success: false,
       error: error.message || 'Error al obtener presupuestos',
@@ -587,7 +588,7 @@ export async function obtenerPresupuestosPorZonaFechaAction(
 }
 
 // Crear producto
-export async function crearProducto(
+export async function crearProductoAction(
   data: ProductoFormData
 ): Promise<ApiResponse<{ productoId: string }>> {
   try {
@@ -646,7 +647,7 @@ export async function crearProducto(
       message: 'Producto creado exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al crear producto:', error)
+    devError('Error al crear producto:', error)
     return {
       success: false,
       error: error.message || 'Error al crear producto',
@@ -655,7 +656,7 @@ export async function crearProducto(
 }
 
 // Actualizar producto
-export async function actualizarProducto(
+export async function actualizarProductoAction(
   productoId: string,
   data: ProductoFormData
 ): Promise<ApiResponse> {
@@ -715,7 +716,7 @@ export async function actualizarProducto(
       message: 'Producto actualizado exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al actualizar producto:', error)
+    devError('Error al actualizar producto:', error)
     return {
       success: false,
       error: error.message || 'Error al actualizar producto',
@@ -724,7 +725,7 @@ export async function actualizarProducto(
 }
 
 // Eliminar producto (soft delete)
-export async function eliminarProducto(
+export async function eliminarProductoAction(
   productoId: string
 ): Promise<ApiResponse> {
   try {
@@ -763,7 +764,7 @@ export async function eliminarProducto(
       message: 'Producto desactivado exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al eliminar producto:', error)
+    devError('Error al eliminar producto:', error)
     return {
       success: false,
       error: error.message || 'Error al eliminar producto',
@@ -772,7 +773,7 @@ export async function eliminarProducto(
 }
 
 // Eliminar lote (solo si no tiene movimientos y no está asociado a pedidos)
-export async function eliminarLote(loteId: string): Promise<ApiResponse> {
+export async function eliminarLoteAction(loteId: string): Promise<ApiResponse> {
   try {
     const supabase = await createClient()
 
@@ -844,7 +845,7 @@ export async function eliminarLote(loteId: string): Promise<ApiResponse> {
       message: 'Lote eliminado exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al eliminar lote:', error)
+    devError('Error al eliminar lote:', error)
     return {
       success: false,
       error: error.message || 'Error al eliminar lote',
@@ -853,7 +854,7 @@ export async function eliminarLote(loteId: string): Promise<ApiResponse> {
 }
 
 // Obtener productos
-export async function obtenerProductos(): Promise<ApiResponse<any[]>> {
+export async function obtenerProductosAction(): Promise<ApiResponse<any[]>> {
   try {
     const supabase = await createClient()
 
@@ -869,7 +870,7 @@ export async function obtenerProductos(): Promise<ApiResponse<any[]>> {
       data: data || [],
     }
   } catch (error: any) {
-    console.error('Error al obtener productos:', error)
+    devError('Error al obtener productos:', error)
     return {
       success: false,
       error: error.message || 'Error al obtener productos',
@@ -878,7 +879,7 @@ export async function obtenerProductos(): Promise<ApiResponse<any[]>> {
 }
 
 // Obtener producto por ID
-export async function obtenerProductoPorId(productoId: string): Promise<ApiResponse<any>> {
+export async function obtenerProductoPorIdAction(productoId: string): Promise<ApiResponse<any>> {
   try {
     const supabase = await createClient()
 
@@ -909,7 +910,7 @@ export async function obtenerProductoPorId(productoId: string): Promise<ApiRespo
       data: productoNormalizado,
     }
   } catch (error: any) {
-    console.error('Error al obtener producto:', error)
+    devError('Error al obtener producto:', error)
     return {
       success: false,
       error: error.message || 'Error al obtener producto',
@@ -917,7 +918,7 @@ export async function obtenerProductoPorId(productoId: string): Promise<ApiRespo
   }
 }
 
-export async function buscarProductosPorCodigos(
+export async function buscarProductosPorCodigosAction(
   codigos: string[]
 ): Promise<ApiResponse<any[]>> {
   try {
@@ -936,7 +937,7 @@ export async function buscarProductosPorCodigos(
       data: data || [],
     }
   } catch (error: any) {
-    console.error('Error al buscar productos por códigos:', error)
+    devError('Error al buscar productos por códigos:', error)
     return {
       success: false,
       error: error.message || 'Error al buscar productos',
@@ -944,7 +945,7 @@ export async function buscarProductosPorCodigos(
   }
 }
 
-export async function actualizarCategoriaProductos(
+export async function actualizarCategoriaProductosAction(
   codigos: string[],
   categoria: string
 ): Promise<ApiResponse<{ actualizados: number }>> {
@@ -987,7 +988,7 @@ export async function actualizarCategoriaProductos(
       data: { actualizados: data?.length || 0 },
     }
   } catch (error: any) {
-    console.error('Error al actualizar categoría de productos:', error)
+    devError('Error al actualizar categoría de productos:', error)
     return {
       success: false,
       error: error.message || 'Error al actualizar categoría de productos',

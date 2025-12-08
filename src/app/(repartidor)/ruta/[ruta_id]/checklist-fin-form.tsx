@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
-import { registrarChecklistVehiculo } from '@/actions/reparto.actions'
+import { registrarChecklistVehiculoAction } from '@/actions/reparto.actions'
 import { createClient } from '@/lib/supabase/client'
 
 const checklistSchema = z.object({
@@ -63,7 +63,7 @@ export function ChecklistFinForm({ rutaId, vehiculoId, onComplete }: ChecklistFi
       }
 
       // Registrar checklist
-      const result = await registrarChecklistVehiculo({
+      const result = await registrarChecklistVehiculoAction({
         vehiculo_id: vehiculoId,
         ...data,
       })

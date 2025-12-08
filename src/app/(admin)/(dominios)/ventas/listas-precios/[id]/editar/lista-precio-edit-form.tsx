@@ -84,7 +84,7 @@ export function ListaPrecioEditForm({ lista }: ListaPrecioEditFormProps) {
         showToast('success', result.message || 'Lista de precios actualizada exitosamente')
         router.push(`/ventas/listas-precios/${lista.id}`)
       } else {
-        showToast('error', result.message || 'Error al actualizar lista de precios')
+        showToast('error', result.error || 'Error al actualizar lista de precios')
       }
     } catch (error: any) {
       console.error('Error actualizando lista de precios:', error)

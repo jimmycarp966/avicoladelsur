@@ -4,10 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ArrowRightLeft, Plus, Filter } from 'lucide-react'
 import Link from 'next/link'
-import { listarTransferencias } from '@/actions/sucursales-transferencias.actions'
+import { listarTransferenciasAction } from '@/actions/sucursales-transferencias.actions'
 
 async function getTransferencias() {
-    const data = await listarTransferencias()
+    const data = await listarTransferenciasAction()
     return data
 }
 

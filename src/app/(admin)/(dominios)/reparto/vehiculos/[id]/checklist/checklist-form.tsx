@@ -12,7 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Loader2, Save } from 'lucide-react'
-import { registrarChecklistVehiculo } from '@/actions/reparto.actions'
+import { registrarChecklistVehiculoAction } from '@/actions/reparto.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 
 const checklistSchema = z.object({
@@ -63,7 +63,7 @@ export function ChecklistVehiculoForm({ vehiculoId }: ChecklistVehiculoFormProps
     try {
       setIsLoading(true)
 
-      const result = await registrarChecklistVehiculo({
+      const result = await registrarChecklistVehiculoAction({
         vehiculo_id: vehiculoId,
         ...data,
       })

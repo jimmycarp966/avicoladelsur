@@ -79,7 +79,7 @@ export default function ModalPlan({
         setZonaId('')
         setRepartidorId('')
       } else {
-        toast.error(result?.message || 'No se pudo crear el plan')
+        toast.error(result?.error || 'No se pudo crear el plan')
       }
     })
   }

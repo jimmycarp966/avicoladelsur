@@ -77,7 +77,7 @@ const navigation = [
     name: 'Reparto',
     href: '/reparto',
     icon: Truck,
-    roles: ['admin'],
+    roles: ['admin', 'vendedor', 'almacenista'],
     children: [
       { name: 'Planificación semanal', href: '/reparto/planificacion' },
       { name: 'Rutas', href: '/reparto/rutas' },
@@ -120,6 +120,8 @@ const navigation = [
     children: [
       { name: 'Gestión de Sucursales', href: '/sucursales' },
       { name: 'Dashboard Sucursal', href: '/sucursal/dashboard' },
+      { name: 'Ventas (POS)', href: '/sucursal/ventas' },
+      { name: 'Inventario', href: '/sucursal/inventario' },
       { name: 'Alertas de Stock', href: '/sucursal/alerts' },
       { name: 'Reportes', href: '/sucursal/reportes' },
     ],

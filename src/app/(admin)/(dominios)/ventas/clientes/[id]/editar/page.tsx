@@ -1,6 +1,6 @@
 import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
-import { obtenerClientePorId } from '@/actions/ventas.actions'
+import { obtenerClientePorIdAction } from '@/actions/ventas.actions'
 import { EditarClienteForm } from './editar-cliente-form'
 import { ClienteFormSkeleton } from '@/app/(admin)/(dominios)/ventas/clientes/nuevo/cliente-form-skeleton'
 import { createClient } from '@/lib/supabase/server'
@@ -31,7 +31,7 @@ export default async function EditarClientePage({ params }: EditarClientePagePro
     .order('nombre')
 
   // Cargar datos reales del cliente
-  const clienteResult = await obtenerClientePorId(clienteId)
+  const clienteResult = await obtenerClientePorIdAction(clienteId)
 
   if (!clienteResult.success || !clienteResult.data) {
     notFound()

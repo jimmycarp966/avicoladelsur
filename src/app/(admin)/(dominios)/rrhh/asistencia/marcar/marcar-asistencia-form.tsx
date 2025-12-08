@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, Clock, User, Loader2, Save, AlertTriangle, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
 import { asistenciaSchema, type AsistenciaFormData } from '@/lib/schemas/rrhh.schema'
-import { marcarAsistencia } from '@/actions/rrhh.actions'
+import { marcarAsistenciaAction } from '@/actions/rrhh.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 import { createClient } from '@/lib/supabase/client'
 import type { Empleado } from '@/types/domain.types'
@@ -107,7 +107,7 @@ export function MarcarAsistenciaForm() {
     try {
       setIsLoading(true)
 
-      const result = await marcarAsistencia(data)
+      const result = await marcarAsistenciaAction(data)
 
       if (result.success) {
         showToast(

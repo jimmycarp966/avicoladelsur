@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { ProductosTable } from '@/components/tables/ProductosTable'
 import { useNotificationStore } from '@/store/notificationStore'
-import { obtenerProductos, eliminarProducto } from '@/actions/almacen.actions'
+import { obtenerProductosAction, eliminarProductoAction } from '@/actions/almacen.actions'
 import type { Producto } from '@/types/domain.types'
 
 export function ProductosTableWrapper() {
@@ -20,7 +20,7 @@ export function ProductosTableWrapper() {
     
     try {
       setIsLoading(true)
-      const result = await obtenerProductos()
+      const result = await obtenerProductosAction()
       
       if (!isMountedRef.current) return
       
@@ -61,7 +61,7 @@ export function ProductosTableWrapper() {
   const handleDelete = async (producto: Producto) => {
     if (confirm(`¿Estás seguro de que quieres eliminar el producto "${producto.nombre}"?`)) {
       try {
-        const result = await eliminarProducto(producto.id)
+        const result = await eliminarProductoAction(producto.id)
         if (result.success) {
           await loadProductos()
           showToast('success', result.message || 'Producto eliminado exitosamente')

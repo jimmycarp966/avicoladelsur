@@ -34,7 +34,7 @@ export async function crearPlanRutaAction(formData: FormData) {
   })
 
   if (!parseResult.success) {
-    return { success: false, message: parseResult.error.issues[0]?.message || 'Datos inválidos' }
+    return { success: false, error: parseResult.error.issues[0]?.message || 'Datos inválidos' }
   }
 
   const data = parseResult.data
@@ -57,11 +57,11 @@ export async function crearPlanRutaAction(formData: FormData) {
     .single()
 
   if (zonaError || !zona) {
-    return { success: false, message: 'La zona especificada no existe' }
+    return { success: false, error: 'La zona especificada no existe' }
   }
 
   if (!zona.activo) {
-    return { success: false, message: 'La zona especificada no está activa' }
+    return { success: false, error: 'La zona especificada no está activa' }
   }
 
   // Validar repartidor si está asignado
@@ -73,15 +73,15 @@ export async function crearPlanRutaAction(formData: FormData) {
       .single()
 
     if (repartidorError || !repartidor) {
-      return { success: false, message: 'El repartidor especificado no existe' }
+      return { success: false, error: 'El repartidor especificado no existe' }
     }
 
     if (repartidor.rol !== 'repartidor') {
-      return { success: false, message: 'El usuario especificado no es un repartidor' }
+      return { success: false, error: 'El usuario especificado no es un repartidor' }
     }
 
     if (!repartidor.activo) {
-      return { success: false, message: 'El repartidor especificado no está activo' }
+      return { success: false, error: 'El repartidor especificado no está activo' }
     }
 
     // Validar conflictos de repartidor usando función RPC
@@ -97,7 +97,7 @@ export async function crearPlanRutaAction(formData: FormData) {
     if (conflicto && !conflicto.success) {
       const errores = conflicto.errores || []
       if (errores.some((e: string) => e.includes('repartidor ya está asignado'))) {
-        return { success: false, message: 'El repartidor ya está asignado a otra zona en el mismo día y turno' }
+        return { success: false, error: 'El repartidor ya está asignado a otra zona en el mismo día y turno' }
       }
     }
   }
@@ -113,10 +113,10 @@ export async function crearPlanRutaAction(formData: FormData) {
 
   if (error) {
     if (error.code === '23505') {
-      return { success: false, message: 'Ya existe un plan para esa zona, día, turno y semana' }
+      return { success: false, error: 'Ya existe un plan para esa zona, día, turno y semana' }
     }
     console.error('crearPlanRutaAction error:', error)
-    return { success: false, message: 'No se pudo crear el plan de ruta' }
+    return { success: false, error: 'No se pudo crear el plan de ruta' }
   }
 
   revalidatePath('/(admin)/(dominios)/reparto/planificacion')
@@ -126,7 +126,7 @@ export async function crearPlanRutaAction(formData: FormData) {
 
 export async function eliminarPlanRutaAction(planId: string) {
   if (!planId) {
-    return { success: false, message: 'ID inválido' }
+    return { success: false, error: 'ID inválido' }
   }
 
   const supabase = await createClient()
@@ -134,7 +134,7 @@ export async function eliminarPlanRutaAction(planId: string) {
 
   if (error) {
     console.error('eliminarPlanRutaAction error:', error)
-    return { success: false, message: 'No se pudo eliminar el plan' }
+    return { success: false, error: 'No se pudo eliminar el plan' }
   }
 
   revalidatePath('/(admin)/(dominios)/reparto/planificacion')
@@ -146,7 +146,7 @@ export async function eliminarPlanRutaAction(planId: string) {
 export async function crearPlanSemanaAction(formData: FormData) {
   const semanaInicioStr = formData.get('semanaInicio') as string
   if (!semanaInicioStr) {
-    return { success: false, message: 'Fecha de inicio de semana requerida' }
+    return { success: false, error: 'Fecha de inicio de semana requerida' }
   }
 
   const semanaInicio = calcularInicioSemana(new Date(semanaInicioStr))
@@ -159,7 +159,7 @@ export async function crearPlanSemanaAction(formData: FormData) {
     .eq('activo', true)
 
   if (zonasError || !zonas || zonas.length === 0) {
-    return { success: false, message: 'No hay zonas activas disponibles' }
+    return { success: false, error: 'No hay zonas activas disponibles' }
   }
 
   const planesCreados: string[] = []
@@ -179,7 +179,7 @@ export async function crearPlanSemanaAction(formData: FormData) {
         if (resultado.success) {
           planesCreados.push(`${zona.id}-${diaSemana}-${turno}`)
         } else {
-          errores.push(`${zona.id}-${diaSemana}-${turno}: ${resultado.message}`)
+          errores.push(`${zona.id}-${diaSemana}-${turno}: ${resultado.error}`)
         }
       }
     }
@@ -202,7 +202,7 @@ export async function validarSemanaCompletaAction(semanaInicio: string) {
 
   if (error) {
     console.error('validarSemanaCompletaAction error:', error)
-    return { success: false, message: 'Error al validar la semana' }
+    return { success: false, error: 'Error al validar la semana' }
   }
 
   return {

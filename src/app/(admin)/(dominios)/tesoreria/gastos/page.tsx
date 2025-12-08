@@ -1,5 +1,5 @@
-import { listarGastos, listarCategoriasGasto } from '@/actions/gastos.actions'
-import { listarCajas } from '@/actions/tesoreria.actions'
+import { listarGastosAction, listarCategoriasGastoAction } from '@/actions/gastos.actions'
+import { listarCajasAction } from '@/actions/tesoreria.actions'
 import { GastoForm } from '@/components/forms/GastoForm'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -7,9 +7,9 @@ export const revalidate = 300 // Revalida cada 5 minutos
 
 export default async function GastosPage() {
   const [gastos, categorias, cajas] = await Promise.all([
-    listarGastos(),
-    listarCategoriasGasto(),
-    listarCajas(),
+    listarGastosAction(),
+    listarCategoriasGastoAction(),
+    listarCajasAction(),
   ])
 
   return (

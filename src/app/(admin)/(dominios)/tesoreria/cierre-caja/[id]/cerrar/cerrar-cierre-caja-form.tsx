@@ -54,7 +54,7 @@ export function CerrarCierreCajaForm({
         toast.success(result.message || 'Cierre de caja cerrado exitosamente')
         router.push('/tesoreria/cierre-caja')
       } else {
-        toast.error(result.message || 'Error al cerrar cierre de caja')
+        toast.error(result.error || 'Error al cerrar cierre de caja')
       }
     } catch (error) {
       toast.error('Error inesperado al cerrar cierre de caja')

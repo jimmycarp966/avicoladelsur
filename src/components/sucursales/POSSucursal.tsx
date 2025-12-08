@@ -289,7 +289,10 @@ export function POSSucursal({
           precioUnitario: item.precioUnitario,
         })),
         pago: {
-          estado: 'pagado',
+          pagos: [{
+            metodoPago: 'efectivo',
+            monto: totalCarrito,
+          }],
         },
       })
 

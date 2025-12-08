@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ClientesTable } from '@/components/tables/ClientesTable'
 import { useNotificationStore } from '@/store/notificationStore'
-import { obtenerClientes, eliminarCliente } from '@/actions/ventas.actions'
+import { obtenerClientesAction, eliminarClienteAction } from '@/actions/ventas.actions'
 import type { Cliente } from '@/types/domain.types'
 
 export function ClientesTableWrapper() {
@@ -20,7 +20,7 @@ export function ClientesTableWrapper() {
   const loadClientes = async () => {
     try {
       setIsLoading(true)
-      const result = await obtenerClientes()
+      const result = await obtenerClientesAction()
 
       if (result.success && result.data) {
         setClientes(Array.isArray(result.data) ? result.data : [])
@@ -46,7 +46,7 @@ export function ClientesTableWrapper() {
   const handleDelete = async (cliente: Cliente) => {
     if (confirm(`¿Estás seguro de que quieres eliminar al cliente "${cliente.nombre}"?`)) {
       try {
-        const result = await eliminarCliente(cliente.id)
+        const result = await eliminarClienteAction(cliente.id)
         if (result.success) {
           await loadClientes()
           showToast('success', result.message || 'Cliente eliminado exitosamente')

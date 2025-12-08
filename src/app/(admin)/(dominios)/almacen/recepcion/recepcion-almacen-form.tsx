@@ -132,7 +132,7 @@ export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores
         setUnidadMedida('kg') // Se reseteará automáticamente con el useEffect
         router.refresh()
       } else {
-        toast.error(result.message || 'Error al registrar recepción')
+        toast.error(result.error || 'Error al registrar recepción')
       }
     } catch (error) {
       toast.error('Error inesperado al registrar recepción')

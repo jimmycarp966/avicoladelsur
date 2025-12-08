@@ -1,4 +1,4 @@
-import { obtenerMovimientosCaja, listarCajas } from '@/actions/tesoreria.actions'
+import { obtenerMovimientosCajaAction, listarCajasAction } from '@/actions/tesoreria.actions'
 import { MovimientoCajaForm } from '@/components/forms/MovimientoCajaForm'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -7,7 +7,7 @@ import { ArrowDownCircle, ArrowUpCircle, Wallet } from 'lucide-react'
 export const revalidate = 300 // Revalida cada 5 minutos
 
 export default async function MovimientosPage() {
-  const [movimientos, cajas] = await Promise.all([obtenerMovimientosCaja(), listarCajas()])
+  const [movimientos, cajas] = await Promise.all([obtenerMovimientosCajaAction(), listarCajasAction()])
 
   const movimientosPayload = (movimientos as any)?.data ?? {}
   const movimientosList = movimientosPayload.movimientos ?? []

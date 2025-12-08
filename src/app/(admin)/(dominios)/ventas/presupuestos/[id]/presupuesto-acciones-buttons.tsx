@@ -36,7 +36,7 @@ export function PresupuestoAccionesButtons({
         showToast('success', result.message || 'Presupuesto convertido a cotización exitosamente')
         router.refresh()
       } else {
-        showToast('error', result.message || 'Error al convertir a cotización')
+        showToast('error', result.error || 'Error al convertir a cotización')
       }
     } catch (error: any) {
       console.error('Error convirtiendo presupuesto:', error)
@@ -64,7 +64,7 @@ export function PresupuestoAccionesButtons({
         showToast('success', result.message || 'Presupuesto facturado exitosamente')
         router.refresh()
       } else {
-        showToast('error', result.message || 'Error al facturar presupuesto')
+        showToast('error', result.error || 'Error al facturar presupuesto')
       }
     } catch (error: any) {
       console.error('Error facturando presupuesto:', error)
@@ -86,7 +86,7 @@ export function PresupuestoAccionesButtons({
         showToast('success', result.message || 'Presupuesto enviado a almacén exitosamente')
         router.refresh()
       } else {
-        showToast('error', result.message || 'Error al enviar a almacén')
+        showToast('error', result.error || 'Error al enviar a almacén')
       }
     } catch (error: any) {
       console.error('Error enviando presupuesto:', error)

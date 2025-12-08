@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Loader2, Save } from 'lucide-react'
-import { crearVehiculo } from '@/actions/reparto.actions'
+import { crearVehiculoAction } from '@/actions/reparto.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 
 const crearVehiculoSchema = z.object({
@@ -56,7 +56,7 @@ export function VehiculoForm() {
     try {
       setIsLoading(true)
 
-      const result = await crearVehiculo({
+      const result = await crearVehiculoAction({
         patente: data.patente,
         marca: data.marca,
         modelo: data.modelo,

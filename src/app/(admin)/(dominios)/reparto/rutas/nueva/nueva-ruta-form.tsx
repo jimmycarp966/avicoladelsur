@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
-import { crearRuta } from '@/actions/reparto.actions'
+import { crearRutaAction } from '@/actions/reparto.actions'
 import { toast } from 'sonner'
 import { getTodayArgentina } from '@/lib/utils'
 
@@ -120,7 +120,7 @@ export function NuevaRutaForm({ vehiculos, repartidores, zonas, pedidos }: Nueva
         return
       }
 
-      const result = await crearRuta({
+      const result = await crearRutaAction({
         vehiculo_id: vehiculoId,
         repartidor_id: repartidorId,
         fecha_ruta: fechaRuta,

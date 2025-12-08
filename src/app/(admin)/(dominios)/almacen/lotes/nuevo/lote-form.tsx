@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Loader2, Save } from 'lucide-react'
-import { ingresarMercaderia } from '@/actions/almacen.actions'
+import { ingresarMercaderiaAction } from '@/actions/almacen.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 
 const crearLoteSchema = z.object({
@@ -59,7 +59,7 @@ export function LoteForm({ productos }: LoteFormProps) {
     try {
       setIsLoading(true)
 
-      const result = await ingresarMercaderia({
+      const result = await ingresarMercaderiaAction({
         producto_id: data.producto_id,
         cantidad: data.cantidad,
         fecha_vencimiento: data.fecha_vencimiento || undefined,

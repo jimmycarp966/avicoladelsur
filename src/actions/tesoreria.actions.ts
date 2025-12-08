@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { getNowArgentina, getTodayArgentina } from '@/lib/utils'
+import { devError } from '@/lib/utils/logger'
 
 // Schemas de validación
 const crearCierreCajaSchema = z.object({
@@ -42,7 +43,7 @@ export async function obtenerMovimientosTiempoRealAction(
     // Obtener usuario actual
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return { success: false, message: 'Usuario no autenticado' }
+      return { success: false, error: 'Usuario no autenticado' }
     }
 
     // Verificar permisos (admin o tesorero)
@@ -53,7 +54,7 @@ export async function obtenerMovimientosTiempoRealAction(
       .single()
 
     if (!usuario || !['admin', 'vendedor'].includes(usuario.rol)) {
-      return { success: false, message: 'No tienes permisos para ver movimientos' }
+      return { success: false, error: 'No tienes permisos para ver movimientos' }
     }
 
     let query = supabase
@@ -163,8 +164,8 @@ export async function obtenerMovimientosTiempoRealAction(
       },
     }
   } catch (error: any) {
-    console.error('Error en obtenerMovimientosTiempoRealAction:', error)
-    return { success: false, message: error.message || 'Error al obtener movimientos' }
+    devError('Error en obtenerMovimientosTiempoRealAction:', error)
+    return { success: false, error: error.message || 'Error al obtener movimientos' }
   }
 }
 
@@ -176,7 +177,7 @@ export async function crearCierreCajaAction(formData: FormData) {
     // Obtener usuario actual
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return { success: false, message: 'Usuario no autenticado' }
+      return { success: false, error: 'Usuario no autenticado' }
     }
 
     // Verificar permisos (admin o tesorero)
@@ -187,7 +188,7 @@ export async function crearCierreCajaAction(formData: FormData) {
       .single()
 
     if (!usuario || !['admin', 'vendedor'].includes(usuario.rol)) {
-      return { success: false, message: 'No tienes permisos para crear cierres de caja' }
+      return { success: false, error: 'No tienes permisos para crear cierres de caja' }
     }
 
     // Parsear y validar datos
@@ -207,9 +208,9 @@ export async function crearCierreCajaAction(formData: FormData) {
 
     if (cierreExistente) {
       if (cierreExistente.estado === 'abierto') {
-        return { success: false, message: 'Ya existe un cierre abierto para esta caja y fecha' }
+        return { success: false, error: 'Ya existe un cierre abierto para esta caja y fecha' }
       }
-      return { success: false, message: 'Ya existe un cierre cerrado para esta caja y fecha' }
+      return { success: false, error: 'Ya existe un cierre cerrado para esta caja y fecha' }
     }
 
     // Obtener saldo inicial de la caja
@@ -220,7 +221,7 @@ export async function crearCierreCajaAction(formData: FormData) {
       .single()
 
     if (!caja) {
-      return { success: false, message: 'Caja no encontrada' }
+      return { success: false, error: 'Caja no encontrada' }
     }
 
     // Crear cierre
@@ -245,11 +246,11 @@ export async function crearCierreCajaAction(formData: FormData) {
       data: cierre,
     }
   } catch (error: any) {
-    console.error('Error en crearCierreCajaAction:', error)
+    devError('Error en crearCierreCajaAction:', error)
     if (error instanceof z.ZodError) {
-      return { success: false, message: 'Datos inválidos: ' + error.issues[0].message }
+      return { success: false, error: 'Datos inválidos: ' + error.issues[0].message }
     }
-    return { success: false, message: error.message || 'Error al crear cierre de caja' }
+    return { success: false, error: error.message || 'Error al crear cierre de caja' }
   }
 }
 
@@ -261,7 +262,7 @@ export async function cerrarCierreCajaAction(formData: FormData) {
     // Obtener usuario actual
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return { success: false, message: 'Usuario no autenticado' }
+      return { success: false, error: 'Usuario no autenticado' }
     }
 
     // Verificar permisos (admin o tesorero)
@@ -272,7 +273,7 @@ export async function cerrarCierreCajaAction(formData: FormData) {
       .single()
 
     if (!usuario || !['admin', 'vendedor'].includes(usuario.rol)) {
-      return { success: false, message: 'No tienes permisos para cerrar cierres de caja' }
+      return { success: false, error: 'No tienes permisos para cerrar cierres de caja' }
     }
 
     // Parsear y validar datos
@@ -295,11 +296,11 @@ export async function cerrarCierreCajaAction(formData: FormData) {
       .single()
 
     if (cierreError || !cierre) {
-      return { success: false, message: 'Cierre no encontrado' }
+      return { success: false, error: 'Cierre no encontrado' }
     }
 
     if (cierre.estado === 'cerrado') {
-      return { success: false, message: 'El cierre ya está cerrado' }
+      return { success: false, error: 'El cierre ya está cerrado' }
     }
 
     // Actualizar cierre
@@ -340,11 +341,11 @@ export async function cerrarCierreCajaAction(formData: FormData) {
       message: 'Cierre de caja cerrado exitosamente',
     }
   } catch (error: any) {
-    console.error('Error en cerrarCierreCajaAction:', error)
+    devError('Error en cerrarCierreCajaAction:', error)
     if (error instanceof z.ZodError) {
-      return { success: false, message: 'Datos inválidos: ' + error.issues[0].message }
+      return { success: false, error: 'Datos inválidos: ' + error.issues[0].message }
     }
-    return { success: false, message: error.message || 'Error al cerrar cierre de caja' }
+    return { success: false, error: error.message || 'Error al cerrar cierre de caja' }
   }
 }
 
@@ -356,7 +357,7 @@ export async function registrarRetiroTesoroAction(formData: FormData) {
     // Obtener usuario actual
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return { success: false, message: 'Usuario no autenticado' }
+      return { success: false, error: 'Usuario no autenticado' }
     }
 
     // Verificar permisos (admin o tesorero)
@@ -367,7 +368,7 @@ export async function registrarRetiroTesoroAction(formData: FormData) {
       .single()
 
     if (!usuario || !['admin', 'vendedor'].includes(usuario.rol)) {
-      return { success: false, message: 'No tienes permisos para registrar retiros' }
+      return { success: false, error: 'No tienes permisos para registrar retiros' }
     }
 
     // Parsear y validar datos
@@ -398,11 +399,11 @@ export async function registrarRetiroTesoroAction(formData: FormData) {
       message: 'Retiro al tesoro registrado exitosamente',
     }
   } catch (error: any) {
-    console.error('Error en registrarRetiroTesoroAction:', error)
+    devError('Error en registrarRetiroTesoroAction:', error)
     if (error instanceof z.ZodError) {
-      return { success: false, message: 'Datos inválidos: ' + error.issues[0].message }
+      return { success: false, error: 'Datos inválidos: ' + error.issues[0].message }
     }
-    return { success: false, message: error.message || 'Error al registrar retiro' }
+    return { success: false, error: error.message || 'Error al registrar retiro' }
   }
 }
 
@@ -414,7 +415,7 @@ export async function registrarDepositoBancarioAction(formData: FormData) {
     // Obtener usuario actual
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return { success: false, message: 'Usuario no autenticado' }
+      return { success: false, error: 'Usuario no autenticado' }
     }
 
     // Verificar permisos (admin o tesorero)
@@ -425,7 +426,7 @@ export async function registrarDepositoBancarioAction(formData: FormData) {
       .single()
 
     if (!usuario || !['admin', 'vendedor'].includes(usuario.rol)) {
-      return { success: false, message: 'No tienes permisos para registrar depósitos' }
+      return { success: false, error: 'No tienes permisos para registrar depósitos' }
     }
 
     // Parsear datos
@@ -433,7 +434,7 @@ export async function registrarDepositoBancarioAction(formData: FormData) {
     const numero_transaccion = formData.get('numero_transaccion') as string
 
     if (!monto || !numero_transaccion) {
-      return { success: false, message: 'Faltan datos requeridos' }
+      return { success: false, error: 'Faltan datos requeridos' }
     }
 
     // Validar número de transacción BNA (sin 0 inicial)
@@ -462,8 +463,8 @@ export async function registrarDepositoBancarioAction(formData: FormData) {
       message: 'Depósito bancario registrado exitosamente',
     }
   } catch (error: any) {
-    console.error('Error en registrarDepositoBancarioAction:', error)
-    return { success: false, message: error.message || 'Error al registrar depósito' }
+    devError('Error en registrarDepositoBancarioAction:', error)
+    return { success: false, error: error.message || 'Error al registrar depósito' }
   }
 }
 
@@ -472,17 +473,17 @@ export async function validarTransferenciaBNAAction(numeroTransaccion: string) {
   try {
     // Validar formato básico
     if (!numeroTransaccion || numeroTransaccion.length === 0) {
-      return { success: false, message: 'Número de transacción requerido' }
+      return { success: false, error: 'Número de transacción requerido' }
     }
 
     // Validar que no empiece con 0
     if (numeroTransaccion.startsWith('0')) {
-      return { success: false, message: 'El número de transacción BNA no debe empezar con 0' }
+      return { success: false, error: 'El número de transacción BNA no debe empezar con 0' }
     }
 
     // Validar que sea numérico (sin 0 inicial)
     if (!/^\d+$/.test(numeroTransaccion)) {
-      return { success: false, message: 'El número de transacción debe contener solo dígitos' }
+      return { success: false, error: 'El número de transacción debe contener solo dígitos' }
     }
 
     // Aquí se podría agregar validación adicional con API del BNA si está disponible
@@ -493,13 +494,13 @@ export async function validarTransferenciaBNAAction(numeroTransaccion: string) {
       message: 'Número de transacción válido',
     }
   } catch (error: any) {
-    console.error('Error en validarTransferenciaBNAAction:', error)
-    return { success: false, message: error.message || 'Error al validar transferencia' }
+    devError('Error en validarTransferenciaBNAAction:', error)
+    return { success: false, error: error.message || 'Error al validar transferencia' }
   }
 }
 
 // Listar cajas
-export async function listarCajas() {
+export async function listarCajasAction() {
   try {
     const supabase = await createClient()
     const { data, error } = await supabase
@@ -511,13 +512,13 @@ export async function listarCajas() {
 
     return data || []
   } catch (error: any) {
-    console.error('Error en listarCajas:', error)
+    devError('Error en listarCajas:', error)
     return []
   }
 }
 
 // Crear caja
-export async function crearCaja(data: { nombre: string; saldo_inicial?: number; moneda?: string }) {
+export async function crearCajaAction(data: { nombre: string; saldo_inicial?: number; moneda?: string }) {
   try {
     const supabase = await createClient()
     const { data: caja, error } = await supabase
@@ -535,18 +536,18 @@ export async function crearCaja(data: { nombre: string; saldo_inicial?: number; 
     revalidatePath('/(admin)/(dominios)/tesoreria/cajas')
     return { success: true, data: caja }
   } catch (error: any) {
-    console.error('Error en crearCaja:', error)
+    devError('Error en crearCaja:', error)
     return { success: false, error: error.message || 'Error al crear caja' }
   }
 }
 
 // Obtener movimientos de caja (alias para compatibilidad)
-export async function obtenerMovimientosCaja(cajaId?: string, fecha?: string) {
+export async function obtenerMovimientosCajaAction(cajaId?: string, fecha?: string) {
   return obtenerMovimientosTiempoRealAction(cajaId, fecha)
 }
 
 // Registrar movimiento de caja
-export async function registrarMovimientoCaja(data: {
+export async function registrarMovimientoCajaAction(data: {
   caja_id: string
   tipo: 'ingreso' | 'egreso'
   monto: number
@@ -559,7 +560,7 @@ export async function registrarMovimientoCaja(data: {
     // Obtener usuario actual
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
-      return { success: false, message: 'Usuario no autenticado' }
+      return { success: false, error: 'Usuario no autenticado' }
     }
 
     // Usar RPC para crear movimiento atómicamente
@@ -583,13 +584,13 @@ export async function registrarMovimientoCaja(data: {
       data: result,
     }
   } catch (error: any) {
-    console.error('Error en registrarMovimientoCaja:', error)
-    return { success: false, message: error.message || 'Error al registrar movimiento' }
+    devError('Error en registrarMovimientoCaja:', error)
+    return { success: false, error: error.message || 'Error al registrar movimiento' }
   }
 }
 
 // Obtener resumen de tesorería
-export async function obtenerResumenTesoreria() {
+export async function obtenerResumenTesoreriaAction() {
   try {
     const supabase = await createClient()
 
@@ -624,13 +625,13 @@ export async function obtenerResumenTesoreria() {
       },
     }
   } catch (error: any) {
-    console.error('Error en obtenerResumenTesoreria:', error)
-    return { success: false, message: error.message || 'Error al obtener resumen' }
+    devError('Error en obtenerResumenTesoreria:', error)
+    return { success: false, error: error.message || 'Error al obtener resumen' }
   }
 }
 
 // Registrar pago de pedido
-export async function registrarPagoPedido(data: {
+export async function registrarPagoPedidoAction(data: {
   pedido_id: string
   caja_id: string
   monto: number
@@ -643,7 +644,7 @@ export async function registrarPagoPedido(data: {
     // Obtener usuario actual
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
-      return { success: false, message: 'Usuario no autenticado' }
+      return { success: false, error: 'Usuario no autenticado' }
     }
 
     // Validar número de transacción BNA si es transferencia
@@ -655,7 +656,7 @@ export async function registrarPagoPedido(data: {
     }
 
     // Registrar movimiento de caja
-    const movimiento = await registrarMovimientoCaja({
+    const movimiento = await registrarMovimientoCajaAction({
       caja_id: data.caja_id,
       tipo: 'ingreso',
       monto: data.monto,
@@ -686,8 +687,8 @@ export async function registrarPagoPedido(data: {
       message: 'Pago registrado exitosamente',
     }
   } catch (error: any) {
-    console.error('Error en registrarPagoPedido:', error)
-    return { success: false, message: error.message || 'Error al registrar pago' }
+    devError('Error en registrarPagoPedido:', error)
+    return { success: false, error: error.message || 'Error al registrar pago' }
   }
 }
 
@@ -699,7 +700,7 @@ export async function validarRutaAction(formData: FormData) {
     // Obtener usuario actual
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return { success: false, message: 'Usuario no autenticado' }
+      return { success: false, error: 'Usuario no autenticado' }
     }
 
     // Verificar que sea tesorero o admin
@@ -710,7 +711,7 @@ export async function validarRutaAction(formData: FormData) {
       .single()
 
     if (!usuario || !['admin', 'vendedor'].includes(usuario.rol)) {
-      return { success: false, message: 'Solo tesoreros y administradores pueden validar rutas' }
+      return { success: false, error: 'Solo tesoreros y administradores pueden validar rutas' }
     }
 
     // Parsear datos
@@ -720,7 +721,7 @@ export async function validarRutaAction(formData: FormData) {
     const caja_id = formData.get('caja_id') as string
 
     if (!ruta_id || !caja_id) {
-      return { success: false, message: 'Faltan datos requeridos' }
+      return { success: false, error: 'Faltan datos requeridos' }
     }
 
     // Obtener ruta con detalles de pagos registrados
@@ -744,15 +745,15 @@ export async function validarRutaAction(formData: FormData) {
       .single()
 
     if (rutaError || !ruta) {
-      return { success: false, message: 'Ruta no encontrada' }
+      return { success: false, error: 'Ruta no encontrada' }
     }
 
     if (ruta.estado !== 'completada') {
-      return { success: false, message: 'La ruta debe estar completada para validar' }
+      return { success: false, error: 'La ruta debe estar completada para validar' }
     }
 
     if (ruta.validada_por_tesorero) {
-      return { success: false, message: 'Esta ruta ya fue validada' }
+      return { success: false, error: 'Esta ruta ya fue validada' }
     }
 
     // Agrupar pagos por método de pago
@@ -821,7 +822,7 @@ export async function validarRutaAction(formData: FormData) {
         })
 
         if (cuentaError || !cuentaIdResult) {
-          console.error('Error al asegurar cuenta corriente:', cuentaError)
+          devError('Error al asegurar cuenta corriente:', cuentaError)
           continue
         }
 
@@ -937,13 +938,13 @@ export async function validarRutaAction(formData: FormData) {
       message: mensaje,
     }
   } catch (error: any) {
-    console.error('Error en validarRutaAction:', error)
-    return { success: false, message: error.message || 'Error al validar ruta' }
+    devError('Error en validarRutaAction:', error)
+    return { success: false, error: error.message || 'Error al validar ruta' }
   }
 }
 
 // Obtener rutas completadas pendientes de validación
-export async function obtenerRutasPendientesValidacion() {
+export async function obtenerRutasPendientesValidacionAction() {
   try {
     const supabase = await createClient()
 
@@ -976,7 +977,7 @@ export async function obtenerRutasPendientesValidacion() {
       data: rutas || [],
     }
   } catch (error: any) {
-    console.error('Error en obtenerRutasPendientesValidacion:', error)
-    return { success: false, message: error.message || 'Error al obtener rutas pendientes' }
+    devError('Error en obtenerRutasPendientesValidacion:', error)
+    return { success: false, error: error.message || 'Error al obtener rutas pendientes' }
   }
 }

@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
+import { devError, devLog } from '@/lib/utils/logger'
 
 // Regex para validar formato UUID (menos estricto que z.string().uuid())
 const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
@@ -26,7 +27,7 @@ export async function crearTransferenciaAction(formData: FormData) {
 
         const { data: { user }, error: userError } = await supabase.auth.getUser()
         if (userError || !user) {
-            return { success: false, message: 'Usuario no autenticado' }
+            return { success: false, error: 'Usuario no autenticado' }
         }
 
         const rawData = Object.fromEntries(formData)
@@ -54,7 +55,7 @@ export async function crearTransferenciaAction(formData: FormData) {
 
         if (error) throw error
         if (!result.success) {
-            return { success: false, message: result.error }
+            return { success: false, error: result.error }
         }
 
         revalidatePath('/sucursales')
@@ -66,8 +67,8 @@ export async function crearTransferenciaAction(formData: FormData) {
             data: result,
         }
     } catch (error: any) {
-        console.error('Error en crearTransferenciaAction:', error)
-        return { success: false, message: error.message || 'Error al crear transferencia' }
+        devError('Error en crearTransferenciaAction:', error)
+        return { success: false, error: error.message || 'Error al crear transferencia' }
     }
 }
 
@@ -78,7 +79,7 @@ export async function aprobarTransferenciaAction(transferenciaId: string) {
 
         const { data: { user }, error: userError } = await supabase.auth.getUser()
         if (userError || !user) {
-            return { success: false, message: 'Usuario no autenticado' }
+            return { success: false, error: 'Usuario no autenticado' }
         }
 
         const { data: result, error } = await supabase.rpc('fn_aprobar_transferencia', {
@@ -88,7 +89,7 @@ export async function aprobarTransferenciaAction(transferenciaId: string) {
 
         if (error) throw error
         if (!result.success) {
-            return { success: false, message: result.error }
+            return { success: false, error: result.error }
         }
 
         revalidatePath('/sucursales/transferencias')
@@ -98,8 +99,8 @@ export async function aprobarTransferenciaAction(transferenciaId: string) {
             message: 'Transferencia aprobada y enviada',
         }
     } catch (error: any) {
-        console.error('Error en aprobarTransferenciaAction:', error)
-        return { success: false, message: error.message || 'Error al aprobar transferencia' }
+        devError('Error en aprobarTransferenciaAction:', error)
+        return { success: false, error: error.message || 'Error al aprobar transferencia' }
     }
 }
 
@@ -110,7 +111,7 @@ export async function recibirTransferenciaAction(transferenciaId: string) {
 
         const { data: { user }, error: userError } = await supabase.auth.getUser()
         if (userError || !user) {
-            return { success: false, message: 'Usuario no autenticado' }
+            return { success: false, error: 'Usuario no autenticado' }
         }
 
         const { data: result, error } = await supabase.rpc('fn_recibir_transferencia', {
@@ -120,7 +121,7 @@ export async function recibirTransferenciaAction(transferenciaId: string) {
 
         if (error) throw error
         if (!result.success) {
-            return { success: false, message: result.error }
+            return { success: false, error: result.error }
         }
 
         revalidatePath('/sucursales/transferencias')
@@ -130,14 +131,14 @@ export async function recibirTransferenciaAction(transferenciaId: string) {
             message: 'Transferencia recibida exitosamente',
         }
     } catch (error: any) {
-        console.error('Error en recibirTransferenciaAction:', error)
-        return { success: false, message: error.message || 'Error al recibir transferencia' }
+        devError('Error en recibirTransferenciaAction:', error)
+        return { success: false, error: error.message || 'Error al recibir transferencia' }
     }
 }
 
 // Listar sucursales
 // Listar sucursales operativas (excluyendo Sistema Central)
-export async function listarSucursales() {
+export async function listarSucursalesAction() {
     try {
         const supabase = await createClient()
 
@@ -151,13 +152,13 @@ export async function listarSucursales() {
         if (error) throw error
         return data || []
     } catch (error) {
-        console.error('Error en listarSucursales:', error)
+        devError('Error en listarSucursales:', error)
         return []
     }
 }
 
 // Obtener almacén central (Sistema Central)
-export async function obtenerAlmacenCentral() {
+export async function obtenerAlmacenCentralAction() {
     try {
         const supabase = await createClient()
 
@@ -170,17 +171,17 @@ export async function obtenerAlmacenCentral() {
         if (error) throw error
         return data
     } catch (error) {
-        console.error('Error obteniendo almacén central:', error)
+        devError('Error obteniendo almacén central:', error)
         return null
     }
 }
 
 // Obtener productos directamente desde lotes en almacén central (fallback optimizado)
-export async function obtenerProductosDesdeLotesCentral() {
+export async function obtenerProductosDesdeLotesCentralAction() {
     try {
         const supabase = await createClient()
 
-        console.log('🔄 FALLBACK: Obteniendo productos directamente desde lotes (optimizado)...')
+        devLog('🔄 FALLBACK: Obteniendo productos directamente desde lotes (optimizado)...')
 
         // Misma consulta optimizada que el método principal
         const { data: lotes, error: lotesError } = await supabase
@@ -194,14 +195,14 @@ export async function obtenerProductosDesdeLotesCentral() {
             .gt('cantidad_disponible', 0)
 
         if (lotesError) {
-            console.error('❌ Error en fallback:', lotesError)
+            devError('❌ Error en fallback:', lotesError)
             return []
         }
 
-        console.log('📦 Lotes encontrados:', lotes?.length || 0)
+        devLog('📦 Lotes encontrados:', lotes?.length || 0)
 
         if (!lotes || lotes.length === 0) {
-            console.log('⚠️ No hay lotes disponibles en almacén central')
+            devLog('⚠️ No hay lotes disponibles en almacén central')
             return []
         }
 
@@ -227,22 +228,22 @@ export async function obtenerProductosDesdeLotesCentral() {
         }
 
         const productosConStock = Array.from(productosMap.values())
-        console.log('✅ FALLBACK: Productos encontrados:', productosConStock.length)
+        devLog('✅ FALLBACK: Productos encontrados:', productosConStock.length)
 
         return productosConStock
 
     } catch (error) {
-        console.error('❌ Error en fallback:', error)
+        devError('❌ Error en fallback:', error)
         return []
     }
 }
 
 // Obtener todos los productos disponibles en almacén central (OPTIMIZADO)
-export async function obtenerProductosAlmacenCentral() {
+export async function obtenerProductosAlmacenCentralAction() {
     try {
         const supabase = await createClient()
 
-        console.log('🚀 Obteniendo productos del almacén central (optimizado)...')
+        devLog('🚀 Obteniendo productos del almacén central (optimizado)...')
         const startTime = Date.now()
 
         // UNA SOLA consulta optimizada que obtiene todo
@@ -264,14 +265,14 @@ export async function obtenerProductosAlmacenCentral() {
             // Ordenamos en memoria después para evitar error de sintaxis
 
         if (error) {
-            console.error('❌ Error en consulta optimizada:', error)
+            devError('❌ Error en consulta optimizada:', error)
             throw error
         }
 
-        console.log(`⚡ Consulta ejecutada en ${Date.now() - startTime}ms`)
+        devLog(`⚡ Consulta ejecutada en ${Date.now() - startTime}ms`)
 
         if (!lotesConProductos || lotesConProductos.length === 0) {
-            console.log('📦 No hay lotes disponibles en almacén central')
+            devLog('📦 No hay lotes disponibles en almacén central')
 
             // Verificar si hay productos sin stock
             const { data: productosCatalogo } = await supabase
@@ -281,7 +282,7 @@ export async function obtenerProductosAlmacenCentral() {
                 .limit(5)
 
             if (productosCatalogo && productosCatalogo.length > 0) {
-                console.log('💡 Hay productos en catálogo pero sin stock. Sugerir crear datos de prueba.')
+                devLog('💡 Hay productos en catálogo pero sin stock. Sugerir crear datos de prueba.')
             }
 
             return []
@@ -320,21 +321,21 @@ export async function obtenerProductosAlmacenCentral() {
         const productosConStock = Array.from(productosMap.values())
             .sort((a, b) => a.producto.nombre.localeCompare(b.producto.nombre))
 
-        console.log(`✅ ${productosConStock.length} productos encontrados en ${Date.now() - startTime}ms`)
-        console.log(`📊 Total lotes procesados: ${lotesConProductos.length}`)
+        devLog(`✅ ${productosConStock.length} productos encontrados en ${Date.now() - startTime}ms`)
+        devLog(`📊 Total lotes procesados: ${lotesConProductos.length}`)
 
         return productosConStock
 
     } catch (error) {
-        console.error('❌ Error obteniendo productos almacén central:', error)
+        devError('❌ Error obteniendo productos almacén central:', error)
         // Intentar fallback en caso de error
-        console.log('🔄 Intentando fallback...')
-        return await obtenerProductosDesdeLotesCentral()
+        devLog('🔄 Intentando fallback...')
+        return await obtenerProductosDesdeLotesCentralAction()
     }
 }
 
 // Obtener stock por sucursal
-export async function obtenerStockPorSucursal(sucursalId: string) {
+export async function obtenerStockPorSucursalAction(sucursalId: string) {
     try {
         const supabase = await createClient()
 
@@ -368,13 +369,13 @@ export async function obtenerStockPorSucursal(sucursalId: string) {
 
         return Object.values(stockPorProducto)
     } catch (error) {
-        console.error('Error en obtenerStockPorSucursal:', error)
+        devError('Error en obtenerStockPorSucursal:', error)
         return []
     }
 }
 
 // Listar transferencias
-export async function listarTransferencias(sucursalId?: string, estado?: string) {
+export async function listarTransferenciasAction(sucursalId?: string, estado?: string) {
     try {
         const supabase = await createClient()
 
@@ -407,7 +408,7 @@ export async function listarTransferencias(sucursalId?: string, estado?: string)
         if (error) throw error
         return data || []
     } catch (error) {
-        console.error('Error en listarTransferencias:', error)
+        devError('Error en listarTransferencias:', error)
         return []
     }
 }
@@ -441,7 +442,7 @@ export async function obtenerTransferenciaAction(id: string) {
         if (error) throw error
         return data
     } catch (error) {
-        console.error('Error en obtenerTransferenciaAction:', error)
+        devError('Error en obtenerTransferenciaAction:', error)
         return null
     }
 }
@@ -494,7 +495,7 @@ export async function obtenerTransferenciasDiaAction(
         if (error) throw error
         return data || []
     } catch (error) {
-        console.error('Error en obtenerTransferenciasDiaAction:', error)
+        devError('Error en obtenerTransferenciasDiaAction:', error)
         return []
     }
 }
@@ -509,7 +510,7 @@ export async function prepararTransferenciaAction(
 
         const { data: { user }, error: userError } = await supabase.auth.getUser()
         if (userError || !user) {
-            return { success: false, message: 'Usuario no autenticado' }
+            return { success: false, error: 'Usuario no autenticado' }
         }
 
         const { data: result, error } = await supabase.rpc('fn_preparar_transferencia', {
@@ -520,7 +521,7 @@ export async function prepararTransferenciaAction(
 
         if (error) throw error
         if (!result.success) {
-            return { success: false, message: result.error }
+            return { success: false, error: result.error }
         }
 
         revalidatePath('/sucursales/transferencias')
@@ -531,8 +532,8 @@ export async function prepararTransferenciaAction(
             message: 'Transferencia preparada exitosamente',
         }
     } catch (error: any) {
-        console.error('Error en prepararTransferenciaAction:', error)
-        return { success: false, message: error.message || 'Error al preparar transferencia' }
+        devError('Error en prepararTransferenciaAction:', error)
+        return { success: false, error: error.message || 'Error al preparar transferencia' }
     }
 }
 
@@ -546,7 +547,7 @@ export async function asignarTransferenciaRutaAction(
 
         const { data: { user }, error: userError } = await supabase.auth.getUser()
         if (userError || !user) {
-            return { success: false, message: 'Usuario no autenticado' }
+            return { success: false, error: 'Usuario no autenticado' }
         }
 
         const { data: result, error } = await supabase.rpc('fn_asignar_transferencia_a_ruta', {
@@ -557,7 +558,7 @@ export async function asignarTransferenciaRutaAction(
 
         if (error) throw error
         if (!result.success) {
-            return { success: false, message: result.error }
+            return { success: false, error: result.error }
         }
 
         revalidatePath('/sucursales/transferencias')
@@ -568,8 +569,8 @@ export async function asignarTransferenciaRutaAction(
             message: 'Transferencia asignada a ruta',
         }
     } catch (error: any) {
-        console.error('Error en asignarTransferenciaRutaAction:', error)
-        return { success: false, message: error.message || 'Error al asignar a ruta' }
+        devError('Error en asignarTransferenciaRutaAction:', error)
+        return { success: false, error: error.message || 'Error al asignar a ruta' }
     }
 }
 
@@ -580,7 +581,7 @@ export async function entregarTransferenciaAction(transferenciaId: string) {
 
         const { data: { user }, error: userError } = await supabase.auth.getUser()
         if (userError || !user) {
-            return { success: false, message: 'Usuario no autenticado' }
+            return { success: false, error: 'Usuario no autenticado' }
         }
 
         const { data: result, error } = await supabase.rpc('fn_entregar_transferencia', {
@@ -590,7 +591,7 @@ export async function entregarTransferenciaAction(transferenciaId: string) {
 
         if (error) throw error
         if (!result.success) {
-            return { success: false, message: result.error }
+            return { success: false, error: result.error }
         }
 
         revalidatePath('/sucursales/transferencias')
@@ -601,8 +602,8 @@ export async function entregarTransferenciaAction(transferenciaId: string) {
             message: 'Transferencia marcada como entregada',
         }
     } catch (error: any) {
-        console.error('Error en entregarTransferenciaAction:', error)
-        return { success: false, message: error.message || 'Error al entregar transferencia' }
+        devError('Error en entregarTransferenciaAction:', error)
+        return { success: false, error: error.message || 'Error al entregar transferencia' }
     }
 }
 
@@ -616,7 +617,7 @@ export async function confirmarRecepcionTransferenciaAction(
 
         const { data: { user }, error: userError } = await supabase.auth.getUser()
         if (userError || !user) {
-            return { success: false, message: 'Usuario no autenticado' }
+            return { success: false, error: 'Usuario no autenticado' }
         }
 
         const { data: result, error } = await supabase.rpc('fn_recibir_transferencia', {
@@ -627,7 +628,7 @@ export async function confirmarRecepcionTransferenciaAction(
 
         if (error) throw error
         if (!result.success) {
-            return { success: false, message: result.error }
+            return { success: false, error: result.error }
         }
 
         revalidatePath('/sucursales/transferencias')
@@ -638,8 +639,8 @@ export async function confirmarRecepcionTransferenciaAction(
             message: 'Transferencia recibida exitosamente',
         }
     } catch (error: any) {
-        console.error('Error en confirmarRecepcionTransferenciaAction:', error)
-        return { success: false, message: error.message || 'Error al confirmar recepción' }
+        devError('Error en confirmarRecepcionTransferenciaAction:', error)
+        return { success: false, error: error.message || 'Error al confirmar recepción' }
     }
 }
 
@@ -653,7 +654,7 @@ export async function cancelarTransferenciaAction(
 
         const { data: { user }, error: userError } = await supabase.auth.getUser()
         if (userError || !user) {
-            return { success: false, message: 'Usuario no autenticado' }
+            return { success: false, error: 'Usuario no autenticado' }
         }
 
         const { data: result, error } = await supabase.rpc('fn_cancelar_transferencia', {
@@ -664,7 +665,7 @@ export async function cancelarTransferenciaAction(
 
         if (error) throw error
         if (!result.success) {
-            return { success: false, message: result.error }
+            return { success: false, error: result.error }
         }
 
         revalidatePath('/sucursales/transferencias')
@@ -674,13 +675,13 @@ export async function cancelarTransferenciaAction(
             message: 'Transferencia cancelada y stock devuelto',
         }
     } catch (error: any) {
-        console.error('Error en cancelarTransferenciaAction:', error)
-        return { success: false, message: error.message || 'Error al cancelar transferencia' }
+        devError('Error en cancelarTransferenciaAction:', error)
+        return { success: false, error: error.message || 'Error al cancelar transferencia' }
     }
 }
 
 // Obtener transferencias pendientes de recibir para una sucursal
-export async function obtenerTransferenciasPendientesRecepcion(sucursalId: string) {
+export async function obtenerTransferenciasPendientesRecepcionAction(sucursalId: string) {
     try {
         const supabase = await createClient()
 
@@ -705,7 +706,7 @@ export async function obtenerTransferenciasPendientesRecepcion(sucursalId: strin
         if (error) throw error
         return data || []
     } catch (error) {
-        console.error('Error en obtenerTransferenciasPendientesRecepcion:', error)
+        devError('Error en obtenerTransferenciasPendientesRecepcion:', error)
         return []
     }
 }

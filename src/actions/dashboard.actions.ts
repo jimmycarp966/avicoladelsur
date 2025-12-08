@@ -2,12 +2,13 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { getTodayArgentina } from '@/lib/utils'
+import { devError, devWarn } from '@/lib/utils/logger'
 import type { ApiResponse } from '@/types/api.types'
 
 /**
  * Obtiene métricas del dashboard admin
  */
-export async function obtenerMetricasDashboard(): Promise<ApiResponse<{
+export async function obtenerMetricasDashboardAction(): Promise<ApiResponse<{
   totalProductos: number
   pedidosPendientes: number
   entregasHoy: { completadas: number; pendientes: number; total: number }
@@ -96,7 +97,7 @@ export async function obtenerMetricasDashboard(): Promise<ApiResponse<{
       },
     }
   } catch (error: any) {
-    console.error('Error al obtener métricas del dashboard:', error)
+    devError('Error al obtener métricas del dashboard:', error)
     return {
       success: false,
       error: error.message || 'Error al obtener métricas del dashboard',
@@ -107,7 +108,7 @@ export async function obtenerMetricasDashboard(): Promise<ApiResponse<{
 /**
  * Obtiene actividad reciente del sistema
  */
-export async function obtenerActividadReciente(): Promise<ApiResponse<Array<{
+export async function obtenerActividadRecienteAction(): Promise<ApiResponse<Array<{
   id: string
   type: 'pedido' | 'entrega' | 'stock' | 'cliente'
   message: string
@@ -214,7 +215,7 @@ export async function obtenerActividadReciente(): Promise<ApiResponse<Array<{
       data: actividades.slice(0, 4),
     }
   } catch (error: any) {
-    console.error('Error al obtener actividad reciente:', error)
+    devError('Error al obtener actividad reciente:', error)
     return {
       success: false,
       error: error.message || 'Error al obtener actividad reciente',
@@ -226,7 +227,7 @@ export async function obtenerActividadReciente(): Promise<ApiResponse<Array<{
 /**
  * Obtiene métricas de rendimiento del mes actual
  */
-export async function obtenerMetricasRendimiento(): Promise<ApiResponse<{
+export async function obtenerMetricasRendimientoAction(): Promise<ApiResponse<{
   crecimientoVentas: number
   tiempoPromedioEntrega: number
   tasaSatisfaccion: number
@@ -317,7 +318,7 @@ export async function obtenerMetricasRendimiento(): Promise<ApiResponse<{
       },
     }
   } catch (error: any) {
-    console.error('Error al obtener métricas de rendimiento:', error)
+    devError('Error al obtener métricas de rendimiento:', error)
     return {
       success: false,
       error: error.message || 'Error al obtener métricas de rendimiento',
@@ -328,7 +329,7 @@ export async function obtenerMetricasRendimiento(): Promise<ApiResponse<{
 /**
  * Obtiene datos de ventas mensuales para el gráfico
  */
-export async function obtenerVentasMensuales(): Promise<ApiResponse<Array<{
+export async function obtenerVentasMensualesAction(): Promise<ApiResponse<Array<{
   mes: string
   ventas: number
   pedidos: number
@@ -368,7 +369,7 @@ export async function obtenerVentasMensuales(): Promise<ApiResponse<Array<{
       data: meses,
     }
   } catch (error: any) {
-    console.error('Error al obtener ventas mensuales:', error)
+    devError('Error al obtener ventas mensuales:', error)
     return {
       success: false,
       error: error.message || 'Error al obtener ventas mensuales',
@@ -380,7 +381,7 @@ export async function obtenerVentasMensuales(): Promise<ApiResponse<Array<{
 /**
  * Obtiene distribución de productos por categoría
  */
-export async function obtenerProductosPorCategoria(): Promise<ApiResponse<Array<{
+export async function obtenerProductosPorCategoriaAction(): Promise<ApiResponse<Array<{
   name: string
   value: number
   color: string
@@ -431,7 +432,7 @@ export async function obtenerProductosPorCategoria(): Promise<ApiResponse<Array<
       data: categorias,
     }
   } catch (error: any) {
-    console.error('Error al obtener productos por categoría:', error)
+    devError('Error al obtener productos por categoría:', error)
     return {
       success: false,
       error: error.message || 'Error al obtener productos por categoría',
@@ -443,7 +444,7 @@ export async function obtenerProductosPorCategoria(): Promise<ApiResponse<Array<
 /**
  * Obtiene entregas por día de la semana (última semana)
  */
-export async function obtenerEntregasPorDia(): Promise<ApiResponse<Array<{
+export async function obtenerEntregasPorDiaAction(): Promise<ApiResponse<Array<{
   dia: string
   entregas: number
   km: number
@@ -498,7 +499,7 @@ export async function obtenerEntregasPorDia(): Promise<ApiResponse<Array<{
       data: entregasPorDia,
     }
   } catch (error: any) {
-    console.error('Error al obtener entregas por día:', error)
+    devError('Error al obtener entregas por día:', error)
     return {
       success: false,
       error: error.message || 'Error al obtener entregas por día',
@@ -510,7 +511,7 @@ export async function obtenerEntregasPorDia(): Promise<ApiResponse<Array<{
 /**
  * Obtiene métricas de eficiencia de rutas (semana actual)
  */
-export async function obtenerMetricasEficienciaRutas(): Promise<ApiResponse<{
+export async function obtenerMetricasEficienciaRutasAction(): Promise<ApiResponse<{
   distanciaAhorradaKm: number
   tiempoAhorradoMin: number
   combustibleAhorrado: number
@@ -526,7 +527,7 @@ export async function obtenerMetricasEficienciaRutas(): Promise<ApiResponse<{
 
     if (error) {
       // Si la función no existe o hay error, retornar valores por defecto sin fallar
-      console.warn('Error al obtener métricas de rutas (puede ser que la función no exista aún):', error.message)
+      devWarn('Error al obtener métricas de rutas (puede ser que la función no exista aún):', error.message)
       return {
         success: true,
         data: {
@@ -562,7 +563,7 @@ export async function obtenerMetricasEficienciaRutas(): Promise<ApiResponse<{
     }
   } catch (error: any) {
     // Capturar cualquier error y retornar valores por defecto
-    console.warn('Error al obtener métricas de eficiencia de rutas:', error?.message || error)
+    devWarn('Error al obtener métricas de eficiencia de rutas:', error?.message || error)
     return {
       success: true, // Retornar success: true para no romper el dashboard
       data: {
@@ -578,7 +579,7 @@ export async function obtenerMetricasEficienciaRutas(): Promise<ApiResponse<{
 /**
  * Obtiene métricas de rendimiento del repartidor
  */
-export async function obtenerMetricasRepartidor(repartidorId: string): Promise<ApiResponse<{
+export async function obtenerMetricasRepartidorAction(repartidorId: string): Promise<ApiResponse<{
   eficiencia: number
   puntuacionGeneral: number
   tiempoPromedioEntrega: number
@@ -669,7 +670,7 @@ export async function obtenerMetricasRepartidor(repartidorId: string): Promise<A
       },
     }
   } catch (error: any) {
-    console.error('Error al obtener métricas del repartidor:', error)
+    devError('Error al obtener métricas del repartidor:', error)
     return {
       success: false,
       error: error.message || 'Error al obtener métricas del repartidor',

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { LotesTable } from '@/components/tables/LotesTable'
 import { useNotificationStore } from '@/store/notificationStore'
-import { obtenerLotes } from '@/actions/almacen.actions'
+import { obtenerLotesAction } from '@/actions/almacen.actions'
 import type { Lote } from '@/types/domain.types'
 
 export function LotesTableWrapper() {
@@ -17,7 +17,7 @@ export function LotesTableWrapper() {
   // Cargar lotes reales de la base de datos
   const loadLotes = useCallback(async () => {
     setLoading(true)
-    const result = await obtenerLotes()
+    const result = await obtenerLotesAction()
     
     if (!isMountedRef.current) return
     
@@ -50,8 +50,8 @@ export function LotesTableWrapper() {
   const handleDelete = async (lote: Lote) => {
     if (confirm(`¿Estás seguro de que quieres eliminar el lote ${lote.numero_lote}?\n\nSolo se pueden eliminar lotes sin movimientos de stock y que no estén asociados a pedidos activos.`)) {
       try {
-        const { eliminarLote } = await import('@/actions/almacen.actions')
-        const result = await eliminarLote(lote.id)
+        const { eliminarLoteAction } = await import('@/actions/almacen.actions')
+        const result = await eliminarLoteAction(lote.id)
         if (result.success) {
           await loadLotes()
           showToast('success', result.message || `Lote ${lote.numero_lote} eliminado exitosamente`)

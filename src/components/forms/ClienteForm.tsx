@@ -186,11 +186,11 @@ export function ClienteForm({ cliente, zonas = [], onSuccess }: ClienteFormProps
     try {
       setIsLoading(true)
 
-      const { crearCliente, actualizarCliente } = await import('@/actions/ventas.actions')
+      const { crearClienteAction, actualizarClienteAction } = await import('@/actions/ventas.actions')
       
       const result = isEditing
-        ? await actualizarCliente(cliente.id, data)
-        : await crearCliente(data)
+        ? await actualizarClienteAction(cliente.id, data)
+        : await crearClienteAction(data)
 
       if (!result.success) {
         throw new Error(result.error || 'Error al guardar cliente')

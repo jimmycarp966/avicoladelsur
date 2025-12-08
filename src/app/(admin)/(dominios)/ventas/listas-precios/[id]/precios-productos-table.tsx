@@ -14,7 +14,7 @@ import {
 import { Plus, Save, X, Calculator } from 'lucide-react'
 import { useNotificationStore } from '@/store/notificationStore'
 import { guardarPrecioProductoAction, obtenerPreciosListaAction } from '@/actions/listas-precios.actions'
-import { obtenerProductos } from '@/actions/almacen.actions'
+import { obtenerProductosAction } from '@/actions/almacen.actions'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatCurrency } from '@/lib/utils'
@@ -57,7 +57,7 @@ export function PreciosProductosTable({ listaId, precios: preciosIniciales, list
 
   const cargarProductos = async () => {
     const [productosResult, listaResult] = await Promise.all([
-      obtenerProductos(),
+      obtenerProductosAction(),
       obtenerListaPrecioAction(listaId)
     ])
     
@@ -102,7 +102,7 @@ export function PreciosProductosTable({ listaId, precios: preciosIniciales, list
         setPrecios(preciosResult.data as any)
       }
     } else {
-      showToast('error', result.message || 'Error al actualizar precio')
+      showToast('error', result.error || 'Error al actualizar precio')
     }
   }
 
@@ -130,7 +130,7 @@ export function PreciosProductosTable({ listaId, precios: preciosIniciales, list
         setPrecios(preciosResult.data as any)
       }
     } else {
-      showToast('error', result.message || 'Error al agregar precio')
+      showToast('error', result.error || 'Error al agregar precio')
     }
   }
 

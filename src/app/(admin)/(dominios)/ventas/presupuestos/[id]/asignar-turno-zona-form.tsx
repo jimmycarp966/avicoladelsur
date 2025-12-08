@@ -109,7 +109,7 @@ export function AsignarTurnoZonaForm({
         toast.success(result.message || 'Turno y zona asignados exitosamente')
         router.refresh()
       } else {
-        toast.error(result.message || 'Error al asignar turno y zona')
+        toast.error(result.error || 'Error al asignar turno y zona')
       }
     } catch (error) {
       toast.error('Error inesperado al asignar turno y zona')

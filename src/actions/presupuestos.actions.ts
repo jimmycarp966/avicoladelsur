@@ -8,6 +8,7 @@ import { generateRutaOptimizada } from '@/lib/services/ruta-optimizer'
 import { confirmarPresupuestosAgrupadosSchema } from '@/lib/schemas/presupuestos.schema'
 import { getNowArgentina } from '@/lib/utils'
 import { enviarNotificacionWhatsApp } from '@/lib/services/notificaciones'
+import { devError, devLog } from '@/lib/utils/logger'
 
 // Schemas de validación
 const crearPresupuestoSchema = z.object({
@@ -45,7 +46,7 @@ export async function crearPresupuestoAction(formData: FormData) {
     // Obtener usuario actual
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return { success: false, message: 'Usuario no autenticado' }
+      return { success: false, error: 'Usuario no autenticado' }
     }
 
     // Verificar permisos (vendedor o admin)
@@ -56,7 +57,7 @@ export async function crearPresupuestoAction(formData: FormData) {
       .single()
 
     if (!usuario || !['admin', 'vendedor'].includes(usuario.rol)) {
-      return { success: false, message: 'No tienes permisos para crear presupuestos' }
+      return { success: false, error: 'No tienes permisos para crear presupuestos' }
     }
 
     // Parsear y validar datos
@@ -87,18 +88,18 @@ export async function crearPresupuestoAction(formData: FormData) {
     })
 
     if (error) {
-      console.error('[SERVER] Error creando presupuesto RPC:', error)
-      return { success: false, message: 'Error al crear presupuesto: ' + error.message }
+      devError('[SERVER] Error creando presupuesto RPC:', error)
+      return { success: false, error: 'Error al crear presupuesto: ' + error.message }
     }
 
-    console.log('[SERVER] Resultado RPC crear presupuesto:', JSON.stringify(result, null, 2))
+    devLog('[SERVER] Resultado RPC crear presupuesto:', JSON.stringify(result, null, 2))
 
     if (!result || !result.success) {
-      console.error('[SERVER] Error: result.success es false:', result)
-      return { success: false, message: result?.error || 'Error en la creación del presupuesto' }
+      devError('[SERVER] Error: result.success es false:', result)
+      return { success: false, error: result?.error || 'Error en la creación del presupuesto' }
     }
 
-    console.log('[SERVER] Presupuesto creado exitosamente:', {
+    devLog('[SERVER] Presupuesto creado exitosamente:', {
       presupuesto_id: result.presupuesto_id,
       numero_presupuesto: result.numero_presupuesto,
       result_keys: Object.keys(result),
@@ -139,7 +140,7 @@ export async function crearPresupuestoAction(formData: FormData) {
         }
       )
     } catch (notifError) {
-      console.error('Error enviando notificación WhatsApp:', notifError)
+      devError('Error enviando notificación WhatsApp:', notifError)
       // No bloqueamos la operación si falla la notificación
     }
 
@@ -157,9 +158,9 @@ export async function crearPresupuestoAction(formData: FormData) {
   } catch (error) {
     console.error('Error en crearPresupuestoAction:', error)
     if (error instanceof z.ZodError) {
-      return { success: false, message: 'Datos inválidos: ' + error.issues[0].message }
+      return { success: false, error: 'Datos inválidos: ' + error.issues[0].message }
     }
-    return { success: false, message: 'Error interno del servidor' }
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
 
@@ -171,7 +172,7 @@ export async function reservarStockAction(formData: FormData) {
     // Obtener usuario actual
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return { success: false, message: 'Usuario no autenticado' }
+      return { success: false, error: 'Usuario no autenticado' }
     }
 
     // Parsear y validar datos
@@ -186,12 +187,12 @@ export async function reservarStockAction(formData: FormData) {
     })
 
     if (error) {
-      console.error('Error reservando stock:', error)
-      return { success: false, message: 'Error al reservar stock' }
+      devError('Error reservando stock:', error)
+      return { success: false, error: 'Error al reservar stock' }
     }
 
     if (!result.success) {
-      return { success: false, message: result.error || 'Error en la reserva de stock' }
+      return { success: false, error: result.error || 'Error en la reserva de stock' }
     }
 
     // Actualizar estado del presupuesto
@@ -217,9 +218,9 @@ export async function reservarStockAction(formData: FormData) {
   } catch (error) {
     console.error('Error en reservarStockAction:', error)
     if (error instanceof z.ZodError) {
-      return { success: false, message: 'Datos inválidos: ' + error.issues[0].message }
+      return { success: false, error: 'Datos inválidos: ' + error.issues[0].message }
     }
-    return { success: false, message: 'Error interno del servidor' }
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
 
@@ -231,7 +232,7 @@ export async function confirmarPresupuestoAction(formData: FormData) {
     // Obtener usuario actual
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return { success: false, message: 'Usuario no autenticado' }
+      return { success: false, error: 'Usuario no autenticado' }
     }
 
     // Verificar permisos (admin, vendedor o almacenista)
@@ -242,7 +243,7 @@ export async function confirmarPresupuestoAction(formData: FormData) {
       .single()
 
     if (!usuario || !['admin', 'vendedor', 'almacenista'].includes(usuario.rol)) {
-      return { success: false, message: 'No tienes permisos para confirmar presupuestos' }
+      return { success: false, error: 'No tienes permisos para confirmar presupuestos' }
     }
 
     // Parsear y validar datos
@@ -259,10 +260,10 @@ export async function confirmarPresupuestoAction(formData: FormData) {
       .eq('id', data.presupuesto_id)
       .single()
     
-    console.log('🔍 DEBUG confirmarPresupuestoAction - Presupuesto:', JSON.stringify(presupuestoDebug, null, 2))
+    devLog('🔍 DEBUG confirmarPresupuestoAction - Presupuesto:', JSON.stringify(presupuestoDebug, null, 2))
 
     // Llamar RPC para convertir presupuesto a pedido
-    console.log('🔍 DEBUG - Llamando fn_convertir_presupuesto_a_pedido con:', {
+    devLog('🔍 DEBUG - Llamando fn_convertir_presupuesto_a_pedido con:', {
       p_presupuesto_id: data.presupuesto_id,
       p_user_id: user.id,
       p_caja_id: data.caja_id,
@@ -274,11 +275,11 @@ export async function confirmarPresupuestoAction(formData: FormData) {
       p_caja_id: data.caja_id,
     })
 
-    console.log('🔍 DEBUG - Resultado RPC:', JSON.stringify(result, null, 2))
-    console.log('🔍 DEBUG - Error RPC:', error ? JSON.stringify(error, null, 2) : 'null')
+    devLog('🔍 DEBUG - Resultado RPC:', JSON.stringify(result, null, 2))
+    devLog('🔍 DEBUG - Error RPC:', error ? JSON.stringify(error, null, 2) : 'null')
 
     if (error) {
-      console.error('❌ Error convirtiendo presupuesto:', error)
+      devError('❌ Error convirtiendo presupuesto:', error)
       return { 
         success: false, 
         message: `Error al convertir presupuesto: ${error.message || error.code || 'Error desconocido'}`,
@@ -287,7 +288,7 @@ export async function confirmarPresupuestoAction(formData: FormData) {
     }
 
     if (!result || !result.success) {
-      console.error('❌ RPC devolvió error:', result?.error)
+      devError('❌ RPC devolvió error:', result?.error)
       return { 
         success: false, 
         message: result?.error || 'Error en la conversión del presupuesto',
@@ -307,18 +308,18 @@ export async function confirmarPresupuestoAction(formData: FormData) {
         )
 
         if (facturaError) {
-          console.error(
+          devError(
             'Error creando factura desde pedido (presupuesto individual):',
             facturaError
           )
         } else if (!facturaResult?.success) {
-          console.error(
+          devError(
             'RPC fn_crear_factura_desde_pedido devolvió error:',
             facturaResult?.error
           )
         }
       } catch (factError) {
-        console.error('Excepción creando factura desde pedido:', factError)
+        devError('Excepción creando factura desde pedido:', factError)
       }
     }
 
@@ -330,7 +331,7 @@ export async function confirmarPresupuestoAction(formData: FormData) {
           usarGoogle: true,
         })
       } catch (optError) {
-        console.error('No se pudo optimizar la ruta planificada automáticamente:', optError)
+        devError('No se pudo optimizar la ruta planificada automáticamente:', optError)
       }
     }
 
@@ -367,7 +368,7 @@ export async function confirmarPresupuestoAction(formData: FormData) {
           }
         )
       } catch (notifError) {
-        console.error('Error enviando notificación WhatsApp:', notifError)
+        devError('Error enviando notificación WhatsApp:', notifError)
       }
     }
 
@@ -385,9 +386,9 @@ export async function confirmarPresupuestoAction(formData: FormData) {
   } catch (error) {
     console.error('Error en confirmarPresupuestoAction:', error)
     if (error instanceof z.ZodError) {
-      return { success: false, message: 'Datos inválidos: ' + error.issues[0].message }
+      return { success: false, error: 'Datos inválidos: ' + error.issues[0].message }
     }
-    return { success: false, message: 'Error interno del servidor' }
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
 
@@ -399,7 +400,7 @@ export async function finalizarPesajeAction(formData: FormData) {
     // Obtener usuario actual
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return { success: false, message: 'Usuario no autenticado' }
+      return { success: false, error: 'Usuario no autenticado' }
     }
 
     // Verificar permisos (almacenista o admin)
@@ -410,7 +411,7 @@ export async function finalizarPesajeAction(formData: FormData) {
       .single()
 
     if (!usuario || !['admin', 'almacenista'].includes(usuario.rol)) {
-      return { success: false, message: 'No tienes permisos para finalizar pesaje' }
+      return { success: false, error: 'No tienes permisos para finalizar pesaje' }
     }
 
     // Parsear y validar datos
@@ -418,7 +419,7 @@ export async function finalizarPesajeAction(formData: FormData) {
     const presupuestoId = rawData.presupuesto_id as string
 
     if (!presupuestoId) {
-      return { success: false, message: 'ID de presupuesto requerido' }
+      return { success: false, error: 'ID de presupuesto requerido' }
     }
 
     // Llamar RPC para finalizar pesaje sin convertir a pedido
@@ -427,12 +428,12 @@ export async function finalizarPesajeAction(formData: FormData) {
     })
 
     if (error) {
-      console.error('Error finalizando pesaje:', error)
-      return { success: false, message: 'Error al finalizar pesaje: ' + error.message }
+      devError('Error finalizando pesaje:', error)
+      return { success: false, error: 'Error al finalizar pesaje: ' + error.message }
     }
 
     if (!result.success) {
-      return { success: false, message: result.error || 'Error al finalizar pesaje' }
+      return { success: false, error: result.error || 'Error al finalizar pesaje' }
     }
 
     revalidatePath('/almacen/presupuestos-dia')
@@ -446,7 +447,7 @@ export async function finalizarPesajeAction(formData: FormData) {
 
   } catch (error) {
     console.error('Error en finalizarPesajeAction:', error)
-    return { success: false, message: 'Error interno del servidor' }
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
 
@@ -458,7 +459,7 @@ export async function confirmarPresupuestosAgrupadosAction(formData: FormData) {
     // Obtener usuario actual
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return { success: false, message: 'Usuario no autenticado' }
+      return { success: false, error: 'Usuario no autenticado' }
     }
 
     // Verificar permisos (admin, vendedor o almacenista)
@@ -469,7 +470,7 @@ export async function confirmarPresupuestosAgrupadosAction(formData: FormData) {
       .single()
 
     if (!usuario || !['admin', 'vendedor', 'almacenista'].includes(usuario.rol)) {
-      return { success: false, message: 'No tienes permisos para confirmar presupuestos' }
+      return { success: false, error: 'No tienes permisos para confirmar presupuestos' }
     }
 
     // Parsear y validar datos
@@ -513,7 +514,7 @@ export async function confirmarPresupuestosAgrupadosAction(formData: FormData) {
     }
 
     if (errores > 0) {
-      console.error('Errores en conversión masiva:', erroresDetalle)
+      devError('Errores en conversión masiva:', erroresDetalle)
     }
 
     // Crear notificación
@@ -556,9 +557,9 @@ export async function confirmarPresupuestosAgrupadosAction(formData: FormData) {
   } catch (error) {
     console.error('Error en confirmarPresupuestosAgrupadosAction:', error)
     if (error instanceof z.ZodError) {
-      return { success: false, message: 'Datos inválidos: ' + error.issues[0].message }
+      return { success: false, error: 'Datos inválidos: ' + error.issues[0].message }
     }
-    return { success: false, message: 'Error interno del servidor' }
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
 
@@ -570,7 +571,7 @@ export async function actualizarPesoItemAction(formData: FormData) {
     // Obtener usuario actual
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return { success: false, message: 'Usuario no autenticado' }
+      return { success: false, error: 'Usuario no autenticado' }
     }
 
     // Verificar permisos (almacenista o admin)
@@ -581,7 +582,7 @@ export async function actualizarPesoItemAction(formData: FormData) {
       .single()
 
     if (!usuario || !['admin', 'almacenista'].includes(usuario.rol)) {
-      return { success: false, message: 'No tienes permisos para actualizar pesos' }
+      return { success: false, error: 'No tienes permisos para actualizar pesos' }
     }
 
     // Parsear y validar datos
@@ -598,12 +599,12 @@ export async function actualizarPesoItemAction(formData: FormData) {
     })
 
     if (error) {
-      console.error('Error actualizando peso:', error)
-      return { success: false, message: 'Error al actualizar peso del item' }
+      devError('Error actualizando peso:', error)
+      return { success: false, error: 'Error al actualizar peso del item' }
     }
 
     if (!result.success) {
-      return { success: false, message: result.error || 'Error en la actualización del peso' }
+      return { success: false, error: result.error || 'Error en la actualización del peso' }
     }
 
     revalidatePath(`/almacen/presupuesto/*`)
@@ -617,9 +618,9 @@ export async function actualizarPesoItemAction(formData: FormData) {
   } catch (error) {
     console.error('Error en actualizarPesoItemAction:', error)
     if (error instanceof z.ZodError) {
-      return { success: false, message: 'Datos inválidos: ' + error.issues[0].message }
+      return { success: false, error: 'Datos inválidos: ' + error.issues[0].message }
     }
-    return { success: false, message: 'Error interno del servidor' }
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
 
@@ -672,7 +673,7 @@ export async function obtenerPresupuestosAction(filtros?: {
     const { data, error } = await query
 
     if (error) {
-      console.error('Error obteniendo presupuestos:', error)
+      devError('Error obteniendo presupuestos:', error)
       // Mostrar el error real para debugging
       return {
         success: false,
@@ -685,18 +686,18 @@ export async function obtenerPresupuestosAction(filtros?: {
 
   } catch (error) {
     console.error('Error en obtenerPresupuestosAction:', error)
-    return { success: false, message: 'Error interno del servidor' }
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
 
 // Acción para obtener detalle de un presupuesto
 export async function obtenerPresupuestoAction(presupuestoId: string) {
   try {
-    console.log('[SERVER] obtenerPresupuestoAction - ID recibido:', presupuestoId)
+    devLog('[SERVER] obtenerPresupuestoAction - ID recibido:', presupuestoId)
     const supabase = await createClient()
 
     // OPTIMIZADO: Una sola query con todos los joins en lugar de 7 queries separadas
-    console.log('[SERVER] Ejecutando query para obtener presupuesto...')
+    devLog('[SERVER] Ejecutando query para obtener presupuesto...')
     const { data: presupuestoData, error: presupuestoError } = await supabase
       .from('presupuestos')
       .select(`
@@ -716,7 +717,7 @@ export async function obtenerPresupuestoAction(presupuestoId: string) {
       .single()
 
     if (presupuestoError) {
-      console.error('[SERVER] Error al obtener presupuesto de BD:', {
+      devError('[SERVER] Error al obtener presupuesto de BD:', {
         presupuestoId,
         errorCode: presupuestoError.code,
         errorMessage: presupuestoError.message,
@@ -787,7 +788,7 @@ export async function obtenerPresupuestoAction(presupuestoId: string) {
 
   } catch (error) {
     console.error('Error en obtenerPresupuestoAction:', error)
-    return { success: false, message: 'Error interno del servidor' }
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
 
@@ -799,7 +800,7 @@ export async function recalcularPresupuestoAction(presupuestoId: string) {
     // Obtener usuario actual
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return { success: false, message: 'Usuario no autenticado' }
+      return { success: false, error: 'Usuario no autenticado' }
     }
 
     // Obtener presupuesto con items
@@ -818,12 +819,12 @@ export async function recalcularPresupuestoAction(presupuestoId: string) {
       .single()
 
     if (presupuestoError || !presupuesto) {
-      return { success: false, message: 'Presupuesto no encontrado' }
+      return { success: false, error: 'Presupuesto no encontrado' }
     }
 
     // Solo se puede recalcular si está pendiente
     if (presupuesto.estado !== 'pendiente') {
-      return { success: false, message: 'Solo se pueden recalcular presupuestos pendientes' }
+      return { success: false, error: 'Solo se pueden recalcular presupuestos pendientes' }
     }
 
     let totalEstimado = 0
@@ -868,8 +869,8 @@ export async function recalcularPresupuestoAction(presupuestoId: string) {
       .eq('id', presupuestoId)
 
     if (updateError) {
-      console.error('Error actualizando presupuesto:', updateError)
-      return { success: false, message: 'Error al actualizar presupuesto' }
+      devError('Error actualizando presupuesto:', updateError)
+      return { success: false, error: 'Error al actualizar presupuesto' }
     }
 
     revalidatePath('/ventas/presupuestos')
@@ -883,7 +884,7 @@ export async function recalcularPresupuestoAction(presupuestoId: string) {
 
   } catch (error) {
     console.error('Error en recalcularPresupuestoAction:', error)
-    return { success: false, message: 'Error interno del servidor' }
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
 
@@ -895,7 +896,7 @@ export async function actualizarPresupuestoAction(formData: FormData) {
     // Obtener usuario actual
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return { success: false, message: 'Usuario no autenticado' }
+      return { success: false, error: 'Usuario no autenticado' }
     }
 
     const presupuestoId = formData.get('presupuesto_id') as string
@@ -903,7 +904,7 @@ export async function actualizarPresupuestoAction(formData: FormData) {
     const fecha_entrega_estimada = formData.get('fecha_entrega_estimada') as string
 
     if (!presupuestoId) {
-      return { success: false, message: 'ID de presupuesto requerido' }
+      return { success: false, error: 'ID de presupuesto requerido' }
     }
 
     // Verificar que el presupuesto existe y está en estado pendiente
@@ -914,11 +915,11 @@ export async function actualizarPresupuestoAction(formData: FormData) {
       .single()
 
     if (presupuestoError || !presupuesto) {
-      return { success: false, message: 'Presupuesto no encontrado' }
+      return { success: false, error: 'Presupuesto no encontrado' }
     }
 
     if (presupuesto.estado !== 'pendiente') {
-      return { success: false, message: 'Solo se pueden editar presupuestos pendientes' }
+      return { success: false, error: 'Solo se pueden editar presupuestos pendientes' }
     }
 
     // Actualizar presupuesto
@@ -940,8 +941,8 @@ export async function actualizarPresupuestoAction(formData: FormData) {
       .eq('id', presupuestoId)
 
     if (updateError) {
-      console.error('Error actualizando presupuesto:', updateError)
-      return { success: false, message: 'Error al actualizar presupuesto' }
+      devError('Error actualizando presupuesto:', updateError)
+      return { success: false, error: 'Error al actualizar presupuesto' }
     }
 
     revalidatePath('/ventas/presupuestos')
@@ -955,7 +956,7 @@ export async function actualizarPresupuestoAction(formData: FormData) {
 
   } catch (error) {
     console.error('Error en actualizarPresupuestoAction:', error)
-    return { success: false, message: 'Error interno del servidor' }
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
 
@@ -967,7 +968,7 @@ export async function enviarPresupuestoAlmacenAction(presupuestoId: string) {
     // Obtener usuario actual
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return { success: false, message: 'Usuario no autenticado' }
+      return { success: false, error: 'Usuario no autenticado' }
     }
 
     // Verificar que el presupuesto tenga turno y zona antes de enviar
@@ -978,15 +979,15 @@ export async function enviarPresupuestoAlmacenAction(presupuestoId: string) {
       .single()
 
     if (presupuestoError || !presupuesto) {
-      return { success: false, message: 'Presupuesto no encontrado' }
+      return { success: false, error: 'Presupuesto no encontrado' }
     }
 
     if (presupuesto.estado !== 'pendiente') {
-      return { success: false, message: 'Solo se pueden enviar presupuestos pendientes a almacén' }
+      return { success: false, error: 'Solo se pueden enviar presupuestos pendientes a almacén' }
     }
 
     if (!presupuesto.zona_id) {
-      return { success: false, message: 'El presupuesto debe tener una zona asignada antes de enviar a almacén' }
+      return { success: false, error: 'El presupuesto debe tener una zona asignada antes de enviar a almacén' }
     }
 
     // Actualizar estado y usuario almacén
@@ -1001,8 +1002,8 @@ export async function enviarPresupuestoAlmacenAction(presupuestoId: string) {
       .eq('estado', 'pendiente')
 
     if (error) {
-      console.error('Error enviando presupuesto a almacén:', error)
-      return { success: false, message: 'Error al enviar presupuesto a almacén' }
+      devError('Error enviando presupuesto a almacén:', error)
+      return { success: false, error: 'Error al enviar presupuesto a almacén' }
     }
 
     // Crear notificación para almacenistas
@@ -1022,7 +1023,7 @@ export async function enviarPresupuestoAlmacenAction(presupuestoId: string) {
 
   } catch (error) {
     console.error('Error en enviarPresupuestoAlmacenAction:', error)
-    return { success: false, message: 'Error interno del servidor' }
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
 
@@ -1034,7 +1035,7 @@ export async function asignarTurnoZonaPresupuestoAction(formData: FormData) {
     // Obtener usuario actual
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return { success: false, message: 'Usuario no autenticado' }
+      return { success: false, error: 'Usuario no autenticado' }
     }
 
     // Verificar permisos (vendedor o admin)
@@ -1045,7 +1046,7 @@ export async function asignarTurnoZonaPresupuestoAction(formData: FormData) {
       .single()
 
     if (!usuario || !['admin', 'vendedor'].includes(usuario.rol)) {
-      return { success: false, message: 'No tienes permisos para asignar turno y zona' }
+      return { success: false, error: 'No tienes permisos para asignar turno y zona' }
     }
 
     // Parsear datos
@@ -1056,11 +1057,11 @@ export async function asignarTurnoZonaPresupuestoAction(formData: FormData) {
     const recargo_total = formData.get('recargo_total') ? parseFloat(formData.get('recargo_total') as string) : 0
 
     if (!presupuesto_id || !turno || !zona_id) {
-      return { success: false, message: 'Faltan datos requeridos: presupuesto_id, turno, zona_id' }
+      return { success: false, error: 'Faltan datos requeridos: presupuesto_id, turno, zona_id' }
     }
 
     if (!['mañana', 'tarde'].includes(turno)) {
-      return { success: false, message: 'Turno inválido. Debe ser "mañana" o "tarde"' }
+      return { success: false, error: 'Turno inválido. Debe ser "mañana" o "tarde"' }
     }
 
     // Llamar RPC para asignar turno y zona
@@ -1073,12 +1074,12 @@ export async function asignarTurnoZonaPresupuestoAction(formData: FormData) {
     })
 
     if (error) {
-      console.error('Error asignando turno y zona:', error)
-      return { success: false, message: 'Error al asignar turno y zona' }
+      devError('Error asignando turno y zona:', error)
+      return { success: false, error: 'Error al asignar turno y zona' }
     }
 
     if (!result.success) {
-      return { success: false, message: result.error || 'Error en la asignación' }
+      return { success: false, error: result.error || 'Error en la asignación' }
     }
 
     revalidatePath('/ventas/presupuestos')
@@ -1092,7 +1093,7 @@ export async function asignarTurnoZonaPresupuestoAction(formData: FormData) {
 
   } catch (error) {
     console.error('Error en asignarTurnoZonaPresupuestoAction:', error)
-    return { success: false, message: 'Error interno del servidor' }
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
 
@@ -1104,7 +1105,7 @@ export async function convertirPresupuestoACotizacionAction(presupuestoId: strin
     // Obtener usuario actual
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return { success: false, message: 'Usuario no autenticado' }
+      return { success: false, error: 'Usuario no autenticado' }
     }
 
     // Verificar permisos (vendedor o admin)
@@ -1115,7 +1116,7 @@ export async function convertirPresupuestoACotizacionAction(presupuestoId: strin
       .single()
 
     if (!usuario || !['admin', 'vendedor'].includes(usuario.rol)) {
-      return { success: false, message: 'No tienes permisos para convertir presupuestos' }
+      return { success: false, error: 'No tienes permisos para convertir presupuestos' }
     }
 
     // Llamar RPC para convertir a cotización
@@ -1124,12 +1125,12 @@ export async function convertirPresupuestoACotizacionAction(presupuestoId: strin
     })
 
     if (error) {
-      console.error('Error convirtiendo presupuesto a cotización:', error)
-      return { success: false, message: 'Error al convertir presupuesto a cotización' }
+      devError('Error convirtiendo presupuesto a cotización:', error)
+      return { success: false, error: 'Error al convertir presupuesto a cotización' }
     }
 
     if (!result.success) {
-      return { success: false, message: result.error || 'Error en la conversión' }
+      return { success: false, error: result.error || 'Error en la conversión' }
     }
 
     revalidatePath('/ventas/presupuestos')
@@ -1143,7 +1144,7 @@ export async function convertirPresupuestoACotizacionAction(presupuestoId: strin
 
   } catch (error) {
     console.error('Error en convertirPresupuestoACotizacionAction:', error)
-    return { success: false, message: 'Error interno del servidor' }
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
 
@@ -1155,7 +1156,7 @@ export async function recalcularRecargosAction(presupuestoId: string) {
     // Obtener usuario actual
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return { success: false, message: 'Usuario no autenticado' }
+      return { success: false, error: 'Usuario no autenticado' }
     }
 
     // Obtener presupuesto con métodos de pago
@@ -1166,7 +1167,7 @@ export async function recalcularRecargosAction(presupuestoId: string) {
       .single()
 
     if (presupuestoError || !presupuesto) {
-      return { success: false, message: 'Presupuesto no encontrado' }
+      return { success: false, error: 'Presupuesto no encontrado' }
     }
 
     // Calcular recargos según métodos de pago
@@ -1191,8 +1192,8 @@ export async function recalcularRecargosAction(presupuestoId: string) {
       .eq('id', presupuestoId)
 
     if (updateError) {
-      console.error('Error actualizando recargos:', updateError)
-      return { success: false, message: 'Error al recalcular recargos' }
+      devError('Error actualizando recargos:', updateError)
+      return { success: false, error: 'Error al recalcular recargos' }
     }
 
     revalidatePath('/ventas/presupuestos')
@@ -1206,6 +1207,6 @@ export async function recalcularRecargosAction(presupuestoId: string) {
 
   } catch (error) {
     console.error('Error en recalcularRecargosAction:', error)
-    return { success: false, message: 'Error interno del servidor' }
+    return { success: false, error: 'Error interno del servidor' }
   }
 }

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { obtenerVehiculoPorId } from '@/actions/reparto.actions'
+import { obtenerVehiculoPorIdAction } from '@/actions/reparto.actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatDate } from '@/lib/utils'
 
@@ -32,7 +32,7 @@ const getEstadoConfig = (estado: string) => {
 
 export default async function VehiculoDetallePage({ params }: VehiculoDetallePageProps) {
   const { id } = await params
-  const result = await obtenerVehiculoPorId(id)
+  const result = await obtenerVehiculoPorIdAction(id)
 
   if (!result.success || !result.data) {
     notFound()

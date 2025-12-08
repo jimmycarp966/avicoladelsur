@@ -63,7 +63,7 @@ export function ValidarRutaForm({ ruta, cajas }: ValidarRutaFormProps) {
       toast.success(result.message || 'Ruta validada exitosamente')
       router.refresh()
     } else {
-      toast.error(result.message || 'Error al validar la ruta')
+      toast.error(result.error || 'Error al validar la ruta')
     }
   }
 

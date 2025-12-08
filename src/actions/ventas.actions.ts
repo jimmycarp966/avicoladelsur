@@ -14,7 +14,7 @@ import type {
 } from '@/types/api.types'
 
 // Crear cliente
-export async function crearCliente(
+export async function crearClienteAction(
   clienteData: {
     codigo: string
     nombre: string
@@ -85,7 +85,7 @@ export async function crearCliente(
 }
 
 // Crear cliente desde bot (WhatsApp)
-export async function crearClienteDesdeBot(
+export async function crearClienteDesdeBotAction(
   clienteData: {
     nombre: string
     apellido?: string
@@ -177,7 +177,7 @@ export async function crearClienteDesdeBot(
       message: 'Cliente creado exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al crear cliente desde bot:', error)
+    devError('Error al crear cliente desde bot:', error)
     return {
       success: false,
       error: error.message || 'Error al crear cliente',
@@ -186,7 +186,7 @@ export async function crearClienteDesdeBot(
 }
 
 // Eliminar cliente (soft delete)
-export async function eliminarCliente(
+export async function eliminarClienteAction(
   clienteId: string
 ): Promise<ApiResponse> {
   try {
@@ -225,7 +225,7 @@ export async function eliminarCliente(
       message: 'Cliente desactivado exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al eliminar cliente:', error)
+    devError('Error al eliminar cliente:', error)
     return {
       success: false,
       error: error.message || 'Error al eliminar cliente',
@@ -234,7 +234,7 @@ export async function eliminarCliente(
 }
 
 // Actualizar cliente
-export async function actualizarCliente(
+export async function actualizarClienteAction(
   clienteId: string,
   updates: Partial<{
     codigo?: string
@@ -302,7 +302,7 @@ export async function actualizarCliente(
       message: 'Cliente actualizado exitosamente',
     }
   } catch (error: any) {
-    console.error('Error al actualizar cliente:', error)
+    devError('Error al actualizar cliente:', error)
     return {
       success: false,
       error: error.message || 'Error al actualizar cliente',
@@ -311,7 +311,7 @@ export async function actualizarCliente(
 }
 
 // Obtener clientes
-export async function obtenerClientes(
+export async function obtenerClientesAction(
   filtros?: {
     search?: string
     zona_entrega?: string
@@ -418,7 +418,7 @@ export async function obtenerClientes(
 }
 
 // Obtener cliente por ID con estadísticas
-export async function obtenerClientePorId(
+export async function obtenerClientePorIdAction(
   clienteId: string
 ): Promise<ApiResponse<any>> {
   try {
@@ -531,7 +531,7 @@ export async function obtenerClientePorId(
 }
 
 // Crear pedido
-export async function crearPedido(
+export async function crearPedidoAction(
   params: CrearPedidoParams
 ): Promise<ApiResponse<{ pedidoId: string }>> {
   try {
@@ -593,7 +593,7 @@ export async function crearPedido(
 }
 
 // Crear pedido desde bot (usa función RPC)
-export async function crearPedidoBot(
+export async function crearPedidoBotAction(
   params: CrearPedidoBotParams
 ): Promise<ApiResponse<CrearPedidoBotResponse>> {
   try {
@@ -648,7 +648,7 @@ export async function crearPedidoBot(
 }
 
 // Actualizar estado de pedido
-export async function actualizarEstadoPedido(
+export async function actualizarEstadoPedidoAction(
   pedidoId: string,
   estado: string
 ): Promise<ApiResponse> {
@@ -682,7 +682,7 @@ export async function actualizarEstadoPedido(
 }
 
 // Crear cotización
-export async function crearCotizacion(
+export async function crearCotizacionAction(
   params: CrearCotizacionParams
 ): Promise<ApiResponse<{ cotizacionId: string }>> {
   try {
@@ -760,7 +760,7 @@ export async function crearCotizacion(
 }
 
 // Convertir cotización a pedido
-export async function convertirCotizacionAPedido(
+export async function convertirCotizacionAPedidoAction(
   cotizacionId: string
 ): Promise<ApiResponse<{ pedidoId: string }>> {
   try {
@@ -841,7 +841,7 @@ export async function convertirCotizacionAPedido(
 }
 
 // Crear reclamo
-export async function crearReclamo(
+export async function crearReclamoAction(
   params: CrearReclamoParams
 ): Promise<ApiResponse<{ reclamoId: string }>> {
   try {
@@ -880,7 +880,7 @@ export async function crearReclamo(
 }
 
 // Crear reclamo desde bot
-export async function crearReclamoBot(
+export async function crearReclamoBotAction(
   params: CrearReclamoBotParams
 ): Promise<ApiResponse<{ reclamoId: string }>> {
   try {
@@ -920,7 +920,7 @@ export async function crearReclamoBot(
 }
 
 // Obtener reclamos con filtros
-export async function obtenerReclamos(
+export async function obtenerReclamosAction(
   filtros?: {
     search?: string
     cliente_id?: string
@@ -1023,7 +1023,7 @@ export async function obtenerReclamos(
 }
 
 // Actualizar estado de reclamo
-export async function actualizarEstadoReclamo(
+export async function actualizarEstadoReclamoAction(
   reclamoId: string,
   estado: string,
   solucion?: string
@@ -1064,7 +1064,7 @@ export async function actualizarEstadoReclamo(
 }
 
 // Obtener lista de pedidos
-export async function obtenerPedidos(
+export async function obtenerPedidosAction(
   filtros?: {
     search?: string
     estado?: string
@@ -1138,7 +1138,7 @@ export async function obtenerPedidos(
 }
 
 // Obtener detalle de pedido
-export async function obtenerPedidoPorId(pedidoId: string): Promise<ApiResponse<any>> {
+export async function obtenerPedidoPorIdAction(pedidoId: string): Promise<ApiResponse<any>> {
   try {
     const supabase = await createClient()
 
@@ -1161,7 +1161,7 @@ export async function obtenerPedidoPorId(pedidoId: string): Promise<ApiResponse<
       data: resultado.data,
     }
   } catch (error: any) {
-    devError('obtenerPedidoPorId', error)
+    devError('obtenerPedidoPorIdAction', error)
     return {
       success: false,
       error: error.message || 'Error al obtener el pedido',

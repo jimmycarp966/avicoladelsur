@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, Loader2, Save, Star, User, Building } from 'lucide-react'
 import Link from 'next/link'
 import { evaluacionSchema, type EvaluacionFormData } from '@/lib/schemas/rrhh.schema'
-import { crearEvaluacion } from '@/actions/rrhh.actions'
+import { crearEvaluacionAction } from '@/actions/rrhh.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 import { createClient } from '@/lib/supabase/client'
 import type { Empleado, Sucursal } from '@/types/domain.types'
@@ -129,7 +129,7 @@ export function NuevaEvaluacionForm() {
     try {
       setIsLoading(true)
 
-      const result = await crearEvaluacion(data)
+      const result = await crearEvaluacionAction(data)
 
       if (result.success) {
         showToast(

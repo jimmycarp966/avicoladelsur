@@ -6,8 +6,8 @@ import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { ArrowLeft, Edit, Truck, FileText, Printer, User, MapPin, CheckCircle, Wallet, Users, Clock, Scale, Navigation } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { obtenerPedidoPorId } from '@/actions/ventas.actions'
-import { listarCajas } from '@/actions/tesoreria.actions'
+import { obtenerPedidoPorIdAction } from '@/actions/ventas.actions'
+import { listarCajasAction } from '@/actions/tesoreria.actions'
 import { RegistrarPagoPedidoForm } from '@/components/forms/RegistrarPagoPedidoForm'
 import { EntregasPedido } from '@/components/pedidos/EntregasPedido'
 import { PasarARutaButton } from '@/components/pedidos/PasarARutaButton'
@@ -47,7 +47,7 @@ const estadoCierreConfig = (estado: string) => {
 export default async function PedidoDetallePage({ params }: PedidoDetallePageProps) {
   const { id } = await params
   const pedidoId = id
-  const [pedidoResult, cajas] = await Promise.all([obtenerPedidoPorId(pedidoId), listarCajas()])
+  const [pedidoResult, cajas] = await Promise.all([obtenerPedidoPorIdAction(pedidoId), listarCajasAction()])
 
   if (!pedidoResult.success || !pedidoResult.data?.pedido) {
     notFound()

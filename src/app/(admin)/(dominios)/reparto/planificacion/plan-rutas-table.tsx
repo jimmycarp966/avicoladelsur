@@ -31,7 +31,7 @@ export default function PlanRutasTable({ plan, diasSemana }: PlanRutasTableProps
       if (result?.success) {
         toast.success('Plan eliminado')
       } else {
-        toast.error(result?.message || 'No se pudo eliminar')
+        toast.error(result?.error || 'No se pudo eliminar')
       }
     })
   }

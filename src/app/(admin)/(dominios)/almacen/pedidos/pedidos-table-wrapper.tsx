@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { PedidosTable } from '@/components/tables/PedidosTable'
 import { useNotificationStore } from '@/store/notificationStore'
-import { obtenerPedidos } from '@/actions/ventas.actions'
-import { asignarPedidoARutaDesdeAlmacen, generarRutaDiariaAutomatica } from '@/actions/reparto.actions'
+import { obtenerPedidosAction } from '@/actions/ventas.actions'
+import { asignarPedidoARutaDesdeAlmacen, generarRutaDiariaAutomaticaAction } from '@/actions/reparto.actions'
 import { PedidosFiltros } from './pedidos-filtros'
 import { GenerarRutaModal } from '@/components/reparto/GenerarRutaModal'
 import { Button } from '@/components/ui/button'
@@ -39,7 +39,7 @@ export function PedidosTableWrapper() {
       if (turno && turno !== 'all') {
         filtros.turno = turno
       }
-      const result = await obtenerPedidos(filtros)
+      const result = await obtenerPedidosAction(filtros)
       if (!isMountedRef.current) return
       
       if (result.success && result.data) {
@@ -81,8 +81,8 @@ export function PedidosTableWrapper() {
   const handleDelete = async (pedido: Pedido) => {
     if (confirm(`¿Estás seguro de que quieres cancelar el pedido ${pedido.numero_pedido}?`)) {
       try {
-        const { actualizarEstadoPedido } = await import('@/actions/ventas.actions')
-        const result = await actualizarEstadoPedido(pedido.id, 'cancelado')
+        const { actualizarEstadoPedidoAction } = await import('@/actions/ventas.actions')
+        const result = await actualizarEstadoPedidoAction(pedido.id, 'cancelado')
         if (result.success) {
           await loadPedidos()
           showToast('success', result.message || `Pedido ${pedido.numero_pedido} cancelado exitosamente`)
@@ -98,8 +98,8 @@ export function PedidosTableWrapper() {
 
   const handleDeliver = async (pedido: Pedido) => {
     try {
-      const { actualizarEstadoPedido } = await import('@/actions/ventas.actions')
-      const result = await actualizarEstadoPedido(pedido.id, 'entregado')
+      const { actualizarEstadoPedidoAction } = await import('@/actions/ventas.actions')
+      const result = await actualizarEstadoPedidoAction(pedido.id, 'entregado')
       if (result.success) {
         await loadPedidos()
         showToast('success', result.message || `Pedido ${pedido.numero_pedido} marcado como entregado`)
@@ -155,7 +155,7 @@ export function PedidosTableWrapper() {
     setIsGenerandoAutomatica(true)
 
     try {
-      const result = await generarRutaDiariaAutomatica(fecha, turno)
+      const result = await generarRutaDiariaAutomaticaAction(fecha, turno)
 
       if (result.success) {
         showToast('success', result.message || 'Rutas generadas exitosamente')

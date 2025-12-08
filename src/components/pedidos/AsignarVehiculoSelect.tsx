@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/select'
 import { Loader2, Truck, AlertTriangle } from 'lucide-react'
 import { useNotificationStore } from '@/store/notificationStore'
-import { obtenerVehiculos } from '@/actions/reparto.actions'
+import { obtenerVehiculosAction } from '@/actions/reparto.actions'
 import { asignarPedidoARutaConVehiculo } from '@/actions/reparto.actions'
 
 interface Vehiculo {
@@ -54,7 +54,7 @@ export function AsignarVehiculoSelect({
     const cargarVehiculos = async () => {
       setLoadingVehiculos(true)
       try {
-        const result = await obtenerVehiculos()
+        const result = await obtenerVehiculosAction()
         if (result.success && result.data) {
           setVehiculos(result.data)
         }

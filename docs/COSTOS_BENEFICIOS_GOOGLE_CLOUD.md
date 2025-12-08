@@ -33,7 +33,7 @@ Ejemplo real en tu negocio:
 - Este sistema calcula la ruta perfecta: evita tráfico, calles cortadas, y elige caminos más rápidos
 - Resultado: tus camiones recorren un 20-30% menos de kilómetros
 
-### Beneficios que vas a notar en tu bolsillo
+### Beneficios que vas a ver en tu bolsillo
 
 1. Menos combustible: imagina ahorrar $50-100 pesos por camión cada día
 2. Entregas más rápidas: tus clientes reciben el pollo más fresco
@@ -68,7 +68,7 @@ Ejemplo real en tu negocio:
 - Otro camión lleva medicinas a 5 criaderos
 - Este sistema organiza todo para que los camiones hagan el recorrido más corto posible
 
-### Beneficios que vas a notar en tu bolsillo
+### Beneficios que vas a ver en tu bolsillo
 
 1. Menos kilómetros recorridos: tus camiones gastan menos combustible y aceite
 2. Más eficiencia: un mismo camión puede hacer más tareas en un día
@@ -101,7 +101,7 @@ Imagina que tienes **un vendedor estrella trabajando 24 horas al día** en Whats
 - Si el cliente quiere hacer un pedido, el chatbot lo toma y lo registra
 - Hasta puede llamar al cliente si hay algún problema
 
-### Beneficios que vas a notar en tu bolsillo
+### Beneficios que vas a ver en tu bolsillo
 
 1. **Ventas las 24 horas:** Imagina vender pollo a las 3 AM a alguien que trabaja de noche
 2. **Menos llamadas telefónicas:** Tu teléfono suena menos, tus empleados descansan más
@@ -135,7 +135,7 @@ Piensa en este como **un secretario que graba todas tus llamadas y las convierte
 - Después puedes buscar "pollo en mal estado" y encontrar esa llamada específica
 - También puede detectar si el cliente estaba muy enojado
 
-### Beneficios que vas a notar en tu bolsillo
+### Beneficios que vas a ver en tu bolsillo
 
 1. **Registro perfecto de quejas:** Nunca más "no me acuerdo qué dijo el cliente"
 2. **Auditorías más fáciles:** Cuando venga el inspector de SENASA, tienes todo registrado
@@ -169,7 +169,7 @@ Este es como tener **un contador que lee documentos a la velocidad de la luz**. 
 - Sacas una foto con tu teléfono y el sistema lee: proveedor, monto, fecha, productos
 - Todo se ingresa automáticamente a tu ERP
 
-### Beneficios que vas a notar en tu bolsillo
+### Beneficios que vas a ver en tu bolsillo
 
 1. **Tiempo ahorrado:** De horas de digitación a segundos
 2. **Cero errores:** Nunca más "me equivoqué al tipear el monto"
@@ -202,7 +202,7 @@ Imagina que tienes **un experto en avicultura que analiza años de datos** y te 
 - Te avisa: "Compra más alimento balanceado, se va a acabar en 3 días"
 - Te sugiere: "Baja el precio del pollo entero los martes, vendes 30% más"
 
-### Beneficios que vas a notar en tu bolsillo
+### Beneficios que vas a ver en tu bolsillo
 
 1. **Menos productos desperdiciados:** Sabes exactamente cuánto comprar
 2. **Más ventas:** Precios óptimos en el momento justo
@@ -236,7 +236,7 @@ Este es como tener **un asistente personal súper inteligente** que puede hacer 
 - Te ayuda a decidir: "¿Debería bajar precios este mes?"
 - Crea reportes mensuales automáticamente
 
-### Beneficios que vas a notar en tu bolsillo
+### Beneficios que vas a ver en tu bolsillo
 
 1. **Menos tiempo escribiendo:** De horas escribiendo emails a minutos
 2. **Reportes perfectos:** Siempre bien escritos y completos
@@ -291,7 +291,7 @@ Vamos a hablar en pesos argentinos porque es más fácil de entender:
 
 ---
 
-## ¡La mejor parte: empezás gratis!
+## La mejor parte: empezás gratis
 
 ### Créditos gratuitos que te dan
 - **$300 dólares GRATIS** para probar todo
@@ -313,16 +313,16 @@ Vamos a hablar en pesos argentinos porque es más fácil de entender:
 
 Vamos a ser bien honestos con números realistas para tu negocio avícola:
 
-### 🌱 Para un negocio pequeño (2-3 camiones, ventas locales)
+### Para un negocio pequeño (2-3 camiones, ventas locales)
 - **Total aproximado: $76/mes** ($900/año)
 - Usas poco cada servicio, te alcanza con lo gratis
 
-### 🐔 Para un negocio mediano (como Avícola del Sur)
+### Para un negocio mediano (como Avícola del Sur)
 - **Total aproximado: $224/mes** ($2,700/año)
 - Usas todos los servicios regularmente
 - **Ahorras fácilmente $50,000/mes** (¡vale la pena!)
 
-### 🏭 Para un negocio grande (mucha expansión)
+### Para un negocio grande (mucha expansión)
 - **Total aproximado: $450/mes** ($5,400/año)
 - Usas todo al máximo, pero los descuentos te ayudan
 
@@ -420,19 +420,19 @@ Vamos a ser bien honestos con números realistas para tu negocio avícola:
 
 ## Conclusión: ¿Listo para modernizar tu avícola?
 
-Este sistema no es "gastos extra", es **una inversión que se paga sola**. Imaginate:
+Este sistema no es un gasto extra, es una inversión que se paga sola. Pensá:
 
-- **Tus empleados** felices porque hacen trabajo más interesante
-- **Tus clientes** encantados con el servicio 24/7
-- **Tu bolsillo** más lleno por ahorros y más ventas
-- **Tu negocio** preparado para competir con los grandes
+- Tus empleados contentos porque hacen trabajo más interesante
+- Tus clientes contentos con el servicio las 24 horas
+- Tu bolsillo más lleno por los ahorros y más ventas
+- Tu negocio preparado para competir con los más grandes
 
-**Inversión inicial: Casi nada (gracias a los $300 gratis)**
-**Ahorro mensual: Miles de pesos**
-**Resultado: Un negocio más moderno, eficiente y rentable**
+Inversión inicial: casi nada (gracias a los $300 gratis)
+Ahorro mensual: miles de pesos
+Resultado: un negocio más moderno, eficiente y rentable
 
 ---
 
 *Los precios pueden variar ligeramente, pero Google avisa con anticipación de cualquier cambio. Este documento se actualiza regularmente.*
 
-**¿Querés que te explique algún punto específico o empezamos con una demo gratis?**
+¿Querés que te explique algún punto específico o empezamos con una prueba gratis?

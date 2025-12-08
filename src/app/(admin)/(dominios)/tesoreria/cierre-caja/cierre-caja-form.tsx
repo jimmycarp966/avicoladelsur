@@ -44,7 +44,7 @@ export function CierreCajaForm({ cajas }: CierreCajaFormProps) {
         setCajaId('')
         router.refresh()
       } else {
-        toast.error(result.message || 'Error al crear cierre de caja')
+        toast.error(result.error || 'Error al crear cierre de caja')
       }
     } catch (error) {
       toast.error('Error inesperado al crear cierre de caja')

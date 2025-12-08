@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { EditarRutaForm } from './editar-ruta-form'
-import { obtenerRutaPorId } from '@/actions/reparto.actions'
+import { obtenerRutaPorIdAction } from '@/actions/reparto.actions'
 import { createClient } from '@/lib/supabase/server'
 import { Loader2 } from 'lucide-react'
 
@@ -20,7 +20,7 @@ export const metadata = {
 }
 
 async function EditarRutaContent({ rutaId }: { rutaId: string }) {
-  const rutaResult = await obtenerRutaPorId(rutaId)
+  const rutaResult = await obtenerRutaPorIdAction(rutaId)
 
   if (!rutaResult.success || !rutaResult.data) {
     notFound()

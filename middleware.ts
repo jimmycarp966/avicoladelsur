@@ -169,8 +169,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/unauthorized', request.url))
   }
 
-  if (isDeliveryRoute && !['admin'].includes(userRole)) {
-    // Solo admin puede gestionar rutas, pero repartidores tienen su propia app
+  if (isDeliveryRoute && !['admin', 'vendedor', 'almacenista'].includes(userRole)) {
+    // Admin puede gestionar rutas, vendedor y almacenista solo pueden ver (RLS limita permisos)
     return NextResponse.redirect(new URL('/unauthorized', request.url))
   }
 

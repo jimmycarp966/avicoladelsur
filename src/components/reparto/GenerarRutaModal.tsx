@@ -15,7 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Loader2, Truck, Package, MapPin, Clock } from 'lucide-react'
-import { generarRutaDiariaManual } from '@/actions/reparto.actions'
+import { generarRutaDiariaManualAction } from '@/actions/reparto.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 import type { Pedido } from '@/types/domain.types'
 
@@ -115,7 +115,7 @@ export function GenerarRutaModal({
     setIsLoading(true)
 
     try {
-      const result = await generarRutaDiariaManual(
+      const result = await generarRutaDiariaManualAction(
         Array.from(pedidosSeleccionados),
         fecha,
         zonaId,

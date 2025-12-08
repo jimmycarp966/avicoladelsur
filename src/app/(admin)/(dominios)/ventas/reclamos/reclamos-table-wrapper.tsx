@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ReclamosTable } from '@/components/tables/ReclamosTable'
 import { useNotificationStore } from '@/store/notificationStore'
-import { obtenerReclamos } from '@/actions/ventas.actions'
+import { obtenerReclamosAction } from '@/actions/ventas.actions'
 import type { Reclamo } from '@/types/domain.types'
 
 interface ReclamoCompleto extends Reclamo {
@@ -37,7 +37,7 @@ export function ReclamosTableWrapper() {
       if (searchParams.get('fecha_hasta')) filtros.fecha_hasta = searchParams.get('fecha_hasta')
       if (searchParams.get('search')) filtros.search = searchParams.get('search')
 
-      const result = await obtenerReclamos(filtros)
+      const result = await obtenerReclamosAction(filtros)
 
       if (result.success && result.data) {
         setReclamos(Array.isArray(result.data) ? result.data : [])

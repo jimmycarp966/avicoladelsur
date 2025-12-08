@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { registrarPagoPedido } from '@/actions/tesoreria.actions'
+import { registrarPagoPedidoAction } from '@/actions/tesoreria.actions'
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
   try {
     const payload = await request.json()
     if (payload.action === 'registrarPago') {
-      const result = await registrarPagoPedido({
+      const result = await registrarPagoPedidoAction({
         pedido_id: payload.pedido_id,
         caja_id: payload.caja_id,
         monto: payload.monto,

@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { CalendarDays, Calculator, Users, ArrowLeft, Loader2, Save } from 'lucide-react'
 import Link from 'next/link'
 import { licenciaSchema, type LicenciaFormData } from '@/lib/schemas/rrhh.schema'
-import { crearLicencia } from '@/actions/rrhh.actions'
+import { crearLicenciaAction } from '@/actions/rrhh.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 import { createClient } from '@/lib/supabase/client'
 import type { Empleado } from '@/types/domain.types'
@@ -78,7 +78,7 @@ export function NuevaLicenciaForm() {
     try {
       setIsLoading(true)
 
-      const result = await crearLicencia(data)
+      const result = await crearLicenciaAction(data)
 
       if (result.success) {
         showToast(

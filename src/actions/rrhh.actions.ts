@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { devError } from '@/lib/utils/logger'
 import type { ApiResponse } from '@/types/api.types'
 
 // ===========================================
@@ -10,7 +11,7 @@ import type { ApiResponse } from '@/types/api.types'
 
 // ========== EMPLEADOS ==========
 
-export async function crearEmpleado(
+export async function crearEmpleadoAction(
   empleadoData: {
     usuario_id?: string
     sucursal_id?: string
@@ -94,7 +95,7 @@ export async function crearEmpleado(
       .single()
 
     if (error) {
-      console.error('Error al crear empleado:', error)
+      devError('Error al crear empleado:', error)
       return {
         success: false,
         error: 'Error al crear empleado: ' + error.message,
@@ -110,7 +111,7 @@ export async function crearEmpleado(
       message: 'Empleado creado exitosamente',
     }
   } catch (error) {
-    console.error('Error en crearEmpleado:', error)
+    devError('Error en crearEmpleado:', error)
     return {
       success: false,
       error: 'Error interno del servidor',
@@ -118,7 +119,7 @@ export async function crearEmpleado(
   }
 }
 
-export async function actualizarEmpleado(
+export async function actualizarEmpleadoAction(
   empleadoId: string,
   empleadoData: {
     usuario_id?: string
@@ -204,7 +205,7 @@ export async function actualizarEmpleado(
       .single()
 
     if (error) {
-      console.error('Error al actualizar empleado:', error)
+      devError('Error al actualizar empleado:', error)
       return {
         success: false,
         error: 'Error al actualizar empleado: ' + error.message,
@@ -220,7 +221,7 @@ export async function actualizarEmpleado(
       message: 'Empleado actualizado exitosamente',
     }
   } catch (error) {
-    console.error('Error en actualizarEmpleado:', error)
+    devError('Error en actualizarEmpleado:', error)
     return {
       success: false,
       error: 'Error interno del servidor',
@@ -228,7 +229,7 @@ export async function actualizarEmpleado(
   }
 }
 
-export async function eliminarEmpleado(empleadoId: string): Promise<ApiResponse<void>> {
+export async function eliminarEmpleadoAction(empleadoId: string): Promise<ApiResponse<void>> {
   try {
     const supabase = await createClient()
 
@@ -265,7 +266,7 @@ export async function eliminarEmpleado(empleadoId: string): Promise<ApiResponse<
       .eq('id', empleadoId)
 
     if (error) {
-      console.error('Error al eliminar empleado:', error)
+      devError('Error al eliminar empleado:', error)
       return {
         success: false,
         error: 'Error al eliminar empleado: ' + error.message,
@@ -279,7 +280,7 @@ export async function eliminarEmpleado(empleadoId: string): Promise<ApiResponse<
       message: 'Empleado eliminado exitosamente',
     }
   } catch (error) {
-    console.error('Error en eliminarEmpleado:', error)
+    devError('Error en eliminarEmpleado:', error)
     return {
       success: false,
       error: 'Error interno del servidor',
@@ -289,7 +290,7 @@ export async function eliminarEmpleado(empleadoId: string): Promise<ApiResponse<
 
 // ========== NOVEDADES ==========
 
-export async function crearNovedad(
+export async function crearNovedadAction(
   novedadData: {
     titulo: string
     descripcion?: string
@@ -327,7 +328,7 @@ export async function crearNovedad(
       .single()
 
     if (error) {
-      console.error('Error al crear novedad:', error)
+      devError('Error al crear novedad:', error)
       return {
         success: false,
         error: 'Error al crear novedad: ' + error.message,
@@ -342,7 +343,7 @@ export async function crearNovedad(
       message: 'Novedad creada exitosamente',
     }
   } catch (error) {
-    console.error('Error en crearNovedad:', error)
+    devError('Error en crearNovedad:', error)
     return {
       success: false,
       error: 'Error interno del servidor',
@@ -350,7 +351,7 @@ export async function crearNovedad(
   }
 }
 
-export async function actualizarNovedad(
+export async function actualizarNovedadAction(
   novedadId: string,
   novedadData: {
     titulo?: string
@@ -375,7 +376,7 @@ export async function actualizarNovedad(
       .single()
 
     if (error) {
-      console.error('Error al actualizar novedad:', error)
+      devError('Error al actualizar novedad:', error)
       return {
         success: false,
         error: 'Error al actualizar novedad: ' + error.message,
@@ -391,7 +392,7 @@ export async function actualizarNovedad(
       message: 'Novedad actualizada exitosamente',
     }
   } catch (error) {
-    console.error('Error en actualizarNovedad:', error)
+    devError('Error en actualizarNovedad:', error)
     return {
       success: false,
       error: 'Error interno del servidor',
@@ -399,7 +400,7 @@ export async function actualizarNovedad(
   }
 }
 
-export async function eliminarNovedad(novedadId: string): Promise<ApiResponse<void>> {
+export async function eliminarNovedadAction(novedadId: string): Promise<ApiResponse<void>> {
   try {
     const supabase = await createClient()
 
@@ -409,7 +410,7 @@ export async function eliminarNovedad(novedadId: string): Promise<ApiResponse<vo
       .eq('id', novedadId)
 
     if (error) {
-      console.error('Error al eliminar novedad:', error)
+      devError('Error al eliminar novedad:', error)
       return {
         success: false,
         error: 'Error al eliminar novedad: ' + error.message,
@@ -423,7 +424,7 @@ export async function eliminarNovedad(novedadId: string): Promise<ApiResponse<vo
       message: 'Novedad eliminada exitosamente',
     }
   } catch (error) {
-    console.error('Error en eliminarNovedad:', error)
+    devError('Error en eliminarNovedad:', error)
     return {
       success: false,
       error: 'Error interno del servidor',
@@ -433,7 +434,7 @@ export async function eliminarNovedad(novedadId: string): Promise<ApiResponse<vo
 
 // ========== ASISTENCIA ==========
 
-export async function marcarAsistencia(
+export async function marcarAsistenciaAction(
   asistenciaData: {
     empleado_id: string
     fecha: string
@@ -456,7 +457,7 @@ export async function marcarAsistencia(
       })
 
     if (error) {
-      console.error('Error al marcar asistencia:', error)
+      devError('Error al marcar asistencia:', error)
       return {
         success: false,
         error: 'Error al marcar asistencia: ' + error.message,
@@ -471,7 +472,7 @@ export async function marcarAsistencia(
       message: 'Asistencia registrada exitosamente',
     }
   } catch (error) {
-    console.error('Error en marcarAsistencia:', error)
+    devError('Error en marcarAsistencia:', error)
     return {
       success: false,
       error: 'Error interno del servidor',
@@ -479,7 +480,7 @@ export async function marcarAsistencia(
   }
 }
 
-export async function actualizarAsistencia(
+export async function actualizarAsistenciaAction(
   asistenciaId: string,
   asistenciaData: {
     hora_entrada?: string
@@ -501,7 +502,7 @@ export async function actualizarAsistencia(
       .single()
 
     if (error) {
-      console.error('Error al actualizar asistencia:', error)
+      devError('Error al actualizar asistencia:', error)
       return {
         success: false,
         error: 'Error al actualizar asistencia: ' + error.message,
@@ -516,7 +517,7 @@ export async function actualizarAsistencia(
       message: 'Asistencia actualizada exitosamente',
     }
   } catch (error) {
-    console.error('Error en actualizarAsistencia:', error)
+    devError('Error en actualizarAsistencia:', error)
     return {
       success: false,
       error: 'Error interno del servidor',
@@ -526,7 +527,7 @@ export async function actualizarAsistencia(
 
 // ========== ADELANTOS ==========
 
-export async function crearAdelanto(
+export async function crearAdelantoAction(
   adelantoData: {
     empleado_id: string
     tipo: 'dinero' | 'producto'
@@ -559,7 +560,7 @@ export async function crearAdelanto(
         })
 
       if (validationError) {
-        console.error('Error al validar límite de adelanto:', validationError)
+        devError('Error al validar límite de adelanto:', validationError)
         return {
           success: false,
           error: 'Error al validar límite de adelanto',
@@ -585,7 +586,7 @@ export async function crearAdelanto(
       .single()
 
     if (error) {
-      console.error('Error al crear adelanto:', error)
+      devError('Error al crear adelanto:', error)
       return {
         success: false,
         error: 'Error al crear adelanto: ' + error.message,
@@ -600,7 +601,7 @@ export async function crearAdelanto(
       message: 'Adelanto creado exitosamente, pendiente de aprobación',
     }
   } catch (error) {
-    console.error('Error en crearAdelanto:', error)
+    devError('Error en crearAdelanto:', error)
     return {
       success: false,
       error: 'Error interno del servidor',
@@ -608,7 +609,7 @@ export async function crearAdelanto(
   }
 }
 
-export async function aprobarAdelanto(
+export async function aprobarAdelantoAction(
   adelantoId: string,
   aprobadoPor: string
 ): Promise<ApiResponse<void>> {
@@ -627,7 +628,7 @@ export async function aprobarAdelanto(
       .single()
 
     if (error) {
-      console.error('Error al aprobar adelanto:', error)
+      devError('Error al aprobar adelanto:', error)
       return {
         success: false,
         error: 'Error al aprobar adelanto: ' + error.message,
@@ -641,7 +642,7 @@ export async function aprobarAdelanto(
       message: 'Adelanto aprobado exitosamente',
     }
   } catch (error) {
-    console.error('Error en aprobarAdelanto:', error)
+    devError('Error en aprobarAdelanto:', error)
     return {
       success: false,
       error: 'Error interno del servidor',
@@ -649,7 +650,7 @@ export async function aprobarAdelanto(
   }
 }
 
-export async function rechazarAdelanto(adelantoId: string): Promise<ApiResponse<void>> {
+export async function rechazarAdelantoAction(adelantoId: string): Promise<ApiResponse<void>> {
   try {
     const supabase = await createClient()
 
@@ -659,7 +660,7 @@ export async function rechazarAdelanto(adelantoId: string): Promise<ApiResponse<
       .eq('id', adelantoId)
 
     if (error) {
-      console.error('Error al rechazar adelanto:', error)
+      devError('Error al rechazar adelanto:', error)
       return {
         success: false,
         error: 'Error al rechazar adelanto: ' + error.message,
@@ -673,7 +674,7 @@ export async function rechazarAdelanto(adelantoId: string): Promise<ApiResponse<
       message: 'Adelanto rechazado exitosamente',
     }
   } catch (error) {
-    console.error('Error en rechazarAdelanto:', error)
+    devError('Error en rechazarAdelanto:', error)
     return {
       success: false,
       error: 'Error interno del servidor',
@@ -683,7 +684,7 @@ export async function rechazarAdelanto(adelantoId: string): Promise<ApiResponse<
 
 // ========== LIQUIDACIONES ==========
 
-export async function calcularLiquidacionMensual(
+export async function calcularLiquidacionMensualAction(
   empleadoId: string,
   mes: number,
   anio: number
@@ -709,7 +710,7 @@ export async function calcularLiquidacionMensual(
       })
 
     if (error) {
-      console.error('Error al calcular liquidación:', error)
+      devError('Error al calcular liquidación:', error)
       return {
         success: false,
         error: 'Error al calcular liquidación: ' + error.message,
@@ -724,7 +725,7 @@ export async function calcularLiquidacionMensual(
       message: 'Liquidación calculada exitosamente',
     }
   } catch (error) {
-    console.error('Error en calcularLiquidacionMensual:', error)
+    devError('Error en calcularLiquidacionMensual:', error)
     return {
       success: false,
       error: 'Error interno del servidor',
@@ -732,7 +733,7 @@ export async function calcularLiquidacionMensual(
   }
 }
 
-export async function aprobarLiquidacion(liquidacionId: string): Promise<ApiResponse<void>> {
+export async function aprobarLiquidacionAction(liquidacionId: string): Promise<ApiResponse<void>> {
   try {
     const supabase = await createClient()
 
@@ -757,7 +758,7 @@ export async function aprobarLiquidacion(liquidacionId: string): Promise<ApiResp
       .single()
 
     if (error) {
-      console.error('Error al aprobar liquidación:', error)
+      devError('Error al aprobar liquidación:', error)
       return {
         success: false,
         error: 'Error al aprobar liquidación: ' + error.message,
@@ -771,7 +772,7 @@ export async function aprobarLiquidacion(liquidacionId: string): Promise<ApiResp
       message: 'Liquidación aprobada exitosamente',
     }
   } catch (error) {
-    console.error('Error en aprobarLiquidacion:', error)
+    devError('Error en aprobarLiquidacion:', error)
     return {
       success: false,
       error: 'Error interno del servidor',
@@ -779,7 +780,7 @@ export async function aprobarLiquidacion(liquidacionId: string): Promise<ApiResp
   }
 }
 
-export async function marcarLiquidacionPagada(liquidacionId: string): Promise<ApiResponse<void>> {
+export async function marcarLiquidacionPagadaAction(liquidacionId: string): Promise<ApiResponse<void>> {
   try {
     const supabase = await createClient()
 
@@ -795,7 +796,7 @@ export async function marcarLiquidacionPagada(liquidacionId: string): Promise<Ap
       .single()
 
     if (error) {
-      console.error('Error al marcar liquidación como pagada:', error)
+      devError('Error al marcar liquidación como pagada:', error)
       return {
         success: false,
         error: 'Error al marcar liquidación como pagada: ' + error.message,
@@ -809,7 +810,7 @@ export async function marcarLiquidacionPagada(liquidacionId: string): Promise<Ap
       message: 'Liquidación marcada como pagada exitosamente',
     }
   } catch (error) {
-    console.error('Error en marcarLiquidacionPagada:', error)
+    devError('Error en marcarLiquidacionPagada:', error)
     return {
       success: false,
       error: 'Error interno del servidor',
@@ -819,7 +820,7 @@ export async function marcarLiquidacionPagada(liquidacionId: string): Promise<Ap
 
 // ========== LICENCIAS ==========
 
-export async function crearLicencia(
+export async function crearLicenciaAction(
   licenciaData: {
     empleado_id: string
     tipo: 'vacaciones' | 'enfermedad' | 'maternidad' | 'estudio' | 'otro'
@@ -847,7 +848,7 @@ export async function crearLicencia(
       .single()
 
     if (error) {
-      console.error('Error al crear licencia:', error)
+      devError('Error al crear licencia:', error)
       return {
         success: false,
         error: 'Error al crear licencia: ' + error.message,
@@ -862,7 +863,7 @@ export async function crearLicencia(
       message: 'Licencia creada exitosamente, pendiente de aprobación',
     }
   } catch (error) {
-    console.error('Error en crearLicencia:', error)
+    devError('Error en crearLicencia:', error)
     return {
       success: false,
       error: 'Error interno del servidor',
@@ -870,7 +871,7 @@ export async function crearLicencia(
   }
 }
 
-export async function aprobarLicencia(licenciaId: string): Promise<ApiResponse<void>> {
+export async function aprobarLicenciaAction(licenciaId: string): Promise<ApiResponse<void>> {
   try {
     const supabase = await createClient()
 
@@ -895,7 +896,7 @@ export async function aprobarLicencia(licenciaId: string): Promise<ApiResponse<v
       .single()
 
     if (error) {
-      console.error('Error al aprobar licencia:', error)
+      devError('Error al aprobar licencia:', error)
       return {
         success: false,
         error: 'Error al aprobar licencia: ' + error.message,
@@ -909,7 +910,7 @@ export async function aprobarLicencia(licenciaId: string): Promise<ApiResponse<v
       message: 'Licencia aprobada exitosamente',
     }
   } catch (error) {
-    console.error('Error en aprobarLicencia:', error)
+    devError('Error en aprobarLicencia:', error)
     return {
       success: false,
       error: 'Error interno del servidor',
@@ -919,7 +920,7 @@ export async function aprobarLicencia(licenciaId: string): Promise<ApiResponse<v
 
 // ========== DESCUENTOS ==========
 
-export async function crearDescuento(
+export async function crearDescuentoAction(
   descuentoData: {
     empleado_id: string
     tipo: 'multa' | 'daño_equipo' | 'otro'
@@ -952,7 +953,7 @@ export async function crearDescuento(
       .single()
 
     if (error) {
-      console.error('Error al crear descuento:', error)
+      devError('Error al crear descuento:', error)
       return {
         success: false,
         error: 'Error al crear descuento: ' + error.message,
@@ -967,7 +968,7 @@ export async function crearDescuento(
       message: 'Descuento creado exitosamente, pendiente de aprobación',
     }
   } catch (error) {
-    console.error('Error en crearDescuento:', error)
+    devError('Error en crearDescuento:', error)
     return {
       success: false,
       error: 'Error interno del servidor',
@@ -975,7 +976,7 @@ export async function crearDescuento(
   }
 }
 
-export async function aprobarDescuento(descuentoId: string): Promise<ApiResponse<void>> {
+export async function aprobarDescuentoAction(descuentoId: string): Promise<ApiResponse<void>> {
   try {
     const supabase = await createClient()
 
@@ -1000,7 +1001,7 @@ export async function aprobarDescuento(descuentoId: string): Promise<ApiResponse
       .single()
 
     if (error) {
-      console.error('Error al aprobar descuento:', error)
+      devError('Error al aprobar descuento:', error)
       return {
         success: false,
         error: 'Error al aprobar descuento: ' + error.message,
@@ -1014,7 +1015,7 @@ export async function aprobarDescuento(descuentoId: string): Promise<ApiResponse
       message: 'Descuento aprobado exitosamente',
     }
   } catch (error) {
-    console.error('Error en aprobarDescuento:', error)
+    devError('Error en aprobarDescuento:', error)
     return {
       success: false,
       error: 'Error interno del servidor',
@@ -1024,7 +1025,7 @@ export async function aprobarDescuento(descuentoId: string): Promise<ApiResponse
 
 // ========== EVALUACIONES ==========
 
-export async function crearEvaluacion(
+export async function crearEvaluacionAction(
   evaluacionData: {
     empleado_id: string
     sucursal_id: string
@@ -1083,7 +1084,7 @@ export async function crearEvaluacion(
       .single()
 
     if (error) {
-      console.error('Error al crear evaluación:', error)
+      devError('Error al crear evaluación:', error)
       return {
         success: false,
         error: 'Error al crear evaluación: ' + error.message,
@@ -1098,7 +1099,7 @@ export async function crearEvaluacion(
       message: 'Evaluación creada exitosamente',
     }
   } catch (error) {
-    console.error('Error en crearEvaluacion:', error)
+    devError('Error en crearEvaluacion:', error)
     return {
       success: false,
       error: 'Error interno del servidor',
@@ -1106,7 +1107,7 @@ export async function crearEvaluacion(
   }
 }
 
-export async function actualizarEvaluacion(
+export async function actualizarEvaluacionAction(
   evaluacionId: string,
   evaluacionData: {
     puntualidad?: number
@@ -1132,7 +1133,7 @@ export async function actualizarEvaluacion(
       .single()
 
     if (error) {
-      console.error('Error al actualizar evaluación:', error)
+      devError('Error al actualizar evaluación:', error)
       return {
         success: false,
         error: 'Error al actualizar evaluación: ' + error.message,
@@ -1148,7 +1149,7 @@ export async function actualizarEvaluacion(
       message: 'Evaluación actualizada exitosamente',
     }
   } catch (error) {
-    console.error('Error en actualizarEvaluacion:', error)
+    devError('Error en actualizarEvaluacion:', error)
     return {
       success: false,
       error: 'Error interno del servidor',
@@ -1156,7 +1157,7 @@ export async function actualizarEvaluacion(
   }
 }
 
-export async function enviarEvaluacion(evaluacionId: string): Promise<ApiResponse<void>> {
+export async function enviarEvaluacionAction(evaluacionId: string): Promise<ApiResponse<void>> {
   try {
     const supabase = await createClient()
 
@@ -1173,7 +1174,7 @@ export async function enviarEvaluacion(evaluacionId: string): Promise<ApiRespons
       .single()
 
     if (error) {
-      console.error('Error al enviar evaluación:', error)
+      devError('Error al enviar evaluación:', error)
       return {
         success: false,
         error: 'Error al enviar evaluación: ' + error.message,
@@ -1187,7 +1188,7 @@ export async function enviarEvaluacion(evaluacionId: string): Promise<ApiRespons
       message: 'Evaluación enviada exitosamente',
     }
   } catch (error) {
-    console.error('Error en enviarEvaluacion:', error)
+    devError('Error en enviarEvaluacion:', error)
     return {
       success: false,
       error: 'Error interno del servidor',
@@ -1197,7 +1198,7 @@ export async function enviarEvaluacion(evaluacionId: string): Promise<ApiRespons
 
 // ========== SUCURSALES ==========
 
-export async function crearSucursal(
+export async function crearSucursalAction(
   sucursalData: {
     nombre: string
     direccion?: string
@@ -1219,7 +1220,7 @@ export async function crearSucursal(
       .single()
 
     if (error) {
-      console.error('Error al crear sucursal:', error)
+      devError('Error al crear sucursal:', error)
       return {
         success: false,
         error: 'Error al crear sucursal: ' + error.message,
@@ -1234,7 +1235,7 @@ export async function crearSucursal(
       message: 'Sucursal creada exitosamente',
     }
   } catch (error) {
-    console.error('Error en crearSucursal:', error)
+    devError('Error en crearSucursal:', error)
     return {
       success: false,
       error: 'Error interno del servidor',
@@ -1242,7 +1243,7 @@ export async function crearSucursal(
   }
 }
 
-export async function actualizarSucursal(
+export async function actualizarSucursalAction(
   sucursalId: string,
   sucursalData: {
     nombre?: string
@@ -1263,7 +1264,7 @@ export async function actualizarSucursal(
       .single()
 
     if (error) {
-      console.error('Error al actualizar sucursal:', error)
+      devError('Error al actualizar sucursal:', error)
       return {
         success: false,
         error: 'Error al actualizar sucursal: ' + error.message,
@@ -1279,7 +1280,7 @@ export async function actualizarSucursal(
       message: 'Sucursal actualizada exitosamente',
     }
   } catch (error) {
-    console.error('Error en actualizarSucursal:', error)
+    devError('Error en actualizarSucursal:', error)
     return {
       success: false,
       error: 'Error interno del servidor',
@@ -1289,7 +1290,7 @@ export async function actualizarSucursal(
 
 // ========== CATEGORÍAS ==========
 
-export async function crearCategoriaEmpleado(
+export async function crearCategoriaEmpleadoAction(
   categoriaData: {
     nombre: string
     descripcion?: string
@@ -1314,7 +1315,7 @@ export async function crearCategoriaEmpleado(
       .single()
 
     if (error) {
-      console.error('Error al crear categoría:', error)
+      devError('Error al crear categoría:', error)
       return {
         success: false,
         error: 'Error al crear categoría: ' + error.message,
@@ -1329,7 +1330,7 @@ export async function crearCategoriaEmpleado(
       message: 'Categoría creada exitosamente',
     }
   } catch (error) {
-    console.error('Error en crearCategoriaEmpleado:', error)
+    devError('Error en crearCategoriaEmpleado:', error)
     return {
       success: false,
       error: 'Error interno del servidor',
@@ -1337,7 +1338,7 @@ export async function crearCategoriaEmpleado(
   }
 }
 
-export async function actualizarCategoriaEmpleado(
+export async function actualizarCategoriaEmpleadoAction(
   categoriaId: string,
   categoriaData: {
     nombre?: string
@@ -1359,7 +1360,7 @@ export async function actualizarCategoriaEmpleado(
       .single()
 
     if (error) {
-      console.error('Error al actualizar categoría:', error)
+      devError('Error al actualizar categoría:', error)
       return {
         success: false,
         error: 'Error al actualizar categoría: ' + error.message,
@@ -1375,7 +1376,7 @@ export async function actualizarCategoriaEmpleado(
       message: 'Categoría actualizada exitosamente',
     }
   } catch (error) {
-    console.error('Error en actualizarCategoriaEmpleado:', error)
+    devError('Error en actualizarCategoriaEmpleado:', error)
     return {
       success: false,
       error: 'Error interno del servidor',

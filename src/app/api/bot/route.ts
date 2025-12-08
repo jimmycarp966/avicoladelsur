@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { crearPresupuestoAction } from '@/actions/presupuestos.actions'
-import { crearReclamoBot, crearClienteDesdeBot } from '@/actions/ventas.actions'
+import { crearReclamoBotAction, crearClienteDesdeBotAction } from '@/actions/ventas.actions'
 import { obtenerListasClienteAction, obtenerPrecioProductoAction } from '@/actions/listas-precios.actions'
 
 // Tipos para las llamadas de Botpress
@@ -347,7 +347,7 @@ Selecciona tu *localidad* (responde con el número):
       const localidadSeleccionada = localidades[numero - 1]
 
       // Crear cliente
-      const resultado = await crearClienteDesdeBot({
+      const resultado = await crearClienteDesdeBotAction({
         nombre: estado.nombre!,
         apellido: estado.apellido,
         whatsapp: phoneNumber,
@@ -551,7 +551,7 @@ Responde con el número de pedido (ej: *PED-20250101-000001*) o escribe *no* par
         params.pedido_id = pedidoId
       }
 
-      const result = await crearReclamoBot(params)
+        const result = await crearReclamoBotAction(params)
 
       reclamosPendientes.delete(phoneNumber)
 
@@ -812,7 +812,7 @@ Nuestro equipo revisará tu presupuesto y te contactará pronto.`,
         }
 
         // Crear reclamo
-        const result = await crearReclamoBot({
+        const result = await crearReclamoBotAction({
           cliente_id: cliente.id,
           tipo_reclamo,
           descripcion,

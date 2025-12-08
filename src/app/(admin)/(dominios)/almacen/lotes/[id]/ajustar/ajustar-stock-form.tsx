@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Loader2, Save, AlertTriangle } from 'lucide-react'
-import { ajustarStock } from '@/actions/almacen.actions'
+import { ajustarStockAction } from '@/actions/almacen.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 
 const ajustarStockSchema = z.object({
@@ -78,7 +78,7 @@ export function AjustarStockForm({ lote }: AjustarStockFormProps) {
         return
       }
 
-      const result = await ajustarStock({
+      const result = await ajustarStockAction({
         lote_id: lote.id,
         tipo_movimiento: data.tipo_movimiento,
         cantidad: data.cantidad,

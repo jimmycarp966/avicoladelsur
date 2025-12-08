@@ -64,7 +64,7 @@ export function EditarPresupuestoForm({ presupuesto }: EditarPresupuestoFormProp
         showToast('success', result.message || 'Presupuesto actualizado exitosamente')
         router.push(`/ventas/presupuestos/${presupuesto.id}`)
       } else {
-        showToast('error', result.message || 'Error al actualizar presupuesto')
+        showToast('error', result.error || 'Error al actualizar presupuesto')
       }
     } catch (error: any) {
       console.error('Error actualizando presupuesto:', error)

@@ -1,5 +1,5 @@
 import { getCurrentUser } from '@/actions/auth.actions'
-import { obtenerRutaActiva } from '@/actions/reparto.actions'
+import { obtenerRutaActivaAction } from '@/actions/reparto.actions'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -19,7 +19,7 @@ export default async function CheckinPage() {
   }
 
   // Obtener ruta activa del repartidor
-  const rutaActivaResponse = await obtenerRutaActiva(user.id)
+  const rutaActivaResponse = await obtenerRutaActivaAction(user.id)
   const rutaActiva = rutaActivaResponse.success ? rutaActivaResponse.data : null
 
   // Si no hay ruta activa, mostrar mensaje

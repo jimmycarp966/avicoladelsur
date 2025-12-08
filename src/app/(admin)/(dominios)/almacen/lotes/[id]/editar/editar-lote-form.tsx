@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Loader2, Save } from 'lucide-react'
-import { actualizarLote } from '@/actions/almacen.actions'
+import { actualizarLoteAction } from '@/actions/almacen.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 
 const editarLoteSchema = z.object({
@@ -62,7 +62,7 @@ export function EditarLoteForm({ lote, productos }: EditarLoteFormProps) {
       if (data.ubicacion_almacen !== undefined) updates.ubicacion_almacen = data.ubicacion_almacen
       if (data.numero_factura !== undefined) updates.numero_factura = data.numero_factura
 
-      const result = await actualizarLote(lote.id, updates)
+      const result = await actualizarLoteAction(lote.id, updates)
 
       if (result.success) {
         showToast('success', result.message || 'Lote actualizado exitosamente')

@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, Calculator, Loader2, Users, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
-import { calcularLiquidacionMensual } from '@/actions/rrhh.actions'
+import { calcularLiquidacionMensualAction } from '@/actions/rrhh.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 import { createClient } from '@/lib/supabase/client'
 import type { Empleado } from '@/types/domain.types'
@@ -86,7 +86,7 @@ export function CalcularLiquidacionesForm() {
 
       for (const empleado of empleadosSeleccionados) {
         try {
-          const result = await calcularLiquidacionMensual(empleado.id, mes, anio)
+          const result = await calcularLiquidacionMensualAction(empleado.id, mes, anio)
           if (result.success) {
             successCount++
           } else {

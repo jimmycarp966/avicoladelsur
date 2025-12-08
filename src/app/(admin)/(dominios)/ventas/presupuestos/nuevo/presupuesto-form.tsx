@@ -364,7 +364,7 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
         }
       } else {
         console.error('[CLIENT] Error al crear presupuesto:', result)
-        showToast('error', result.message || 'Error al crear presupuesto')
+        showToast('error', result.error || 'Error al crear presupuesto')
       }
     } catch (error: any) {
       console.error('Error creando presupuesto:', error)

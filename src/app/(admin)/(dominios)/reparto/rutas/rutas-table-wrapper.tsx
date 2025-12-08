@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { RutasTable } from '@/components/tables/RutasTable'
 import { useNotificationStore } from '@/store/notificationStore'
-import { obtenerRutas } from '@/actions/reparto.actions'
+import { obtenerRutasAction } from '@/actions/reparto.actions'
 import type { RutaReparto as Ruta } from '@/types/domain.types'
 
 export function RutasTableWrapper() {
@@ -20,7 +20,7 @@ export function RutasTableWrapper() {
   const loadRutas = async () => {
     try {
       setIsLoading(true)
-      const result = await obtenerRutas()
+      const result = await obtenerRutasAction()
       if (result.success && result.data) {
         setRutas(result.data as Ruta[])
       } else {
@@ -45,8 +45,8 @@ export function RutasTableWrapper() {
   const handleDelete = async (ruta: Ruta) => {
     if (confirm(`¿Estás seguro de que quieres cancelar la ruta ${ruta.numero_ruta}?`)) {
       try {
-        const { cancelarRuta } = await import('@/actions/reparto.actions')
-        const result = await cancelarRuta(ruta.id)
+        const { cancelarRutaAction } = await import('@/actions/reparto.actions')
+        const result = await cancelarRutaAction(ruta.id)
         if (result.success) {
           await loadRutas()
           showToast('success', result.message || `Ruta ${ruta.numero_ruta} cancelada exitosamente`)
@@ -62,8 +62,8 @@ export function RutasTableWrapper() {
 
   const handleStart = async (ruta: Ruta) => {
     try {
-      const { iniciarRuta } = await import('@/actions/reparto.actions')
-      const result = await iniciarRuta(ruta.id)
+      const { iniciarRutaAction } = await import('@/actions/reparto.actions')
+      const result = await iniciarRutaAction(ruta.id)
       if (result.success) {
         await loadRutas()
         showToast('success', result.message || `Ruta ${ruta.numero_ruta} iniciada exitosamente`)
@@ -78,8 +78,8 @@ export function RutasTableWrapper() {
 
   const handleComplete = async (ruta: Ruta) => {
     try {
-      const { finalizarRuta } = await import('@/actions/reparto.actions')
-      const result = await finalizarRuta(ruta.id)
+      const { finalizarRutaAction } = await import('@/actions/reparto.actions')
+      const result = await finalizarRutaAction(ruta.id)
       if (result.success) {
         await loadRutas()
         showToast('success', result.message || `Ruta ${ruta.numero_ruta} completada exitosamente`)

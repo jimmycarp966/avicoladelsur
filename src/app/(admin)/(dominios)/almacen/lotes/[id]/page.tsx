@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { obtenerLotePorId } from '@/actions/almacen.actions'
+import { obtenerLotePorIdAction } from '@/actions/almacen.actions'
 import { createClient } from '@/lib/supabase/server'
 import { formatDate } from '@/lib/utils'
 
@@ -46,7 +46,7 @@ const getEstadoConfig = (estado: string, vencimiento?: string) => {
 
 export default async function LoteDetallePage({ params }: LoteDetallePageProps) {
   const { id } = await params
-  const loteResult = await obtenerLotePorId(id)
+  const loteResult = await obtenerLotePorIdAction(id)
 
   if (!loteResult.success || !loteResult.data) {
     notFound()

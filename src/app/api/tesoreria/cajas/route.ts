@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { crearCaja, listarCajas } from '@/actions/tesoreria.actions'
+import { crearCajaAction, listarCajasAction } from '@/actions/tesoreria.actions'
 import { crearCajaSchema } from '@/lib/schemas/tesoreria.schema'
 
 export async function GET() {
-  const result = await listarCajas()
+  const result = await listarCajasAction()
   return NextResponse.json(result, { status: 200 })
 }
 
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const result = await crearCaja(parsed.data)
+    const result = await crearCajaAction(parsed.data)
     return NextResponse.json(result, { status: result.success ? 201 : 400 })
   } catch (error: any) {
     return NextResponse.json(

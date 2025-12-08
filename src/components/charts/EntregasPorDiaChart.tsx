@@ -10,7 +10,7 @@ import {
   YAxis,
 } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { obtenerEntregasPorDia } from '@/actions/dashboard.actions'
+import { obtenerEntregasPorDiaAction } from '@/actions/dashboard.actions'
 
 export function EntregasPorDiaChart() {
   const [data, setData] = useState<Array<{ dia: string; entregas: number; km: number }>>([])
@@ -18,7 +18,7 @@ export function EntregasPorDiaChart() {
 
   useEffect(() => {
     async function fetchData() {
-      const result = await obtenerEntregasPorDia()
+      const result = await obtenerEntregasPorDiaAction()
       if (result.success && result.data) {
         setData(result.data)
       }

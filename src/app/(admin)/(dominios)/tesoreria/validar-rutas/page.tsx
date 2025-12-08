@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { obtenerRutasPendientesValidacion, listarCajas } from '@/actions/tesoreria.actions'
+import { obtenerRutasPendientesValidacionAction, listarCajasAction } from '@/actions/tesoreria.actions'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -29,8 +29,8 @@ export default async function ValidarRutasPage() {
   }
 
   const [rutasResult, cajas] = await Promise.all([
-    obtenerRutasPendientesValidacion(),
-    listarCajas(),
+    obtenerRutasPendientesValidacionAction(),
+    listarCajasAction(),
   ])
 
   const rutas = rutasResult.success ? (rutasResult.data || []) : []
