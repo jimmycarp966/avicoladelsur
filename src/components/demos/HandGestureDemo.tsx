@@ -38,25 +38,21 @@ function InteractiveObject({
     // Smooth interpolation for physics-like movement
     useFrame((state, delta) => {
         if (meshRef.current) {
-            // Position: Only follow if pinching, otherwise float gently back to center (or stay)
-            const targetPos = isPinching ? new THREE.Vector3(...position) : meshRef.current.position.clone();
+            // Position: SIEMPRE seguir la posición de la mano
+            const targetPos = new THREE.Vector3(...position);
+            
+            // Lerp position - más rápido cuando está agarrando
+            const lerpSpeed = isPinching ? 0.3 : 0.15;
+            meshRef.current.position.lerp(targetPos, lerpSpeed);
 
-            // Lerp position
-            meshRef.current.position.lerp(targetPos, 0.2); // Snappier when grabbing
+            // Rotation: SIEMPRE seguir la rotación de la mano
+            const targetRot = new THREE.Euler(...rotation);
 
-            // Rotation: Follow hand rotation if pinching, otherwise idle rotation
-            const targetRot = isPinching
-                ? new THREE.Euler(...rotation)
-                : new THREE.Euler(
-                    meshRef.current.rotation.x + 0.01,
-                    meshRef.current.rotation.y + 0.01,
-                    0
-                );
-
-            // Lerp Rotation
-            meshRef.current.rotation.x = THREE.MathUtils.lerp(meshRef.current.rotation.x, targetRot.x, 0.1);
-            meshRef.current.rotation.y = THREE.MathUtils.lerp(meshRef.current.rotation.y, targetRot.y, 0.1);
-            meshRef.current.rotation.z = THREE.MathUtils.lerp(meshRef.current.rotation.z, targetRot.z, 0.1);
+            // Lerp Rotation - más rápido cuando está agarrando
+            const rotLerpSpeed = isPinching ? 0.15 : 0.08;
+            meshRef.current.rotation.x = THREE.MathUtils.lerp(meshRef.current.rotation.x, targetRot.x, rotLerpSpeed);
+            meshRef.current.rotation.y = THREE.MathUtils.lerp(meshRef.current.rotation.y, targetRot.y, rotLerpSpeed);
+            meshRef.current.rotation.z = THREE.MathUtils.lerp(meshRef.current.rotation.z, targetRot.z, rotLerpSpeed);
         }
     });
 
@@ -154,9 +150,12 @@ export default function HandGestureDemo() {
         const setupMediaPipe = async () => {
             try {
                 setStatus("Cargando modelo IA...");
+                console.log("[HandGesture] Iniciando carga de MediaPipe...");
+                
                 const vision = await FilesetResolver.forVisionTasks(
                     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
                 );
+                console.log("[HandGesture] FilesetResolver cargado");
 
                 handLandmarkerRef.current = await HandLandmarker.createFromOptions(
                     vision,
@@ -169,11 +168,12 @@ export default function HandGestureDemo() {
                         numHands: 1,
                     }
                 );
+                console.log("[HandGesture] HandLandmarker creado exitosamente");
 
                 setIsLoaded(true);
                 setStatus("Esperando cámara...");
             } catch (error) {
-                console.error("Error MediaPipe:", error);
+                console.error("[HandGesture] Error MediaPipe:", error);
                 setStatus("Error de carga. Recarga la página.");
             }
         };
@@ -181,8 +181,15 @@ export default function HandGestureDemo() {
         setupMediaPipe();
 
         return () => {
-            if (handLandmarkerRef.current) handLandmarkerRef.current.close();
-            if (requestRef.current) cancelAnimationFrame(requestRef.current);
+            console.log("[HandGesture] Limpiando recursos...");
+            if (handLandmarkerRef.current) {
+                handLandmarkerRef.current.close();
+                handLandmarkerRef.current = null;
+            }
+            if (requestRef.current) {
+                cancelAnimationFrame(requestRef.current);
+                requestRef.current = 0;
+            }
         };
     }, []);
 
@@ -203,9 +210,34 @@ export default function HandGestureDemo() {
 
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
-                videoRef.current.addEventListener("loadeddata", predictWebcam);
-                setPermissionGranted(true);
-                setStatus("¡Cámara activa!");
+                
+                // Esperar a que el video esté listo antes de iniciar la detección
+                videoRef.current.addEventListener("loadeddata", () => {
+                    console.log("[HandGesture] Video loaded, dimensiones:", videoRef.current?.videoWidth, "x", videoRef.current?.videoHeight);
+                    setPermissionGranted(true);
+                    setStatus("¡Cámara activa!");
+                    // Iniciar el loop de detección después de un pequeño delay para asegurar que el video esté reproduciéndose
+                    setTimeout(() => {
+                        if (requestRef.current) {
+                            cancelAnimationFrame(requestRef.current);
+                        }
+                        console.log("[HandGesture] Iniciando loop de detección...");
+                        predictWebcam();
+                    }, 100);
+                }, { once: true });
+                
+                // También iniciar cuando el video empiece a reproducirse
+                videoRef.current.addEventListener("playing", () => {
+                    console.log("[HandGesture] Video playing, ensuring detection loop is running...");
+                    if (!requestRef.current) {
+                        predictWebcam();
+                    }
+                }, { once: true });
+                
+                // Forzar reproducción del video
+                videoRef.current.play().catch(err => {
+                    console.error("[HandGesture] Error al reproducir video:", err);
+                });
             }
         } catch (err: any) {
             console.error("Error accessing webcam:", err);
@@ -228,7 +260,7 @@ export default function HandGestureDemo() {
         const thumbTip = landmarks[4];
         const indexTip = landmarks[8];
         const pinchDist = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
-        const isPinchingNow = pinchDist < 0.05; // Adjustable threshold
+        const isPinchingNow = pinchDist < 0.08; // INCREASED THRESHOLD: Was 0.05
 
         // 2. ROTATION/ORIENTATION
         const wrist = landmarks[0];
@@ -248,6 +280,7 @@ export default function HandGestureDemo() {
         setHandRotation({ x: pitch, y: yaw, z: roll });
 
         // 3. VICTORY SIGN (Changing Shapes)
+        // Relaxed logic: Index and Middle tips above their PIP joints; Ring and Pinky tips below their PIP joints
         const isIndexExtended = landmarks[8].y < landmarks[6].y;
         const isMiddleExtended = landmarks[12].y < landmarks[10].y;
         const isRingCurled = landmarks[16].y > landmarks[14].y;
@@ -255,18 +288,20 @@ export default function HandGestureDemo() {
 
         const isVictory = isIndexExtended && isMiddleExtended && isRingCurled && isPinkyCurled && !isPinchingNow;
 
+        // SIEMPRE actualizar la posición de la mano (usando el índice como referencia)
+        setHandPosition({ x: indexTip.x, y: indexTip.y, z: indexTip.z });
+
         if (isPinchingNow) {
             setGestureName("AGARRANDO");
             setIsPinching(true);
-            // Only update position if pinching (Grab mechanics)
-            setHandPosition({ x: indexTip.x, y: indexTip.y, z: indexTip.z });
         } else if (isVictory) {
             setGestureName("CAMBIO DE FORMA");
             setIsPinching(false);
 
             // Cooldown check
             const now = Date.now();
-            if (now - lastSwitchTime.current > 1000) {
+            if (now - lastSwitchTime.current > 1500) { // Increased cooldown slightly to avoid double triggers
+                console.log("Shape switch triggered!");
                 setCurrentShape(prev => {
                     if (prev === 'box') return 'sphere';
                     if (prev === 'sphere') return 'torus';
@@ -281,21 +316,59 @@ export default function HandGestureDemo() {
     };
 
     const predictWebcam = () => {
-        if (!videoRef.current || !handLandmarkerRef.current) return;
-        const startTimeMs = performance.now();
-        if (videoRef.current.currentTime !== 0) {
-            const results = handLandmarkerRef.current.detectForVideo(videoRef.current, startTimeMs);
-            if (results.landmarks && results.landmarks.length > 0) {
-                detectGestures(results.landmarks[0]);
-            }
+        if (!videoRef.current || !handLandmarkerRef.current) {
+            console.warn("[HandGesture] Video or handLandmarker not ready");
+            requestRef.current = window.requestAnimationFrame(predictWebcam);
+            return;
         }
+
+        // Verificar que el video esté reproduciéndose y tenga dimensiones válidas
+        if (videoRef.current.readyState < 2) {
+            // Video aún no está listo, reintentar en el siguiente frame
+            requestRef.current = window.requestAnimationFrame(predictWebcam);
+            return;
+        }
+
+        // Verificar que el video tenga dimensiones válidas
+        if (videoRef.current.videoWidth === 0 || videoRef.current.videoHeight === 0) {
+            requestRef.current = window.requestAnimationFrame(predictWebcam);
+            return;
+        }
+
+        const startTimeMs = performance.now();
+        
+        try {
+            const results = handLandmarkerRef.current.detectForVideo(videoRef.current, startTimeMs);
+            
+            if (results && results.landmarks && results.landmarks.length > 0) {
+                detectGestures(results.landmarks[0]);
+            } else {
+                // Feedback when hands are lost
+                setGestureName("NO SE DETECTA MANO");
+                setIsPinching(false);
+            }
+        } catch (error) {
+            console.error("[HandGesture] Error en detectForVideo:", error);
+            setGestureName("ERROR DE DETECCIÓN");
+        }
+        
+        // Continuar el loop
         requestRef.current = window.requestAnimationFrame(predictWebcam);
     };
 
     return (
-        <div className="fixed inset-0 w-full h-full bg-gradient-to-b from-[#0E131B] to-[#152419] overflow-hidden text-[#F5F7F9] font-sans select-none z-[50]">
+        <div className="fixed inset-0 w-full h-full bg-[#0E131B] overflow-hidden text-[#F5F7F9] font-sans select-none z-[50]">
+            {/* Webcam Feed - Visible now for debugging/positioning */}
+            <video
+                ref={videoRef}
+                className={`absolute inset-0 w-full h-full object-cover transform -scale-x-100 transition-opacity duration-1000 ${permissionGranted ? 'opacity-20' : 'opacity-0'}`}
+                autoPlay
+                playsInline
+                muted
+            />
+
             {/* 3D Scene */}
-            <div className="absolute inset-0 z-0 cursor-move">
+            <div className="absolute inset-0 z-10 cursor-move">
                 <Canvas shadows camera={{ position: [0, 0, 8], fov: 45 }}>
                     <Suspense fallback={null}>
                         <SceneContent
@@ -308,8 +381,6 @@ export default function HandGestureDemo() {
                 </Canvas>
             </div>
 
-            <video ref={videoRef} className="hidden" autoPlay playsInline muted />
-
             {/* UI Overlay */}
             <div className="absolute inset-0 z-20 pointer-events-none p-6 md:p-12 flex flex-col justify-between">
                 {/* Header */}
@@ -319,8 +390,8 @@ export default function HandGestureDemo() {
                             layoutId="logo"
                             className="flex items-center gap-2 mb-2"
                         >
-                            <div className="w-8 h-8 rounded-lg bg-[#2F7058] grid place-items-center">
-                                <span className="font-bold text-[#FCDE8D]">A</span>
+                            <div className="w-8 h-8 rounded-lg bg-[#2F7058] grid place-items-center overflow-hidden">
+                                <img src="/images/favicon.svg" alt="Avícola Logo" className="w-6 h-6 object-contain" />
                             </div>
                             <span className="font-bold tracking-tight text-[#2F7058] bg-[#FCDE8D] px-2 py-0.5 rounded text-xs">EXPERIMENTAL</span>
                         </motion.div>
@@ -347,6 +418,10 @@ export default function HandGestureDemo() {
                         </div>
                         <div className="text-xs text-[#FCDE8D] font-mono opacity-80">
                             SHAPE: {currentShape.toUpperCase()}
+                        </div>
+                        {/* Debug info */}
+                        <div className="text-xs text-[#9ca3af] font-mono opacity-60 mt-2 text-right">
+                            POS: ({handPosition.x.toFixed(2)}, {handPosition.y.toFixed(2)}, {handPosition.z.toFixed(2)})
                         </div>
                     </div>
                 </div>
