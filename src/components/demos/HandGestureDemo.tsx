@@ -144,12 +144,11 @@ export default function HandGestureDemo() {
 
     // Cooldown for shape switching to prevent rapid toggling
     const lastSwitchTime = useRef(0);
+    const requestRef = useRef<number>(0);
 
     const handLandmarkerRef = useRef<HandLandmarker | null>(null);
 
     useEffect(() => {
-        let animationFrameId: number;
-
         const setupMediaPipe = async () => {
             try {
                 setStatus("Cargando modelo IA...");
@@ -181,7 +180,7 @@ export default function HandGestureDemo() {
 
         return () => {
             if (handLandmarkerRef.current) handLandmarkerRef.current.close();
-            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+            if (requestRef.current) cancelAnimationFrame(requestRef.current);
         };
     }, []);
 
@@ -266,7 +265,7 @@ export default function HandGestureDemo() {
                 detectGestures(results.landmarks[0]);
             }
         }
-        animationFrameId = window.requestAnimationFrame(predictWebcam);
+        requestRef.current = window.requestAnimationFrame(predictWebcam);
     };
 
     return (
@@ -381,7 +380,7 @@ export default function HandGestureDemo() {
                     </motion.div>
                 )}
             </div>
-        </div>
+        </div >
     );
 }
 
