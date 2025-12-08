@@ -62,9 +62,11 @@ function InteractiveObject({
 
     const material = (
         <meshStandardMaterial
-            color={isPinching ? "#ef4444" : hovered ? "#f59e0b" : "#3b82f6"}
-            roughness={0.1}
-            metalness={0.8}
+            color={isPinching ? "#CB3433" : hovered ? "#FCDE8D" : "#2F7058"}
+            roughness={0.2}
+            metalness={0.6}
+            emissive={isPinching ? "#CB3433" : "#000000"}
+            emissiveIntensity={isPinching ? 0.5 : 0}
         />
     );
 
@@ -111,10 +113,10 @@ function SceneContent({
 
     return (
         <>
-            <ambientLight intensity={0.5} />
-            {/* We use standard lights to avoid type issues with SpotLight/divSpotLight */}
-            <pointLight position={[10, 10, 10]} intensity={1.5} />
-            <pointLight position={[-10, -10, -10]} intensity={1} color="#ff0000" />
+            <ambientLight intensity={0.6} />
+            <pointLight position={[10, 10, 10]} intensity={1.5} color="#FCDE8D" />
+            <pointLight position={[-10, -10, -10]} intensity={1} color="#2F7058" />
+            <directionalLight position={[0, 5, 5]} intensity={1} />
 
             <InteractiveObject
                 position={[targetX, targetY, targetZ]}
@@ -123,8 +125,8 @@ function SceneContent({
                 shape={shape}
             />
 
-            <ContactShadows position={[0, -4.5, 0]} opacity={0.5} scale={20} blur={2.5} far={5} />
-            <Environment preset="city" />
+            <ContactShadows position={[0, -4.5, 0]} opacity={0.6} scale={20} blur={2.5} far={5} color="#1a2f24" />
+            <Environment preset="forest" />
         </>
     );
 }
@@ -186,16 +188,41 @@ export default function HandGestureDemo() {
 
     const enableCam = async () => {
         if (!handLandmarkerRef.current) return;
+
+        setStatus("Solicitando permiso de cámara...");
+
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
+            // Try robust constraints first, fallback will be handled naturally if user denies
+            const constraints = {
+                video: {
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                    facingMode: "user"
+                }
+            };
+
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
                 videoRef.current.addEventListener("loadeddata", predictWebcam);
                 setPermissionGranted(true);
+                setStatus("¡Cámara activa!");
             }
         } catch (err) {
-            console.error(err);
-            setStatus("Permiso denegado.");
+            console.error("Error accessing webcam:", err);
+            // Fallback for some older devices/browsers
+            try {
+                const simpleStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                if (videoRef.current) {
+                    videoRef.current.srcObject = simpleStream;
+                    videoRef.current.addEventListener("loadeddata", predictWebcam);
+                    setPermissionGranted(true);
+                    setStatus("¡Cámara activa (Modo Básico)!");
+                }
+            } catch (fallbackErr) {
+                setStatus("No se pudo acceder a la cámara. Verifique permisos.");
+            }
         }
     };
 
@@ -269,7 +296,7 @@ export default function HandGestureDemo() {
     };
 
     return (
-        <div className="relative w-full h-screen bg-neutral-950 overflow-hidden text-white font-sans select-none">
+        <div className="relative w-full h-screen bg-gradient-to-b from-[#0E131B] to-[#152419] overflow-hidden text-[#F5F7F9] font-sans select-none">
             {/* 3D Scene */}
             <div className="absolute inset-0 z-0 cursor-move">
                 <Canvas shadows camera={{ position: [0, 0, 8], fov: 45 }}>
@@ -291,27 +318,37 @@ export default function HandGestureDemo() {
                 {/* Header */}
                 <div className="flex justify-between items-start">
                     <div>
+                        <motion.div
+                            layoutId="logo"
+                            className="flex items-center gap-2 mb-2"
+                        >
+                            <div className="w-8 h-8 rounded-lg bg-[#2F7058] grid place-items-center">
+                                <span className="font-bold text-[#FCDE8D]">A</span>
+                            </div>
+                            <span className="font-bold tracking-tight text-[#2F7058] bg-[#FCDE8D] px-2 py-0.5 rounded text-xs">EXPERIMENTAL</span>
+                        </motion.div>
+
                         <motion.h1
                             layoutId="title"
-                            className="text-3xl md:text-5xl font-black italic tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 uppercase"
+                            className="text-3xl md:text-5xl font-black italic tracking-tighter text-white uppercase drop-shadow-sm"
                         >
-                            Avícola 3D Lab
+                            <span className="text-[#FCDE8D]">Avícola</span> 3D
                         </motion.h1>
                         <motion.p
                             initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                            className="text-neutral-400 mt-2 font-mono text-sm max-w-sm"
+                            className="text-[#9ca3af] mt-2 font-mono text-sm max-w-sm"
                         >
-                            Interfaz gestual experimental.
+                            Control gestual para logística.
                         </motion.p>
                     </div>
 
                     <div className="flex flex-col gap-2 items-end">
                         <div className={`px-4 py-2 rounded-lg font-bold font-mono tracking-widest text-xs border backdrop-blur-md transition-colors duration-300 flex items-center gap-2
-                    ${isPinching ? 'bg-red-500/20 border-red-500 text-red-400' : 'bg-blue-500/10 border-blue-500/30 text-blue-400'}`}>
+                    ${isPinching ? 'bg-[#CB3433]/20 border-[#CB3433] text-[#CB3433]' : 'bg-[#2F7058]/20 border-[#2F7058] text-[#2F7058] bg-white/5'}`}>
                             {isPinching ? <Grab size={16} /> : <Hand size={16} />}
                             {gestureName}
                         </div>
-                        <div className="text-xs text-neutral-500 font-mono">
+                        <div className="text-xs text-[#FCDE8D] font-mono opacity-80">
                             SHAPE: {currentShape.toUpperCase()}
                         </div>
                     </div>
@@ -336,13 +373,13 @@ export default function HandGestureDemo() {
                                     {isLoaded && <div className="absolute inset-0 rounded-full animate-ping bg-blue-500/20" />}
                                 </div>
 
-                                <h2 className="text-2xl font-bold mb-2">Activación Requerida</h2>
-                                <p className="text-neutral-400 mb-8 font-light">{status}</p>
+                                <h2 className="text-2xl font-bold mb-2 text-[#FCDE8D]">Activación Requerida</h2>
+                                <p className="text-[#9ca3af] mb-8 font-light">{status}</p>
 
                                 <button
                                     onClick={enableCam}
-                                    disabled={!isLoaded}
-                                    className="w-full bg-white text-black hover:bg-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed font-bold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2"
+                                    disabled={!isLoaded || status.includes("Solicitando")}
+                                    className="w-full bg-[#2F7058] hover:bg-[#3d8a6f] text-white disabled:opacity-50 disabled:cursor-not-allowed font-bold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#2F7058]/20"
                                 >
                                     {isLoaded ? "INICIAR EXPERIENCIA" : "CARGANDO MODELOS..."}
                                 </button>
@@ -360,19 +397,19 @@ export default function HandGestureDemo() {
                         className="grid grid-cols-3 gap-4"
                     >
                         <InstructionCard
-                            icon={<Grab className="text-red-400" />}
+                            icon={<Grab className="text-[#CB3433]" />}
                             title="Agarrar y Mover"
                             desc='Junta pulgar e índice ("Pinch") para tomar control del objeto.'
                             active={isPinching}
                         />
                         <InstructionCard
-                            icon={<div className="flex"><Hand className="text-blue-400 -mr-2" /><Hand className="text-blue-400 opacity-50" /></div>}
+                            icon={<div className="flex"><Hand className="text-[#2F7058] -mr-2" /><Hand className="text-[#2F7058] opacity-50" /></div>}
                             title="Rotar Muñeca"
                             desc="Gira tu mano para rotar el objeto en 3D."
                             active={!isPinching && gestureName === 'Rastreo Activo'}
                         />
                         <InstructionCard
-                            icon={<span className="text-xl font-bold text-purple-400">✌️</span>}
+                            icon={<span className="text-xl font-bold text-[#FCDE8D]">✌️</span>}
                             title="Cambiar Forma"
                             desc='Haz el gesto de "Amor y Paz" para cambiar la geometría.'
                             active={gestureName === 'CAMBIO DE FORMA'}
