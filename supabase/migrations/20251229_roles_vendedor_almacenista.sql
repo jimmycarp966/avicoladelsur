@@ -742,3 +742,4 @@ ORDER BY tablename, policyname;
 --    además de los permisos específicos de cada rol
 
 
+
