@@ -31,7 +31,7 @@ $googleCloudVars = @{
     "GOOGLE_DOCUMENT_AI_LOCATION" = "us"
     "GOOGLE_VERTEX_AI_LOCATION" = "us-central1"
     "GOOGLE_AUTOML_LOCATION" = "us-central1"
-    "GOOGLE_GEMINI_MODEL" = "gemini-pro"
+    "GOOGLE_GEMINI_MODEL" = "gemini-3-pro-preview"
     "GOOGLE_GEMINI_LOCATION" = "us-central1"
 }
 

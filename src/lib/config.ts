@@ -69,7 +69,7 @@ export const config = {
     },
     gemini: {
       apiKey: process.env.GOOGLE_GEMINI_API_KEY,
-      model: process.env.GOOGLE_GEMINI_MODEL || 'gemini-pro',
+      model: process.env.GOOGLE_GEMINI_MODEL || 'gemini-3-pro-preview',
       location: process.env.GOOGLE_GEMINI_LOCATION || 'us-central1',
     },
   },

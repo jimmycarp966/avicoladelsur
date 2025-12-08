@@ -210,6 +210,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       storeLogout()
       showToast('info', 'Sesión cerrada exitosamente')
       router.push('/login')
+      router.refresh()
     } catch (error: any) {
       console.error('Logout error:', error)
       showToast('error', 'Error al cerrar sesión')

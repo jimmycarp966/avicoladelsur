@@ -11,6 +11,7 @@ import { Menu, LogOut, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { useUserStore } from '@/store/userStore'
 
 // Fallback para el sidebar mientras carga
 function SidebarSkeleton() {
@@ -36,14 +37,18 @@ interface SucursalLayoutProps {
 export default function SucursalLayout({ children }: SucursalLayoutProps) {
   const pathname = usePathname()
   const router = useRouter()
+  const { logout: storeLogout } = useUserStore()
 
   const handleLogout = async () => {
     try {
       const supabase = createClient()
       await supabase.auth.signOut()
-      router.push('/login')
+      storeLogout()
       toast.success('Sesión cerrada exitosamente')
+      router.push('/login')
+      router.refresh()
     } catch (error) {
+      console.error('Error al cerrar sesión:', error)
       toast.error('Error al cerrar sesión')
     }
   }

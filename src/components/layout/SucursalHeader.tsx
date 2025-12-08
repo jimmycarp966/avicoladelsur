@@ -12,6 +12,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Bell, Settings, LogOut, User } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+import { useUserStore } from '@/store/userStore'
+import { useNotificationStore } from '@/store/notificationStore'
 
 interface Sucursal {
   id: string
@@ -24,6 +28,23 @@ interface SucursalHeaderProps {
 }
 
 export function SucursalHeader({ sucursal }: SucursalHeaderProps) {
+  const router = useRouter()
+  const { logout: storeLogout } = useUserStore()
+  const { showToast } = useNotificationStore()
+
+  const handleLogout = async () => {
+    try {
+      const supabase = createClient()
+      await supabase.auth.signOut()
+      storeLogout()
+      showToast('success', 'Sesión cerrada exitosamente')
+      router.push('/login')
+      router.refresh()
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error)
+      showToast('error', 'Error al cerrar sesión')
+    }
+  }
   return (
     <header className="fixed top-0 left-64 right-0 z-40 h-16 bg-background border-b">
       <div className="flex h-full items-center justify-between px-6">
@@ -78,7 +99,7 @@ export function SucursalHeader({ sucursal }: SucursalHeaderProps) {
                 <span>Configuración</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-red-600">
+              <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Cerrar Sesión</span>
               </DropdownMenuItem>

@@ -31,7 +31,7 @@ async function procesarMensajeNatural(mensaje: string, contextoCliente: any) {
   });
   
   const model = vertexAI.preview.getGenerativeModel({
-    model: 'gemini-pro',
+    model: 'gemini-3-pro-preview',
   });
   
   const prompt = `
@@ -162,7 +162,7 @@ export async function analizarReclamo(
   productos_mencionados: string[];
 }>> {
   const vertexAI = new VertexAI({...});
-  const model = vertexAI.preview.getGenerativeModel({ model: 'gemini-pro' });
+  const model = vertexAI.preview.getGenerativeModel({ model: 'gemini-3-pro-preview' });
   
   const prompt = `
 Analiza este reclamo de ${contextoCliente.nombre}:
