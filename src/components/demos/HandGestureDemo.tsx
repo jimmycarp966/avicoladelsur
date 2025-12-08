@@ -187,21 +187,19 @@ export default function HandGestureDemo() {
     }, []);
 
     const enableCam = async () => {
-        if (!handLandmarkerRef.current) return;
+        console.log("Attempting to enable camera...");
+        if (!handLandmarkerRef.current) {
+            console.error("handLandmarker not ready");
+            setStatus("Error: Modelo IA no listo. Recarga la página.");
+            return;
+        }
 
-        setStatus("Solicitando permiso de cámara...");
+        setStatus("Solicitando permiso... Mira la barra de dirección 🔒");
 
         try {
-            // Try robust constraints first, fallback will be handled naturally if user denies
-            const constraints = {
-                video: {
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 },
-                    facingMode: "user"
-                }
-            };
-
-            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            // Simplest constraint to maximize compatibility
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            console.log("Camera access granted:", stream.id);
 
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
@@ -209,19 +207,18 @@ export default function HandGestureDemo() {
                 setPermissionGranted(true);
                 setStatus("¡Cámara activa!");
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error("Error accessing webcam:", err);
-            // Fallback for some older devices/browsers
-            try {
-                const simpleStream = await navigator.mediaDevices.getUserMedia({ video: true });
-                if (videoRef.current) {
-                    videoRef.current.srcObject = simpleStream;
-                    videoRef.current.addEventListener("loadeddata", predictWebcam);
-                    setPermissionGranted(true);
-                    setStatus("¡Cámara activa (Modo Básico)!");
-                }
-            } catch (fallbackErr) {
-                setStatus("No se pudo acceder a la cámara. Verifique permisos.");
+
+            // Helpful error messages for the user
+            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                setStatus("⛔ Permiso denegado. Haz clic en el candado 🔒 de la barra de URL y permite la cámara.");
+            } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+                setStatus("📷 No se encontró ninguna cámara.");
+            } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+                setStatus("⚠️ La cámara está siendo usada por otra aplicación.");
+            } else {
+                setStatus(`Error: ${err.message || 'Desconocido'}`);
             }
         }
     };
@@ -417,7 +414,7 @@ export default function HandGestureDemo() {
                     </motion.div>
                 )}
             </div>
-        </div >
+        </div>
     );
 }
 
