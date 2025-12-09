@@ -84,6 +84,10 @@ export async function login(data: LoginFormData): Promise<ApiResponse<{ redirect
       case 'vendedor':
         redirectTo = '/almacen/pedidos'
         break
+      case 'encargado_sucursal':
+        // Encargado_sucursal siempre debe tener sucursal, pero por si acaso
+        redirectTo = '/sucursal/dashboard'
+        break
       case 'repartidor':
         redirectTo = '/home'
         break

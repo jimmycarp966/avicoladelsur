@@ -96,6 +96,8 @@ export default async function HomePage() {
         redirect('/dashboard')
       case 'vendedor':
         redirect('/almacen/pedidos')
+      case 'encargado_sucursal':
+        redirect('/sucursal/dashboard')
       case 'repartidor':
         redirect('/home')
       case 'almacenista':

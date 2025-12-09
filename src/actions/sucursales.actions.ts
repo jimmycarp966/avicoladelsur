@@ -101,7 +101,8 @@ export async function crearSucursalAction(
         sucursal_id: sucursal.id,
         saldo_actual: 0,
         saldo_inicial: 0,
-        moneda: 'ARS'
+        moneda: 'ARS',
+        active: true
       })
 
     if (cajaError) {
@@ -507,6 +508,194 @@ export async function obtenerSucursalesAction(): Promise<ApiResponse<Array<{
     return {
       success: false,
       error: `Error interno: ${error instanceof Error ? error.message : 'Error desconocido'}`
+    }
+  }
+}
+
+// =============================================
+// STOCK MÍNIMO POR SUCURSAL
+// =============================================
+
+export interface ObtenerStockMinimoSucursalParams {
+  sucursalId: string
+}
+
+export interface ConfigurarStockMinimoParams {
+  sucursalId: string
+  productoId: string
+  stockMinimo: number | null
+}
+
+export interface EliminarStockMinimoParams {
+  sucursalId: string
+  productoId: string
+}
+
+export interface StockMinimoProducto {
+  productoId: string
+  productoNombre: string
+  productoCodigo: string
+  stockMinimoGlobal: number | null
+  stockMinimoSucursal: number | null
+  stockActual: number
+}
+
+// Obtener configuración de stock mínimo para una sucursal
+export async function obtenerStockMinimoSucursalAction(params: ObtenerStockMinimoSucursalParams): Promise<ApiResponse<StockMinimoProducto[]>> {
+  try {
+    const supabase = await createClient()
+
+    // Obtener productos con stock en la sucursal, junto con sus mínimas globales y específicos
+    const { data, error } = await supabase
+      .from('lotes')
+      .select(`
+        cantidad_disponible,
+        productos!inner (
+          id,
+          nombre,
+          codigo,
+          stock_minimo,
+          activo
+        )
+      `)
+      .eq('sucursal_id', params.sucursalId)
+      .eq('estado', 'disponible')
+      .gt('cantidad_disponible', 0)
+
+    if (error) throw error
+
+    // Obtener configuraciones específicas por sucursal
+    const { data: minimosSucursal, error: minimosError } = await supabase
+      .from('producto_sucursal_minimos')
+      .select('producto_id, stock_minimo')
+      .eq('sucursal_id', params.sucursalId)
+
+    if (minimosError) throw minimosError
+
+    // Crear mapa de mínimos por sucursal
+    const minimosMap = new Map(
+      (minimosSucursal || []).map(item => [item.producto_id, item.stock_minimo])
+    )
+
+    // Agrupar por producto y calcular stock total
+    const productosMap = new Map<string, StockMinimoProducto>()
+
+    for (const lote of data || []) {
+      const productos = Array.isArray(lote.productos) ? lote.productos : [lote.productos]
+      if (productos.length === 0) continue
+      
+      const producto = productos[0] as { id: string; nombre: string; codigo: string; stock_minimo: number; activo: boolean }
+      if (!producto.activo) continue
+
+      const productoId = producto.id
+
+      if (!productosMap.has(productoId)) {
+        productosMap.set(productoId, {
+          productoId,
+          productoNombre: producto.nombre,
+          productoCodigo: producto.codigo,
+          stockMinimoGlobal: producto.stock_minimo,
+          stockMinimoSucursal: minimosMap.get(productoId) || null,
+          stockActual: 0
+        })
+      }
+
+      // Sumar stock actual
+      productosMap.get(productoId)!.stockActual += lote.cantidad_disponible
+    }
+
+    const resultado = Array.from(productosMap.values())
+
+    return {
+      success: true,
+      data: resultado
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: `Error al obtener stock mínimo: ${error instanceof Error ? error.message : 'Error desconocido'}`
+    }
+  }
+}
+
+// Configurar stock mínimo específico para una sucursal
+export async function configurarStockMinimoAction(params: ConfigurarStockMinimoParams): Promise<ApiResponse<void>> {
+  try {
+    const supabase = await createClient()
+
+    // Validar que el producto existe
+    const { data: producto, error: productoError } = await supabase
+      .from('productos')
+      .select('id')
+      .eq('id', params.productoId)
+      .eq('activo', true)
+      .single()
+
+    if (productoError || !producto) {
+      return {
+        success: false,
+        error: 'Producto no encontrado o inactivo'
+      }
+    }
+
+    if (params.stockMinimo === null || params.stockMinimo < 0) {
+      // Eliminar configuración específica si existe
+      await supabase
+        .from('producto_sucursal_minimos')
+        .delete()
+        .eq('sucursal_id', params.sucursalId)
+        .eq('producto_id', params.productoId)
+    } else {
+      // Insertar o actualizar configuración específica
+      const { error: upsertError } = await supabase
+        .from('producto_sucursal_minimos')
+        .upsert({
+          sucursal_id: params.sucursalId,
+          producto_id: params.productoId,
+          stock_minimo: params.stockMinimo,
+          updated_at: new Date().toISOString()
+        })
+
+      if (upsertError) throw upsertError
+    }
+
+    revalidatePath(`/sucursal/inventario/stock-minimo`)
+
+    return {
+      success: true,
+      data: undefined
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: `Error al configurar stock mínimo: ${error instanceof Error ? error.message : 'Error desconocido'}`
+    }
+  }
+}
+
+// Eliminar configuración específica de stock mínimo
+export async function eliminarStockMinimoAction(params: EliminarStockMinimoParams): Promise<ApiResponse<void>> {
+  try {
+    const supabase = await createClient()
+
+    const { error } = await supabase
+      .from('producto_sucursal_minimos')
+      .delete()
+      .eq('sucursal_id', params.sucursalId)
+      .eq('producto_id', params.productoId)
+
+    if (error) throw error
+
+    revalidatePath(`/sucursal/inventario/stock-minimo`)
+
+    return {
+      success: true,
+      data: undefined
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: `Error al eliminar configuración: ${error instanceof Error ? error.message : 'Error desconocido'}`
     }
   }
 }

@@ -378,7 +378,11 @@ async function getVentasData(sidParam?: string) {
       }
     }),
     productosDisponibles: Object.values(productosAgrupados) as ProductoDisponible[],
-    clientes: clientes || [] as Cliente[],
+    clientes: (clientes || []).map(c => ({
+      id: c.id,
+      nombre: c.nombre,
+      codigo: c.codigo || ''
+    })),
     cajas: cajas || [] as Caja[],
     listasPrecios: (listasPrecios || []).filter(lista => {
       // Filtrar por vigencia si está activada

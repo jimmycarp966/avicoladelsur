@@ -49,6 +49,7 @@ function Button({
   variant,
   size,
   asChild = false,
+  onClick,
   ...props
 }: React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
@@ -56,10 +57,29 @@ function Button({
   }) {
   const Comp = asChild ? Slot : "button"
 
+  // Validar que onClick sea una función válida (solo cuando no es asChild)
+  const handleClick = React.useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    if (typeof onClick === 'function') {
+      onClick(e)
+    } else if (onClick) {
+      // Si onClick no es una función pero existe, loguear el error en desarrollo
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Button onClick recibió un valor que no es una función:', onClick)
+      }
+    }
+  }, [onClick])
+
+  // Si es asChild, pasar onClick directamente (Slot maneja sus props)
+  // Si no es asChild, validar y usar handleClick
+  const onClickProp = asChild 
+    ? onClick 
+    : (typeof onClick === 'function' ? handleClick : undefined)
+
   return (
     <Comp
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
+      onClick={onClickProp}
       {...props}
     />
   )

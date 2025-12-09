@@ -62,6 +62,10 @@ export const cerrarCierreCajaSchema = z.object({
   cobranzas_cuenta_corriente: z.number().min(0).default(0),
   gastos: z.number().min(0).default(0),
   retiro_tesoro: z.number().min(0).default(0),
+  arqueo_efectivo: z.number().min(0).default(0),
+  arqueo_transferencia: z.number().min(0).default(0),
+  arqueo_tarjeta: z.number().min(0).default(0),
+  arqueo_qr: z.number().min(0).default(0),
 })
 
 // Schema para registrar retiro al tesoro

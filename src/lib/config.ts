@@ -83,6 +83,7 @@ export const ROLES = {
   ALMACENISTA: 'almacenista',
   TESORERO: 'tesorero',
   SUCURSAL: 'sucursal',
+  ENCARGADO_SUCURSAL: 'encargado_sucursal',
 } as const
 
 export type UserRole = typeof ROLES[keyof typeof ROLES]

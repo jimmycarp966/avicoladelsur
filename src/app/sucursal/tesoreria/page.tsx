@@ -3,10 +3,14 @@ import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { CreditCard, DollarSign, TrendingUp, TrendingDown, RefreshCw, ArrowUpRight, ArrowDownRight, AlertTriangle, Building2 } from 'lucide-react'
+import { CreditCard, DollarSign, TrendingUp, TrendingDown, RefreshCw, ArrowUpRight, ArrowDownRight, AlertTriangle, Building2, LockOpen, Lock } from 'lucide-react'
 import { TesoreriaTable } from '@/components/sucursales/TesoreriaTable'
 import { getSucursalUsuarioConAdmin } from '@/lib/utils'
 import Link from 'next/link'
+import { AbrirCajaDialog } from '@/components/sucursales/AbrirCajaDialog'
+import { CerrarCajaDialog } from '@/components/sucursales/CerrarCajaDialog'
+import { IngresoEgresoDialog } from '@/components/sucursales/IngresoEgresoDialog'
+import { AccionesTesoreria } from '@/components/sucursales/AccionesTesoreria'
 
 interface PageProps {
   searchParams: Promise<{
@@ -45,20 +49,58 @@ async function getTesoreriaSucursal(sidParam?: string) {
         movimientosHoy: 0
       },
       sinSucursal: true,
-      esAdmin: true
+      esAdmin: true,
+      cierreAbierto: null,
+      totalesCierre: {
+        ingresos: 0,
+        egresos: 0,
+        cobranzasCC: 0,
+        gastos: 0
+      }
     }
   }
 
   // Obtener caja de la sucursal
-  const { data: caja, error: cajaError } = await supabase
+  let { data: caja, error: cajaError } = await supabase
     .from('tesoreria_cajas')
     .select('*')
     .eq('sucursal_id', sucursalId)
     .eq('active', true)
-    .single()
+    .maybeSingle()
 
-  if (cajaError || !caja) {
-    throw new Error('No se encontró caja para esta sucursal')
+  // Si no se encuentra caja, crear una automáticamente
+  if (!caja && !cajaError) {
+    // Obtener información de la sucursal para el nombre de la caja
+    const { data: sucursalData } = await supabase
+      .from('sucursales')
+      .select('nombre')
+      .eq('id', sucursalId)
+      .single()
+
+    const nombreCaja = sucursalData?.nombre 
+      ? `Caja ${sucursalData.nombre}` 
+      : `Caja Sucursal ${sucursalId.substring(0, 8)}`
+
+    const { data: nuevaCaja, error: crearError } = await supabase
+      .from('tesoreria_cajas')
+      .insert({
+        nombre: nombreCaja,
+        sucursal_id: sucursalId,
+        saldo_inicial: 0,
+        saldo_actual: 0,
+        moneda: 'ARS',
+        active: true
+      })
+      .select()
+      .single()
+
+    if (crearError || !nuevaCaja) {
+      throw new Error(`No se encontró caja para esta sucursal y no se pudo crear una nueva: ${crearError?.message || 'Error desconocido'}`)
+    }
+
+    caja = nuevaCaja
+  } else if (cajaError || !caja) {
+    throw new Error(`No se encontró caja para esta sucursal: ${cajaError?.message || 'Error desconocido'}`)
   }
 
   // Obtener movimientos recientes (últimos 30 días)
@@ -113,12 +155,62 @@ async function getTesoreriaSucursal(sidParam?: string) {
     }).length
   }
 
+  // Obtener cierre abierto del día
+  const hoy = new Date().toISOString().split('T')[0]
+  const { data: cierreAbierto } = await supabase
+    .from('cierres_caja')
+    .select('*')
+    .eq('caja_id', caja.id)
+    .eq('fecha', hoy)
+    .eq('estado', 'abierto')
+    .maybeSingle()
+
+  // Calcular totales del día para el cierre
+  const fechaInicio = `${hoy}T00:00:00Z`
+  const fechaFin = `${hoy}T23:59:59Z`
+
+  const { data: movimientosDia } = await supabase
+    .from('tesoreria_movimientos')
+    .select('tipo, monto, metodo_pago')
+    .eq('caja_id', caja.id)
+    .gte('created_at', fechaInicio)
+    .lte('created_at', fechaFin)
+
+  const totalIngresosDia = movimientosDia?.filter(m => m.tipo === 'ingreso').reduce((sum, m) => sum + Number(m.monto), 0) || 0
+  const totalEgresosDia = movimientosDia?.filter(m => m.tipo === 'egreso').reduce((sum, m) => sum + Number(m.monto), 0) || 0
+
+  // Obtener cobranzas de cuenta corriente del día
+  const { data: cobranzasDia } = await supabase
+    .from('cuentas_movimientos')
+    .select('monto')
+    .eq('tipo', 'pago')
+    .gte('fecha', fechaInicio)
+    .lte('fecha', fechaFin)
+
+  const totalCobranzasCC = cobranzasDia?.reduce((sum, c) => sum + Number(c.monto), 0) || 0
+
+  // Obtener gastos del día
+  const { data: gastosDia } = await supabase
+    .from('gastos')
+    .select('monto')
+    .eq('fecha', hoy)
+    .eq('afecta_caja', true)
+
+  const totalGastosDia = gastosDia?.reduce((sum, g) => sum + Number(g.monto), 0) || 0
+
   return {
     caja,
     movimientos: movimientosList,
     estadisticas,
     sinSucursal: false,
-    esAdmin
+    esAdmin,
+    cierreAbierto,
+    totalesCierre: {
+      ingresos: totalIngresosDia,
+      egresos: totalEgresosDia,
+      cobranzasCC: totalCobranzasCC,
+      gastos: totalGastosDia,
+    }
   }
 }
 
@@ -126,6 +218,11 @@ export default async function SucursalTesoreriaPage({ searchParams }: PageProps)
   const params = await searchParams
   try {
     const data = await getTesoreriaSucursal(params.sid)
+    
+    // Si no hay caja, mostrar error
+    if (!data.caja) {
+      throw new Error('No se encontró caja para esta sucursal')
+    }
 
     // Si es admin sin sucursal, mostrar mensaje informativo
     if (data.sinSucursal && data.esAdmin) {
@@ -167,6 +264,14 @@ export default async function SucursalTesoreriaPage({ searchParams }: PageProps)
               Control y seguimiento de caja y movimientos financieros
             </p>
           </div>
+          <AccionesTesoreria 
+            cajaId={data.caja.id}
+            cajaNombre={data.caja.nombre}
+            cierreAbierto={data.cierreAbierto}
+            totalesCierre={data.totalesCierre}
+            saldoInicial={data.cierreAbierto?.saldo_inicial || data.caja.saldo_actual}
+            saldoActual={data.caja.saldo_actual}
+          />
         </div>
 
         {/* Información de Caja */}

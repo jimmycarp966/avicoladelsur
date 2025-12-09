@@ -21,7 +21,6 @@ interface Cliente {
   id: string
   nombre: string
   codigo: string
-  apellido?: string // Opcional para compatibilidad
 }
 
 interface Caja {

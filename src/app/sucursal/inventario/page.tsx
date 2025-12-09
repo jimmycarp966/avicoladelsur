@@ -159,34 +159,40 @@ export default async function SucursalInventarioPage({ searchParams }: PageProps
               </div>
             ) : (
               <div className="space-y-4">
-                {data.productos.map((item, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-4 border rounded-lg"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                        <Package className="w-5 h-5 text-primary" />
+                {data.productos.map((item, index) => {
+                  const producto = Array.isArray(item.productos) 
+                    ? item.productos[0] 
+                    : (item.productos as { nombre?: string; codigo?: string } | null)
+                  
+                  return (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-4 border rounded-lg"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                          <Package className="w-5 h-5 text-primary" />
+                        </div>
+
+                        <div>
+                          <h4 className="font-semibold">
+                            {producto?.nombre || 'Producto desconocido'}
+                          </h4>
+                          {producto?.codigo && (
+                            <Badge variant="outline" className="text-xs">
+                              {producto.codigo}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
 
-                      <div>
-                        <h4 className="font-semibold">
-                          {item.productos?.[0]?.nombre || 'Producto desconocido'}
-                        </h4>
-                        {item.productos?.[0]?.codigo && (
-                          <Badge variant="outline" className="text-xs">
-                            {item.productos[0].codigo}
-                          </Badge>
-                        )}
+                      <div className="text-right">
+                        <div className="text-lg font-bold">{item.cantidad_disponible}</div>
+                        <div className="text-sm text-muted-foreground">unidades</div>
                       </div>
                     </div>
-
-                    <div className="text-right">
-                      <div className="text-lg font-bold">{item.cantidad_disponible}</div>
-                      <div className="text-sm text-muted-foreground">unidades</div>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </CardContent>

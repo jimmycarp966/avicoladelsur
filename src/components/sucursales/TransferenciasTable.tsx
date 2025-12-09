@@ -9,16 +9,16 @@ interface Transferencia {
   id: string
   numero_transferencia: string
   estado: string
-  sucursal_origen: { id: string; nombre: string }
-  sucursal_destino: { id: string; nombre: string }
+  sucursal_origen?: { id: string; nombre: string } | null
+  sucursal_destino?: { id: string; nombre: string } | null
   fecha_solicitud: string
-  items: Array<{
+  items?: Array<{
     id: string
     cantidad_solicitada: number
     cantidad_enviada: number | null
     cantidad_recibida: number | null
     producto: { nombre: string; codigo: string } | null
-  }>
+  }> | null
 }
 
 interface TransferenciasTableProps {
@@ -63,11 +63,19 @@ export function TransferenciasTable({ transferencias, sucursalId }: Transferenci
   }
 
   const getTipoTransferencia = (transferencia: Transferencia) => {
-    if (transferencia.sucursal_origen.id === sucursalId) {
+    const esOrigen = transferencia.sucursal_origen?.id === sucursalId
+    const esDestino = transferencia.sucursal_destino?.id === sucursalId
+
+    if (esOrigen) {
       return { tipo: 'origen', icon: ArrowRight, label: 'Enviada' }
-    } else {
+    }
+
+    if (esDestino) {
       return { tipo: 'destino', icon: ArrowLeft, label: 'Recibida' }
     }
+
+    // Caso defensivo: transferencia sin relaciones cargadas
+    return { tipo: 'desconocido', icon: ArrowRight, label: 'Transferencia' }
   }
 
   if (transferencias.length === 0) {
@@ -87,21 +95,32 @@ export function TransferenciasTable({ transferencias, sucursalId }: Transferenci
       {transferencias.map((transferencia) => {
         const { tipo, icon: DirectionIcon, label } = getTipoTransferencia(transferencia)
         const totalItems = transferencia.items?.length || 0
-        const totalCantidad = transferencia.items?.reduce((sum, item) =>
-          sum + (item.cantidad_solicitada || 0), 0
-        ) || 0
+        const totalCantidad =
+          transferencia.items?.reduce((sum, item) => sum + (item.cantidad_solicitada || 0), 0) || 0
 
         return (
           <Card key={transferencia.id} className="hover:shadow-md transition-shadow">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4 flex-1">
-                  <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                    tipo === 'origen' ? 'bg-blue-100' : 'bg-green-100'
-                  }`}>
-                    <DirectionIcon className={`w-6 h-6 ${
-                      tipo === 'origen' ? 'text-blue-600' : 'text-green-600'
-                    }`} />
+                  <div
+                    className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                      tipo === 'origen'
+                        ? 'bg-blue-100'
+                        : tipo === 'destino'
+                          ? 'bg-green-100'
+                          : 'bg-muted'
+                    }`}
+                  >
+                    <DirectionIcon
+                      className={`w-6 h-6 ${
+                        tipo === 'origen'
+                          ? 'text-blue-600'
+                          : tipo === 'destino'
+                            ? 'text-green-600'
+                            : 'text-muted-foreground'
+                      }`}
+                    />
                   </div>
 
                   <div className="flex-1">
@@ -117,7 +136,9 @@ export function TransferenciasTable({ transferencias, sucursalId }: Transferenci
                       <span className="flex items-center gap-1">
                         <span>{tipo === 'origen' ? 'Para:' : 'Desde:'}</span>
                         <span className="font-medium">
-                          {tipo === 'origen' ? transferencia.sucursal_destino.nombre : transferencia.sucursal_origen.nombre}
+                          {tipo === 'origen'
+                            ? transferencia.sucursal_destino?.nombre || 'Sucursal destino'
+                            : transferencia.sucursal_origen?.nombre || 'Sucursal origen'}
                         </span>
                       </span>
 
@@ -167,9 +188,9 @@ export function TransferenciasTable({ transferencias, sucursalId }: Transferenci
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div className="text-sm text-muted-foreground">
-              <strong>{transferencias.filter(t => t.sucursal_origen.id === sucursalId).length}</strong> enviadas •
-              <strong> {transferencias.filter(t => t.sucursal_destino.id === sucursalId).length}</strong> recibidas •
-              <strong> {transferencias.filter(t => t.estado === 'recibida').length}</strong> completadas
+              <strong>{transferencias.filter((t) => t.sucursal_origen?.id === sucursalId).length}</strong> enviadas •
+              <strong> {transferencias.filter((t) => t.sucursal_destino?.id === sucursalId).length}</strong> recibidas •
+              <strong> {transferencias.filter((t) => t.estado === 'recibida').length}</strong> completadas
             </div>
 
             <div className="text-right">

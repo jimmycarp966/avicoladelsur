@@ -259,64 +259,57 @@ export async function obtenerConteoStockAction(
   try {
     const supabase = await createClient()
 
-    // Obtener conteo
-    const { data: conteo, error: conteoError } = await supabase
-      .from('conteos_stock')
-      .select('*')
-      .eq('id', conteoId)
-      .single()
+    // Usar función RPC que bypasea RLS y valida permisos
+    const { data, error } = await supabase.rpc('fn_obtener_conteo_stock', {
+      p_conteo_id: conteoId
+    })
 
-    if (conteoError) {
-      return { success: false, error: `Error al obtener conteo: ${conteoError.message}` }
+    if (error) {
+      return { success: false, error: `Error al obtener conteo: ${error.message}` }
     }
+
+    if (!data || !data.success) {
+      return { success: false, error: data?.error || 'Conteo no encontrado' }
+    }
+
+    const conteoData = data.data
 
     // Obtener nombre del usuario que realizó el conteo
     let nombreUsuario = 'Desconocido'
-    if (conteo.realizado_por) {
-      const { data: usuarioData } = await supabase
+    if (conteoData.realizado_por) {
+      const { data: usuarioData, error: usuarioError } = await supabase
         .from('usuarios')
         .select('nombre')
-        .eq('id', conteo.realizado_por)
-        .single()
+        .eq('id', conteoData.realizado_por)
+        .maybeSingle()
       
-      if (usuarioData) {
+      if (!usuarioError && usuarioData) {
         nombreUsuario = usuarioData.nombre || 'Desconocido'
       }
     }
 
-    // Obtener items
-    const { data: items, error: itemsError } = await supabase
-      .from('conteo_stock_items')
-      .select(`
-        *,
-        productos (nombre)
-      `)
-      .eq('conteo_id', conteoId)
-      .order('productos(nombre)')
-
-    if (itemsError) {
-      return { success: false, error: `Error al obtener items: ${itemsError.message}` }
-    }
+    // Mapear items del resultado
+    const items = (conteoData.items || []).map((item: any) => ({
+      productoId: item.producto_id,
+      productoNombre: item.producto_nombre || 'Producto',
+      cantidadTeorica: item.cantidad_teorica,
+      cantidadContada: item.cantidad_contada,
+      diferencia: item.diferencia || 0,
+      costoUnitario: item.costo_unitario_promedio || 0,
+      valorDiferencia: item.valor_diferencia || 0
+    }))
 
     return {
       success: true,
       data: {
-        id: conteo.id,
-        sucursalId: conteo.sucursal_id,
-        fechaConteo: conteo.fecha_conteo,
-        estado: conteo.estado,
+        id: conteoData.id,
+        sucursalId: conteoData.sucursal_id,
+        fechaConteo: conteoData.fecha_conteo,
+        estado: conteoData.estado,
         realizadoPor: nombreUsuario,
-        totalDiferencias: conteo.total_diferencias || 0,
-        totalMermaValor: conteo.total_merma_valor || 0,
-        items: items.map(item => ({
-          productoId: item.producto_id,
-          productoNombre: (item.productos as { nombre: string })?.nombre || 'Producto',
-          cantidadTeorica: item.cantidad_teorica,
-          cantidadContada: item.cantidad_contada,
-          diferencia: item.diferencia || 0,
-          costoUnitario: item.costo_unitario_promedio || 0,
-          valorDiferencia: item.valor_diferencia || 0
-        }))
+        totalDiferencias: conteoData.total_diferencias || 0,
+        totalMermaValor: conteoData.total_merma_valor || 0,
+        items
       }
     }
   } catch (error) {
@@ -456,13 +449,13 @@ export async function listarConteosStockAction(
         let nombreRealizadoPor = 'Desconocido'
         
         if (conteo.realizado_por) {
-          const { data: usuarioData } = await supabase
+          const { data: usuarioData, error: usuarioError } = await supabase
             .from('usuarios')
             .select('nombre')
             .eq('id', conteo.realizado_por)
-            .single()
+            .maybeSingle()
           
-          if (usuarioData) {
+          if (!usuarioError && usuarioData) {
             nombreRealizadoPor = usuarioData.nombre || 'Desconocido'
           }
         }

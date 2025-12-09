@@ -36,6 +36,7 @@ const navigation = [
     icon: Package,
     children: [
       { name: 'Inventario', href: '/sucursal/inventario', icon: Package },
+      { name: 'Stock Mínimo', href: '/sucursal/inventario/stock-minimo', icon: Scale },
       { name: 'Conteos de Stock', href: '/sucursal/inventario/conteos', icon: ClipboardList },
       { name: 'Ventas (POS)', href: '/sucursal/ventas', icon: ShoppingCart },
       { name: 'Alertas de Stock', href: '/sucursal/alerts', icon: AlertTriangle, badge: 'alerts' },

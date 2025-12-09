@@ -98,31 +98,55 @@ export function ConteosStockContent({ data }: { data: ConteosData }) {
       const result = await iniciarConteoStockAction(data.sucursalId)
       if (result.success && result.data) {
         toast.success('Conteo iniciado correctamente')
-        // Cargar el conteo recién creado
-        await cargarConteo(result.data.conteoId)
-        setDialogAbierto(true)
+        // Intentar cargar el conteo con reintentos
+        let cargaResult = false
+        for (let intento = 0; intento < 3; intento++) {
+          // Pequeño delay antes de cada intento
+          await new Promise(resolve => setTimeout(resolve, 300))
+          cargaResult = await cargarConteo(result.data.conteoId)
+          if (cargaResult) {
+            setDialogAbierto(true)
+            break
+          }
+          // Si es el último intento y falló, mostrar mensaje y recargar
+          if (intento === 2) {
+            toast.info('Conteo creado. Recargando página...')
+            setTimeout(() => window.location.reload(), 1000)
+          }
+        }
       } else {
-        toast.error(result.error || 'Error al iniciar conteo')
+        const errorMsg = result.error || 'Error al iniciar conteo'
+        toast.error(errorMsg)
+        // Si hay un conteo existente, recargar la página para mostrarlo
+        if (errorMsg.includes('Ya existe un conteo en proceso')) {
+          setTimeout(() => window.location.reload(), 2000)
+        }
       }
     } catch (error) {
       toast.error('Error al iniciar conteo')
+      console.error('Error al iniciar conteo:', error)
     } finally {
       setIniciandoConteo(false)
     }
   }
 
   // Cargar conteo existente
-  const cargarConteo = async (conteoId: string) => {
+  const cargarConteo = async (conteoId: string): Promise<boolean> => {
     setCargandoConteo(true)
     try {
       const result = await obtenerConteoStockAction(conteoId)
       if (result.success && result.data) {
         setConteoActivo(result.data)
+        return true
       } else {
         toast.error(result.error || 'Error al cargar conteo')
+        console.error('Error al cargar conteo:', result.error)
+        return false
       }
     } catch (error) {
       toast.error('Error al cargar conteo')
+      console.error('Error al cargar conteo:', error)
+      return false
     } finally {
       setCargandoConteo(false)
     }

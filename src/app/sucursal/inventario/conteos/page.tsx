@@ -68,23 +68,23 @@ async function getConteosData(sidParam?: string) {
       let nombreAprobadoPor = null
 
       if (conteo.realizado_por) {
-        const { data: usuarioRealizado } = await supabase
+        const { data: usuarioRealizado, error: errorRealizado } = await supabase
           .from('usuarios')
           .select('nombre')
           .eq('id', conteo.realizado_por)
-          .single()
-        if (usuarioRealizado) {
+          .maybeSingle()
+        if (!errorRealizado && usuarioRealizado) {
           nombreRealizadoPor = usuarioRealizado.nombre || 'Desconocido'
         }
       }
 
       if (conteo.aprobado_por) {
-        const { data: usuarioAprobado } = await supabase
+        const { data: usuarioAprobado, error: errorAprobado } = await supabase
           .from('usuarios')
           .select('nombre')
           .eq('id', conteo.aprobado_por)
-          .single()
-        if (usuarioAprobado) {
+          .maybeSingle()
+        if (!errorAprobado && usuarioAprobado) {
           nombreAprobadoPor = usuarioAprobado.nombre
         }
       }
@@ -98,11 +98,11 @@ async function getConteosData(sidParam?: string) {
   )
 
   // Obtener sucursal info
-  const { data: sucursal } = await supabase
+  const { data: sucursal, error: sucursalError } = await supabase
     .from('sucursales')
     .select('id, nombre')
     .eq('id', sucursalId)
-    .single()
+    .maybeSingle()
 
   // Mapear conteos al formato esperado por el componente
   const conteosMapeados = conteosConUsuarios.map(conteo => ({

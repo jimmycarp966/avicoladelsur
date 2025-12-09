@@ -448,6 +448,101 @@ export async function obtenerTransferenciaAction(id: string) {
 }
 
 // =============================================
+// GESTIÓN STOCK MÍNIMO POR SUCURSAL
+// =============================================
+
+// Obtener stock mínimo de un producto para una sucursal específica
+export async function obtenerStockMinimoSucursalAction(sucursalId: string, productoId: string) {
+  try {
+    const supabase = await createClient()
+
+    // Primero buscar en la tabla específica de sucursal
+    const { data: minimoSucursal, error: errorSucursal } = await supabase
+      .from('producto_sucursal_minimos')
+      .select('stock_minimo')
+      .eq('sucursal_id', sucursalId)
+      .eq('producto_id', productoId)
+      .single()
+
+    if (minimoSucursal) {
+      return { stock_minimo: minimoSucursal.stock_minimo, tipo: 'sucursal' }
+    }
+
+    // Si no existe, usar el global del producto
+    const { data: producto, error: errorProducto } = await supabase
+      .from('productos')
+      .select('stock_minimo')
+      .eq('id', productoId)
+      .single()
+
+    if (errorProducto) throw errorProducto
+
+    return {
+      stock_minimo: producto?.stock_minimo || 0,
+      tipo: 'global'
+    }
+  } catch (error) {
+    devError('Error en obtenerStockMinimoSucursalAction:', error)
+    return { stock_minimo: 0, tipo: 'error' }
+  }
+}
+
+// Actualizar stock mínimo de un producto para una sucursal específica
+export async function actualizarStockMinimoSucursalAction(
+  sucursalId: string,
+  productoId: string,
+  stockMinimo: number
+) {
+  try {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+      .from('producto_sucursal_minimos')
+      .upsert({
+        sucursal_id: sucursalId,
+        producto_id: productoId,
+        stock_minimo: stockMinimo,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'sucursal_id,producto_id'
+      })
+      .select()
+
+    if (error) throw error
+
+    return { success: true, data }
+  } catch (error) {
+    devError('Error en actualizarStockMinimoSucursalAction:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Error desconocido' }
+  }
+}
+
+// Obtener todos los stock mínimos de una sucursal (para gestión masiva)
+export async function obtenerTodosStockMinimosSucursalAction(sucursalId: string) {
+  try {
+    const supabase = await createClient()
+
+    // Obtener productos con stock mínimo configurado para la sucursal
+    const { data: minimosSucursal, error: errorSucursal } = await supabase
+      .from('producto_sucursal_minimos')
+      .select(`
+        producto_id,
+        stock_minimo,
+        updated_at,
+        producto:productos(id, nombre, codigo, unidad_medida, stock_minimo)
+      `)
+      .eq('sucursal_id', sucursalId)
+
+    if (errorSucursal) throw errorSucursal
+
+    return minimosSucursal || []
+  } catch (error) {
+    devError('Error en obtenerTodosStockMinimosSucursalAction:', error)
+    return []
+  }
+}
+
+// =============================================
 // NUEVAS FUNCIONES: Flujo integrado con presupuestos
 // =============================================
 

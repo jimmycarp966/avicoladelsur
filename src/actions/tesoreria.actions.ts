@@ -20,6 +20,10 @@ const cerrarCierreCajaSchema = z.object({
   cobranzas_cuenta_corriente: z.number(),
   gastos: z.number(),
   retiro_tesoro: z.number(),
+  arqueo_efectivo: z.number().min(0).default(0),
+  arqueo_transferencia: z.number().min(0).default(0),
+  arqueo_tarjeta: z.number().min(0).default(0),
+  arqueo_qr: z.number().min(0).default(0),
 })
 
 const registrarRetiroTesoroSchema = z.object({
@@ -53,7 +57,7 @@ export async function obtenerMovimientosTiempoRealAction(
       .eq('id', user.id)
       .single()
 
-    if (!usuario || !['admin', 'vendedor'].includes(usuario.rol)) {
+    if (!usuario || !['admin', 'vendedor', 'encargado_sucursal'].includes(usuario.rol)) {
       return { success: false, error: 'No tienes permisos para ver movimientos' }
     }
 
@@ -187,12 +191,14 @@ export async function crearCierreCajaAction(formData: FormData) {
       .eq('id', user.id)
       .single()
 
-    if (!usuario || !['admin', 'vendedor'].includes(usuario.rol)) {
+    if (!usuario || !['admin', 'vendedor', 'encargado_sucursal'].includes(usuario.rol)) {
       return { success: false, error: 'No tienes permisos para crear cierres de caja' }
     }
 
     // Parsear y validar datos
     const rawData = Object.fromEntries(formData)
+    const saldoInicialManual = rawData.saldo_inicial ? parseFloat(rawData.saldo_inicial as string) : null
+    
     const data = crearCierreCajaSchema.parse({
       caja_id: rawData.caja_id,
       fecha: rawData.fecha,
@@ -204,7 +210,7 @@ export async function crearCierreCajaAction(formData: FormData) {
       .select('id, estado')
       .eq('caja_id', data.caja_id)
       .eq('fecha', data.fecha)
-      .single()
+      .maybeSingle()
 
     if (cierreExistente) {
       if (cierreExistente.estado === 'abierto') {
@@ -213,7 +219,7 @@ export async function crearCierreCajaAction(formData: FormData) {
       return { success: false, error: 'Ya existe un cierre cerrado para esta caja y fecha' }
     }
 
-    // Obtener saldo inicial de la caja
+    // Obtener saldo actual de la caja
     const { data: caja } = await supabase
       .from('tesoreria_cajas')
       .select('saldo_actual')
@@ -224,13 +230,16 @@ export async function crearCierreCajaAction(formData: FormData) {
       return { success: false, error: 'Caja no encontrada' }
     }
 
+    // Usar saldo manual si se proporcionó, sino usar el saldo actual de la caja
+    const saldoInicialFinal = saldoInicialManual !== null ? saldoInicialManual : caja.saldo_actual
+
     // Crear cierre
     const { data: cierre, error } = await supabase
       .from('cierres_caja')
       .insert({
         caja_id: data.caja_id,
         fecha: data.fecha,
-        saldo_inicial: caja.saldo_actual,
+        saldo_inicial: saldoInicialFinal,
         estado: 'abierto',
       })
       .select()
@@ -272,7 +281,7 @@ export async function cerrarCierreCajaAction(formData: FormData) {
       .eq('id', user.id)
       .single()
 
-    if (!usuario || !['admin', 'vendedor'].includes(usuario.rol)) {
+    if (!usuario || !['admin', 'vendedor', 'encargado_sucursal'].includes(usuario.rol)) {
       return { success: false, error: 'No tienes permisos para cerrar cierres de caja' }
     }
 
@@ -286,6 +295,10 @@ export async function cerrarCierreCajaAction(formData: FormData) {
       cobranzas_cuenta_corriente: parseFloat(rawData.cobranzas_cuenta_corriente as string),
       gastos: parseFloat(rawData.gastos as string),
       retiro_tesoro: parseFloat(rawData.retiro_tesoro as string),
+      arqueo_efectivo: parseFloat(rawData.arqueo_efectivo as string) || 0,
+      arqueo_transferencia: parseFloat(rawData.arqueo_transferencia as string) || 0,
+      arqueo_tarjeta: parseFloat(rawData.arqueo_tarjeta as string) || 0,
+      arqueo_qr: parseFloat(rawData.arqueo_qr as string) || 0,
     })
 
     // Obtener cierre
@@ -313,6 +326,10 @@ export async function cerrarCierreCajaAction(formData: FormData) {
         cobranzas_cuenta_corriente: data.cobranzas_cuenta_corriente,
         gastos: data.gastos,
         retiro_tesoro: data.retiro_tesoro,
+        arqueo_efectivo: data.arqueo_efectivo,
+        arqueo_transferencia: data.arqueo_transferencia,
+        arqueo_tarjeta: data.arqueo_tarjeta,
+        arqueo_qr: data.arqueo_qr,
         estado: 'cerrado',
         updated_at: getNowArgentina().toISOString(),
       })
@@ -349,6 +366,34 @@ export async function cerrarCierreCajaAction(formData: FormData) {
   }
 }
 
+// Obtener cierre de caja abierto del día actual
+export async function obtenerCierreAbiertoAction(cajaId: string) {
+  try {
+    const supabase = await createClient()
+    
+    // Obtener fecha actual en Argentina
+    const hoy = getTodayArgentina()
+    
+    const { data: cierre, error } = await supabase
+      .from('cierres_caja')
+      .select('*')
+      .eq('caja_id', cajaId)
+      .eq('fecha', hoy)
+      .eq('estado', 'abierto')
+      .maybeSingle()
+    
+    if (error) throw error
+    
+    return {
+      success: true,
+      data: cierre
+    }
+  } catch (error: any) {
+    devError('Error en obtenerCierreAbierto:', error)
+    return { success: false, error: error.message || 'Error al obtener cierre abierto' }
+  }
+}
+
 // Registrar retiro al tesoro
 export async function registrarRetiroTesoroAction(formData: FormData) {
   try {
@@ -367,7 +412,7 @@ export async function registrarRetiroTesoroAction(formData: FormData) {
       .eq('id', user.id)
       .single()
 
-    if (!usuario || !['admin', 'vendedor'].includes(usuario.rol)) {
+    if (!usuario || !['admin', 'vendedor', 'encargado_sucursal'].includes(usuario.rol)) {
       return { success: false, error: 'No tienes permisos para registrar retiros' }
     }
 
@@ -425,7 +470,7 @@ export async function registrarDepositoBancarioAction(formData: FormData) {
       .eq('id', user.id)
       .single()
 
-    if (!usuario || !['admin', 'vendedor'].includes(usuario.rol)) {
+    if (!usuario || !['admin', 'vendedor', 'encargado_sucursal'].includes(usuario.rol)) {
       return { success: false, error: 'No tienes permisos para registrar depósitos' }
     }
 
@@ -518,7 +563,7 @@ export async function listarCajasAction() {
 }
 
 // Crear caja
-export async function crearCajaAction(data: { nombre: string; saldo_inicial?: number; moneda?: string }) {
+export async function crearCajaAction(data: { nombre: string; saldo_inicial?: number; moneda?: string; sucursal_id?: string }) {
   try {
     const supabase = await createClient()
     const { data: caja, error } = await supabase
@@ -526,7 +571,10 @@ export async function crearCajaAction(data: { nombre: string; saldo_inicial?: nu
       .insert({
         nombre: data.nombre,
         saldo_actual: data.saldo_inicial || 0,
+        saldo_inicial: data.saldo_inicial || 0,
         moneda: data.moneda || 'ARS',
+        sucursal_id: data.sucursal_id || null,
+        active: true
       })
       .select()
       .single()

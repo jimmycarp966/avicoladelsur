@@ -217,6 +217,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
             case 'vendedor':
               redirectTo = '/almacen/pedidos'
               break
+            case 'encargado_sucursal':
+              redirectTo = '/sucursal/dashboard'
+              break
             case 'repartidor':
               redirectTo = '/home'
               break

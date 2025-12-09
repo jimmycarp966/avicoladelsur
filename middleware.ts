@@ -161,7 +161,17 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/unauthorized', request.url))
   }
 
-  if (isSellerRoute && !['admin', 'vendedor', 'sucursal'].includes(userRole)) {
+  if (isSellerRoute && !['admin', 'vendedor', 'encargado_sucursal'].includes(userRole)) {
+    return NextResponse.redirect(new URL('/unauthorized', request.url))
+  }
+  
+  // Rutas de sucursal (solo para encargado_sucursal y admin)
+  const sucursalRoutes = [
+    '/sucursal',
+  ]
+  const isSucursalRoute = sucursalRoutes.some(route => pathname.startsWith(route))
+  
+  if (isSucursalRoute && !['admin', 'encargado_sucursal'].includes(userRole)) {
     return NextResponse.redirect(new URL('/unauthorized', request.url))
   }
 
@@ -179,9 +189,19 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/unauthorized', request.url))
   }
 
-  if (isTesoreriaRoute && !['admin', 'tesorero'].includes(userRole)) {
-    // Admin y tesorero pueden acceder a tesorería
+  if (isTesoreriaRoute && !['admin', 'tesorero', 'encargado_sucursal'].includes(userRole)) {
+    // Admin, tesorero y encargado_sucursal pueden acceder a tesorería (con restricciones RLS)
     return NextResponse.redirect(new URL('/unauthorized', request.url))
+  }
+  
+  // Redirección automática para encargado_sucursal
+  if (userRole === 'encargado_sucursal' && pathname === '/dashboard') {
+    return NextResponse.redirect(new URL('/sucursal/dashboard', request.url))
+  }
+  
+  // Redirección automática para encargado_sucursal desde raíz
+  if (userRole === 'encargado_sucursal' && pathname === '/') {
+    return NextResponse.redirect(new URL('/sucursal/dashboard', request.url))
   }
 
   if (isDriverRoute && userRole !== 'repartidor') {

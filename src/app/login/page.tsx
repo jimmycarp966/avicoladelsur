@@ -54,6 +54,8 @@ export default async function LoginPage() {
         redirect('/dashboard')
       case 'vendedor':
         redirect('/almacen/pedidos')
+      case 'encargado_sucursal':
+        redirect('/sucursal/dashboard')
       case 'repartidor':
         redirect('/home')
       case 'almacenista':

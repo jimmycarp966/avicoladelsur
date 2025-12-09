@@ -74,7 +74,7 @@ supabase/                         # Scripts SQL y migraciones
 4. **Turnos Automáticos**: Pedidos sin turno definido lo heredan según hora de confirmación (<05:00 mañana mismo día, 05:00-15:00 tarde mismo día, ≥15:00 mañana día siguiente)
 5. **Asignación Automática**: fn_asignar_pedido_a_ruta() busca rutas planificadas y valida capacidad por peso final
 6. **FIFO Automático**: Sistema de lotes con descuento automático del más antiguo primero
-7. **RLS Estricto**: Cada tabla tiene Row Level Security por roles (admin, vendedor, repartidor, almacenista)
+7. **RLS Estricto**: Cada tabla tiene Row Level Security por roles (admin, vendedor, encargado_sucursal, repartidor, almacenista, tesorero)
 8. **Validación Preventiva**: Clientes bloqueados por deuda no pueden crear pedidos
 9. **Operaciones Atómicas**: Todas las transacciones críticas usan RPCs de Postgres
 10. **Trazabilidad Completa**: Desde lote específico usado hasta firma digital de entrega
@@ -179,7 +179,8 @@ supabase/                         # Scripts SQL y migraciones
 - **Confirmación**: SÍ/NO explícito antes de crear pedido
 
 ### 🔐 **Autenticación**: Sistema de Roles
-- **4 Roles**: admin(vendedor+almacen+reparto), vendedor, repartidor, almacenista
+- **5 Roles principales**: admin (acceso completo), vendedor (casa central - ventas y presupuestos), encargado_sucursal (sucursales - gestión local), repartidor (PWA móvil), almacenista (almacén central)
+- **Roles adicionales**: tesorero (tesorería central)
 - **RLS**: Políticas por tabla/rol en Supabase
 - **JWT**: Autenticación stateless con refresh automático
 - **Redirección Inteligente**: Usuarios con sucursal asignada son redirigidos automáticamente a `/sucursal/dashboard` al iniciar sesión
@@ -278,7 +279,11 @@ supabase/                         # Scripts SQL y migraciones
 - ✅ **Función Helper Mejorada**: `getSucursalUsuario()` usa `maybeSingle()` para manejar mejor casos sin registro
 - ✅ **Migración SQL**: `20250101_fix_rls_rrhh_empleados_lectura.sql` agrega la política necesaria para lectura de empleados
 - ✅ **Integración Completa**: Funciona tanto en Server Actions (`auth.actions.ts`) como en Client Components (`AuthProvider.tsx`)
-- ✅ **Fallback Inteligente**: Si no tiene sucursal asignada, redirige según rol (admin → `/dashboard`, vendedor → `/almacen/pedidos`, etc.)
+- ✅ **Fallback Inteligente**: Si no tiene sucursal asignada, redirige según rol (admin → `/dashboard`, vendedor → `/almacen/pedidos`, encargado_sucursal → `/sucursal/dashboard`, etc.)
+- ✅ **Separación de Roles**: Usuarios con `sucursal_id` en `rrhh_empleados` tienen rol `encargado_sucursal` (migración automática desde `vendedor`), mientras que vendedores de casa central mantienen rol `vendedor`
+- ✅ **Permisos por Rol**: 
+  - `encargado_sucursal`: Acceso completo a módulos de su sucursal (dashboard, inventario, ventas POS, tesorería), solo lectura de presupuestos/pedidos, puede recibir transferencias pero no crearlas
+  - `vendedor`: Acceso a módulos centrales (presupuestos, clientes, listas de precios, facturas, almacén central, rutas de reparto), solo lectura de sucursales
 
 ### **Vista Previa de Clientes en Monitor GPS (Diciembre 2025)**
 - ✅ **Panel lateral de números**: Lista clickeable de clientes con números ordenados por ruta seleccionada

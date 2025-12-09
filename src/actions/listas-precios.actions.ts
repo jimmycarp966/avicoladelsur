@@ -483,7 +483,6 @@ export async function obtenerPreciosListaAction(listaPrecioId: string): Promise<
       `)
       .eq('lista_precio_id', listaPrecioId)
       .eq('activo', true)
-      .order('producto(nombre)', { ascending: true })
 
     if (error) {
       devError('Error obteniendo precios de lista:', error)
@@ -493,7 +492,14 @@ export async function obtenerPreciosListaAction(listaPrecioId: string): Promise<
       return { success: false, error: `Error al obtener precios: ${error.message || 'Error desconocido'}` }
     }
 
-    return { success: true, data }
+    // Ordenar por nombre del producto en JavaScript
+    const dataOrdenada = (data || []).sort((a: any, b: any) => {
+      const nombreA = a.producto?.nombre || ''
+      const nombreB = b.producto?.nombre || ''
+      return nombreA.localeCompare(nombreB)
+    })
+
+    return { success: true, data: dataOrdenada }
   } catch (error) {
     devError('Error en obtenerPreciosListaAction:', error)
     return { success: false, error: 'Error interno del servidor' }
@@ -640,6 +646,108 @@ export async function guardarPrecioProductoAction(formData: FormData): Promise<A
       return { success: false, error: error.issues[0].message }
     }
     devError('Error en guardarPrecioProductoAction:', error)
+    return { success: false, error: 'Error interno del servidor' }
+  }
+}
+
+// Obtener todos los precios de un producto en todas las listas
+export async function obtenerPreciosProductoEnTodasListasAction(
+  productoId: string
+): Promise<ApiResponse<Array<{
+  lista_precio_id: string
+  lista_precio: {
+    id: string
+    codigo: string
+    nombre: string
+    tipo: string
+    margen_ganancia: number | null
+  }
+  precio: number | null
+  activo: boolean
+  fecha_desde: string | null
+  fecha_hasta: string | null
+}>>> {
+  try {
+    const supabase = await createClient()
+
+    // Obtener todos los precios del producto en todas las listas
+    const { data: precios, error: preciosError } = await supabase
+      .from('precios_productos')
+      .select(`
+        lista_precio_id,
+        precio,
+        activo,
+        fecha_desde,
+        fecha_hasta,
+        lista_precio:listas_precios(
+          id,
+          codigo,
+          nombre,
+          tipo,
+          margen_ganancia
+        )
+      `)
+      .eq('producto_id', productoId)
+
+    if (preciosError) {
+      devError('Error obteniendo precios del producto:', preciosError)
+      return { success: false, error: 'Error al obtener precios del producto' }
+    }
+
+    // Ordenar por nombre de la lista de precios en JavaScript
+    const preciosOrdenados = (precios || []).sort((a: any, b: any) => {
+      const nombreA = a.lista_precio?.nombre || ''
+      const nombreB = b.lista_precio?.nombre || ''
+      return nombreA.localeCompare(nombreB)
+    })
+
+    // Obtener todas las listas activas para mostrar también las que no tienen precio configurado
+    const { data: todasLasListas, error: listasError } = await supabase
+      .from('listas_precios')
+      .select('id, codigo, nombre, tipo, margen_ganancia')
+      .eq('activa', true)
+      .order('nombre', { ascending: true })
+
+    if (listasError) {
+      devError('Error obteniendo listas:', listasError)
+      return { success: false, error: 'Error al obtener listas de precios' }
+    }
+
+    // Combinar: precios existentes + listas sin precio
+    const preciosMap = new Map(
+      preciosOrdenados.map((p: any) => [
+        p.lista_precio_id,
+        {
+          lista_precio_id: p.lista_precio_id,
+          lista_precio: p.lista_precio,
+          precio: p.precio,
+          activo: p.activo,
+          fecha_desde: p.fecha_desde,
+          fecha_hasta: p.fecha_hasta,
+        },
+      ])
+    )
+
+    // Agregar listas que no tienen precio configurado
+    const resultado = todasLasListas.map((lista) => {
+      const precioExistente = preciosMap.get(lista.id)
+      if (precioExistente) {
+        return precioExistente
+      }
+      // Si no hay precio configurado, retornar null para precio (se calculará con margen o precio_venta)
+      return {
+        lista_precio_id: lista.id,
+        lista_precio: lista,
+        precio: null as number | null,
+        activo: false,
+        fecha_desde: null,
+        fecha_hasta: null,
+      }
+    })
+
+    return { success: true, data: resultado }
+  } catch (error) {
+    devError('Error en obtenerPreciosProductoEnTodasListasAction:', error)
     return { success: false, error: 'Error interno del servidor' }
   }
 }

@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { ArrowLeft, Edit, Package, TrendingUp, AlertTriangle } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
-// import { getProductoById } from '@/actions/almacen.actions' // TODO: Implementar cuando esté disponible
+import { obtenerProductoPorIdAction } from '@/actions/almacen.actions'
+import { PreciosProductoListas } from '@/components/productos/precios-producto-listas'
 
 interface ProductoDetallePageProps {
   params: {
@@ -26,30 +27,14 @@ export default async function ProductoDetallePage({ params }: ProductoDetallePag
   const { id } = await params
   const productoId = id
 
-  // En producción, esto sería una llamada real a la base de datos
-  // const producto = await getProductoById(productoId)
-  // if (!producto) notFound()
-
-  // Datos de ejemplo para desarrollo
-  const productoEjemplo = {
-    id: productoId,
-    codigo: 'POLLO001',
-    nombre: 'Pollo Entero',
-    descripcion: 'Pollo entero fresco de granja, criado en condiciones óptimas y procesado siguiendo los más altos estándares de calidad.',
-    categoria: 'Aves',
-    precio_venta: 850.00,
-    precio_costo: 700.00,
-    unidad_medida: 'kg',
-    stock_minimo: 50,
-    stock_actual: 75,
-    activo: true,
-    fecha_creacion: '2024-01-15T10:00:00Z',
-    fecha_actualizacion: '2025-11-05T14:30:00Z',
-    lotes_activos: 3,
-    total_vendido_mes: 120,
+  // Obtener el producto de la base de datos
+  const result = await obtenerProductoPorIdAction(productoId)
+  
+  if (!result.success || !result.data) {
+    notFound()
   }
 
-  const producto = productoEjemplo
+  const producto = result.data
 
   return (
     <div className="space-y-6">
@@ -194,6 +179,13 @@ export default async function ProductoDetallePage({ params }: ProductoDetallePag
           </CardContent>
         </Card>
       </div>
+
+      {/* Precios en Listas de Precios */}
+      <PreciosProductoListas
+        productoId={producto.id}
+        precioCosto={producto.precio_costo}
+        precioVenta={producto.precio_venta}
+      />
 
       {/* Lotes asociados */}
       <Card>

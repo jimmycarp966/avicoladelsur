@@ -64,7 +64,7 @@ const navigation = [
     name: 'Ventas',
     href: '/ventas',
     icon: ShoppingCart,
-    roles: ['admin', 'vendedor', 'sucursal'],
+    roles: ['admin', 'vendedor'],
     children: [
       { name: 'Presupuestos', href: '/ventas/presupuestos' },
       { name: 'Clientes', href: '/ventas/clientes' },

@@ -168,7 +168,7 @@ async function getSucursalData(searchParams?: { sid?: string }) {
       .select('saldo_actual')
       .eq('sucursal_id', sucursalIdFinal)
       .eq('active', true)
-      .single()
+      .maybeSingle()
     caja = cajaData
 
     // Obtener transferencias pendientes
