@@ -16,7 +16,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog'
-import { Check, X, Edit, Package, Building2 } from 'lucide-react'
+import { Check, X, Edit, Package, Building2, Loader2 } from 'lucide-react'
 import { 
     aprobarSolicitudAutomaticaAction, 
     rechazarSolicitudAutomaticaAction 

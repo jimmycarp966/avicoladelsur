@@ -20,7 +20,6 @@ interface ProductoDisponible {
 interface Cliente {
   id: string
   nombre: string
-  apellido: string
   codigo: string
 }
 
@@ -34,11 +33,10 @@ interface VentaDia {
   id: string
   total: number
   estado: string
-  metodo_pago: string
+  metodos_pago: any // JSONB con métodos de pago
   created_at: string
   clientes: {
     nombre: string
-    apellido: string
   } | null
 }
 

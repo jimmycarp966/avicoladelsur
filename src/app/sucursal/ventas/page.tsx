@@ -24,7 +24,6 @@ interface ProductoDisponible {
 interface Cliente {
   id: string
   nombre: string
-  apellido: string
   codigo: string
 }
 
@@ -41,6 +40,27 @@ async function getVentasData(sidParam?: string) {
   const { data: { user }, error: userError } = await supabase.auth.getUser()
   if (userError || !user) {
     throw new Error('Usuario no autenticado')
+  }
+
+  // Verificar que el usuario tiene sesión válida
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+  
+  // Log detallado para debugging
+  console.log('🔍 Debug getVentasData:')
+  console.log('  - User ID:', user.id)
+  console.log('  - User Email:', user.email)
+  console.log('  - Session existe:', !!session)
+  console.log('  - Session error:', sessionError ? JSON.stringify(sessionError, null, 2) : 'Ninguno')
+  console.log('  - Access token:', session?.access_token ? `${session.access_token.substring(0, 20)}...` : 'ausente')
+  console.log('  - Expires at:', session?.expires_at)
+  console.log('  - Token type:', session?.token_type)
+  
+  if (!session) {
+    console.error('❌ No hay sesión válida:', {
+      sessionError,
+      userExists: !!user
+    })
+    throw new Error('Sesión no válida')
   }
 
   // Obtener sucursal del usuario con soporte para admin
@@ -87,24 +107,98 @@ async function getVentasData(sidParam?: string) {
 
   // Obtener ventas del día actual
   const hoy = new Date().toISOString().split('T')[0]
-  const { data: ventasDia, error: ventasError } = await supabase
+  
+  // Primero probar una consulta simple para verificar que RLS funciona
+  const { data: testPedidos, error: testError } = await supabase
     .from('pedidos')
-    .select(`
-      id,
-      total,
-      estado,
-      metodo_pago,
-      created_at,
-      clientes (
-        nombre,
-        apellido
-      )
-    `)
+    .select('id')
+    .limit(1)
+  
+  console.log('🔍 Test inicial de acceso a pedidos:')
+  console.log('  - Tiene datos:', !!testPedidos, 'Cantidad:', testPedidos?.length || 0)
+  console.log('  - Error:', testError ? JSON.stringify(testError, null, 2) : 'Ninguno')
+  console.log('  - Puede acceder:', !testError)
+  if (testError) {
+    console.log('  - Código error:', testError.code)
+    console.log('  - Mensaje error:', testError.message)
+    console.log('  - Detalles error:', testError.details)
+    console.log('  - Hint error:', testError.hint)
+  }
+  
+  // Ahora obtener pedidos con filtros
+  const { data: pedidosData, error: pedidosError } = await supabase
+    .from('pedidos')
+    .select('id, total, estado, metodos_pago, created_at, cliente_id, sucursal_id')
     .eq('sucursal_id', sucursalIdFinal)
-    .eq('estado', 'completado')
+    .in('estado', ['completado', 'entregado', 'facturado'])
     .gte('created_at', `${hoy}T00:00:00.000Z`)
     .lte('created_at', `${hoy}T23:59:59.999Z`)
     .order('created_at', { ascending: false })
+  
+  if (pedidosError) {
+    console.error('❌ Error al obtener pedidos con filtros:', {
+      error: pedidosError,
+      code: pedidosError.code,
+      message: pedidosError.message,
+      details: pedidosError.details,
+      hint: pedidosError.hint,
+      sucursalId: sucursalIdFinal,
+      userId: user.id,
+      userEmail: user.email
+    })
+  } else {
+    console.log('✅ Pedidos obtenidos correctamente:', {
+      cantidad: pedidosData?.length || 0
+    })
+  }
+  
+  // Obtener datos de clientes por separado si hay pedidos
+  let ventasDia: Array<{
+    id: string
+    total: number
+    estado: string
+    metodos_pago: any
+    created_at: string
+    clientes: { nombre: string } | null
+  }> = []
+  if (pedidosData && pedidosData.length > 0) {
+    const clienteIds = [...new Set(pedidosData.map(p => p.cliente_id).filter(Boolean))]
+    
+    if (clienteIds.length > 0) {
+      const { data: clientesData } = await supabase
+        .from('clientes')
+        .select('id, nombre')
+        .in('id', clienteIds)
+      
+      // Crear mapa de clientes
+      const clientesMap = new Map(
+        (clientesData || []).map(c => [c.id, { nombre: c.nombre }])
+      )
+      
+      // Combinar pedidos con datos de clientes
+      ventasDia = pedidosData.map(pedido => ({
+        id: pedido.id,
+        total: pedido.total,
+        estado: pedido.estado,
+        metodos_pago: pedido.metodos_pago,
+        created_at: pedido.created_at,
+        clientes: pedido.cliente_id ? clientesMap.get(pedido.cliente_id) || null : null
+      }))
+    } else {
+      // Si no hay cliente_id, usar estructura sin cliente
+      ventasDia = pedidosData.map(pedido => ({
+        id: pedido.id,
+        total: pedido.total,
+        estado: pedido.estado,
+        metodos_pago: pedido.metodos_pago,
+        created_at: pedido.created_at,
+        clientes: null
+      }))
+    }
+  }
+  
+  // Mantener compatibilidad con código existente
+  const ventasError = pedidosError
 
   // Obtener productos disponibles para venta
   const { data: productosDisponibles, error: productosError } = await supabase
@@ -122,19 +216,51 @@ async function getVentasData(sidParam?: string) {
     .eq('sucursal_id', sucursalIdFinal)
     .gt('cantidad_disponible', 0)
 
+  // Probar acceso a clientes primero
+  const { data: testClientes, error: testClientesError } = await supabase
+    .from('clientes')
+    .select('id')
+    .limit(1)
+  
+  console.log('🔍 Test inicial de acceso a clientes:')
+  console.log('  - Tiene datos:', !!testClientes, 'Cantidad:', testClientes?.length || 0)
+  console.log('  - Error:', testClientesError ? JSON.stringify(testClientesError, null, 2) : 'Ninguno')
+  console.log('  - Puede acceder:', !testClientesError)
+  if (testClientesError) {
+    console.log('  - Código error:', testClientesError.code)
+    console.log('  - Mensaje error:', testClientesError.message)
+    console.log('  - Detalles error:', testClientesError.details)
+    console.log('  - Hint error:', testClientesError.hint)
+  }
+  
   // Obtener clientes disponibles
   const { data: clientes, error: clientesError } = await supabase
     .from('clientes')
-    .select('id, nombre, apellido, codigo')
+    .select('id, nombre, codigo')
     .eq('activo', true)
     .order('nombre')
+  
+  if (clientesError) {
+    console.error('❌ Error al obtener clientes con filtros:', {
+      error: clientesError,
+      code: clientesError.code,
+      message: clientesError.message,
+      details: clientesError.details,
+      hint: clientesError.hint,
+      userId: user.id,
+      userEmail: user.email
+    })
+  } else {
+    console.log('✅ Clientes obtenidos correctamente:', {
+      cantidad: clientes?.length || 0
+    })
+  }
 
   // Obtener cajas disponibles
   const { data: cajas, error: cajasError } = await supabase
     .from('tesoreria_cajas')
     .select('id, nombre, saldo_actual')
     .eq('sucursal_id', sucursalIdFinal)
-    .eq('active', true)
 
   // Obtener listas de precios activas
   const { data: listasPrecios, error: listasError } = await supabase
@@ -143,22 +269,64 @@ async function getVentasData(sidParam?: string) {
     .eq('activa', true)
     .order('tipo')
 
-  // Mejorar manejo de errores con mensajes específicos
-  if (ventasError) {
-    console.error('Error al obtener ventas:', ventasError)
-    throw new Error(`Error al obtener ventas: ${ventasError.message}`)
-  }
+  // Si hay error crítico en pedidos, solo loguear pero continuar (ya manejado arriba)
+  // No lanzar error para permitir que la página se cargue con datos parciales
   if (productosError) {
-    console.error('Error al obtener productos:', productosError)
-    throw new Error(`Error al obtener productos: ${productosError.message}`)
+    // Verificar si el error es realmente un objeto con propiedades o está vacío
+    const hasErrorInfo = productosError && (
+      productosError.code || 
+      productosError.message || 
+      productosError.details || 
+      productosError.hint ||
+      Object.keys(productosError).length > 0
+    )
+    
+    if (hasErrorInfo) {
+      const errorMessage = productosError.message || productosError.details || productosError.hint || JSON.stringify(productosError)
+      console.error('Error al obtener productos:', {
+        error: productosError,
+        code: productosError.code,
+        message: productosError.message,
+        sucursalId: sucursalIdFinal
+      })
+      // No lanzar error, continuar con array vacío
+    } else {
+      // Error vacío - probablemente RLS bloqueando silenciosamente
+      console.warn('Error vacío al obtener productos - posible problema de RLS:', {
+        sucursalId: sucursalIdFinal,
+        hint: 'Verifica que las políticas RLS de lotes permiten acceso a vendedores'
+      })
+      // Continuar sin lanzar error
+    }
   }
   if (clientesError) {
-    console.error('Error al obtener clientes:', clientesError)
-    throw new Error(`Error al obtener clientes: ${clientesError.message}`)
+    console.error('Error al obtener clientes:', {
+      error: clientesError,
+      code: clientesError.code,
+      message: clientesError.message,
+      details: clientesError.details,
+      hint: clientesError.hint,
+      userId: user.id,
+      userEmail: user.email,
+      errorString: JSON.stringify(clientesError),
+      errorKeys: Object.keys(clientesError || {})
+    })
+    // Continuar con array vacío en lugar de lanzar error
   }
   if (cajasError) {
-    console.error('Error al obtener cajas:', cajasError)
-    throw new Error(`Error al obtener cajas: ${cajasError.message}`)
+    console.error('Error al obtener cajas:', {
+      error: cajasError,
+      code: cajasError.code,
+      message: cajasError.message,
+      details: cajasError.details,
+      hint: cajasError.hint,
+      sucursalId: sucursalIdFinal,
+      userId: user.id,
+      userEmail: user.email,
+      errorString: JSON.stringify(cajasError),
+      errorKeys: Object.keys(cajasError || {})
+    })
+    // Continuar con array vacío en lugar de lanzar error
   }
   if (listasError) {
     console.error('Error al obtener listas de precios:', listasError)
