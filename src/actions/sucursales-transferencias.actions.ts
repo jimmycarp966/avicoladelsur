@@ -710,3 +710,165 @@ export async function obtenerTransferenciasPendientesRecepcionAction(sucursalId:
         return []
     }
 }
+
+// =============================================
+// NUEVAS FUNCIONES: Gestión de Solicitudes Automáticas
+// =============================================
+
+// Obtener solicitudes automáticas pendientes
+export async function obtenerSolicitudesAutomaticasAction() {
+    try {
+        const supabase = await createClient()
+
+        const { data, error } = await supabase
+            .from('transferencias_stock')
+            .select(`
+                *,
+                sucursal_origen:sucursales!sucursal_origen_id(id, nombre),
+                sucursal_destino:sucursales!sucursal_destino_id(id, nombre),
+                items:transferencia_items(
+                    id,
+                    cantidad_solicitada,
+                    cantidad_sugerida,
+                    cantidad_enviada,
+                    cantidad_recibida,
+                    producto:productos(id, nombre, codigo, unidad_medida, stock_minimo)
+                )
+            `)
+            .eq('estado', 'solicitud_automatica')
+            .eq('origen', 'automatica')
+            .order('fecha_solicitud', { ascending: true })
+
+        if (error) throw error
+        return data || []
+    } catch (error) {
+        devError('Error en obtenerSolicitudesAutomaticas:', error)
+        return []
+    }
+}
+
+// Aprobar solicitud automática (convertir a transferencia pendiente)
+export async function aprobarSolicitudAutomaticaAction(
+    transferenciaId: string,
+    itemsModificados?: { item_id: string; cantidad: number }[]
+) {
+    try {
+        const supabase = await createClient()
+
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        if (userError || !user) {
+            return { success: false, error: 'Usuario no autenticado' }
+        }
+
+        // Obtener la transferencia para verificar que tiene turno y fecha_entrega
+        const { data: transferencia } = await supabase
+            .from('transferencias_stock')
+            .select('turno, fecha_entrega')
+            .eq('id', transferenciaId)
+            .single()
+
+        // Si hay items modificados, actualizarlos primero
+        if (itemsModificados && itemsModificados.length > 0) {
+            for (const item of itemsModificados) {
+                const { error: updateError } = await supabase
+                    .from('transferencia_items')
+                    .update({ cantidad_solicitada: item.cantidad })
+                    .eq('id', item.item_id)
+                    .eq('transferencia_id', transferenciaId)
+
+                if (updateError) {
+                    devError('Error actualizando item:', updateError)
+                    return { success: false, error: 'Error al actualizar cantidades' }
+                }
+            }
+        }
+
+        // Reservar stock en Casa Central (igual que cuando se crea transferencia manual)
+        // Esto descuenta del disponible para que no se venda mientras se prepara
+        const { data: reservaResult, error: reservaError } = await supabase.rpc(
+            'fn_reservar_stock_solicitud_automatica',
+            { p_transferencia_id: transferenciaId }
+        )
+
+        if (reservaError || !reservaResult?.success) {
+            devError('Error reservando stock:', reservaError || reservaResult?.error)
+            return { 
+                success: false, 
+                error: reservaResult?.error || 'Error al reservar stock. Verifica disponibilidad.' 
+            }
+        }
+
+        // Cambiar estado de solicitud_automatica a en_almacen (igual que presupuestos)
+        // Esto hace que aparezca en "Presupuestos del Día" y siga el mismo flujo
+        const { error: updateError } = await supabase
+            .from('transferencias_stock')
+            .update({
+                estado: 'en_almacen', // Estado que aparece en Presupuestos del Día
+                aprobado_por: user.id,
+                fecha_aprobacion: new Date().toISOString()
+            })
+            .eq('id', transferenciaId)
+            .eq('estado', 'solicitud_automatica')
+
+        if (updateError) throw updateError
+
+        revalidatePath('/sucursales/transferencias')
+        revalidatePath('/sucursales/transferencias/solicitudes')
+
+        return {
+            success: true,
+            message: 'Solicitud aprobada exitosamente'
+        }
+    } catch (error: any) {
+        devError('Error en aprobarSolicitudAutomaticaAction:', error)
+        return { success: false, error: error.message || 'Error al aprobar solicitud' }
+    }
+}
+
+// Rechazar solicitud automática
+export async function rechazarSolicitudAutomaticaAction(
+    transferenciaId: string,
+    motivo?: string
+) {
+    try {
+        const supabase = await createClient()
+
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        if (userError || !user) {
+            return { success: false, error: 'Usuario no autenticado' }
+        }
+
+        // Obtener observaciones actuales
+        const { data: transferencia } = await supabase
+            .from('transferencias_stock')
+            .select('observaciones')
+            .eq('id', transferenciaId)
+            .single()
+
+        const observacionesActuales = transferencia?.observaciones || ''
+        const nuevaObservacion = observacionesActuales + '\nRechazada: ' + (motivo || 'Sin motivo especificado')
+
+        // Cambiar estado a cancelada
+        const { error: updateError } = await supabase
+            .from('transferencias_stock')
+            .update({
+                estado: 'cancelada',
+                observaciones: nuevaObservacion
+            })
+            .eq('id', transferenciaId)
+            .eq('estado', 'solicitud_automatica')
+
+        if (updateError) throw updateError
+
+        revalidatePath('/sucursales/transferencias')
+        revalidatePath('/sucursales/transferencias/solicitudes')
+
+        return {
+            success: true,
+            message: 'Solicitud rechazada'
+        }
+    } catch (error: any) {
+        devError('Error en rechazarSolicitudAutomaticaAction:', error)
+        return { success: false, error: error.message || 'Error al rechazar solicitud' }
+    }
+}
