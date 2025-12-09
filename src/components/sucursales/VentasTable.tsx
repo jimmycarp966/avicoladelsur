@@ -15,11 +15,10 @@ interface Venta {
   numeroPedido?: string
   total: number
   estado: string
-  metodo_pago: string
+  metodos_pago: any // JSONB con métodos de pago
   created_at: string
   clientes: {
     nombre: string
-    apellido: string
   } | null
 }
 
@@ -76,27 +75,41 @@ export function VentasTable({ ventas }: VentasTableProps) {
     }
   }
 
-  const getMetodoPagoBadge = (metodo: string) => {
-    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      efectivo: "default",
-      transferencia: "secondary",
-      tarjeta: "outline",
-      cuenta_corriente: "destructive",
+  const getMetodoPagoBadge = (metodosPago: any) => {
+    // metodos_pago es un JSONB, puede ser un array o un objeto
+    if (!metodosPago) {
+      return <Badge variant="secondary">Sin método</Badge>
     }
+    
+    // Si es un array, mostrar el primero
+    if (Array.isArray(metodosPago) && metodosPago.length > 0) {
+      const metodo = metodosPago[0].metodoPago || metodosPago[0].metodo_pago || metodosPago[0]
+      const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+        efectivo: "default",
+        transferencia: "secondary",
+        tarjeta: "outline",
+        cuenta_corriente: "destructive",
+      }
 
-    const labels: Record<string, string> = {
-      efectivo: "Efectivo",
-      transferencia: "Transferencia",
-      tarjeta: "Tarjeta",
-      mercado_pago: "Mercado Pago",
-      cuenta_corriente: "Cta. Cte.",
+      const labels: Record<string, string> = {
+        efectivo: "Efectivo",
+        transferencia: "Transferencia",
+        tarjeta: "Tarjeta",
+        mercado_pago: "Mercado Pago",
+        cuenta_corriente: "Cta. Cte.",
+      }
+
+      return (
+        <Badge variant={variants[metodo] || "secondary"}>
+          {labels[metodo] || metodo}
+          {metodosPago.length > 1 && ` +${metodosPago.length - 1}`}
+        </Badge>
+      )
     }
-
-    return (
-      <Badge variant={variants[metodo] || "secondary"}>
-        {labels[metodo] || metodo}
-      </Badge>
-    )
+    
+    // Si es un objeto o string, intentar parsearlo
+    const metodoStr = typeof metodosPago === 'string' ? metodosPago : JSON.stringify(metodosPago)
+    return <Badge variant="secondary">{metodoStr}</Badge>
   }
 
   if (ventas.length === 0) {
@@ -137,7 +150,7 @@ export function VentasTable({ ventas }: VentasTableProps) {
                       <div className="flex items-center gap-1">
                         <User className="w-3 h-3" />
                         {venta.clientes
-                          ? `${venta.clientes.nombre} ${venta.clientes.apellido || ''}`
+                          ? venta.clientes.nombre
                           : 'Cliente desconocido'
                         }
                       </div>
@@ -159,7 +172,7 @@ export function VentasTable({ ventas }: VentasTableProps) {
                 </div>
 
                 <div className="flex items-center gap-3">
-                  {getMetodoPagoBadge(venta.metodo_pago)}
+                  {getMetodoPagoBadge(venta.metodos_pago)}
                   <div className="flex flex-col gap-2">
                     <div className="text-right">
                       <div className="text-lg font-bold text-green-600">

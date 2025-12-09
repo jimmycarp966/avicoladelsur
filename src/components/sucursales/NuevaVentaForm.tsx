@@ -62,7 +62,7 @@ import { generarTicketTermicoAction } from '@/actions/pos-sucursal.actions'
 // ===========================================
 
 const ventaSchema = z.object({
-  clienteId: z.string().optional(), // Opcional para venta genérica
+  clienteId: z.string().optional().or(z.literal('none')), // Opcional para venta genérica
   cajaId: z.string().min(1, 'Selecciona una caja'),
   listaPrecioId: z.string().min(1, 'Selecciona una lista de precios'),
   tipoComprobante: z.enum(['ticket', 'factura_a', 'factura_b']),
@@ -99,7 +99,6 @@ interface NuevaVentaFormProps {
   clientes: Array<{
     id: string
     nombre: string
-    apellido: string
     codigo: string
   }>
   cajas: Array<{
@@ -128,6 +127,7 @@ export function NuevaVentaForm({
   listasPrecios,
   sucursalId,
 }: NuevaVentaFormProps) {
+  const [mounted, setMounted] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [busquedaProducto, setBusquedaProducto] = useState('')
   const [codigoBarras, setCodigoBarras] = useState('')
@@ -140,10 +140,15 @@ export function NuevaVentaForm({
   } | null>(null)
   const barcodeInputRef = useRef<HTMLInputElement>(null)
 
+  // Evitar problemas de hidratación con componentes Select
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   const form = useForm<VentaFormData>({
     resolver: zodResolver(ventaSchema),
     defaultValues: {
-      clienteId: '',
+      clienteId: undefined,
       cajaId: cajas[0]?.id || '',
       listaPrecioId: listasPrecios[0]?.id || '',
       tipoComprobante: 'ticket',
@@ -501,6 +506,17 @@ export function NuevaVentaForm({
     p.codigo.toLowerCase().includes(busquedaProducto.toLowerCase())
   ).slice(0, 10) // Limitar a 10 resultados
 
+  // Evitar problemas de hidratación - solo renderizar después de montar
+  if (!mounted) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center p-8">
+          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -584,17 +600,17 @@ export function NuevaVentaForm({
                   <User className="w-4 h-4" />
                   Cliente (Opcional)
                 </FormLabel>
-                <Select onValueChange={field.onChange} value={field.value || ''}>
+                <Select onValueChange={(value) => field.onChange(value === 'none' ? undefined : value)} value={field.value || 'none'}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Venta genérica (sin cliente)" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="">Venta genérica</SelectItem>
+                    <SelectItem value="none">Venta genérica</SelectItem>
                     {clientes.map((cliente) => (
                       <SelectItem key={cliente.id} value={cliente.id}>
-                        {cliente.nombre} {cliente.apellido}
+                        {cliente.nombre}
                         {cliente.codigo && ` (${cliente.codigo})`}
                       </SelectItem>
                     ))}

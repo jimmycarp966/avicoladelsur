@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { SucursalSidebar } from '@/components/layout/SucursalSidebar'
@@ -38,6 +38,12 @@ export default function SucursalLayout({ children }: SucursalLayoutProps) {
   const pathname = usePathname()
   const router = useRouter()
   const { logout: storeLogout } = useUserStore()
+  const [mounted, setMounted] = useState(false)
+
+  // Evitar problemas de hidratación renderizando componentes con Radix UI solo en el cliente
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const handleLogout = async () => {
     try {
@@ -67,18 +73,24 @@ export default function SucursalLayout({ children }: SucursalLayoutProps) {
         {/* Header */}
         <header className="flex h-16 items-center justify-between border-b bg-background px-4 lg:px-6">
           {/* Mobile Menu */}
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="lg:hidden">
-                <Menu className="h-6 w-6" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-64 p-0">
-              <Suspense fallback={<SidebarSkeleton />}>
-                <SucursalSidebar />
-              </Suspense>
-            </SheetContent>
-          </Sheet>
+          {mounted ? (
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="lg:hidden">
+                  <Menu className="h-6 w-6" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-64 p-0">
+                <Suspense fallback={<SidebarSkeleton />}>
+                  <SucursalSidebar />
+                </Suspense>
+              </SheetContent>
+            </Sheet>
+          ) : (
+            <Button variant="ghost" size="icon" className="lg:hidden" disabled>
+              <Menu className="h-6 w-6" />
+            </Button>
+          )}
 
           {/* Title */}
           <div className="flex-1">
@@ -89,7 +101,7 @@ export default function SucursalLayout({ children }: SucursalLayoutProps) {
 
           {/* Actions */}
           <div className="flex items-center gap-2">
-            <NotificationBell />
+            {mounted && <NotificationBell />}
             <Button
               variant="ghost"
               size="icon"

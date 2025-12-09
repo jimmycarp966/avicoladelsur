@@ -58,7 +58,6 @@ interface Producto {
 interface Cliente {
   id: string
   nombre: string
-  apellido?: string
   codigo: string
   tipoCliente?: string
 }
@@ -495,7 +494,7 @@ export function POSSucursal({
               <SelectContent>
                 {clientes.map((cliente) => (
                   <SelectItem key={cliente.id} value={cliente.id}>
-                    {cliente.nombre} {cliente.apellido || ''}{' '}
+                    {cliente.nombre}{' '}
                     <span className="text-muted-foreground">
                       ({cliente.codigo})
                     </span>

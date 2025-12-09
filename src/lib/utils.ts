@@ -228,15 +228,40 @@ export function formatDuration(seconds: number): string {
  */
 export async function getSucursalUsuario(supabase: any, userId: string): Promise<string | null> {
   try {
+    // Consulta directa usando la política RLS "empleados_read_own"
+    // Esta política permite que usuarios lean su propio registro
     const { data: empleado, error } = await supabase
       .from('rrhh_empleados')
       .select('sucursal_id')
       .eq('usuario_id', userId)
       .eq('activo', true)
-      .single()
+      .maybeSingle() // Usa maybeSingle() en lugar de single() para evitar error si no hay registro
 
-    if (error || !empleado?.sucursal_id) {
+    // Si hay error, loguear detalles para diagnóstico
+    if (error) {
+      // Si el error es porque no se encontró registro (PGRST116), es normal
+      if (error.code !== 'PGRST116') {
+        console.error('Error al obtener sucursal del usuario:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          userId
+        })
+      }
       return null
+    }
+
+    // Si no hay empleado o no tiene sucursal_id, retornar null
+    if (!empleado?.sucursal_id) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Usuario sin sucursal asignada:', { userId, empleado })
+      }
+      return null
+    }
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('✅ Sucursal obtenida para usuario:', { userId, sucursalId: empleado.sucursal_id })
     }
 
     return empleado.sucursal_id

@@ -2,17 +2,25 @@ import { Suspense } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { ArrowRightLeft, Plus, Filter } from 'lucide-react'
+import { ArrowRightLeft, Plus, Filter, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
-import { listarTransferenciasAction } from '@/actions/sucursales-transferencias.actions'
+import { listarTransferenciasAction, obtenerSolicitudesAutomaticasAction } from '@/actions/sucursales-transferencias.actions'
 
 async function getTransferencias() {
     const data = await listarTransferenciasAction()
     return data
 }
 
+async function getSolicitudesAutomaticas() {
+    const data = await obtenerSolicitudesAutomaticasAction()
+    return data
+}
+
 export default async function TransferenciasPage() {
-    const transferencias = await getTransferencias()
+    const [transferencias, solicitudes] = await Promise.all([
+        getTransferencias(),
+        getSolicitudesAutomaticas()
+    ])
 
     return (
         <div className="space-y-6">
@@ -27,12 +35,22 @@ export default async function TransferenciasPage() {
                         Gestiona los movimientos de mercadería entre sucursales
                     </p>
                 </div>
-                <Button asChild>
-                    <Link href="/sucursales/transferencias/nueva">
-                        <Plus className="w-4 h-4 mr-2" />
-                        Nueva Transferencia
-                    </Link>
-                </Button>
+                <div className="flex gap-2">
+                    {solicitudes.length > 0 && (
+                        <Button variant="outline" asChild>
+                            <Link href="/sucursales/transferencias/solicitudes">
+                                <AlertCircle className="w-4 h-4 mr-2" />
+                                Solicitudes Automáticas ({solicitudes.length})
+                            </Link>
+                        </Button>
+                    )}
+                    <Button asChild>
+                        <Link href="/sucursales/transferencias/nueva">
+                            <Plus className="w-4 h-4 mr-2" />
+                            Nueva Transferencia
+                        </Link>
+                    </Button>
+                </div>
             </div>
 
             {/* Lista */}

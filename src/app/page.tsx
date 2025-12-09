@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { colors } from '@/lib/config'
+import { createClient } from '@/lib/supabase/server'
+import { getSucursalUsuario } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -75,8 +77,20 @@ export default async function HomePage() {
   // Verificar si hay un usuario autenticado
   const user = await getCurrentUser()
 
-  // Si hay usuario autenticado, redirigir según su rol
+  // Si hay usuario autenticado, redirigir según su rol y sucursal
   if (user) {
+    const supabase = await createClient()
+    const { data: { user: authUser } } = await supabase.auth.getUser()
+    
+    // Verificar si tiene sucursal asignada
+    if (authUser) {
+      const sucursalId = await getSucursalUsuario(supabase, authUser.id)
+      if (sucursalId) {
+        redirect('/sucursal/dashboard')
+      }
+    }
+
+    // Si no tiene sucursal, redirigir según rol
     switch (user.rol) {
       case 'admin':
         redirect('/dashboard')

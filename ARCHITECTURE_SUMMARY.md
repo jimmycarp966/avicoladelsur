@@ -167,6 +167,9 @@ supabase/                         # Scripts SQL y migraciones
 - **Reportes Consolidados**: Vista unificada admin + vistas específicas por sucursal
 - **RLS Estricto**: Usuarios ven solo datos de su sucursal asignada
 - **Dashboard Sucursal**: Métricas específicas, inventario, ventas y alertas en tiempo real
+- **Redirección Automática**: Usuarios con sucursal asignada son redirigidos automáticamente al dashboard de su sucursal al iniciar sesión
+- **Asignación de Usuarios**: Los usuarios se asignan a sucursales mediante la tabla `rrhh_empleados` (campo `sucursal_id`)
+- **Función Helper**: `getSucursalUsuario()` obtiene la sucursal del usuario desde `rrhh_empleados` con soporte RLS
 - **Rutas**: `/sucursales` (admin), `/sucursal/dashboard`, `/sucursal/alerts`, `/sucursal/inventario`, `/sucursal/ventas`, `/sucursal/tesoreria`, `/sucursal/reportes`
 
 ### 🤖 **Bot WhatsApp**: Automatización de Ventas
@@ -179,6 +182,9 @@ supabase/                         # Scripts SQL y migraciones
 - **4 Roles**: admin(vendedor+almacen+reparto), vendedor, repartidor, almacenista
 - **RLS**: Políticas por tabla/rol en Supabase
 - **JWT**: Autenticación stateless con refresh automático
+- **Redirección Inteligente**: Usuarios con sucursal asignada son redirigidos automáticamente a `/sucursal/dashboard` al iniciar sesión
+- **Asignación de Sucursales**: Usuarios vinculados a empleados en `rrhh_empleados` con `sucursal_id` asignado
+- **Políticas RLS**: Usuarios pueden leer su propio registro en `rrhh_empleados` para obtener su sucursal asignada
 
 ### 📊 **Reportes**: Business Intelligence
 - **Formatos**: CSV (separado por ;) y PDF (profesional con paginación)
@@ -264,6 +270,15 @@ supabase/                         # Scripts SQL y migraciones
 ---
 
 ## 🔧 **Actualizaciones Recientes**
+
+### **Redirección Automática a Dashboard de Sucursal (Enero 2025)**
+- ✅ **Redirección Inteligente**: Usuarios con sucursal asignada en `rrhh_empleados` son redirigidos automáticamente a `/sucursal/dashboard` al iniciar sesión
+- ✅ **Verificación Automática**: El sistema verifica la sucursal asignada durante el proceso de login
+- ✅ **Política RLS**: Agregada política `empleados_read_own` que permite a usuarios leer su propio registro en `rrhh_empleados` para obtener su `sucursal_id`
+- ✅ **Función Helper Mejorada**: `getSucursalUsuario()` usa `maybeSingle()` para manejar mejor casos sin registro
+- ✅ **Migración SQL**: `20250101_fix_rls_rrhh_empleados_lectura.sql` agrega la política necesaria para lectura de empleados
+- ✅ **Integración Completa**: Funciona tanto en Server Actions (`auth.actions.ts`) como en Client Components (`AuthProvider.tsx`)
+- ✅ **Fallback Inteligente**: Si no tiene sucursal asignada, redirige según rol (admin → `/dashboard`, vendedor → `/almacen/pedidos`, etc.)
 
 ### **Vista Previa de Clientes en Monitor GPS (Diciembre 2025)**
 - ✅ **Panel lateral de números**: Lista clickeable de clientes con números ordenados por ruta seleccionada

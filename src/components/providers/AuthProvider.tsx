@@ -195,21 +195,53 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setUser(userData)
       setSession(data.user)
 
-      // Redirigir según rol
+      // Verificar si el usuario tiene sucursal asignada
       let redirectTo = '/'
-      switch (userData.rol) {
-        case 'admin':
-          redirectTo = '/dashboard'
-          break
-        case 'vendedor':
-          redirectTo = '/almacen/pedidos'
-          break
-        case 'repartidor':
-          redirectTo = '/home'
-          break
-        case 'almacenista':
-          redirectTo = '/almacen/productos'
-          break
+      try {
+        const { data: empleado, error: empleadoError } = await supabase
+          .from('rrhh_empleados')
+          .select('sucursal_id')
+          .eq('usuario_id', data.user.id)
+          .eq('activo', true)
+          .maybeSingle()
+
+        if (!empleadoError && empleado?.sucursal_id) {
+          console.log('Usuario tiene sucursal asignada:', empleado.sucursal_id)
+          redirectTo = '/sucursal/dashboard'
+        } else {
+          // Si no tiene sucursal, redirigir según rol
+          switch (userData.rol) {
+            case 'admin':
+              redirectTo = '/dashboard'
+              break
+            case 'vendedor':
+              redirectTo = '/almacen/pedidos'
+              break
+            case 'repartidor':
+              redirectTo = '/home'
+              break
+            case 'almacenista':
+              redirectTo = '/almacen/productos'
+              break
+          }
+        }
+      } catch (error) {
+        console.error('Error al verificar sucursal:', error)
+        // En caso de error, usar redirección por defecto según rol
+        switch (userData.rol) {
+          case 'admin':
+            redirectTo = '/dashboard'
+            break
+          case 'vendedor':
+            redirectTo = '/almacen/pedidos'
+            break
+          case 'repartidor':
+            redirectTo = '/home'
+            break
+          case 'almacenista':
+            redirectTo = '/almacen/productos'
+            break
+        }
       }
 
       console.log('Redirigiendo a:', redirectTo)

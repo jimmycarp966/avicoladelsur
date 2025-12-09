@@ -335,7 +335,7 @@ Para optimizar la logística y la facturación, el sistema implementa un modelo 
 - **Validación capacidad**: Peso final del pedido ≤ capacidad del vehículo planificada
 - **RPC integrada**: `fn_asignar_pedido_a_ruta()` busca planes y valida restricciones
 
-### 8️⃣ Dominio: Control de Sucursales ✅ NUEVO (Diciembre 2025)
+### 8️⃣ Dominio: Control de Sucursales ✅ NUEVO (Diciembre 2025) - ACTUALIZADO (Enero 2025)
 
 **Funcionalidades Implementadas:**
 
@@ -385,6 +385,16 @@ Para optimizar la logística y la facturación, el sistema implementa un modelo 
 - `/sucursal/inventario/conteos`: Gestión de conteos físicos
 - `/sucursal/reportes/auditoria`: Reportes de auditoría de precios
 - `POSSucursal.tsx`: Componente POS mejorado
+
+#### Redirección Automática a Dashboard de Sucursal (Enero 2025) ✅ NUEVO
+- **Asignación de Sucursales**: Los usuarios se asignan a sucursales mediante la tabla `rrhh_empleados` (campo `sucursal_id`)
+- **Redirección Inteligente**: Al iniciar sesión, el sistema verifica si el usuario tiene sucursal asignada
+  - Si tiene sucursal → Redirige automáticamente a `/sucursal/dashboard`
+  - Si no tiene sucursal → Redirige según rol (admin → `/dashboard`, vendedor → `/almacen/pedidos`, etc.)
+- **Política RLS**: `empleados_read_own` permite a usuarios leer su propio registro en `rrhh_empleados` para obtener su `sucursal_id`
+- **Función Helper**: `getSucursalUsuario()` obtiene la sucursal del usuario con manejo robusto de errores
+- **Integración Completa**: Funciona tanto en Server Actions (`auth.actions.ts`) como en Client Components (`AuthProvider.tsx`)
+- **Migración SQL**: `20250101_fix_rls_rrhh_empleados_lectura.sql` agrega la política necesaria para lectura de empleados
 - `ConteosStockContent.tsx`: Interfaz de conteos
 - `AuditoriaListasContent.tsx`: Reportes de auditoría
 
@@ -2055,6 +2065,8 @@ variant="link"         // Estilo link
   - `vendedor`: Gestión de clientes, pedidos, cotizaciones y reclamos
   - `repartidor`: Acceso limitado a rutas asignadas y entregas
   - `almacenista`: Control de stock, ingresos y picking
+- **Redirección Automática**: Usuarios con sucursal asignada en `rrhh_empleados` son redirigidos automáticamente a `/sucursal/dashboard` al iniciar sesión
+- **Política de Lectura de Empleados**: `empleados_read_own` permite a usuarios leer su propio registro para obtener su `sucursal_id`
 
 ### Políticas de Ejemplo
 ```sql

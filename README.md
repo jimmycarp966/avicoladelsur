@@ -18,6 +18,7 @@
 - ⚡ **Optimizaciones de Rendimiento**: Caché inteligente, revalidación estratégica, queries optimizadas, índices de BD
 - 🎯 **Pedidos Agrupados**: Sistema único donde pedidos agrupan múltiples entregas por turno/zona/fecha
 - 🏢 **Control de Sucursales**: Modelo completo de control mayorista/minorista con auditoría de precios, conteos físicos de stock y detección automática de desvíos
+- 🔄 **Redirección Automática**: Usuarios con sucursal asignada son redirigidos automáticamente al dashboard de su sucursal al iniciar sesión
 - 🤖 **Google Cloud AI Services**: Integración completa con Dialogflow, Speech-to-Text, Document AI, Vertex AI, AutoML y Gemini para predicciones inteligentes, procesamiento de documentos y análisis avanzado
 
 ## 🚀 Inicio Rápido
@@ -146,6 +147,8 @@ Controlar que las sucursales no manipulen precios mayorista/minorista para queda
 - **Reportes de Control**: Uso de listas por usuario, márgenes por día, diferencias de stock
 - **Dashboard Mejorado**: Identificación clara de sucursal activa con banner destacado y selector para administradores
 - **Manejo de Admins**: Los administradores pueden navegar todas las secciones sin sucursal asignada, con mensajes informativos cuando no hay sucursales activas
+- **Redirección Automática**: Usuarios con sucursal asignada en `rrhh_empleados` son redirigidos automáticamente a `/sucursal/dashboard` al iniciar sesión
+- **Asignación de Sucursales**: Los usuarios se vinculan a sucursales mediante la tabla `rrhh_empleados` (campo `sucursal_id`)
 
 ### 🔄 Flujo de Control
 ```

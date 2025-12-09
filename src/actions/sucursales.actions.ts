@@ -101,7 +101,7 @@ export async function crearSucursalAction(
         sucursal_id: sucursal.id,
         saldo_actual: 0,
         saldo_inicial: 0,
-        active: true
+        moneda: 'ARS'
       })
 
     if (cajaError) {

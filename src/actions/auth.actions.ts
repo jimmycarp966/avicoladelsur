@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { loginSchema, registerUserSchema, changePasswordSchema, resetPasswordSchema } from '@/lib/schemas/auth.schema'
 import type { LoginFormData, RegisterUserFormData, ChangePasswordFormData, ResetPasswordFormData } from '@/lib/schemas/auth.schema'
 import type { ApiResponse } from '@/types/api.types'
+import { getSucursalUsuario } from '@/lib/utils'
 
 // Login
 export async function login(data: LoginFormData): Promise<ApiResponse<{ redirectTo: string }>> {
@@ -62,7 +63,19 @@ export async function login(data: LoginFormData): Promise<ApiResponse<{ redirect
       }
     }
 
-    // Determinar redirección según rol
+    // Verificar si el usuario tiene sucursal asignada
+    const sucursalId = await getSucursalUsuario(supabase, authData.user.id)
+    
+    // Si tiene sucursal asignada, redirigir al dashboard de sucursal
+    if (sucursalId) {
+      return {
+        success: true,
+        data: { redirectTo: '/sucursal/dashboard' },
+        message: `Bienvenido ${userData.nombre}`,
+      }
+    }
+
+    // Si no tiene sucursal, redirigir según rol
     let redirectTo = '/'
     switch (userData.rol) {
       case 'admin':
