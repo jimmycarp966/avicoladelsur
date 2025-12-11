@@ -68,7 +68,7 @@
 - **Framework**: Next.js 15 (App Router, Server Components)
 - **Frontend**: React 19 + TypeScript + Tailwind CSS + shadcn/ui
 - **Backend**: Server Actions + Supabase (Postgres + Auth + Storage + Realtime)
-- **Base de Datos**: Supabase (PostgreSQL) con **70+ migraciones** y funciones RPC optimizadas.
+- **Base de Datos**: Supabase (PostgreSQL) con **118+ migraciones** y funciones RPC optimizadas.
 - **Backend**: Next.js Server Actions (seguridad y performance).
 - **Frontend**: React 19, Tailwind CSS, Shadcn UI.
 - **Mapas**: Google Maps JavaScript API + Directions API.
@@ -300,6 +300,18 @@ scripts/                         # Scripts de automatización
 - **Selección en presupuestos**: Vendedor elige qué lista usar al crear presupuestos
 - **Bot integrado**: Usa automáticamente la primera lista asignada del cliente
 - **Herencia en pedidos**: Los pedidos heredan la lista del presupuesto
+
+### 📦 **Configuración de Productos Mayoristas**
+- **Unidad Mayor Personalizada**: Cada producto puede tener su propia unidad mayor configurada (`unidad_mayor_nombre`: "caja", "bolsa", "pallet", etc.)
+- **Peso por Unidad Mayor**: Cada producto define su propio `kg_por_unidad_mayor` (no todos son 20 kg)
+- **Visualización Consistente**: El sistema muestra la unidad y peso configurados en cada producto en todos los lugares:
+  - Presupuestos del Día (card "Ver productos")
+  - Ver Detalles de Presupuesto
+  - Formulario de Pesaje
+  - Crear Presupuesto
+  - Monitor GPS y rutas
+- **Sin Fallbacks Hardcodeados**: El sistema usa los valores configurados en cada producto, sin asumir valores por defecto incorrectos
+- **Pluralización Inteligente**: Muestra "1 caja" o "2 caja(s)" según corresponda
 
 ### 🔐 **Seguridad y Roles**
 - **4 roles definidos**: admin, vendedor, repartidor, almacenista
@@ -1411,6 +1423,28 @@ BOTPRESS_WEBHOOK_URL=https://your-botpress-webhook
 - ✅ **Consistencia**: Mismo proveedor de mapas en toda la aplicación (Google Maps)
 - ✅ **Corrección GpsTracker.tsx**: Bug corregido en envío de ubicaciones (uso de ref para posición actual)
 - ✅ **Manejo de errores mejorado**: Verificaciones robustas de carga de Google Maps API
+
+### **Configuración de Productos Mayoristas (Enero 2025)**
+- ✅ **Unidad Mayor Personalizada**: Cada producto puede configurar su propia unidad mayor (`unidad_mayor_nombre`: "caja", "bolsa", "pallet", etc.) en lugar de usar valores hardcodeados
+- ✅ **Peso por Unidad Mayor Configurable**: Cada producto define su propio `kg_por_unidad_mayor` (no todos son 20 kg por defecto)
+- ✅ **Visualización Consistente**: El sistema muestra la unidad y peso configurados en cada producto en todos los lugares:
+  - Presupuestos del Día (card "Ver productos")
+  - Ver Detalles de Presupuesto
+  - Formulario de Pesaje (`PesajeItemCard`)
+  - Crear Presupuesto (formulario y preview)
+  - Monitor GPS y rutas
+- ✅ **Sin Fallbacks Incorrectos**: Eliminados todos los fallbacks hardcodeados (`|| 'caja'`, `|| 20`). El sistema usa solo los valores configurados en cada producto
+- ✅ **Validación de Cálculos**: Los cálculos de `solicitadoKg` y `reservadoKg` solo se ejecutan cuando `kg_por_unidad_mayor` está configurado, evitando valores `NaN`
+- ✅ **Pluralización Inteligente**: Muestra "1 caja" o "2 caja(s)" según corresponda
+- ✅ **Archivos actualizados**:
+  - `src/app/(admin)/(dominios)/almacen/presupuestos-dia/page.tsx`
+  - `src/app/(admin)/(dominios)/ventas/presupuestos/[id]/page.tsx`
+  - `src/components/almacen/PesajeItemCard.tsx`
+  - `src/components/almacen/PesajeForm.tsx`
+  - `src/app/(admin)/(dominios)/ventas/presupuestos/nuevo/presupuesto-form.tsx`
+  - `src/app/(admin)/(dominios)/ventas/presupuestos/nuevo/producto-item-row.tsx`
+  - `src/app/sucursal/ventas/page.tsx`
+  - `src/actions/presupuestos-dia.actions.ts` (función `calcularKgItem`)
 
 ### **Vigencia Opcional en Listas de Precios (07/12/2025)**
 - ✅ **Nuevo campo `vigencia_activa`**: Las listas pueden tener validación de vigencia opcional

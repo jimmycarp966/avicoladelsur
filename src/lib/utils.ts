@@ -328,3 +328,16 @@ export async function getSucursalUsuarioConAdmin(
   return { sucursalId: sucursalIdFinal, esAdmin }
 }
 
+// Helper para determinar si es venta mayorista
+// Función pura sin dependencias del servidor (puede usarse en client components)
+export function esVentaMayorista(presupuesto: any, item: any): boolean {
+  // Verificar si la lista del presupuesto es mayorista
+  const tipoLista = presupuesto?.lista_precio?.tipo || item?.lista_precio?.tipo
+  if (tipoLista !== 'mayorista') {
+    return false
+  }
+
+  // Verificar si el producto tiene venta mayor habilitada
+  return item.producto?.venta_mayor_habilitada === true
+}
+

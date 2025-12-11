@@ -65,8 +65,24 @@ export function PesajeForm({ presupuesto, itemsPesables, presupuestoId }: Pesaje
   }, [presupuestoId, presupuesto.lista_precio?.tipo, itemsPesables])
   // #endregion
 
+  // Helper para determinar si es venta mayorista
+  function esVentaMayorista(item: ItemPesable): boolean {
+    // Verificar si la lista del presupuesto es mayorista
+    const tipoLista = presupuesto?.lista_precio?.tipo || item.lista_precio?.tipo
+    if (tipoLista !== 'mayorista') {
+      return false
+    }
+    // Verificar si el producto tiene venta mayor habilitada
+    return item.producto?.venta_mayor_habilitada === true
+  }
+
   // Helper para determinar si un item es pesable
   function esItemPesable(item: ItemPesable): boolean {
+    // Si es venta mayorista, NO es pesable (productos vienen en caja cerrada)
+    if (esVentaMayorista(item)) {
+      return false
+    }
+    
     if (item.pesable === true) {
       return true
     }

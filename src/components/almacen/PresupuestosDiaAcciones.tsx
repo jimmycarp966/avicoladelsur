@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { ShoppingCart, Loader2, AlertTriangle, Info } from 'lucide-react'
 import { confirmarPresupuestoAction, confirmarPresupuestosAgrupadosAction } from '@/actions/presupuestos.actions'
 import { useNotificationStore } from '@/store/notificationStore'
+import { esVentaMayorista } from '@/lib/utils'
 import {
   Dialog,
   DialogContent,
@@ -22,10 +23,19 @@ interface Presupuesto {
   zona_id?: string | null
   cliente_id?: string | null
   fecha_entrega_estimada?: string | null
+  lista_precio?: {
+    tipo?: string | null
+  } | null
   items?: Array<{ 
     pesable?: boolean
     peso_final?: number | null
-    producto?: { categoria?: string }
+    lista_precio?: {
+      tipo?: string | null
+    } | null
+    producto?: { 
+      categoria?: string
+      venta_mayor_habilitada?: boolean
+    }
   }>
 }
 
@@ -44,7 +54,12 @@ export function PresupuestosDiaAcciones({
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
 
   // Helper para determinar si un item es pesable
-  const esItemPesable = (item: any): boolean => {
+  const esItemPesable = (presupuesto: Presupuesto, item: any): boolean => {
+    // Si es venta mayorista, NO es pesable (productos vienen en caja cerrada)
+    if (esVentaMayorista(presupuesto, item)) {
+      return false
+    }
+    
     if (item.pesable === true) {
       return true
     }
@@ -59,7 +74,7 @@ export function PresupuestosDiaAcciones({
   // Verificar si hay items pesables sin pesar
   const tieneItemsSinPesar = (presupuesto: Presupuesto) => {
     return presupuesto.items?.some(
-      (item) => esItemPesable(item) && !item.peso_final
+      (item) => esItemPesable(presupuesto, item) && !item.peso_final
     )
   }
 

@@ -1,17 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
-import { getTodayArgentina } from '@/lib/utils'
+import { getTodayArgentina, esVentaMayorista } from '@/lib/utils'
 
-// Helper para determinar si es venta mayorista
-export function esVentaMayorista(presupuesto: any, item: any): boolean {
-  // Verificar si la lista del presupuesto es mayorista
-  const tipoLista = presupuesto?.lista_precio?.tipo
-  if (tipoLista !== 'mayorista') {
-    return false
-  }
-
-  // Verificar si el producto tiene venta mayor habilitada
-  return item.producto?.venta_mayor_habilitada === true
-}
+// Re-exportar para mantener compatibilidad
+export { esVentaMayorista }
 
 // Helper para determinar si un item es pesable
 export function esItemPesable(item: any, esVentaMayorista: boolean = false): boolean {

@@ -17,7 +17,8 @@ import { PresupuestosDiaAcciones, PresupuestoIndividualAccion } from '@/componen
 import { TransferenciasDiaCard } from '@/components/almacen/TransferenciasDiaCard'
 import { obtenerTransferenciasDiaAction } from '@/actions/sucursales-transferencias.actions'
 import { PresupuestosDiaRealtime } from '@/components/almacen/PresupuestosDiaRealtime'
-import { obtenerPresupuestosDiaAction, esItemPesable, esVentaMayorista, calcularKgItem } from '@/actions/presupuestos-dia.actions'
+import { obtenerPresupuestosDiaAction, esItemPesable, calcularKgItem } from '@/actions/presupuestos-dia.actions'
+import { esVentaMayorista } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 60 // Revalida cada 60 segundos

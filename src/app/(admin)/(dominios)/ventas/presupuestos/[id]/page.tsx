@@ -10,6 +10,8 @@ import { PresupuestoDetalleSkeleton } from './presupuesto-detalle-skeleton'
 import { AsignarTurnoZonaForm } from './asignar-turno-zona-form'
 import { PresupuestoAccionesButtons } from './presupuesto-acciones-buttons'
 import { createClient } from '@/lib/supabase/server'
+import { esItemPesable } from '@/actions/presupuestos-dia.actions'
+import { esVentaMayorista } from '@/lib/utils'
 import fs from 'fs'
 
 interface PresupuestoDetallePageProps {
@@ -42,7 +44,7 @@ async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) 
   }
 
   const presupuesto = result.data
-  const itemsPesables = (presupuesto.items || []).filter((item: any) => item.pesable)
+  const itemsPesables = (presupuesto.items || []).filter((item: any) => esItemPesable(item, esVentaMayorista(presupuesto, item)))
   const puedeFacturarDirecto = presupuesto.estado === 'pendiente' && itemsPesables.length === 0
 
   const logPath = 'd:\\Daniel\\Paginas\\Clientes\\Avicola del Sur\\.cursor\\debug.log'

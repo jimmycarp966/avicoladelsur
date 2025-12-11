@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { obtenerPresupuestoAction } from '@/actions/presupuestos.actions'
 import { PesajeSkeleton } from './pesaje-skeleton'
 import { PesajeForm } from '@/components/almacen/PesajeForm'
+import { esVentaMayorista } from '@/lib/utils'
 
 interface PesajePageProps {
   params: Promise<{
@@ -24,6 +25,11 @@ async function PesajeContent({ presupuestoId }: { presupuestoId: string }) {
 
   // Helper para determinar si un item es pesable
   function esItemPesable(item: any): boolean {
+    // Si es venta mayorista, NO es pesable (productos vienen en caja cerrada)
+    if (esVentaMayorista(presupuesto, item)) {
+      return false
+    }
+    
     // Primero verificar el campo pesable del item
     if (item.pesable === true) {
       return true

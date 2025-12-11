@@ -228,6 +228,12 @@ Para optimizar la logística y la facturación, el sistema implementa un modelo 
 - **Control de Stock**: Diferenciación entre stock físico y disponible
 - **Gestión de Picking**: Preparación optimizada de pedidos
 - **Control de Calidad**: Checklists obligatorios antes de salida
+- **Configuración de Productos Mayoristas**: 
+  - Cada producto puede configurar su propia unidad mayor (`unidad_mayor_nombre`: "caja", "bolsa", "pallet", etc.)
+  - Cada producto define su propio peso por unidad mayor (`kg_por_unidad_mayor`)
+  - Visualización consistente en todos los módulos (presupuestos, pesaje, rutas)
+  - Sin fallbacks hardcodeados - solo usa valores configurados en cada producto
+  - Validación de cálculos: solo ejecuta cuando valores están configurados
 
 ### 2️⃣ Dominio: Ventas (CRM - Customer Relationship Management)
 
@@ -2137,6 +2143,28 @@ CREATE POLICY "repartidor_rutas_propias" ON pedidos FOR SELECT USING (
 - **Expiración Automática de Reservas**: Job pg_cron ejecuta `fn_expirar_reservas()` cada 15 minutos
 - **Alertas de Stock Inteligentes**: Sistema de priorización (crítico ≤50%, bajo ≤umbral, normal)
 - **Notificaciones Push**: Notificaciones del navegador para eventos críticos
+
+### **Configuración de Productos Mayoristas (Enero 2025)**
+- ✅ **Unidad Mayor Personalizada**: Cada producto puede configurar su propia unidad mayor (`unidad_mayor_nombre`: "caja", "bolsa", "pallet", etc.) en lugar de usar valores hardcodeados
+- ✅ **Peso por Unidad Mayor Configurable**: Cada producto define su propio `kg_por_unidad_mayor` (no todos son 20 kg por defecto)
+- ✅ **Visualización Consistente**: El sistema muestra la unidad y peso configurados en cada producto en todos los lugares:
+  - Presupuestos del Día (card "Ver productos")
+  - Ver Detalles de Presupuesto
+  - Formulario de Pesaje (`PesajeItemCard`)
+  - Crear Presupuesto (formulario y preview)
+  - Monitor GPS y rutas
+- ✅ **Sin Fallbacks Incorrectos**: Eliminados todos los fallbacks hardcodeados (`|| 'caja'`, `|| 20`). El sistema usa solo los valores configurados en cada producto
+- ✅ **Validación de Cálculos**: Los cálculos de `solicitadoKg` y `reservadoKg` solo se ejecutan cuando `kg_por_unidad_mayor` está configurado, evitando valores `NaN`
+- ✅ **Pluralización Inteligente**: Muestra "1 caja" o "2 caja(s)" según corresponda
+- ✅ **Archivos actualizados**:
+  - `src/app/(admin)/(dominios)/almacen/presupuestos-dia/page.tsx`
+  - `src/app/(admin)/(dominios)/ventas/presupuestos/[id]/page.tsx`
+  - `src/components/almacen/PesajeItemCard.tsx`
+  - `src/components/almacen/PesajeForm.tsx`
+  - `src/app/(admin)/(dominios)/ventas/presupuestos/nuevo/presupuesto-form.tsx`
+  - `src/app/(admin)/(dominios)/ventas/presupuestos/nuevo/producto-item-row.tsx`
+  - `src/app/sucursal/ventas/page.tsx`
+  - `src/actions/presupuestos-dia.actions.ts` (función `calcularKgItem`)
 
 ### Mejoras de Código
 - **Logging Condicional**: Utilidad `logger.ts` que solo loguea en desarrollo

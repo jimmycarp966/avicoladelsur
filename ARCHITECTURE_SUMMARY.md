@@ -212,6 +212,14 @@ supabase/                         # Scripts SQL y migraciones
 - **RPC funciones**: `fn_obtener_precio_producto()`, `fn_asignar_lista_automatica_cliente()` (actualizada para validar vigencia), `fn_validar_listas_cliente()`
 - **UI completa**: `/ventas/listas-precios` para CRUD de listas y gestión de precios por producto
 
+### 📦 **Configuración de Productos Mayoristas**: Unidad y Peso Personalizados
+- **Unidad Mayor Personalizada**: Cada producto puede configurar su propia unidad mayor (`unidad_mayor_nombre`: "caja", "bolsa", "pallet", etc.) en lugar de usar valores hardcodeados
+- **Peso por Unidad Mayor Configurable**: Cada producto define su propio `kg_por_unidad_mayor` (no todos son 20 kg por defecto)
+- **Visualización Consistente**: El sistema muestra la unidad y peso configurados en cada producto en todos los lugares (presupuestos, pesaje, rutas, monitor GPS)
+- **Sin Fallbacks Incorrectos**: Eliminados todos los fallbacks hardcodeados (`|| 'caja'`, `|| 20`). El sistema usa solo los valores configurados en cada producto
+- **Validación de Cálculos**: Los cálculos de `solicitadoKg` y `reservadoKg` solo se ejecutan cuando `kg_por_unidad_mayor` está configurado, evitando valores `NaN`
+- **Pluralización Inteligente**: Muestra "1 caja" o "2 caja(s)" según corresponda
+
 ---
 
 ## 🎯 Flujo Completo Automatizado Implementado
@@ -501,4 +509,14 @@ Para el flujo de registro de nuevos clientes, el bot implementa una máquina de 
 
 ---
 
-*Resumen actualizado el Diciembre 2025 - Modelo de control para sucursales implementado + Mejoras de UX y manejo de admins*
+### **Configuración de Productos Mayoristas (Enero 2025)**
+- ✅ **Unidad Mayor Personalizada**: Cada producto puede configurar su propia unidad mayor (`unidad_mayor_nombre`: "caja", "bolsa", "pallet", etc.)
+- ✅ **Peso por Unidad Mayor Configurable**: Cada producto define su propio `kg_por_unidad_mayor` (no todos son 20 kg)
+- ✅ **Visualización Consistente**: El sistema muestra la unidad y peso configurados en todos los lugares (presupuestos, pesaje, rutas)
+- ✅ **Sin Fallbacks Incorrectos**: Eliminados todos los fallbacks hardcodeados (`|| 'caja'`, `|| 20`)
+- ✅ **Validación de Cálculos**: Los cálculos solo se ejecutan cuando valores están configurados, evitando `NaN`
+- ✅ **Archivos actualizados**: 8 archivos en total (páginas, componentes, actions)
+
+---
+
+*Resumen actualizado el Enero 2025 - Configuración de productos mayoristas implementada + Modelo de control para sucursales + Mejoras de UX y manejo de admins*
