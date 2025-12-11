@@ -25,7 +25,7 @@ async function NuevoPresupuestoContent() {
   // Obtener productos
   const { data: productos } = await supabase
     .from('productos')
-    .select('id, codigo, nombre, precio_venta, unidad_medida, categoria')
+    .select('id, codigo, nombre, precio_venta, unidad_medida, categoria, venta_mayor_habilitada, unidad_mayor_nombre, kg_por_unidad_mayor')
     .eq('activo', true)
     .order('nombre')
 
@@ -54,8 +54,8 @@ async function NuevoPresupuestoContent() {
       </div>
 
       <Suspense fallback={<div>Cargando formulario...</div>}>
-        <PresupuestoForm 
-          clientes={clientes || []} 
+        <PresupuestoForm
+          clientes={clientes || []}
           productos={productos || []}
           zonas={zonas || []}
         />

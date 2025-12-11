@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ArrowLeft, Loader2, Save } from 'lucide-react'
 import Link from 'next/link'
-import { productoSchema, type ProductoFormData } from '@/lib/schemas/productos.schema'
+import { productoSchema, type ProductoFormData, type ProductoFormInput } from '@/lib/schemas/productos.schema'
 import { useNotificationStore } from '@/store/notificationStore'
 import { useFormShortcuts } from '@/lib/hooks/useFormShortcuts'
 import { useFormContextShortcuts } from '@/lib/hooks/useFormContextShortcuts'
@@ -31,6 +31,10 @@ interface ProductoFormProps {
     unidad_medida: string
     stock_minimo: number
     activo: boolean
+    // Configuración de venta por mayor
+    venta_mayor_habilitada?: boolean
+    unidad_mayor_nombre?: string
+    kg_por_unidad_mayor?: number
   }
   onSuccess?: () => void
 }
@@ -48,7 +52,7 @@ export function ProductoForm({ producto, onSuccess }: ProductoFormProps) {
     watch,
     setValue,
     formState: { errors },
-  } = useForm<ProductoFormData>({
+  } = useForm<ProductoFormInput>({
     resolver: zodResolver(productoSchema),
     defaultValues: producto ? {
       codigo: producto.codigo,
@@ -60,6 +64,9 @@ export function ProductoForm({ producto, onSuccess }: ProductoFormProps) {
       unidad_medida: producto.unidad_medida,
       stock_minimo: producto.stock_minimo,
       activo: producto.activo,
+      venta_mayor_habilitada: producto.venta_mayor_habilitada || false,
+      unidad_mayor_nombre: producto.unidad_mayor_nombre || 'caja',
+      kg_por_unidad_mayor: producto.kg_por_unidad_mayor || 20,
     } : {
       codigo: '',
       nombre: '',
@@ -70,10 +77,15 @@ export function ProductoForm({ producto, onSuccess }: ProductoFormProps) {
       unidad_medida: 'kg',
       stock_minimo: 0,
       activo: true,
+      venta_mayor_habilitada: false,
+      unidad_mayor_nombre: 'caja',
+      kg_por_unidad_mayor: 20,
     },
   })
 
   const activo = watch('activo')
+  const ventaMayorHabilitada = watch('venta_mayor_habilitada')
+  const unidadMedida = watch('unidad_medida')
 
   // Atajos contextuales para campos del formulario
   useFormContextShortcuts({
@@ -89,12 +101,12 @@ export function ProductoForm({ producto, onSuccess }: ProductoFormProps) {
     ],
   })
 
-  const onSubmit = async (data: ProductoFormData) => {
+  const onSubmit = async (data: ProductoFormInput) => {
     try {
       setIsLoading(true)
 
       const { crearProductoAction, actualizarProductoAction } = await import('@/actions/almacen.actions')
-      
+
       const result = isEditing
         ? await actualizarProductoAction(producto.id, data)
         : await crearProductoAction(data)
@@ -319,6 +331,74 @@ export function ProductoForm({ producto, onSuccess }: ProductoFormProps) {
         </CardContent>
       </Card>
 
+      {/* Configuración de venta por mayor */}
+      <Card className="border-l-[3px] border-l-amber-500">
+        <CardHeader>
+          <CardTitle className="text-amber-600">Venta por Mayor</CardTitle>
+          <CardDescription>
+            Configura si este producto puede venderse por unidad mayor (caja, bolsa, etc.) en listas mayoristas
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="venta_mayor_habilitada"
+              checked={ventaMayorHabilitada}
+              onCheckedChange={(checked) => setValue('venta_mayor_habilitada', checked)}
+              disabled={isLoading || unidadMedida !== 'kg'}
+            />
+            <Label htmlFor="venta_mayor_habilitada">
+              Habilitar venta por mayor
+              {unidadMedida !== 'kg' && (
+                <span className="text-muted-foreground text-xs ml-2">(Solo disponible para productos en kg)</span>
+              )}
+            </Label>
+          </div>
+
+          {ventaMayorHabilitada && unidadMedida === 'kg' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
+              <div className="space-y-2">
+                <Label htmlFor="unidad_mayor_nombre">Nombre de unidad mayor</Label>
+                <select
+                  id="unidad_mayor_nombre"
+                  {...register('unidad_mayor_nombre')}
+                  disabled={isLoading}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="caja">Caja</option>
+                  <option value="bolsa">Bolsa</option>
+                  <option value="pack">Pack</option>
+                  <option value="bandeja">Bandeja</option>
+                  <option value="bulto">Bulto</option>
+                </select>
+                {errors.unidad_mayor_nombre && (
+                  <p className="text-sm text-destructive">{errors.unidad_mayor_nombre.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="kg_por_unidad_mayor">Kg por unidad mayor</Label>
+                <Input
+                  id="kg_por_unidad_mayor"
+                  type="number"
+                  step="0.1"
+                  min="0.1"
+                  placeholder="20"
+                  {...register('kg_por_unidad_mayor', { valueAsNumber: true })}
+                  disabled={isLoading}
+                />
+                {errors.kg_por_unidad_mayor && (
+                  <p className="text-sm text-destructive">{errors.kg_por_unidad_mayor.message}</p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Ej: Si una caja tiene 20 kg, ingresa 20
+                </p>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Acciones */}
       <div className="flex items-center justify-between sticky bottom-4 bg-background/95 backdrop-blur-sm p-4 rounded-lg border border-primary/10 shadow-lg">
         <Button type="button" variant="outline" asChild disabled={isLoading} className="hover:bg-primary/5 hover:text-primary hover:border-primary/30">
@@ -328,10 +408,10 @@ export function ProductoForm({ producto, onSuccess }: ProductoFormProps) {
           </Link>
         </Button>
 
-        <Button 
+        <Button
           ref={submitButtonRef}
-          type="submit" 
-          disabled={isLoading} 
+          type="submit"
+          disabled={isLoading}
           className="bg-primary hover:bg-primary/90 shadow-sm"
         >
           {isLoading ? (

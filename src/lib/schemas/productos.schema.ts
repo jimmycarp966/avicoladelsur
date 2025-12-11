@@ -47,6 +47,24 @@ export const productoSchema = z.object({
 
   activo: z
     .boolean(),
+
+  // Configuración de venta por mayor
+  venta_mayor_habilitada: z
+    .boolean()
+    .default(false),
+
+  unidad_mayor_nombre: z
+    .string()
+    .max(50, 'El nombre de unidad mayor debe tener máximo 50 caracteres')
+    .optional()
+    .default('caja'),
+
+  kg_por_unidad_mayor: z
+    .number()
+    .positive('Los kg por unidad mayor deben ser positivos')
+    .max(999, 'Los kg por unidad mayor son demasiado altos')
+    .optional()
+    .default(20),
 })
 
 // Esquema para búsqueda y filtros de productos
@@ -62,4 +80,6 @@ export const productosFilterSchema = z.object({
 
 // Tipos inferidos
 export type ProductoFormData = z.infer<typeof productoSchema>
+// Tipo para input del formulario (acepta valores antes de aplicar defaults)
+export type ProductoFormInput = z.input<typeof productoSchema>
 export type ProductosFilterData = z.infer<typeof productosFilterSchema>

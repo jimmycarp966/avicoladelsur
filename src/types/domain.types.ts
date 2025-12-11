@@ -29,7 +29,12 @@ export interface Producto extends BaseEntity {
   unidad_medida: string
   stock_minimo: number
   activo: boolean
+  // Configuración de venta por mayor
+  venta_mayor_habilitada: boolean
+  unidad_mayor_nombre?: string
+  kg_por_unidad_mayor?: number
 }
+
 
 // Cliente
 export interface Cliente extends BaseEntity {

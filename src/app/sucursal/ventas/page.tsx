@@ -44,7 +44,7 @@ async function getVentasData(sidParam?: string) {
 
   // Verificar que el usuario tiene sesión válida
   const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-  
+
   // Log detallado para debugging
   console.log('🔍 Debug getVentasData:')
   console.log('  - User ID:', user.id)
@@ -54,7 +54,7 @@ async function getVentasData(sidParam?: string) {
   console.log('  - Access token:', session?.access_token ? `${session.access_token.substring(0, 20)}...` : 'ausente')
   console.log('  - Expires at:', session?.expires_at)
   console.log('  - Token type:', session?.token_type)
-  
+
   if (!session) {
     console.error('❌ No hay sesión válida:', {
       sessionError,
@@ -75,7 +75,7 @@ async function getVentasData(sidParam?: string) {
       .eq('active', true)
       .order('nombre')
       .limit(1)
-    
+
     if (sucursalesActivas && sucursalesActivas.length > 0) {
       sucursalIdFinal = sucursalesActivas[0].id
     }
@@ -107,13 +107,13 @@ async function getVentasData(sidParam?: string) {
 
   // Obtener ventas del día actual
   const hoy = new Date().toISOString().split('T')[0]
-  
+
   // Primero probar una consulta simple para verificar que RLS funciona
   const { data: testPedidos, error: testError } = await supabase
     .from('pedidos')
     .select('id')
     .limit(1)
-  
+
   console.log('🔍 Test inicial de acceso a pedidos:')
   console.log('  - Tiene datos:', !!testPedidos, 'Cantidad:', testPedidos?.length || 0)
   console.log('  - Error:', testError ? JSON.stringify(testError, null, 2) : 'Ninguno')
@@ -124,7 +124,7 @@ async function getVentasData(sidParam?: string) {
     console.log('  - Detalles error:', testError.details)
     console.log('  - Hint error:', testError.hint)
   }
-  
+
   // Ahora obtener pedidos con filtros
   const { data: pedidosData, error: pedidosError } = await supabase
     .from('pedidos')
@@ -134,7 +134,7 @@ async function getVentasData(sidParam?: string) {
     .gte('created_at', `${hoy}T00:00:00.000Z`)
     .lte('created_at', `${hoy}T23:59:59.999Z`)
     .order('created_at', { ascending: false })
-  
+
   if (pedidosError) {
     console.error('❌ Error al obtener pedidos con filtros:', {
       error: pedidosError,
@@ -151,7 +151,7 @@ async function getVentasData(sidParam?: string) {
       cantidad: pedidosData?.length || 0
     })
   }
-  
+
   // Obtener datos de clientes por separado si hay pedidos
   let ventasDia: Array<{
     id: string
@@ -163,18 +163,18 @@ async function getVentasData(sidParam?: string) {
   }> = []
   if (pedidosData && pedidosData.length > 0) {
     const clienteIds = [...new Set(pedidosData.map(p => p.cliente_id).filter(Boolean))]
-    
+
     if (clienteIds.length > 0) {
       const { data: clientesData } = await supabase
         .from('clientes')
         .select('id, nombre')
         .in('id', clienteIds)
-      
+
       // Crear mapa de clientes
       const clientesMap = new Map(
         (clientesData || []).map(c => [c.id, { nombre: c.nombre }])
       )
-      
+
       // Combinar pedidos con datos de clientes
       ventasDia = pedidosData.map(pedido => ({
         id: pedido.id,
@@ -196,7 +196,7 @@ async function getVentasData(sidParam?: string) {
       }))
     }
   }
-  
+
   // Mantener compatibilidad con código existente
   const ventasError = pedidosError
 
@@ -210,7 +210,10 @@ async function getVentasData(sidParam?: string) {
         nombre,
         codigo,
         precio_venta,
-        unidad_medida
+        unidad_medida,
+        venta_mayor_habilitada,
+        unidad_mayor_nombre,
+        kg_por_unidad_mayor
       )
     `)
     .eq('sucursal_id', sucursalIdFinal)
@@ -221,7 +224,7 @@ async function getVentasData(sidParam?: string) {
     .from('clientes')
     .select('id')
     .limit(1)
-  
+
   console.log('🔍 Test inicial de acceso a clientes:')
   console.log('  - Tiene datos:', !!testClientes, 'Cantidad:', testClientes?.length || 0)
   console.log('  - Error:', testClientesError ? JSON.stringify(testClientesError, null, 2) : 'Ninguno')
@@ -232,14 +235,14 @@ async function getVentasData(sidParam?: string) {
     console.log('  - Detalles error:', testClientesError.details)
     console.log('  - Hint error:', testClientesError.hint)
   }
-  
+
   // Obtener clientes disponibles
   const { data: clientes, error: clientesError } = await supabase
     .from('clientes')
     .select('id, nombre, codigo')
     .eq('activo', true)
     .order('nombre')
-  
+
   if (clientesError) {
     console.error('❌ Error al obtener clientes con filtros:', {
       error: clientesError,
@@ -274,13 +277,13 @@ async function getVentasData(sidParam?: string) {
   if (productosError) {
     // Verificar si el error es realmente un objeto con propiedades o está vacío
     const hasErrorInfo = productosError && (
-      productosError.code || 
-      productosError.message || 
-      productosError.details || 
+      productosError.code ||
+      productosError.message ||
+      productosError.details ||
       productosError.hint ||
       Object.keys(productosError).length > 0
     )
-    
+
     if (hasErrorInfo) {
       const errorMessage = productosError.message || productosError.details || productosError.hint || JSON.stringify(productosError)
       console.error('Error al obtener productos:', {
@@ -345,7 +348,11 @@ async function getVentasData(sidParam?: string) {
         codigo: producto?.codigo || '',
         precioVenta: producto?.precio_venta || 0,
         unidadMedida: producto?.unidad_medida || 'unidades',
-        stockDisponible: 0
+        stockDisponible: 0,
+        // Campos de venta por mayor
+        ventaMayorHabilitada: producto?.venta_mayor_habilitada || false,
+        unidadMayorNombre: producto?.unidad_mayor_nombre || 'caja',
+        kgPorUnidadMayor: producto?.kg_por_unidad_mayor || 20
       }
     }
 
@@ -407,7 +414,7 @@ export default async function SucursalVentasPage({ searchParams }: PageProps) {
   const params = await searchParams
   try {
     const data = await getVentasData(params.sid)
-    
+
     // Si es admin sin sucursal, mostrar mensaje informativo
     if (data.sinSucursal && data.esAdmin) {
       return (
@@ -433,7 +440,7 @@ export default async function SucursalVentasPage({ searchParams }: PageProps) {
         </div>
       )
     }
-    
+
     return <SucursalVentasContent data={data} />
   } catch (error) {
     return (

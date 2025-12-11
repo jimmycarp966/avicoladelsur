@@ -12,7 +12,7 @@ import type {
   ApiResponse,
   StockDisponibleResponse
 } from '@/types/api.types'
-import type { ProductoFormData } from '@/lib/schemas/productos.schema'
+import type { ProductoFormInput } from '@/lib/schemas/productos.schema'
 
 // Ingreso de mercadería
 export async function ingresarMercaderiaAction(
@@ -243,7 +243,7 @@ export async function ajustarStockAction(
       motivo: params.motivo || 'Ajuste de stock',
       usuario_id: user.id,
     }
-    
+
     const { error: movimientoError } = await supabase.from('movimientos_stock').insert(movimientoData)
 
     if (movimientoError) throw movimientoError
@@ -589,7 +589,7 @@ export async function obtenerPresupuestosPorZonaFechaAction(
 
 // Crear producto
 export async function crearProductoAction(
-  data: ProductoFormData
+  data: ProductoFormInput
 ): Promise<ApiResponse<{ productoId: string }>> {
   try {
     const supabase = await createClient()
@@ -633,6 +633,10 @@ export async function crearProductoAction(
         unidad_medida: data.unidad_medida,
         stock_minimo: data.stock_minimo,
         activo: data.activo ?? true,
+        // Campos de venta por mayor
+        venta_mayor_habilitada: data.venta_mayor_habilitada ?? false,
+        unidad_mayor_nombre: data.unidad_mayor_nombre || 'caja',
+        kg_por_unidad_mayor: data.kg_por_unidad_mayor || 20,
       })
       .select()
       .single()
@@ -658,7 +662,7 @@ export async function crearProductoAction(
 // Actualizar producto
 export async function actualizarProductoAction(
   productoId: string,
-  data: ProductoFormData
+  data: ProductoFormInput
 ): Promise<ApiResponse> {
   try {
     const supabase = await createClient()
@@ -703,6 +707,10 @@ export async function actualizarProductoAction(
         unidad_medida: data.unidad_medida,
         stock_minimo: data.stock_minimo,
         activo: data.activo ?? true,
+        // Campos de venta por mayor
+        venta_mayor_habilitada: data.venta_mayor_habilitada ?? false,
+        unidad_mayor_nombre: data.unidad_mayor_nombre || 'caja',
+        kg_por_unidad_mayor: data.kg_por_unidad_mayor || 20,
         updated_at: getNowArgentina().toISOString(),
       })
       .eq('id', productoId)

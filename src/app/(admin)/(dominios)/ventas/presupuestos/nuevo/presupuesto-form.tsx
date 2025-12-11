@@ -42,7 +42,18 @@ type CrearPresupuestoFormData = z.infer<typeof crearPresupuestoSchema>
 
 interface PresupuestoFormProps {
   clientes: Array<{ id: string; nombre: string; codigo?: string; telefono?: string; zona_entrega?: string }>
-  productos: Array<{ id: string; codigo: string; nombre: string; precio_venta: number; unidad_medida: string; categoria?: string }>
+  productos: Array<{
+    id: string;
+    codigo: string;
+    nombre: string;
+    precio_venta: number;
+    unidad_medida: string;
+    categoria?: string;
+    // Campos de venta por mayor
+    venta_mayor_habilitada?: boolean;
+    unidad_mayor_nombre?: string;
+    kg_por_unidad_mayor?: number;
+  }>
   zonas: Array<{ id: string; nombre: string }>
 }
 
@@ -57,7 +68,7 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
   const [todasListas, setTodasListas] = useState<Array<{ id: string; codigo: string; nombre: string; tipo: string; margen_ganancia: number | null }>>([])
   const [cargandoListas, setCargandoListas] = useState(false)
   const agregarProductoButtonRef = useRef<HTMLButtonElement>(null)
-  
+
   // Estado para listas por producto (index -> lista_id)
   const [listasPorProducto, setListasPorProducto] = useState<Record<number, string>>({})
 
@@ -190,7 +201,7 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
 
   // Actualizar precios cuando cambia la lista global o lista por producto
   const watchedListaPrecioGlobal = useWatch({ control, name: 'lista_precio_id' })
-  
+
   useEffect(() => {
     const actualizarPrecios = async () => {
       if (!watchedItems) return
@@ -205,9 +216,9 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
 
         const precioResult = await obtenerPrecioProductoAction(listaId, item.producto_id)
         if (precioResult.success && precioResult.data) {
-          setValue(`items.${i}.precio_unit_est`, precioResult.data.precio, { 
+          setValue(`items.${i}.precio_unit_est`, precioResult.data.precio, {
             shouldValidate: true,
-            shouldDirty: true 
+            shouldDirty: true
           })
           // Actualizar también la lista_precio_id del item si se calculó desde lista global
           if (!listasPorProducto[i] && watchedListaPrecioGlobal) {
@@ -227,13 +238,13 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
 
     // Usar lista individual si existe, sino usar lista global
     const listaId = listasPorProducto[index] || watchedListaPrecioGlobal
-    
+
     if (listaId) {
       const precioResult = await obtenerPrecioProductoAction(listaId, productoId)
       if (precioResult.success && precioResult.data) {
-        setValue(`items.${index}.precio_unit_est`, precioResult.data.precio, { 
+        setValue(`items.${index}.precio_unit_est`, precioResult.data.precio, {
           shouldValidate: true,
-          shouldDirty: true 
+          shouldDirty: true
         })
         // Actualizar lista_precio_id del item si no tiene lista individual
         if (!listasPorProducto[index] && watchedListaPrecioGlobal) {
@@ -244,9 +255,9 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
     }
 
     // Fallback a precio_venta del producto
-    setValue(`items.${index}.precio_unit_est`, producto.precio_venta, { 
+    setValue(`items.${index}.precio_unit_est`, producto.precio_venta, {
       shouldValidate: true,
-      shouldDirty: true 
+      shouldDirty: true
     })
   }, [productos, setValue, watchedListaPrecioGlobal, listasPorProducto])
 
@@ -254,7 +265,7 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
   const getFilteredProductos = useCallback((index: number, searchTerm: string) => {
     const term = searchTerm.toLowerCase()
     if (!term) return productos
-    return productos.filter(p => 
+    return productos.filter(p =>
       p.codigo.toLowerCase().includes(term) ||
       p.nombre.toLowerCase().includes(term)
     )
@@ -288,15 +299,15 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
       }
     }
     setListasPorProducto(nuevaListasPorProducto)
-    
+
     // Actualizar precio del producto con la nueva lista
     const item = watchedItems?.[index]
     if (item?.producto_id && listaId) {
       const precioResult = await obtenerPrecioProductoAction(listaId, item.producto_id)
       if (precioResult.success && precioResult.data) {
-        setValue(`items.${index}.precio_unit_est`, precioResult.data.precio, { 
+        setValue(`items.${index}.precio_unit_est`, precioResult.data.precio, {
           shouldValidate: true,
-          shouldDirty: true 
+          shouldDirty: true
         })
       }
     }
@@ -306,17 +317,17 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
   const addItem = useCallback(() => {
     const newIndex = fields.length
     append({ producto_id: '', cantidad_solicitada: 1, precio_unit_est: 0, lista_precio_id: undefined })
-    
+
     // Si hay lista global, asignarla al nuevo item
     if (watchedListaPrecioGlobal) {
       setValue(`items.${newIndex}.lista_precio_id`, watchedListaPrecioGlobal, { shouldDirty: false })
     }
-    
+
     // Enfocar el select del producto recién agregado después de que React lo renderice
     // Usar múltiples intentos para asegurar que funcione
     const focusProductSelect = (attempts = 0) => {
       if (attempts > 10) return // Máximo 10 intentos
-      
+
       const nuevoProductoSelect = document.getElementById(`producto_${newIndex}`) as HTMLElement
       if (nuevoProductoSelect) {
         // Si hay un input con foco que no es el que queremos, quitarlo
@@ -324,11 +335,11 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
         if (activeElement && 'name' in activeElement && (activeElement as HTMLInputElement).name === `items.${newIndex}.cantidad_solicitada`) {
           activeElement.blur()
         }
-        
+
         // Enfocar el select
         nuevoProductoSelect.focus()
         nuevoProductoSelect.click()
-        
+
         // Esperar a que se abra el dropdown y luego enfocar el input de búsqueda
         setTimeout(() => {
           const searchInput = document.querySelector('[role="listbox"] input[type="text"]') as HTMLInputElement
@@ -342,7 +353,7 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
         setTimeout(() => focusProductSelect(attempts + 1), 50)
       }
     }
-    
+
     // Iniciar el proceso después de que React renderice
     requestAnimationFrame(() => {
       setTimeout(() => focusProductSelect(), 100)
@@ -398,25 +409,25 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
       console.log('[CLIENT] Message:', result.message)
       console.log('[CLIENT] Data completo:', result.data)
       console.log('[CLIENT] Data keys:', result.data ? Object.keys(result.data) : 'no data')
-      
+
       if (result.success) {
         showToast('success', result.message || 'Presupuesto creado exitosamente')
         const presupuestoId = result.data?.presupuesto_id
-        
+
         console.log('[CLIENT] Presupuesto ID extraído:', presupuestoId)
         console.log('[CLIENT] Tipo de presupuestoId:', typeof presupuestoId)
-        
+
         if (presupuestoId) {
           const url = `/ventas/presupuestos/${presupuestoId}`
           console.log('[CLIENT] ✅ Presupuesto ID válido:', presupuestoId)
           console.log('[CLIENT] 🔗 Redirigiendo a URL:', url)
-          
+
           // Redirigir a la lista primero, luego el usuario puede hacer click en el presupuesto
           // Esto evita problemas de timing donde el presupuesto aún no está disponible
           showToast('success', `Presupuesto creado! Puedes verlo en la lista.`)
           router.push('/ventas/presupuestos')
           router.refresh()
-          
+
           // Alternativa: intentar acceder directamente después de un delay
           // setTimeout(() => {
           //   window.location.href = url
@@ -586,8 +597,8 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
             >
               <SelectTrigger id="lista_precio_id">
                 <SelectValue placeholder={
-                  cargandoListas 
-                    ? 'Cargando listas...' 
+                  cargandoListas
+                    ? 'Cargando listas...'
                     : 'Selecciona una lista de precios (por defecto para todos los productos)'
                 } />
               </SelectTrigger>
@@ -620,43 +631,44 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
           {fields.map((field, index) => {
             const itemListaId = listasPorProducto[index] || watchedListaPrecioGlobal
             const usaListaGlobal = !listasPorProducto[index] && !!watchedListaPrecioGlobal
-            
+
             return (
-            <ProductoItemRow
-              key={field.id}
-              index={index}
-              fieldId={field.id}
-              productos={productos}
-              productoSearch={productoSearch[index] || ''}
-              onProductoSearchChange={(value) => {
-                setProductoSearch(prev => ({ ...prev, [index]: value }))
-              }}
-              onProductoChange={handleProductoChange}
-              onRemove={removeItem}
-              errors={errors.items?.[index]}
-              canRemove={fields.length > 1}
-              watch={watch}
-              setValue={setValue}
-              register={register}
-              control={control}
-              watchedItem={watchedItems?.[index]}
-              todasListas={todasListas}
-              listaId={itemListaId}
-              usaListaGlobal={usaListaGlobal}
-              listaGlobalId={watchedListaPrecioGlobal}
-              onListaChange={handleListaProductoChange}
-            />
-          )})}
+              <ProductoItemRow
+                key={field.id}
+                index={index}
+                fieldId={field.id}
+                productos={productos}
+                productoSearch={productoSearch[index] || ''}
+                onProductoSearchChange={(value) => {
+                  setProductoSearch(prev => ({ ...prev, [index]: value }))
+                }}
+                onProductoChange={handleProductoChange}
+                onRemove={removeItem}
+                errors={errors.items?.[index]}
+                canRemove={fields.length > 1}
+                watch={watch}
+                setValue={setValue}
+                register={register}
+                control={control}
+                watchedItem={watchedItems?.[index]}
+                todasListas={todasListas}
+                listaId={itemListaId}
+                usaListaGlobal={usaListaGlobal}
+                listaGlobalId={watchedListaPrecioGlobal}
+                onListaChange={handleListaProductoChange}
+              />
+            )
+          })}
 
           {errors.items && errors.items.root && (
             <p className="text-sm text-red-500">{errors.items.root.message}</p>
           )}
 
-          <Button 
+          <Button
             ref={agregarProductoButtonRef}
-            type="button" 
-            variant="outline" 
-            onClick={addItem} 
+            type="button"
+            variant="outline"
+            onClick={addItem}
             className="w-full"
           >
             <Plus className="mr-2 h-4 w-4" />

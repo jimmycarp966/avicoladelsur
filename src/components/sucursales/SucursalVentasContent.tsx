@@ -15,6 +15,10 @@ interface ProductoDisponible {
   precioVenta: number
   unidadMedida: string
   stockDisponible: number
+  // Campos de venta por mayor
+  ventaMayorHabilitada?: boolean
+  unidadMayorNombre?: string
+  kgPorUnidadMayor?: number
 }
 
 interface Cliente {

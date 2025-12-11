@@ -97,6 +97,10 @@ interface NuevaVentaFormProps {
     precioVenta: number
     unidadMedida: string
     stockDisponible: number
+    // Campos de venta por mayor
+    ventaMayorHabilitada?: boolean
+    unidadMayorNombre?: string
+    kgPorUnidadMayor?: number
   }>
   clientes: Array<{
     id: string
@@ -168,7 +172,7 @@ export function NuevaVentaForm({
       }))
       setTodasListas(mapped)
     }
-    
+
     // También cargar desde el servidor para asegurar que están actualizadas
     const cargarListas = async () => {
       setCargandoListas(true)
@@ -243,12 +247,12 @@ export function NuevaVentaForm({
     if (watchedItems.length > 0 && pagosFields.length === 0) {
       // Guardar el elemento activo antes de agregar el pago
       const activeElement = document.activeElement as HTMLElement
-      
+
       appendPago({
         metodoPago: 'efectivo',
         monto: subtotal > 0 ? subtotal : 0,
       })
-      
+
       // Restaurar el foco al elemento activo después de un pequeño delay
       setTimeout(() => {
         if (activeElement && activeElement !== document.body) {
@@ -315,7 +319,7 @@ export function NuevaVentaForm({
   const aplicarListaGlobal = useCallback(async (listaGlobalId: string, listaGlobalAnterior?: string) => {
     // Si no se proporciona el valor anterior, obtenerlo del formulario
     const listaAnterior = listaGlobalAnterior || form.getValues('listaPrecioGlobal')
-    
+
     console.log('🔄 aplicarListaGlobal llamado:', {
       listaGlobalId,
       listaAnterior,
@@ -329,18 +333,18 @@ export function NuevaVentaForm({
         tieneListaIndividual: item.listaPrecioId && item.listaPrecioId !== listaAnterior
       }))
     })
-    
+
     // Aplicar lista global SOLO a items que no tienen lista individual O que estaban usando la global anterior
     for (let i = 0; i < watchedItems.length; i++) {
       const item = watchedItems[i]
-      
+
       // Si el item tiene una lista individual diferente a la global anterior, NO la tocamos (prioridad individual)
       if (item.listaPrecioId && listaAnterior && item.listaPrecioId !== listaAnterior) {
         // Este item tiene una lista individual diferente, no aplicamos la global (prioridad)
         console.log(`⏭️ Item ${i} tiene lista individual diferente, omitiendo`)
         continue
       }
-      
+
       // Si no tiene lista individual O estaba usando la global anterior, aplicar la nueva global
       if (item.productoId) {
         console.log(`💰 Actualizando precio item ${i} con lista ${listaGlobalId}`)
@@ -396,13 +400,13 @@ export function NuevaVentaForm({
         e.preventDefault()
         form.handleSubmit(onSubmit)()
       }
-      
+
       // F2: Agregar método de pago
       if (e.key === 'F2' && diferencia > 0.01) {
         e.preventDefault()
         agregarMetodoPago()
       }
-      
+
       // F3: Agregar producto (focus en búsqueda)
       if (e.key === 'F3') {
         e.preventDefault()
@@ -419,7 +423,7 @@ export function NuevaVentaForm({
   const handleCodigoBarras = useCallback(async (codigo: string) => {
     if (!codigo.trim()) return
 
-    const producto = productos.find(p => 
+    const producto = productos.find(p =>
       p.codigo.toLowerCase() === codigo.toLowerCase().trim()
     )
 
@@ -431,7 +435,7 @@ export function NuevaVentaForm({
 
     // Verificar si ya está en el carrito
     const itemExistente = watchedItems.findIndex(item => item.productoId === producto.id)
-    
+
     if (itemExistente >= 0) {
       // Incrementar cantidad
       const cantidadActual = watchedItems[itemExistente].cantidad
@@ -539,7 +543,7 @@ export function NuevaVentaForm({
     setValidandoCredito(true)
     try {
       const result = await validarLimiteCreditoAction(watchedCliente, pagoCredito.monto)
-      
+
       if (!result.success || !result.data) {
         toast.error(result.error || 'Error al validar crédito')
         return false
@@ -607,15 +611,15 @@ export function NuevaVentaForm({
         },
       })
 
-    if (result.success && result.data) {
-      const ventaRegistrada = result.data
-      const pedidoId = ventaRegistrada.pedidoId
+      if (result.success && result.data) {
+        const ventaRegistrada = result.data
+        const pedidoId = ventaRegistrada.pedidoId
 
         toast.success(
           <div className="space-y-1">
             <p className="font-semibold">¡Venta registrada!</p>
-          <p className="text-sm">Pedido: {ventaRegistrada.numeroPedido}</p>
-          <p className="text-sm">Total: ${ventaRegistrada.total.toFixed(2)}</p>
+            <p className="text-sm">Pedido: {ventaRegistrada.numeroPedido}</p>
+            <p className="text-sm">Total: ${ventaRegistrada.total.toFixed(2)}</p>
             <Button
               variant="outline"
               size="sm"
@@ -630,7 +634,7 @@ export function NuevaVentaForm({
                   const url = window.URL.createObjectURL(blob)
                   const a = document.createElement('a')
                   a.href = url
-                a.download = `ticket-${ventaRegistrada.numeroPedido}.pdf`
+                  a.download = `ticket-${ventaRegistrada.numeroPedido}.pdf`
                   document.body.appendChild(a)
                   a.click()
                   window.URL.revokeObjectURL(url)
@@ -656,7 +660,7 @@ export function NuevaVentaForm({
         })
         setBusquedaProducto('')
         setCodigoBarras('')
-        
+
         // Auto-imprimir si está configurado (opcional)
         // const autoImprimir = localStorage.getItem('pos_auto_imprimir') === 'true'
         // if (autoImprimir && data.tipoComprobante === 'ticket') {
@@ -866,8 +870,8 @@ export function NuevaVentaForm({
                               lista.tipo === 'mayorista'
                                 ? 'default'
                                 : lista.tipo === 'minorista'
-                                ? 'secondary'
-                                : 'outline'
+                                  ? 'secondary'
+                                  : 'outline'
                             }
                             className="text-xs"
                           >
@@ -931,7 +935,7 @@ export function NuevaVentaForm({
                   const itemListaId = watchedItems[index]?.listaPrecioId
                   const listaActual = itemListaId ? todasListas.find(l => l.id === itemListaId) : null
                   const usaListaGlobal = itemListaId === watchedListaGlobal && watchedListaGlobal !== undefined
-                  
+
                   return (
                     <div
                       key={field.id}
@@ -963,7 +967,7 @@ export function NuevaVentaForm({
                           const isValidValue = !currentValue || !listasCargadas || todasListas.some(l => l.id === currentValue)
                           // Usar el valor actual si es válido, sino 'none'
                           const displayValue = isValidValue && currentValue ? currentValue : 'none'
-                          
+
                           return (
                             <FormItem>
                               <FormLabel className="text-xs text-muted-foreground">Lista de precio:</FormLabel>
@@ -1000,8 +1004,8 @@ export function NuevaVentaForm({
                                             lista.tipo === 'mayorista'
                                               ? 'default'
                                               : lista.tipo === 'minorista'
-                                              ? 'secondary'
-                                              : 'outline'
+                                                ? 'secondary'
+                                                : 'outline'
                                           }
                                           className="text-xs"
                                         >
@@ -1230,9 +1234,8 @@ export function NuevaVentaForm({
                     <span className="font-medium">${totalPagos.toFixed(2)}</span>
                   </div>
                   {Math.abs(diferencia) > 0.01 && (
-                    <div className={`flex justify-between font-bold ${
-                      diferencia > 0 ? 'text-amber-600' : 'text-green-600'
-                    }`}>
+                    <div className={`flex justify-between font-bold ${diferencia > 0 ? 'text-amber-600' : 'text-green-600'
+                      }`}>
                       <span>{diferencia > 0 ? 'Falta pagar:' : 'Vuelto:'}</span>
                       <span>${Math.abs(diferencia).toFixed(2)}</span>
                     </div>
@@ -1243,7 +1246,7 @@ export function NuevaVentaForm({
           </CardContent>
         </Card>
 
-          {/* Botón de cobrar */}
+        {/* Botón de cobrar */}
         <div className="flex items-center justify-end gap-4">
           <div className="text-2xl font-bold flex items-center gap-2">
             <DollarSign className="w-6 h-6" />
@@ -1257,23 +1260,23 @@ export function NuevaVentaForm({
               className="min-w-48"
               title="Presiona F1 para cobrar"
             >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                Procesando...
-              </>
-            ) : validandoCredito ? (
-              <>
-                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                Validando crédito...
-              </>
-            ) : (
-              <>
-                <CreditCard className="w-5 h-5 mr-2" />
-                Cobrar ${subtotal.toFixed(2)}
-              </>
-            )}
-          </Button>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  Procesando...
+                </>
+              ) : validandoCredito ? (
+                <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  Validando crédito...
+                </>
+              ) : (
+                <>
+                  <CreditCard className="w-5 h-5 mr-2" />
+                  Cobrar ${subtotal.toFixed(2)}
+                </>
+              )}
+            </Button>
             {itemsFields.length > 0 && pagosFields.length > 0 && (
               <div className="text-xs text-muted-foreground flex items-center">
                 <kbd className="px-2 py-1 text-xs font-semibold bg-muted rounded border">F1</kbd>
