@@ -38,6 +38,17 @@ function SelectTrigger({
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
       // El trigger ya maneja esto, pero lo hacemos explícito
+      // Después de abrir, enfocar el input de búsqueda si existe
+      setTimeout(() => {
+        const selectContent = document.querySelector('[role="listbox"]')
+        if (selectContent) {
+          const searchInput = selectContent.querySelector('input[type="text"]') as HTMLInputElement
+          if (searchInput) {
+            searchInput.focus()
+            searchInput.select()
+          }
+        }
+      }, 50)
     }
     // Tab debe funcionar normalmente para navegación
     if (onKeyDown) {

@@ -32,6 +32,8 @@ export function useKeyboardShortcuts({ shortcuts, enabled = true }: UseKeyboardS
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
+      fetch('http://127.0.0.1:7242/ingest/1672462a-0bab-407c-8bd1-baf6ccc7131f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useKeyboardShortcuts.ts:33',message:'handleKeyDown ejecutado',data:{key:event.key,ctrlKey:event.ctrlKey,targetTag:event.target?.tagName,isEnabled:enabled},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'A'})}).catch(()=>{});
+
       if (!enabled) return
 
       // Validar que event.key existe
@@ -42,25 +44,21 @@ export function useKeyboardShortcuts({ shortcuts, enabled = true }: UseKeyboardS
       // Ignorar si está escribiendo en un input, textarea o contenteditable
       const target = event.target as HTMLElement
       const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
-      
+
+      fetch('http://127.0.0.1:7242/ingest/1672462a-0bab-407c-8bd1-baf6ccc7131f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useKeyboardShortcuts.ts:45',message:'Verificación de typing',data:{isTyping,targetTag:target.tagName,targetId:target.id},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'A'})}).catch(()=>{});
+
       // Permitir siempre las teclas de función (F1-F12) y atajos con Ctrl
       const isFunctionKey = event.key.startsWith('F') && /^F\d+$/.test(event.key)
       const isCtrlShortcut = event.ctrlKey || event.metaKey
       const isShiftShortcut = event.shiftKey
       const isAltShortcut = event.altKey
-      
+
       // Si está escribiendo, solo permitir teclas de función y atajos con modificadores
-      // Pero también permitir teclas individuales si el shortcut específicamente las requiere
+      // NO buscar shortcuts cuando está escribiendo sin modificadores
       if (isTyping && !isFunctionKey && !isCtrlShortcut && !isShiftShortcut && !isAltShortcut) {
-        // Verificar si algún shortcut requiere esta tecla sin modificadores
-        const hasSingleKeyShortcut = shortcutsRef.current.some(
-          s => s.key && event.key && 
-          s.key.toLowerCase() === event.key.toLowerCase() && 
-          !s.ctrl && !s.shift && !s.alt && !s.meta && s.fn === undefined
-        )
-        if (!hasSingleKeyShortcut) {
-          return
-        }
+        fetch('http://127.0.0.1:7242/ingest/1672462a-0bab-407c-8bd1-baf6ccc7131f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useKeyboardShortcuts.ts:54',message:'Está escribiendo y no es atajo con modificador, ignorando shortcut',data:{key:event.key,isTyping},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
+        // Cuando está escribiendo sin modificadores, simplemente retornar y dejar que el input maneje la tecla
+        return
       }
 
       // Buscar el shortcut que coincide
@@ -96,6 +94,8 @@ export function useKeyboardShortcuts({ shortcuts, enabled = true }: UseKeyboardS
         }
 
         if (matches) {
+          fetch('http://127.0.0.1:7242/ingest/1672462a-0bab-407c-8bd1-baf6ccc7131f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useKeyboardShortcuts.ts:114',message:'Shortcut encontrado y ejecutándose',data:{shortcutKey:shortcut.key,shortcutCtrl:shortcut.ctrl,eventKey:event.key,eventCtrl:event.ctrlKey,description:shortcut.description},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'A'})}).catch(()=>{});
+
           if (shortcut.preventDefault !== false) {
             event.preventDefault()
             event.stopPropagation()

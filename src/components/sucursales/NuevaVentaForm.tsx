@@ -187,6 +187,7 @@ export function NuevaVentaForm({
 
   const form = useForm<VentaFormData>({
     resolver: zodResolver(ventaSchema),
+    mode: 'onChange', // Actualizar en tiempo real cuando cambian los valores
     defaultValues: {
       clienteId: undefined,
       cajaId: cajas[0]?.id || '',

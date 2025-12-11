@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useForm, useFieldArray } from 'react-hook-form'
+import { useForm, useFieldArray, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -84,6 +84,7 @@ export function PedidoForm({ pedido, onSuccess }: PedidoFormProps) {
     formState: { errors },
   } = useForm<CrearPedidoFormData>({
     resolver: zodResolver(crearPedidoSchema) as any,
+    mode: 'onChange', // Actualizar en tiempo real cuando cambian los valores
     defaultValues: pedido ? {
       cliente_id: pedido.cliente_id,
       fecha_entrega_estimada: pedido.fecha_entrega_estimada ? pedido.fecha_entrega_estimada.split('T')[0] : undefined,
@@ -395,25 +396,49 @@ export function PedidoForm({ pedido, onSuccess }: PedidoFormProps) {
 
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Cantidad *</label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0.01"
-                        placeholder="0.00"
-                        {...register(`items.${index}.cantidad`, { valueAsNumber: true })}
-                        disabled={isLoading}
+                      <Controller
+                        name={`items.${index}.cantidad`}
+                        control={control}
+                        rules={{ required: true, min: 0.01 }}
+                        render={({ field }) => (
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            placeholder="0.00"
+                            {...field}
+                            value={field.value || ''}
+                            onChange={(e) => {
+                              const value = parseFloat(e.target.value) || 0
+                              field.onChange(value)
+                            }}
+                            disabled={isLoading}
+                          />
+                        )}
                       />
                     </div>
 
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Precio Unitario</label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="0.00"
-                        {...register(`items.${index}.precio_unitario`, { valueAsNumber: true })}
-                        disabled={isLoading}
+                      <Controller
+                        name={`items.${index}.precio_unitario`}
+                        control={control}
+                        rules={{ min: 0 }}
+                        render={({ field }) => (
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="0.00"
+                            {...field}
+                            value={field.value || ''}
+                            onChange={(e) => {
+                              const value = parseFloat(e.target.value) || 0
+                              field.onChange(value)
+                            }}
+                            disabled={isLoading}
+                          />
+                        )}
                       />
                     </div>
                   </div>

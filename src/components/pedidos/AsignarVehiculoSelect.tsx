@@ -57,6 +57,15 @@ export function AsignarVehiculoSelect({
         const result = await obtenerVehiculosAction()
         if (result.success && result.data) {
           setVehiculos(result.data)
+          // Seleccionar automáticamente el vehículo más chico (menor capacidad)
+          if (result.data.length > 0) {
+            const vehiculoMasChico = result.data.reduce((menor, actual) => {
+              const capacidadMenor = menor.capacidad_kg || Infinity
+              const capacidadActual = actual.capacidad_kg || Infinity
+              return capacidadActual < capacidadMenor ? actual : menor
+            })
+            setVehiculoSeleccionado(vehiculoMasChico.id)
+          }
         }
       } catch (error) {
         console.error('Error cargando vehículos:', error)
@@ -124,10 +133,21 @@ export function AsignarVehiculoSelect({
               <SelectItem key={vehiculo.id} value={vehiculo.id}>
                 <div className="flex items-center gap-2">
                   <Truck className="h-4 w-4" />
-                  <span>{vehiculo.patente}</span>
+                  <span>
+                    {vehiculo.marca && vehiculo.modelo 
+                      ? `${vehiculo.marca} ${vehiculo.modelo}`
+                      : vehiculo.modelo 
+                        ? vehiculo.modelo
+                        : vehiculo.patente}
+                  </span>
+                  {vehiculo.patente && (
+                    <span className="text-xs text-muted-foreground">
+                      ({vehiculo.patente})
+                    </span>
+                  )}
                   {vehiculo.capacidad_kg && (
                     <span className={`text-xs ${excede ? 'text-red-500' : 'text-muted-foreground'}`}>
-                      ({vehiculo.capacidad_kg} kg)
+                      - {vehiculo.capacidad_kg} kg
                     </span>
                   )}
                   {excede && <AlertTriangle className="h-3 w-3 text-red-500" />}

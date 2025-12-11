@@ -90,8 +90,101 @@ export async function GET(
       })
     }
     
-    // Si tiene pedidos pero no optimización, devolver respuesta con mensaje informativo
+    // Si tiene pedidos pero no optimización, generar orden_visita desde detalles_ruta
     if (!tieneOptimizacion) {
+      // Obtener detalles_ruta con coordenadas de clientes
+      const { data: detallesRutaRaw, error: detallesError } = await supabase
+        .from('detalles_ruta')
+        .select(`
+          id,
+          orden_entrega,
+          estado_entrega,
+          pago_registrado,
+          monto_cobrado_registrado,
+          pedido_id,
+          pedido:pedidos(
+            id,
+            numero_pedido,
+            cliente_id,
+            cliente:clientes(
+              id,
+              nombre,
+              telefono,
+              direccion,
+              ST_AsGeoJSON(coordenadas)::jsonb as coordenadas
+            ),
+            detalle_pedido:detalles_pedido(
+              id,
+              cantidad,
+              producto:productos(
+                id,
+                nombre,
+                codigo
+              )
+            )
+          )
+        `)
+        .eq('ruta_id', rutaId)
+        .order('orden_entrega', { ascending: true })
+
+      if (detallesError) {
+        console.error('Error obteniendo detalles_ruta:', detallesError)
+      }
+
+      // Generar orden_visita desde detalles_ruta
+      const ordenVisitaGenerado = (detallesRutaRaw || []).map((detalle: any) => {
+        const pedido = detalle.pedido
+        const clienteData = Array.isArray(pedido?.cliente) ? pedido.cliente[0] : pedido?.cliente
+        
+        // Convertir coordenadas PostGIS a lat/lng
+        let lat: number | null = null
+        let lng: number | null = null
+        
+        if (clienteData?.coordenadas) {
+          const coords = clienteData.coordenadas
+          if (coords && typeof coords === 'object' && 'type' in coords && coords.type === 'Point' && Array.isArray(coords.coordinates)) {
+            // PostGIS GeoJSON: [lng, lat]
+            const [lngCoord, latCoord] = coords.coordinates
+            lat = latCoord
+            lng = lngCoord
+          } else if (coords && typeof coords === 'object' && 'lat' in coords && 'lng' in coords) {
+            // Formato directo
+            lat = coords.lat
+            lng = coords.lng
+          }
+        }
+
+        // Obtener productos
+        const detallesPedido = Array.isArray(pedido?.detalle_pedido) 
+          ? pedido.detalle_pedido 
+          : (pedido?.detalle_pedido ? [pedido.detalle_pedido] : [])
+        
+        const productos = detallesPedido.map((dp: any) => {
+          const producto = Array.isArray(dp.producto) ? dp.producto[0] : dp.producto
+          return {
+            nombre: producto?.nombre || 'Producto',
+            cantidad: dp.cantidad || 0,
+          }
+        })
+
+        return {
+          id: detalle.id,
+          detalle_ruta_id: detalle.id,
+          pedido_id: pedido?.id,
+          cliente_id: clienteData?.id,
+          cliente_nombre: clienteData?.nombre || 'Cliente',
+          telefono: clienteData?.telefono || null,
+          direccion: clienteData?.direccion || null,
+          lat: lat,
+          lng: lng,
+          orden: detalle.orden_entrega,
+          estado: detalle.estado_entrega || 'pendiente',
+          pago_registrado: detalle.pago_registrado || false,
+          monto_cobrado_registrado: detalle.monto_cobrado_registrado || 0,
+          productos: productos,
+        }
+      }).filter((punto: any) => punto.lat !== null && punto.lng !== null) // Solo incluir puntos con coordenadas válidas
+
       const repartidorData = Array.isArray(rutaReparto.repartidor) 
         ? rutaReparto.repartidor[0] 
         : rutaReparto.repartidor
@@ -103,10 +196,12 @@ export async function GET(
           repartidor_nombre: repartidorData 
             ? `${repartidorData.nombre} ${repartidorData.apellido || ''}`.trim()
             : 'Sin asignar',
-          polyline: '',
-          ordenVisita: [],
+          polyline: '', // No hay polyline si no está optimizada
+          ordenVisita: ordenVisitaGenerado,
           historial: [],
-          mensaje: 'Esta ruta tiene pedidos asignados pero aún no se ha optimizado. Asigna pedidos desde Almacén para generar la ruta optimizada.'
+          mensaje: ordenVisitaGenerado.length === 0 
+            ? 'Esta ruta tiene pedidos asignados pero los clientes no tienen coordenadas. Agrega coordenadas a los clientes para verlos en el mapa.'
+            : `Ruta con ${ordenVisitaGenerado.length} entrega(s). Optimiza la ruta para obtener la ruta más eficiente.`
         }
       })
     }

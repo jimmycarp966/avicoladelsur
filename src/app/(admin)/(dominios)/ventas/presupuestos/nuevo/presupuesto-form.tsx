@@ -66,7 +66,8 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
   const [clienteSearch, setClienteSearch] = useState('')
   const [clienteDropdownOpen, setClienteDropdownOpen] = useState(false)
   const [todasListas, setTodasListas] = useState<Array<{ id: string; codigo: string; nombre: string; tipo: string; margen_ganancia: number | null }>>([])
-  const [cargandoListas, setCargandoListas] = useState(false)
+  const [cargandoListas, setCargandoListas] = useState(true) // Iniciar en true para mostrar loading inicial
+  const [errorListas, setErrorListas] = useState<string | null>(null)
   const agregarProductoButtonRef = useRef<HTMLButtonElement>(null)
 
   // Estado para listas por producto (index -> lista_id)
@@ -77,10 +78,13 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
     control,
     handleSubmit,
     watch,
+    getValues,
     setValue,
+    trigger,
     formState: { errors },
   } = useForm<CrearPresupuestoFormData>({
     resolver: zodResolver(crearPresupuestoSchema),
+    mode: 'onChange', // Actualizar en tiempo real cuando cambian los valores
     defaultValues: {
       fecha_entrega_estimada: new Date().toISOString().split('T')[0], // Fecha de hoy por defecto
       observaciones: '',
@@ -96,16 +100,76 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
   // Optimizar watch usando useWatch para mejor rendimiento
   const watchedItems = useWatch({ control, name: 'items' })
   const watchedCliente = useWatch({ control, name: 'cliente_id' })
+  
+  // Estado para forzar actualización del total cuando cambia precio
+  const [totalUpdateKey, setTotalUpdateKey] = useState(0)
+  
+  // Suscribirse a cambios en items usando watch con callback para detectar cambios profundos
+  useEffect(() => {
+    const subscription = watch((value, { name, type }) => {
+      // Si cambió algún precio o cantidad, forzar actualización del total
+      if (name && (name.includes('precio_unit_est') || name.includes('cantidad_solicitada'))) {
+        setTotalUpdateKey(prev => prev + 1)
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [watch, setTotalUpdateKey])
+  
+  
+  // Ref para rastrear la cantidad de items y detectar cuando se agregan nuevos
+  const cantidadItemsRef = useRef(watchedItems?.length || 0)
+  
+  // Ref para forzar actualización cuando se agregan productos nuevos
+  const [triggerActualizacion, setTriggerActualizacion] = useState(0)
+  
+  // Efecto separado para detectar cuando se agregan productos nuevos
+  useEffect(() => {
+    const cantidadActual = watchedItems?.length || 0
+    if (cantidadActual > cantidadItemsRef.current) {
+      // Se agregaron nuevos productos, limpiar cache y forzar actualización
+      productosProcesadosRef.current.clear()
+      cantidadItemsRef.current = cantidadActual
+      setTriggerActualizacion(prev => prev + 1)
+    }
+  }, [watchedItems?.length])
 
   // Debouncing para búsquedas (solo para cliente, productos se manejan individualmente)
-  const debouncedClienteSearch = useDebounce(clienteSearch, 300)
+  // Reducido a 150ms para mejor respuesta sin sacrificar rendimiento
+  const debouncedClienteSearch = useDebounce(clienteSearch, 150)
 
-  // Memoizar total estimado
-  const totalEstimado = useMemo(() => {
-    return watchedItems?.reduce((sum, item) => {
-      return sum + (item.cantidad_solicitada * (item.precio_unit_est || 0))
-    }, 0) || 0
-  }, [watchedItems])
+  // Calcular total estimado usando watch directamente para detectar cambios inmediatos
+  // Usar watch('items') directamente para obtener valores actuales en cada render
+  const itemsParaTotal = watch('items')
+  
+  // Crear una clave única basada en los valores de los items para detectar cambios profundos
+  const itemsKey = useMemo(() => {
+    if (!itemsParaTotal || itemsParaTotal.length === 0) return 'empty'
+    return JSON.stringify(itemsParaTotal.map(item => ({
+      producto_id: item?.producto_id,
+      cantidad_solicitada: item?.cantidad_solicitada,
+      precio_unit_est: item?.precio_unit_est
+    })))
+  }, [itemsParaTotal])
+  
+  // Estado local para el total que se actualiza cuando cambian los items
+  const [totalEstimadoState, setTotalEstimadoState] = useState(0)
+  
+  // Calcular total cuando cambian los items (detectado por itemsKey) o totalUpdateKey
+  useEffect(() => {
+    if (!itemsParaTotal || itemsParaTotal.length === 0) {
+      setTotalEstimadoState(0)
+      return
+    }
+    const total = itemsParaTotal.reduce((sum: number, item: any) => {
+      const cantidad = item?.cantidad_solicitada || 0
+      const precio = item?.precio_unit_est || 0
+      return sum + (cantidad * precio)
+    }, 0)
+    setTotalEstimadoState(total)
+  }, [itemsKey, totalUpdateKey, itemsParaTotal])
+  
+  // Usar el estado local para el total
+  const totalEstimado = totalEstimadoState
 
   // Memoizar cliente seleccionado
   const clienteSeleccionado = useMemo(() => {
@@ -119,36 +183,16 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
         key: 'c',
         fieldId: 'cliente_id',
         description: 'Enfocar Cliente',
-        action: () => {
-          const element = document.getElementById('cliente_id')
-          if (element) {
-            element.click()
-            setTimeout(() => {
-              const searchInput = document.querySelector('[role="listbox"] input[type="text"]')
-              if (searchInput instanceof HTMLInputElement) {
-                searchInput.focus()
-                searchInput.select()
-              }
-            }, 150)
-          }
-        },
       },
       {
         key: 'p',
-        fieldId: 'producto_0',
         description: 'Enfocar primer Producto',
         action: () => {
-          // Buscar el primer campo de producto disponible
-          const firstProductSelect = document.querySelector('[data-product-index="0"]') as HTMLElement
+          // Buscar el SelectTrigger del primer producto por su ID
+          const firstProductSelect = document.getElementById('producto_0')
           if (firstProductSelect) {
             firstProductSelect.click()
-            setTimeout(() => {
-              const searchInput = document.querySelector('[role="listbox"] input[type="text"]')
-              if (searchInput instanceof HTMLInputElement) {
-                searchInput.focus()
-                searchInput.select()
-              }
-            }, 150)
+            // El hook mejorado manejará el focus del input de búsqueda
           }
         },
       },
@@ -179,57 +223,197 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
         fieldId: 'observaciones',
         description: 'Enfocar Observaciones',
       },
+      {
+        key: 'q',
+        ctrlKey: true,
+        description: 'Enfocar Cantidad del primer producto (Ctrl+Q)',
+        action: () => {
+          const cantidadInput = document.getElementById('cantidad_0')
+          if (cantidadInput instanceof HTMLInputElement) {
+            cantidadInput.focus()
+            cantidadInput.select()
+          }
+        },
+      },
+      {
+        key: 'w',
+        ctrlKey: true,
+        description: 'Enfocar Precio del primer producto (Ctrl+W)',
+        action: () => {
+          const precioInput = document.getElementById('precio_0')
+          if (precioInput instanceof HTMLInputElement) {
+            precioInput.focus()
+            precioInput.select()
+          }
+        },
+      },
+      // Atajos numéricos para enfocar productos por índice (Ctrl+1-9)
+      ...Array.from({ length: 9 }, (_, i) => ({
+        key: String(i + 1),
+        ctrlKey: true,
+        description: `Enfocar Producto ${i + 1} (Ctrl+${i + 1})`,
+        action: () => {
+          const productSelect = document.getElementById(`producto_${i}`)
+          if (productSelect) {
+            productSelect.click()
+          }
+        },
+      })),
     ],
   })
 
+
   // Cargar todas las listas activas disponibles
   useEffect(() => {
+    let isMounted = true
+    let timeoutId: NodeJS.Timeout | null = null
+    
     const cargarListas = async () => {
-      setCargandoListas(true)
-      const result = await obtenerTodasListasActivasAction()
-      if (result.success && result.data) {
-        setTodasListas(result.data as any)
-      } else {
-        console.warn('[PRESUPUESTO FORM] Error al cargar listas:', result.error)
+      try {
+        console.log('[PRESUPUESTO FORM] Iniciando carga de listas...')
+        setCargandoListas(true)
+        setErrorListas(null)
+        
+        // Llamar directamente sin timeout primero para ver si funciona
+        const startTime = Date.now()
+        const result = await obtenerTodasListasActivasAction()
+        const duration = Date.now() - startTime
+        console.log(`[PRESUPUESTO FORM] Listas cargadas en ${duration}ms`, result)
+        
+        if (!isMounted) {
+          console.log('[PRESUPUESTO FORM] Componente desmontado, ignorando resultado')
+          return
+        }
+        
+        if (result.success && result.data) {
+          console.log(`[PRESUPUESTO FORM] ${result.data.length} listas cargadas exitosamente`)
+          setTodasListas(result.data as any)
+        } else {
+          const errorMsg = result.error || 'Error desconocido al cargar listas'
+          console.warn('[PRESUPUESTO FORM] Error al cargar listas:', errorMsg)
+          setErrorListas(errorMsg)
+          setTodasListas([])
+        }
+      } catch (error: any) {
+        if (!isMounted) {
+          console.log('[PRESUPUESTO FORM] Componente desmontado, ignorando error')
+          return
+        }
+        const errorMsg = error?.message || 'Error al cargar listas de precios'
+        console.error('[PRESUPUESTO FORM] Error al cargar listas:', error)
+        setErrorListas(errorMsg)
         setTodasListas([])
+      } finally {
+        if (isMounted) {
+          console.log('[PRESUPUESTO FORM] Finalizando carga de listas')
+          setCargandoListas(false)
+        }
+        if (timeoutId) {
+          clearTimeout(timeoutId)
+        }
       }
-      setCargandoListas(false)
     }
 
     cargarListas()
+    
+    return () => {
+      console.log('[PRESUPUESTO FORM] Limpiando efecto de carga de listas')
+      isMounted = false
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+    }
   }, [])
 
   // Actualizar precios cuando cambia la lista global o lista por producto
   const watchedListaPrecioGlobal = useWatch({ control, name: 'lista_precio_id' })
+  
+  // Ref para rastrear las últimas listas usadas y evitar loops infinitos
+  const ultimasListasRef = useRef<Record<number, string>>({})
+  const ultimaListaGlobalRef = useRef<string | undefined>(undefined)
+  const productosProcesadosRef = useRef<Set<string>>(new Set())
 
+  // Efecto para actualizar precios cuando cambian las listas (NO cuando cambian los items)
   useEffect(() => {
     const actualizarPrecios = async () => {
-      if (!watchedItems) return
+      // Obtener items actuales usando getValues para evitar loops infinitos
+      const itemsActuales = getValues('items')
+      if (!itemsActuales || itemsActuales.length === 0) return
 
-      for (let i = 0; i < watchedItems.length; i++) {
-        const item = watchedItems[i]
+      // Verificar si realmente cambió la lista global
+      const listaGlobalCambio = ultimaListaGlobalRef.current !== watchedListaPrecioGlobal
+      
+      // Si cambió la lista global, limpiar el cache de productos procesados
+      if (listaGlobalCambio) {
+        productosProcesadosRef.current.clear()
+      }
+      
+      for (let i = 0; i < itemsActuales.length; i++) {
+        const item = itemsActuales[i]
         if (!item.producto_id) continue
 
         // Usar lista individual si existe, sino usar lista global
         const listaId = listasPorProducto[i] || watchedListaPrecioGlobal
         if (!listaId) continue
 
+        // Crear una clave única para este producto+lista
+        const clave = `${item.producto_id}-${listaId}`
+        
+        // Verificar si la lista para este producto cambió
+        const listaAnterior = ultimasListasRef.current[i]
+        const listaCambio = listaAnterior !== listaId || listaGlobalCambio
+        
+        // Si la lista no cambió y ya procesamos este producto con esta lista, saltar
+        if (!listaCambio && productosProcesadosRef.current.has(clave)) {
+          continue
+        }
+
         const precioResult = await obtenerPrecioProductoAction(listaId, item.producto_id)
         if (precioResult.success && precioResult.data) {
-          setValue(`items.${i}.precio_unit_est`, precioResult.data.precio, {
-            shouldValidate: true,
-            shouldDirty: true
-          })
+          // Obtener información de la lista seleccionada
+          const listaSeleccionada = todasListas.find(l => l.id === listaId)
+          const esListaMayorista = listaSeleccionada?.tipo === 'mayorista'
+          
+          // Obtener información del producto
+          const producto = productos.find(p => p.id === item.producto_id)
+          const ventaMayorHabilitada = producto?.venta_mayor_habilitada || false
+          const kgPorUnidadMayor = producto?.kg_por_unidad_mayor || 20
+          
+          // Si es lista mayorista y el producto tiene venta mayor habilitada, multiplicar precio por kg_por_unidad_mayor
+          let nuevoPrecio = precioResult.data.precio
+          if (esListaMayorista && ventaMayorHabilitada && producto?.unidad_medida === 'kg') {
+            nuevoPrecio = precioResult.data.precio * kgPorUnidadMayor
+          }
+          
+          const precioActual = item.precio_unit_est || 0
+          
+          // Solo actualizar si el precio es diferente para evitar loops
+          if (Math.abs(nuevoPrecio - precioActual) > 0.01) {
+            setValue(`items.${i}.precio_unit_est`, nuevoPrecio, {
+              shouldValidate: true,
+              shouldDirty: true
+            })
+          }
+          
           // Actualizar también la lista_precio_id del item si se calculó desde lista global
           if (!listasPorProducto[i] && watchedListaPrecioGlobal) {
             setValue(`items.${i}.lista_precio_id`, watchedListaPrecioGlobal, { shouldDirty: false })
           }
+          
+          // Actualizar las referencias
+          ultimasListasRef.current[i] = listaId
+          productosProcesadosRef.current.add(clave)
         }
       }
+      
+      // Actualizar referencia de lista global
+      ultimaListaGlobalRef.current = watchedListaPrecioGlobal
     }
 
     actualizarPrecios()
-  }, [watchedListaPrecioGlobal, listasPorProducto, setValue, watchedItems])
+    // Solo ejecutar cuando cambien las listas o cuando se agreguen productos nuevos
+    // NO cuando cambien los items para evitar loops infinitos
+  }, [watchedListaPrecioGlobal, listasPorProducto, setValue, getValues, triggerActualizacion, todasListas, productos])
 
   // Memoizar handleProductoChange
   const handleProductoChange = useCallback(async (index: number, productoId: string) => {
@@ -240,9 +424,21 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
     const listaId = listasPorProducto[index] || watchedListaPrecioGlobal
 
     if (listaId) {
+      // Obtener información de la lista seleccionada
+      const listaSeleccionada = todasListas.find(l => l.id === listaId)
+      const esListaMayorista = listaSeleccionada?.tipo === 'mayorista' || listaSeleccionada?.tipo === 'distribuidor'
+      const ventaMayorHabilitada = producto.venta_mayor_habilitada || false
+      const kgPorUnidadMayor = producto.kg_por_unidad_mayor || 20
+      
       const precioResult = await obtenerPrecioProductoAction(listaId, productoId)
       if (precioResult.success && precioResult.data) {
-        setValue(`items.${index}.precio_unit_est`, precioResult.data.precio, {
+        // Si es lista mayorista y el producto tiene venta mayor habilitada, multiplicar precio por kg_por_unidad_mayor
+        let precioFinal = precioResult.data.precio
+        if (esListaMayorista && ventaMayorHabilitada && producto.unidad_medida === 'kg') {
+          precioFinal = precioResult.data.precio * kgPorUnidadMayor
+        }
+        
+        setValue(`items.${index}.precio_unit_est`, precioFinal, {
           shouldValidate: true,
           shouldDirty: true
         })
@@ -259,29 +455,111 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
       shouldValidate: true,
       shouldDirty: true
     })
-  }, [productos, setValue, watchedListaPrecioGlobal, listasPorProducto])
+  }, [productos, setValue, watchedListaPrecioGlobal, listasPorProducto, todasListas])
 
-  // Memoizar función para filtrar productos
+  // Memoizar función para filtrar productos con límite de resultados
   const getFilteredProductos = useCallback((index: number, searchTerm: string) => {
-    const term = searchTerm.toLowerCase()
-    if (!term) return productos
-    return productos.filter(p =>
-      p.codigo.toLowerCase().includes(term) ||
-      p.nombre.toLowerCase().includes(term)
-    )
+    const term = searchTerm.toLowerCase().trim()
+    if (!term) {
+      // Si no hay búsqueda, devolver solo los primeros MAX_RESULTS
+      return productos.slice(0, MAX_RESULTS)
+    }
+    
+    // Optimizar filtrado: buscar coincidencias exactas primero, luego parciales
+    const results: typeof productos = []
+    const termLower = term.toLowerCase()
+    
+    for (const producto of productos) {
+      if (results.length >= MAX_RESULTS) break
+      
+      // Coincidencia exacta en código (prioridad alta)
+      if (producto.codigo.toLowerCase() === termLower) {
+        results.unshift(producto) // Al inicio
+        continue
+      }
+      
+      // Coincidencia que empieza con el término (prioridad media)
+      if (
+        producto.codigo.toLowerCase().startsWith(termLower) ||
+        producto.nombre.toLowerCase().startsWith(termLower)
+      ) {
+        results.push(producto)
+        continue
+      }
+      
+      // Coincidencia parcial (prioridad baja)
+      if (
+        producto.codigo.toLowerCase().includes(termLower) ||
+        producto.nombre.toLowerCase().includes(termLower)
+      ) {
+        results.push(producto)
+      }
+    }
+    
+    return results
   }, [productos])
 
-  // Memoizar función para filtrar clientes
+  // Memoizar función para filtrar clientes con límite de resultados
+  const MAX_RESULTS = 50 // Limitar resultados para mejor rendimiento
   const getFilteredClientes = useCallback((searchTerm: string) => {
-    const term = searchTerm.toLowerCase()
-    if (!term) return clientes
-    return clientes.filter(c =>
-      c.nombre.toLowerCase().includes(term) ||
-      (c.telefono && c.telefono.includes(term)) ||
-      (c.zona_entrega && c.zona_entrega.toLowerCase().includes(term)) ||
-      (c.codigo && c.codigo.toLowerCase().includes(term))
-    )
-  }, [clientes])
+    const term = searchTerm.toLowerCase().trim()
+    if (!term) {
+      // Si no hay búsqueda, devolver solo los primeros MAX_RESULTS
+      return clientes.slice(0, MAX_RESULTS)
+    }
+    
+    // Optimizar filtrado: buscar coincidencias exactas primero, luego parciales
+    const results: typeof clientes = []
+    const termLower = term.toLowerCase()
+    
+    // Asegurar que el cliente seleccionado siempre esté en la lista si existe
+    const clienteSeleccionadoEnLista = watchedCliente 
+      ? clientes.find(c => c.id === watchedCliente)
+      : null
+    
+    for (const cliente of clientes) {
+      if (results.length >= MAX_RESULTS) break
+      
+      // Si es el cliente seleccionado, agregarlo primero si no está ya incluido
+      if (cliente.id === watchedCliente && !results.find(c => c.id === cliente.id)) {
+        results.unshift(cliente)
+        continue
+      }
+      
+      // Coincidencia exacta en código (prioridad alta)
+      if (cliente.codigo?.toLowerCase() === termLower) {
+        results.unshift(cliente) // Al inicio
+        continue
+      }
+      
+      // Coincidencia que empieza con el término (prioridad media)
+      if (
+        cliente.nombre.toLowerCase().startsWith(termLower) ||
+        cliente.codigo?.toLowerCase().startsWith(termLower) ||
+        cliente.telefono?.startsWith(term)
+      ) {
+        results.push(cliente)
+        continue
+      }
+      
+      // Coincidencia parcial (prioridad baja)
+      if (
+        cliente.nombre.toLowerCase().includes(termLower) ||
+        cliente.codigo?.toLowerCase().includes(termLower) ||
+        cliente.telefono?.includes(term) ||
+        cliente.zona_entrega?.toLowerCase().includes(termLower)
+      ) {
+        results.push(cliente)
+      }
+    }
+    
+    // Si hay un cliente seleccionado y no está en los resultados, agregarlo al inicio
+    if (clienteSeleccionadoEnLista && !results.find(c => c.id === clienteSeleccionadoEnLista.id)) {
+      results.unshift(clienteSeleccionadoEnLista)
+    }
+    
+    return results
+  }, [clientes, watchedCliente])
 
   // Función para cambiar lista de un producto específico
   const handleListaProductoChange = useCallback(async (index: number, listaId: string) => {
@@ -302,16 +580,44 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
 
     // Actualizar precio del producto con la nueva lista
     const item = watchedItems?.[index]
-    if (item?.producto_id && listaId) {
-      const precioResult = await obtenerPrecioProductoAction(listaId, item.producto_id)
-      if (precioResult.success && precioResult.data) {
-        setValue(`items.${index}.precio_unit_est`, precioResult.data.precio, {
-          shouldValidate: true,
-          shouldDirty: true
-        })
+    if (item?.producto_id) {
+      // Determinar qué lista usar: individual si existe, sino lista global
+      const listaAUsar = listaId || watchedListaPrecioGlobal
+      
+      if (listaAUsar) {
+        // Obtener información de la lista seleccionada
+        const listaSeleccionada = todasListas.find(l => l.id === listaAUsar)
+        const esListaMayorista = listaSeleccionada?.tipo === 'mayorista'
+        
+        // Obtener información del producto
+        const productoSeleccionado = productos.find(p => p.id === item.producto_id)
+        const ventaMayorHabilitada = productoSeleccionado?.venta_mayor_habilitada || false
+        const kgPorUnidadMayor = productoSeleccionado?.kg_por_unidad_mayor || 20
+        
+        const precioResult = await obtenerPrecioProductoAction(listaAUsar, item.producto_id)
+        if (precioResult.success && precioResult.data) {
+          // Si es lista mayorista y el producto tiene venta mayor habilitada, multiplicar precio por kg_por_unidad_mayor
+          let precioFinal = precioResult.data.precio
+          if (esListaMayorista && ventaMayorHabilitada && productoSeleccionado?.unidad_medida === 'kg') {
+            precioFinal = precioResult.data.precio * kgPorUnidadMayor
+          }
+          
+          // Actualizar precio con todas las opciones para forzar actualización
+          setValue(`items.${index}.precio_unit_est`, precioFinal, {
+            shouldValidate: true,
+            shouldDirty: true,
+            shouldTouch: true
+          })
+          // Forzar actualización del formulario y validación
+          await trigger(`items.${index}.precio_unit_est`)
+          // Forzar actualización del total estimado - usar setTimeout para asegurar que React procese el cambio
+          setTimeout(() => {
+            setTotalUpdateKey(prev => prev + 1)
+          }, 0)
+        }
       }
     }
-  }, [listasPorProducto, watchedListaPrecioGlobal, watchedItems, setValue])
+  }, [listasPorProducto, watchedListaPrecioGlobal, watchedItems, setValue, getValues, trigger, watch, todasListas, productos])
 
   // Memoizar addItem
   const addItem = useCallback(() => {
@@ -326,7 +632,7 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
     // Enfocar el select del producto recién agregado después de que React lo renderice
     // Usar múltiples intentos para asegurar que funcione
     const focusProductSelect = (attempts = 0) => {
-      if (attempts > 10) return // Máximo 10 intentos
+      if (attempts > 20) return // Máximo 20 intentos
 
       const nuevoProductoSelect = document.getElementById(`producto_${newIndex}`) as HTMLElement
       if (nuevoProductoSelect) {
@@ -336,20 +642,44 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
           activeElement.blur()
         }
 
-        // Enfocar el select
-        nuevoProductoSelect.focus()
+        // Hacer click para abrir el dropdown
         nuevoProductoSelect.click()
 
         // Esperar a que se abra el dropdown y luego enfocar el input de búsqueda
-        setTimeout(() => {
-          const searchInput = document.querySelector('[role="listbox"] input[type="text"]') as HTMLInputElement
+        // Buscar el input dentro del SelectContent que se acaba de abrir
+        const focusSearchInput = (searchAttempts = 0) => {
+          if (searchAttempts > 30) return // Máximo 30 intentos para encontrar el input
+
+          // Buscar el input de búsqueda usando el atributo data-product-search
+          const searchInput = document.querySelector(`input[data-product-search="${newIndex}"]`) as HTMLInputElement
           if (searchInput) {
+            // Enfocar y seleccionar el texto
             searchInput.focus()
             searchInput.select()
+            return
           }
-        }, 250)
+
+          // Fallback: buscar el input dentro del SelectContent abierto
+          const selectContent = document.querySelector('[role="listbox"]') as HTMLElement
+          if (selectContent) {
+            // Buscar el input dentro del SelectContent
+            const fallbackInput = selectContent.querySelector('input[type="text"], input[placeholder*="Buscar"]') as HTMLInputElement
+            if (fallbackInput) {
+              // Enfocar y seleccionar el texto
+              fallbackInput.focus()
+              fallbackInput.select()
+              return
+            }
+          }
+
+          // Si no se encuentra, intentar de nuevo después de un breve delay
+          setTimeout(() => focusSearchInput(searchAttempts + 1), 50)
+        }
+
+        // Iniciar la búsqueda del input después de un pequeño delay para que el dropdown se abra
+        setTimeout(() => focusSearchInput(), 100)
       } else {
-        // Si no se encuentra, intentar de nuevo después de un breve delay
+        // Si no se encuentra el select, intentar de nuevo después de un breve delay
         setTimeout(() => focusProductSelect(attempts + 1), 50)
       }
     }
@@ -450,6 +780,45 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
     }
   }
 
+  // Atajos globales (Ctrl+Enter para guardar, Ctrl+N para agregar producto)
+  // Debe estar después de la definición de onSubmit
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Solo procesar si no estamos escribiendo en un input/textarea
+      const target = e.target as HTMLElement
+      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA'
+      const isContentEditable = target.isContentEditable
+      
+      // Si estamos en un input de búsqueda dentro de un Select, permitir que funcione normalmente
+      const isSearchInput = isInput && target.closest('[role="listbox"]')
+      
+      if (isSearchInput) {
+        return // Permitir que el input de búsqueda maneje sus propios eventos
+      }
+
+      // Ctrl+Enter o Ctrl+S: Guardar presupuesto
+      if ((e.key === 'Enter' || e.key === 's') && e.ctrlKey && !isInput && !isContentEditable) {
+        e.preventDefault()
+        if (!isLoading) {
+          handleSubmit(onSubmit)()
+        }
+        return
+      }
+
+      // Ctrl+N: Agregar nuevo producto
+      if (e.key === 'n' && e.ctrlKey && !isInput && !isContentEditable) {
+        e.preventDefault()
+        addItem()
+        return
+      }
+    }
+
+    window.addEventListener('keydown', handleGlobalKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleGlobalKeyDown)
+    }
+  }, [isLoading, handleSubmit, onSubmit, addItem])
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       {/* Información del Cliente */}
@@ -469,13 +838,27 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
             <Select
               value={watchedCliente || ''}
               onValueChange={(value) => {
-                setValue('cliente_id', value)
-                setClienteSearch('')
-                setClienteDropdownOpen(false)
+                // Establecer el valor primero
+                setValue('cliente_id', value, { shouldValidate: true, shouldDirty: true })
+                // Limpiar la búsqueda después de un pequeño delay para asegurar que el valor se estableció
+                setTimeout(() => {
+                  setClienteSearch('')
+                  // Avanzar al siguiente campo (zona o fecha)
+                  const zonaInput = document.getElementById('zona_id')
+                  if (zonaInput) {
+                    zonaInput.focus()
+                  } else {
+                    const fechaInput = document.getElementById('fecha_entrega_estimada')
+                    if (fechaInput) {
+                      fechaInput.focus()
+                    }
+                  }
+                }, 100)
               }}
               onOpenChange={(open) => {
                 setClienteDropdownOpen(open)
                 if (!open) {
+                  // Limpiar la búsqueda cuando se cierra el dropdown
                   setClienteSearch('')
                 }
               }}
@@ -495,7 +878,52 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
                       }}
                       className="pl-8"
                       onClick={(e) => e.stopPropagation()}
-                      onKeyDown={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => {
+                        e.stopPropagation()
+                        const filtered = getFilteredClientes(debouncedClienteSearch)
+                        const listaFinal = [...filtered]
+                        const clienteSeleccionadoEnLista = watchedCliente 
+                          ? clientes.find(c => c.id === watchedCliente)
+                          : null
+                        if (clienteSeleccionadoEnLista && !listaFinal.find(c => c.id === clienteSeleccionadoEnLista.id)) {
+                          listaFinal.unshift(clienteSeleccionadoEnLista)
+                        }
+                        
+                        if (e.key === 'Enter' && listaFinal.length > 0) {
+                          e.preventDefault()
+                          // Seleccionar el primer resultado
+                          const primerCliente = listaFinal[0]
+                          setValue('cliente_id', primerCliente.id, { shouldValidate: true, shouldDirty: true })
+                          setClienteSearch('')
+                          setClienteDropdownOpen(false)
+                          // Avanzar al siguiente campo (zona o fecha)
+                          setTimeout(() => {
+                            const zonaInput = document.getElementById('zona_id')
+                            if (zonaInput) {
+                              zonaInput.focus()
+                            } else {
+                              const fechaInput = document.getElementById('fecha_entrega_estimada')
+                              if (fechaInput) {
+                                fechaInput.focus()
+                              }
+                            }
+                          }, 100)
+                        } else if (e.key === 'Tab' && !e.shiftKey) {
+                          // Si hay un cliente seleccionado, cerrar dropdown y avanzar
+                          if (watchedCliente) {
+                            setClienteDropdownOpen(false)
+                          }
+                          // Permitir que TAB funcione normalmente
+                        } else if (e.key === 'Escape') {
+                          e.preventDefault()
+                          setClienteDropdownOpen(false)
+                          const trigger = document.getElementById('cliente_id')
+                          if (trigger) {
+                            trigger.focus()
+                          }
+                        }
+                      }}
+                      autoComplete="off"
                     />
                     {clienteSearch && (
                       <Button
@@ -516,14 +944,35 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
                 <div className="max-h-[200px] overflow-y-auto">
                   {(() => {
                     const filtered = getFilteredClientes(debouncedClienteSearch)
-                    return filtered.length > 0 ? (
-                      filtered.map((cliente) => (
-                        <SelectItem key={cliente.id} value={cliente.id}>
-                          {cliente.codigo && `[${cliente.codigo}] `}
-                          {cliente.nombre} {cliente.telefono && `- ${cliente.telefono}`}
-                          {cliente.zona_entrega && ` (${cliente.zona_entrega})`}
-                        </SelectItem>
-                      ))
+                    const totalClientes = clientes.length
+                    const showingAll = filtered.length >= totalClientes || filtered.length < MAX_RESULTS
+                    
+                    // Asegurar que el cliente seleccionado siempre esté en la lista si existe
+                    const clienteSeleccionadoEnLista = watchedCliente 
+                      ? clientes.find(c => c.id === watchedCliente)
+                      : null
+                    
+                    // Si hay un cliente seleccionado y no está en los resultados filtrados, agregarlo
+                    const listaFinal = [...filtered]
+                    if (clienteSeleccionadoEnLista && !listaFinal.find(c => c.id === clienteSeleccionadoEnLista.id)) {
+                      listaFinal.unshift(clienteSeleccionadoEnLista)
+                    }
+                    
+                    return listaFinal.length > 0 ? (
+                      <>
+                        {listaFinal.map((cliente) => (
+                          <SelectItem key={cliente.id} value={cliente.id}>
+                            {cliente.codigo && `[${cliente.codigo}] `}
+                            {cliente.nombre} {cliente.telefono && `- ${cliente.telefono}`}
+                            {cliente.zona_entrega && ` (${cliente.zona_entrega})`}
+                          </SelectItem>
+                        ))}
+                        {!showingAll && (
+                          <div className="px-2 py-2 text-xs text-muted-foreground text-center border-t bg-muted/50">
+                            Mostrando {listaFinal.length} de {totalClientes} clientes
+                          </div>
+                        )}
+                      </>
                     ) : (
                       <div className="px-2 py-6 text-center text-sm text-muted-foreground">
                         No se encontraron clientes
@@ -547,7 +996,16 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
                 </Label>
                 <Select
                   value={watch('zona_id') || ''}
-                  onValueChange={(value) => setValue('zona_id', value)}
+                  onValueChange={(value) => {
+                    setValue('zona_id', value)
+                    // Avanzar a fecha después de seleccionar zona
+                    setTimeout(() => {
+                      const fechaInput = document.getElementById('fecha_entrega_estimada')
+                      if (fechaInput) {
+                        fechaInput.focus()
+                      }
+                    }, 100)
+                  }}
                 >
                   <SelectTrigger id="zona_id">
                     <SelectValue placeholder="Selecciona una zona" />
@@ -592,24 +1050,51 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
                     setValue(`items.${index}.lista_precio_id`, value, { shouldDirty: false })
                   }
                 })
+                // Avanzar al primer producto después de seleccionar lista
+                setTimeout(() => {
+                  const firstProductSelect = document.getElementById('producto_0')
+                  if (firstProductSelect) {
+                    firstProductSelect.click()
+                    setTimeout(() => {
+                      const searchInput = document.querySelector('input[data-product-search="0"]') as HTMLInputElement
+                      if (searchInput) {
+                        searchInput.focus()
+                        searchInput.select()
+                      }
+                    }, 100)
+                  }
+                }, 100)
               }}
-              disabled={cargandoListas}
+              disabled={cargandoListas || !!errorListas}
             >
               <SelectTrigger id="lista_precio_id">
                 <SelectValue placeholder={
                   cargandoListas
                     ? 'Cargando listas...'
+                    : errorListas
+                    ? 'Error al cargar listas'
                     : 'Selecciona una lista de precios (por defecto para todos los productos)'
                 } />
               </SelectTrigger>
               <SelectContent>
-                {todasListas.map((lista) => (
-                  <SelectItem key={lista.id} value={lista.id}>
-                    {lista.codigo} - {lista.nombre} {lista.margen_ganancia && `(${lista.margen_ganancia}% margen)`}
-                  </SelectItem>
-                ))}
+                {todasListas.length > 0 ? (
+                  todasListas.map((lista) => (
+                    <SelectItem key={lista.id} value={lista.id}>
+                      {lista.codigo} - {lista.nombre} {lista.margen_ganancia && `(${lista.margen_ganancia}% margen)`}
+                    </SelectItem>
+                  ))
+                ) : !cargandoListas ? (
+                  <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                    {errorListas ? `Error: ${errorListas}` : 'No hay listas disponibles'}
+                  </div>
+                ) : null}
               </SelectContent>
             </Select>
+            {errorListas && (
+              <p className="text-sm text-red-500 mt-1">
+                Error al cargar listas. Intenta recargar la página.
+              </p>
+            )}
             {watch('lista_precio_id') && (
               <p className="text-sm text-muted-foreground mt-1">
                 Lista por defecto para todos los productos. Puedes cambiar la lista individualmente en cada producto.
@@ -656,6 +1141,8 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
                 usaListaGlobal={usaListaGlobal}
                 listaGlobalId={watchedListaPrecioGlobal}
                 onListaChange={handleListaProductoChange}
+                totalItems={fields.length}
+                onAddItem={addItem}
               />
             )
           })}

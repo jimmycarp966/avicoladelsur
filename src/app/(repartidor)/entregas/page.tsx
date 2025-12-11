@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { createClient } from '@/lib/supabase/server'
 import { RepartoSkeleton } from './reparto-skeleton'
 import { obtenerRutasPorVehiculoAction } from '@/actions/reparto.actions'
+import { FiltrosClient } from './filtros-client'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,6 +47,11 @@ async function RepartoContent({ searchParams }: { searchParams: { fecha?: string
 
   // Obtener rutas del vehículo del repartidor (sin filtrar por fecha si no se especifica)
   const rutasResponse = await obtenerRutasPorVehiculoAction(usuario.vehiculo_asignado, fechaFiltro)
+  
+  if (!rutasResponse.success) {
+    console.error('Error obteniendo rutas:', rutasResponse.error)
+  }
+  
   const rutas = rutasResponse.success && rutasResponse.data ? (rutasResponse.data as any[]) : []
 
   // Filtrar por turno si se especifica
@@ -53,16 +59,16 @@ async function RepartoContent({ searchParams }: { searchParams: { fecha?: string
     ? rutas.filter((r: any) => r.turno === turnoFiltro)
     : rutas
 
-  // Obtener todas las entregas de las rutas activas
+  // Obtener todas las entregas de las rutas activas (incluir también 'completada' para ver historial)
   const rutasActivas = rutasFiltradas.filter((r: any) => 
-    ['planificada', 'en_curso'].includes(r.estado)
+    ['planificada', 'en_curso', 'completada'].includes(r.estado)
   )
 
   // Obtener detalles de ruta con información completa
   const rutaIds = rutasActivas.map((r: any) => r.id)
   
   // Obtener detalles básicos primero
-  const { data: detallesRutaRaw } = rutaIds.length > 0
+  const { data: detallesRutaRaw, error: detallesError } = rutaIds.length > 0
     ? await supabase
         .from('detalles_ruta')
         .select(`
@@ -93,7 +99,11 @@ async function RepartoContent({ searchParams }: { searchParams: { fecha?: string
         `)
         .in('ruta_id', rutaIds)
         .order('orden_entrega')
-    : { data: [] }
+    : { data: [], error: null }
+
+  if (detallesError) {
+    console.error('Error obteniendo detalles_ruta:', detallesError)
+  }
 
   // Para cada detalle, obtener el cliente (desde pedido o desde entregas)
   const detallesConCliente = await Promise.all(
@@ -209,49 +219,7 @@ async function RepartoContent({ searchParams }: { searchParams: { fecha?: string
 
       {/* Filtros */}
       <div className="px-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-4">
-              <div className="flex-1">
-                <label className="text-sm font-medium mb-1 block">Fecha (opcional)</label>
-                <input
-                  type="date"
-                  defaultValue={fechaFiltro || ''}
-                  className="w-full px-3 py-2 border rounded-md"
-                  onChange={(e) => {
-                    const params = new URLSearchParams(searchParams as any)
-                    if (e.target.value) {
-                      params.set('fecha', e.target.value)
-                    } else {
-                      params.delete('fecha')
-                    }
-                    window.location.search = params.toString()
-                  }}
-                />
-              </div>
-              <div className="flex-1">
-                <label className="text-sm font-medium mb-1 block">Turno</label>
-                <select
-                  defaultValue={turnoFiltro || ''}
-                  className="w-full px-3 py-2 border rounded-md"
-                  onChange={(e) => {
-                    const params = new URLSearchParams(searchParams as any)
-                    if (e.target.value) {
-                      params.set('turno', e.target.value)
-                    } else {
-                      params.delete('turno')
-                    }
-                    window.location.search = params.toString()
-                  }}
-                >
-                  <option value="">Todos</option>
-                  <option value="mañana">Mañana</option>
-                  <option value="tarde">Tarde</option>
-                </select>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <FiltrosClient />
       </div>
 
       {/* Estadísticas rápidas */}
@@ -282,10 +250,30 @@ async function RepartoContent({ searchParams }: { searchParams: { fecha?: string
           <Card>
             <CardContent className="p-8 text-center">
               <Truck className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium">No hay rutas asignadas</h3>
+              <h3 className="text-lg font-medium">
+                {rutas.length === 0 
+                  ? 'No hay rutas asignadas' 
+                  : rutasActivas.length === 0
+                  ? 'No hay rutas activas'
+                  : 'No hay entregas en las rutas activas'}
+              </h3>
               <p className="text-muted-foreground">
-                Esperando asignación de ruta por el administrador
+                {rutas.length === 0 
+                  ? 'Esperando asignación de ruta por el administrador'
+                  : rutasActivas.length === 0
+                  ? `Hay ${rutas.length} ruta(s) pero ninguna está en estado activo (planificada/en_curso)`
+                  : `Hay ${rutasActivas.length} ruta(s) activa(s) pero no tienen entregas asignadas. Contacta al administrador.`}
               </p>
+              {rutas.length > 0 && (
+                <div className="mt-4 text-sm text-muted-foreground">
+                  <p>Estados de rutas encontradas:</p>
+                  <ul className="list-disc list-inside mt-2">
+                    {Array.from(new Set(rutas.map((r: any) => r.estado))).map((estado: any) => (
+                      <li key={estado}>{estado}: {rutas.filter((r: any) => r.estado === estado).length}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </CardContent>
           </Card>
         ) : (

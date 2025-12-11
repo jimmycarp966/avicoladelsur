@@ -957,7 +957,7 @@ export async function obtenerVehiculosAction(): Promise<ApiResponse<any[]>> {
       .from('vehiculos')
       .select('*')
       .eq('activo', true)
-      .order('patente', { ascending: true })
+      .order('capacidad_kg', { ascending: true, nullsLast: true })
 
     if (error) throw error
 

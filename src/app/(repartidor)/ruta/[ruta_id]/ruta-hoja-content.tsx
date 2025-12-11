@@ -43,11 +43,21 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
   const entregasOrdenadas = [...entregas].sort((a, b) => a.orden_entrega - b.orden_entrega)
   const entregasCompletadas = entregas.filter((e: any) => e.estado_entrega === 'entregado').length
   const entregasPendientes = entregas.filter((e: any) => 
-    e.estado_entrega === 'pendiente'
+    e.estado_entrega === 'pendiente' || !e.estado_entrega
   ).length
   const totalCobrar = entregas
     .filter((e: any) => e.pedido?.pago_estado !== 'pagado')
     .reduce((sum: number, e: any) => sum + (e.pedido?.total || 0), 0)
+  
+  // Debug: Log si no hay entregas
+  if (entregas.length === 0) {
+    console.warn('⚠️ Ruta sin entregas:', {
+      rutaId: ruta.id,
+      numeroRuta: ruta.numero_ruta,
+      estado: ruta.estado,
+      detalles_ruta: ruta.detalles_ruta
+    })
+  }
   
   // Calcular recaudación registrada
   const entregasConPago = entregas.filter((e: any) => e.pago_registrado && e.monto_cobrado_registrado > 0)
@@ -459,6 +469,9 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
             <CardContent className="p-8 text-center">
               <Package className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
               <h3 className="text-lg font-medium">No hay entregas asignadas</h3>
+              <p className="text-muted-foreground">
+                Esta ruta no tiene entregas asignadas. Contacta al administrador para agregar pedidos a la ruta.
+              </p>
             </CardContent>
           </Card>
         ) : (

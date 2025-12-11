@@ -29,20 +29,37 @@ export const metadata = {
   description: 'Gestión de presupuestos para pesaje en almacén',
 }
 
+// Helper para determinar si es venta mayorista
+function esVentaMayorista(presupuesto: any, item: any): boolean {
+  // Verificar si la lista del presupuesto es mayorista
+  const tipoLista = presupuesto?.lista_precio?.tipo
+  if (tipoLista !== 'mayorista') {
+    return false
+  }
+
+  // Verificar si el producto tiene venta mayor habilitada
+  return item.producto?.venta_mayor_habilitada === true
+}
+
 // Helper para determinar si un item es pesable
-function esItemPesable(item: any): boolean {
+function esItemPesable(item: any, esVentaMayorista: boolean = false): boolean {
+  // Si es venta mayorista, NO es pesable (productos vienen en caja cerrada)
+  if (esVentaMayorista) {
+    return false
+  }
+
   // Primero verificar el campo pesable del item
   if (item.pesable === true) {
     return true
   }
-  
+
   // Si no está marcado como pesable, verificar la categoría del producto
   const categoria = item.producto?.categoria
   if (categoria) {
     const categoriaUpper = categoria.toUpperCase().trim()
     return categoriaUpper === 'BALANZA'
   }
-  
+
   return false
 }
 
@@ -56,13 +73,14 @@ async function PresupuestosDiaContent({
       *,
       cliente:clientes(nombre, telefono),
       zona:zonas(nombre),
+      lista_precio:listas_precios(tipo),
       items:presupuesto_items(
         id,
         cantidad_solicitada,
         cantidad_reservada,
         pesable,
         peso_final,
-        producto:productos(nombre, codigo, categoria)
+        producto:productos(nombre, codigo, categoria, venta_mayor_habilitada, unidad_medida)
       )
     `
 
@@ -133,7 +151,7 @@ async function PresupuestosDiaContent({
   const totalItemsPesablesPendientesDia =
     presupuestosDelDia.reduce(
       (acc, presupuesto) =>
-        acc + (presupuesto.items?.filter((item: any) => esItemPesable(item) && !item.peso_final).length || 0),
+        acc + (presupuesto.items?.filter((item: any) => esItemPesable(item, esVentaMayorista(presupuesto, item)) && !item.peso_final).length || 0),
       0,
     ) || 0
 
@@ -213,18 +231,19 @@ async function PresupuestosDiaContent({
         }
       }
 
-      ;(presupuesto.items || []).forEach((item: any) => {
+      ; (presupuesto.items || []).forEach((item: any) => {
         const productoKey = item.producto?.codigo || `${item.producto?.nombre || 'producto'}-${item.id}`
         const cantidad = calcularKgItem(item)
 
-        if (esItemPesable(item)) {
+        const esMayorista = esVentaMayorista(presupuesto, item)
+        if (esItemPesable(item, esMayorista)) {
           acc[key].totalKgPesables += cantidad
         }
 
         if (!acc[key].productos[productoKey]) {
           acc[key].productos[productoKey] = {
             nombre: item.producto?.nombre || 'Producto sin nombre',
-            pesable: esItemPesable(item),
+            pesable: esItemPesable(item, esMayorista),
             totalCantidad: 0,
             presupuestosIds: new Set<string>(),
           }
@@ -292,43 +311,43 @@ async function PresupuestosDiaContent({
     capacidad_restante: number
   }>()
 
-  ;(sugerenciasVehiculos || []).forEach((sugerencia: any) => {
-    if (!sugerencia?.vehiculo_id || !sugerencia?.presupuesto_id) {
-      return
-    }
-
-    const vehiculo = vehiculosAsignados[sugerencia.vehiculo_id] || null
-    const presupuestoInfo = presupuestoInfoMap.get(sugerencia.presupuesto_id)
-    const pesoEstimado = Number(sugerencia.peso_estimado) || 0
-    const capacidadRestante = Number(sugerencia.capacidad_restante ?? (vehiculo?.capacidad_kg || 0))
-    const vehiculoKey = sugerencia.vehiculo_id
-
-    if (!asignacionesVehiculoMap[vehiculoKey]) {
-      asignacionesVehiculoMap[vehiculoKey] = {
-        vehiculo,
-        peso_total: 0,
-        capacidad_restante: capacidadRestante,
-        presupuestos: [],
+    ; (sugerenciasVehiculos || []).forEach((sugerencia: any) => {
+      if (!sugerencia?.vehiculo_id || !sugerencia?.presupuesto_id) {
+        return
       }
-    }
 
-    asignacionesVehiculoMap[vehiculoKey].peso_total += pesoEstimado
-    asignacionesVehiculoMap[vehiculoKey].capacidad_restante = capacidadRestante
+      const vehiculo = vehiculosAsignados[sugerencia.vehiculo_id] || null
+      const presupuestoInfo = presupuestoInfoMap.get(sugerencia.presupuesto_id)
+      const pesoEstimado = Number(sugerencia.peso_estimado) || 0
+      const capacidadRestante = Number(sugerencia.capacidad_restante ?? (vehiculo?.capacidad_kg || 0))
+      const vehiculoKey = sugerencia.vehiculo_id
 
-    if (presupuestoInfo) {
-      asignacionesVehiculoMap[vehiculoKey].presupuestos.push({
-        id: sugerencia.presupuesto_id,
-        numero: presupuestoInfo.numero,
+      if (!asignacionesVehiculoMap[vehiculoKey]) {
+        asignacionesVehiculoMap[vehiculoKey] = {
+          vehiculo,
+          peso_total: 0,
+          capacidad_restante: capacidadRestante,
+          presupuestos: [],
+        }
+      }
+
+      asignacionesVehiculoMap[vehiculoKey].peso_total += pesoEstimado
+      asignacionesVehiculoMap[vehiculoKey].capacidad_restante = capacidadRestante
+
+      if (presupuestoInfo) {
+        asignacionesVehiculoMap[vehiculoKey].presupuestos.push({
+          id: sugerencia.presupuesto_id,
+          numero: presupuestoInfo.numero,
+          peso_estimado: pesoEstimado,
+        })
+      }
+
+      asignacionPorPresupuesto.set(sugerencia.presupuesto_id, {
+        vehiculo,
         peso_estimado: pesoEstimado,
+        capacidad_restante: capacidadRestante,
       })
-    }
-
-    asignacionPorPresupuesto.set(sugerencia.presupuesto_id, {
-      vehiculo,
-      peso_estimado: pesoEstimado,
-      capacidad_restante: capacidadRestante,
     })
-  })
 
   const asignacionesResumen = Object.values(asignacionesVehiculoMap)
 
@@ -362,7 +381,7 @@ async function PresupuestosDiaContent({
   // Estadísticas de transferencias
   const totalTransferencias = transferencias?.length || 0
   const totalKgTransferencias = transferencias?.reduce((acc: number, t: any) =>
-    acc + (t.items?.reduce((sum: number, item: any) => 
+    acc + (t.items?.reduce((sum: number, item: any) =>
       sum + (item.peso_preparado || item.cantidad_enviada || item.cantidad_solicitada || 0), 0) || 0), 0
   ) || 0
 
@@ -695,15 +714,15 @@ async function PresupuestosDiaContent({
               <CardContent>
                 <div className="space-y-4">
                   {grupo.presupuestos.map((presupuesto: any) => {
-                    const itemsPesables = presupuesto.items?.filter((item: any) => esItemPesable(item)) || []
+                    const itemsPesables = presupuesto.items?.filter((item: any) => esItemPesable(item, esVentaMayorista(presupuesto, item))) || []
                     const itemsPesados = itemsPesables.filter((item: any) => item.peso_final)
                     const totalKg = presupuesto.items?.reduce((sum: number, item: any) =>
                       sum + calcularKgItem(item), 0) || 0
                     const asignacionVehiculo = asignacionPorPresupuesto.get(presupuesto.id)
 
                     // Calcular porcentaje fuera de la expresión inline
-                    const porcentajePesaje = itemsPesables.length > 0 
-                      ? Math.round(itemsPesados.length * 100 / itemsPesables.length) 
+                    const porcentajePesaje = itemsPesables.length > 0
+                      ? Math.round(itemsPesados.length * 100 / itemsPesables.length)
                       : 0
 
                     return (
@@ -790,38 +809,39 @@ async function PresupuestosDiaContent({
                                           <div>
                                             <p className="font-medium">
                                               {(() => {
-                                                const esPesableItem = esItemPesable(item)
+                                                const esMayorista = esVentaMayorista(presupuesto, item)
+                                                const esPesableItem = esItemPesable(item, esMayorista)
                                                 const estaPendienteItem = esPesableItem && !item.peso_final
-                                                
+
                                                 return estaPendienteItem ? (
                                                   <>
-                                              <mark 
-                                                style={{
-                                                  backgroundColor: '#fef08a',
-                                                  padding: '2px 4px',
-                                                  borderRadius: '2px',
-                                                  boxDecorationBreak: 'clone',
-                                                  WebkitBoxDecorationBreak: 'clone',
-                                                  display: 'inline'
-                                                }}
-                                              >
-                                                {item.producto?.nombre || 'Producto'}
-                                              </mark>
-                                              {item.producto?.codigo && (
-                                                <mark
-                                                  className="ml-1 text-xs"
-                                                  style={{
-                                                    backgroundColor: '#fef08a',
-                                                    padding: '2px 4px',
-                                                    borderRadius: '2px',
-                                                    boxDecorationBreak: 'clone',
-                                                    WebkitBoxDecorationBreak: 'clone',
-                                                    display: 'inline'
-                                                  }}
-                                                >
-                                                  ({item.producto.codigo})
-                                                </mark>
-                                              )}
+                                                    <mark
+                                                      style={{
+                                                        backgroundColor: '#fef08a',
+                                                        padding: '2px 4px',
+                                                        borderRadius: '2px',
+                                                        boxDecorationBreak: 'clone',
+                                                        WebkitBoxDecorationBreak: 'clone',
+                                                        display: 'inline'
+                                                      }}
+                                                    >
+                                                      {item.producto?.nombre || 'Producto'}
+                                                    </mark>
+                                                    {item.producto?.codigo && (
+                                                      <mark
+                                                        className="ml-1 text-xs"
+                                                        style={{
+                                                          backgroundColor: '#fef08a',
+                                                          padding: '2px 4px',
+                                                          borderRadius: '2px',
+                                                          boxDecorationBreak: 'clone',
+                                                          WebkitBoxDecorationBreak: 'clone',
+                                                          display: 'inline'
+                                                        }}
+                                                      >
+                                                        ({item.producto.codigo})
+                                                      </mark>
+                                                    )}
                                                   </>
                                                 ) : (
                                                   <>
@@ -836,29 +856,45 @@ async function PresupuestosDiaContent({
                                               })()}
                                             </p>
                                             <p className="text-xs text-muted-foreground">
-                                              {esItemPesable(item) ? 'Pesable' : 'Unidad'} • Solicitado:{' '}
-                                              {item.cantidad_solicitada ?? 0} {esItemPesable(item) ? 'kg' : 'u'}
-                                              {esItemPesable(item) && (
-                                                <>
-                                                  {' '}•{' '}
-                                                  {item.peso_final
-                                                    ? `Final: ${item.peso_final} kg`
-                                                    : 'Pendiente de pesaje'}
-                                                </>
-                                              )}
+                                              {(() => {
+                                                const esMayorista = esVentaMayorista(presupuesto, item)
+                                                const esPesableItem = esItemPesable(item, esMayorista)
+                                                return (
+                                                  <>
+                                                    {esPesableItem ? 'Pesable' : 'Unidad'} • Solicitado:{' '}
+                                                    {item.cantidad_solicitada ?? 0} {esPesableItem ? 'kg' : 'u'}
+                                                    {esPesableItem && (
+                                                      <>
+                                                        {' '}•{' '}
+                                                        {item.peso_final
+                                                          ? `Final: ${item.peso_final} kg`
+                                                          : 'Pendiente de pesaje'}
+                                                      </>
+                                                    )}
+                                                  </>
+                                                )
+                                              })()}
                                             </p>
                                           </div>
                                           <Badge
                                             variant="outline"
                                             className={
-                                              esItemPesable(item)
-                                                ? item.peso_final
-                                                  ? 'border-green-200 bg-green-50 text-green-700'
-                                                  : 'border-yellow-200 bg-yellow-50 text-yellow-700'
-                                                : 'border-slate-200 bg-slate-50 text-slate-700'
+                                              (() => {
+                                                const esMayorista = esVentaMayorista(presupuesto, item)
+                                                const esPesableItem = esItemPesable(item, esMayorista)
+                                                return esPesableItem
+                                                  ? item.peso_final
+                                                    ? 'border-green-200 bg-green-50 text-green-700'
+                                                    : 'border-yellow-200 bg-yellow-50 text-yellow-700'
+                                                  : 'border-slate-200 bg-slate-50 text-slate-700'
+                                              })()
                                             }
                                           >
-                                            {esItemPesable(item) ? (item.peso_final ? 'Pesado' : 'Pendiente') : 'Sin balanza'}
+                                            {(() => {
+                                              const esMayorista = esVentaMayorista(presupuesto, item)
+                                              const esPesableItem = esItemPesable(item, esMayorista)
+                                              return esPesableItem ? (item.peso_final ? 'Pesado' : 'Pendiente') : 'Sin balanza'
+                                            })()}
                                           </Badge>
                                         </div>
                                       ))}
@@ -888,210 +924,212 @@ async function PresupuestosDiaContent({
               Selecciona un presupuesto para comenzar el pesaje
             </CardDescription>
           </CardHeader>
-        <CardContent>
-          {!presupuestos || presupuestos.length === 0 ? (
-            <div className="text-center py-8">
-              <Package className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium">No hay presupuestos pendientes</h3>
-              <p className="text-muted-foreground">
-                Todos los presupuestos del día han sido procesados
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {presupuestos.map((presupuesto: any) => {
-                const itemsPesables = presupuesto.items?.filter((item: any) => item.pesable) || []
-                const itemsPesados = itemsPesables.filter((item: any) => item.peso_final)
-                const totalKg = presupuesto.items?.reduce((sum: number, item: any) =>
-                  sum + calcularKgItem(item), 0) || 0
-                const asignacionVehiculo = asignacionPorPresupuesto.get(presupuesto.id)
+          <CardContent>
+            {!presupuestos || presupuestos.length === 0 ? (
+              <div className="text-center py-8">
+                <Package className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium">No hay presupuestos pendientes</h3>
+                <p className="text-muted-foreground">
+                  Todos los presupuestos del día han sido procesados
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {presupuestos.map((presupuesto: any) => {
+                  const itemsPesables = presupuesto.items?.filter((item: any) => item.pesable) || []
+                  const itemsPesados = itemsPesables.filter((item: any) => item.peso_final)
+                  const totalKg = presupuesto.items?.reduce((sum: number, item: any) =>
+                    sum + calcularKgItem(item), 0) || 0
+                  const asignacionVehiculo = asignacionPorPresupuesto.get(presupuesto.id)
 
-                // Calcular porcentaje fuera de la expresión inline
-                const porcentajePesaje = itemsPesables.length > 0 
-                  ? Math.round(itemsPesados.length * 100 / itemsPesables.length) 
-                  : 0
+                  // Calcular porcentaje fuera de la expresión inline
+                  const porcentajePesaje = itemsPesables.length > 0
+                    ? Math.round(itemsPesados.length * 100 / itemsPesables.length)
+                    : 0
 
-                return (
-                  <Card key={presupuesto.id} className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="text-lg font-semibold">
-                              #{presupuesto.numero_presupuesto}
-                            </h3>
-                            <Badge variant="outline">
-                              {presupuesto.cliente?.nombre || 'Cliente'}
-                            </Badge>
-                            {presupuesto.zona && (
-                              <Badge variant="secondary" className="flex items-center gap-1">
-                                <MapPin className="h-3 w-3" />
-                                {presupuesto.zona.nombre}
+                  return (
+                    <Card key={presupuesto.id} className="hover:shadow-md transition-shadow">
+                      <CardContent className="p-6">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <h3 className="text-lg font-semibold">
+                                #{presupuesto.numero_presupuesto}
+                              </h3>
+                              <Badge variant="outline">
+                                {presupuesto.cliente?.nombre || 'Cliente'}
                               </Badge>
+                              {presupuesto.zona && (
+                                <Badge variant="secondary" className="flex items-center gap-1">
+                                  <MapPin className="h-3 w-3" />
+                                  {presupuesto.zona.nombre}
+                                </Badge>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-6 text-sm text-muted-foreground">
+                              <span>
+                                {presupuesto.fecha_entrega_estimada
+                                  ? `📅 ${new Date(presupuesto.fecha_entrega_estimada).toLocaleDateString('es-AR')}`
+                                  : '📅 Sin fecha'}
+                              </span>
+                              <span>
+                                📦 {presupuesto.items?.length || 0} items
+                              </span>
+                              <span>
+                                ⚖️ {itemsPesables.length} pesables ({itemsPesados.length} de {itemsPesables.length} completados)
+                              </span>
+                              <span>
+                                🏋️ {totalKg.toFixed(1)}kg estimados
+                              </span>
+                            </div>
+
+                            {asignacionVehiculo && (
+                              <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-primary/5 px-3 py-1 text-sm text-primary">
+                                <Truck className="h-4 w-4" />
+                                Vehículo sugerido: {asignacionVehiculo.vehiculo?.patente || 'Por asignar'} ({asignacionVehiculo.peso_estimado.toFixed(1)} kg)
+                              </div>
                             )}
                           </div>
 
-                          <div className="flex items-center gap-6 text-sm text-muted-foreground">
-                            <span>
-                              {presupuesto.fecha_entrega_estimada
-                                ? `📅 ${new Date(presupuesto.fecha_entrega_estimada).toLocaleDateString('es-AR')}`
-                                : '📅 Sin fecha'}
-                            </span>
-                            <span>
-                              📦 {presupuesto.items?.length || 0} items
-                            </span>
-                            <span>
-                              ⚖️ {itemsPesables.length} pesables ({itemsPesados.length} de {itemsPesables.length} completados)
-                            </span>
-                            <span>
-                              🏋️ {totalKg.toFixed(1)}kg estimados
-                            </span>
+                          <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm" asChild>
+                              <Link href={`/ventas/presupuestos/${presupuesto.id}`}>
+                                Ver Detalle
+                              </Link>
+                            </Button>
+                            <Button asChild className="bg-blue-600 hover:bg-blue-700">
+                              <Link href={`/almacen/presupuesto/${presupuesto.id}/pesaje`}>
+                                <Scale className="mr-2 h-4 w-4" />
+                                Comenzar Pesaje
+                              </Link>
+                            </Button>
+                            <PresupuestoIndividualAccion presupuesto={presupuesto} />
                           </div>
+                        </div>
 
-                          {asignacionVehiculo && (
-                            <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-primary/5 px-3 py-1 text-sm text-primary">
-                              <Truck className="h-4 w-4" />
-                              Vehículo sugerido: {asignacionVehiculo.vehiculo?.patente || 'Por asignar'} ({asignacionVehiculo.peso_estimado.toFixed(1)} kg)
+                        {/* Barra de progreso de pesaje */}
+                        {itemsPesables.length > 0 && (
+                          <div className="mt-4">
+                            <div className="flex items-center justify-between text-sm mb-2">
+                              <span>Progreso de pesaje</span>
+                              <span>{itemsPesados.length} de {itemsPesables.length} items</span>
                             </div>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <Button variant="outline" size="sm" asChild>
-                            <Link href={`/ventas/presupuestos/${presupuesto.id}`}>
-                              Ver Detalle
-                            </Link>
-                          </Button>
-                          <Button asChild className="bg-blue-600 hover:bg-blue-700">
-                            <Link href={`/almacen/presupuesto/${presupuesto.id}/pesaje`}>
-                              <Scale className="mr-2 h-4 w-4" />
-                              Comenzar Pesaje
-                            </Link>
-                          </Button>
-                          <PresupuestoIndividualAccion presupuesto={presupuesto} />
-                        </div>
-                      </div>
-
-                      {/* Barra de progreso de pesaje */}
-                      {itemsPesables.length > 0 && (
-                        <div className="mt-4">
-                          <div className="flex items-center justify-between text-sm mb-2">
-                            <span>Progreso de pesaje</span>
-                            <span>{itemsPesados.length} de {itemsPesables.length} items</span>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div
+                                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                                style={{
+                                  width: `${porcentajePesaje}%`
+                                }}
+                              ></div>
+                            </div>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div
-                              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                              style={{
-                                width: `${porcentajePesaje}%`
-                              }}
-                            ></div>
-                          </div>
-                        </div>
-                      )}
+                        )}
 
-                      {presupuesto.items?.length > 0 && (
-                        <div className="mt-4">
-                          <Accordion type="single" collapsible className="rounded-lg border border-slate-200">
-                            <AccordionItem value={`items-${presupuesto.id}`}>
-                              <AccordionTrigger className="px-4 py-2 text-sm">
-                                Ver productos ({presupuesto.items.length})
-                              </AccordionTrigger>
-                              <AccordionContent>
-                                <div className="space-y-3 px-4 pb-4">
-                                  {presupuesto.items.map((item: any) => {
-                                    const esPesable = esItemPesable(item)
-                                    const estaPendiente = esPesable && !item.peso_final
-                                    
-                                    return (
-                                    <div
-                                      key={item.id}
-                                      className="flex items-start justify-between gap-4 rounded-md border border-slate-100 bg-white/80 px-3 py-2 text-sm"
-                                    >
-                                      <div>
-                                        <p className="font-medium">
-                                          {estaPendiente ? (
-                                            <>
-                                              <mark 
-                                                style={{
-                                                  backgroundColor: '#fef08a',
-                                                  padding: '2px 4px',
-                                                  borderRadius: '2px',
-                                                  boxDecorationBreak: 'clone',
-                                                  WebkitBoxDecorationBreak: 'clone',
-                                                  display: 'inline'
-                                                }}
-                                              >
-                                                {item.producto?.nombre || 'Producto'}
-                                              </mark>
-                                              {item.producto?.codigo && (
-                                                <mark
-                                                  className="ml-1 text-xs"
-                                                  style={{
-                                                    backgroundColor: '#fef08a',
-                                                    padding: '2px 4px',
-                                                    borderRadius: '2px',
-                                                    boxDecorationBreak: 'clone',
-                                                    WebkitBoxDecorationBreak: 'clone',
-                                                    display: 'inline'
-                                                  }}
-                                                >
-                                                  ({item.producto.codigo})
-                                                </mark>
+                        {presupuesto.items?.length > 0 && (
+                          <div className="mt-4">
+                            <Accordion type="single" collapsible className="rounded-lg border border-slate-200">
+                              <AccordionItem value={`items-${presupuesto.id}`}>
+                                <AccordionTrigger className="px-4 py-2 text-sm">
+                                  Ver productos ({presupuesto.items.length})
+                                </AccordionTrigger>
+                                <AccordionContent>
+                                  <div className="space-y-3 px-4 pb-4">
+                                    {presupuesto.items.map((item: any) => {
+                                      const esMayorista = esVentaMayorista(presupuesto, item)
+                                      const esPesable = esItemPesable(item, esMayorista)
+                                      const estaPendiente = esPesable && !item.peso_final
+
+                                      return (
+                                        <div
+                                          key={item.id}
+                                          className="flex items-start justify-between gap-4 rounded-md border border-slate-100 bg-white/80 px-3 py-2 text-sm"
+                                        >
+                                          <div>
+                                            <p className="font-medium">
+                                              {estaPendiente ? (
+                                                <>
+                                                  <mark
+                                                    style={{
+                                                      backgroundColor: '#fef08a',
+                                                      padding: '2px 4px',
+                                                      borderRadius: '2px',
+                                                      boxDecorationBreak: 'clone',
+                                                      WebkitBoxDecorationBreak: 'clone',
+                                                      display: 'inline'
+                                                    }}
+                                                  >
+                                                    {item.producto?.nombre || 'Producto'}
+                                                  </mark>
+                                                  {item.producto?.codigo && (
+                                                    <mark
+                                                      className="ml-1 text-xs"
+                                                      style={{
+                                                        backgroundColor: '#fef08a',
+                                                        padding: '2px 4px',
+                                                        borderRadius: '2px',
+                                                        boxDecorationBreak: 'clone',
+                                                        WebkitBoxDecorationBreak: 'clone',
+                                                        display: 'inline'
+                                                      }}
+                                                    >
+                                                      ({item.producto.codigo})
+                                                    </mark>
+                                                  )}
+                                                </>
+                                              ) : (
+                                                <>
+                                                  {item.producto?.nombre || 'Producto'}
+                                                  {item.producto?.codigo && (
+                                                    <span className="text-xs text-muted-foreground ml-1">
+                                                      ({item.producto.codigo})
+                                                    </span>
+                                                  )}
+                                                </>
                                               )}
-                                            </>
-                                          ) : (
-                                            <>
-                                              {item.producto?.nombre || 'Producto'}
-                                              {item.producto?.codigo && (
-                                                <span className="text-xs text-muted-foreground ml-1">
-                                                  ({item.producto.codigo})
-                                                </span>
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                              {esPesable ? 'Pesable' : 'Unidad'} • Solicitado:{' '}
+                                              {item.cantidad_solicitada ?? 0} {esPesable ? 'kg' : 'u'}
+                                              {esPesable && (
+                                                <>
+                                                  {' '}•{' '}
+                                                  {item.peso_final
+                                                    ? `Final: ${item.peso_final} kg`
+                                                    : 'Pendiente de pesaje'}
+                                                </>
                                               )}
-                                            </>
-                                          )}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                          {esPesable ? 'Pesable' : 'Unidad'} • Solicitado:{' '}
-                                          {item.cantidad_solicitada ?? 0} {esPesable ? 'kg' : 'u'}
-                                          {esPesable && (
-                                            <>
-                                              {' '}•{' '}
-                                              {item.peso_final
-                                                ? `Final: ${item.peso_final} kg`
-                                                : 'Pendiente de pesaje'}
-                                            </>
-                                          )}
-                                        </p>
-                                      </div>
-                                      <Badge
-                                        variant="outline"
-                                        className={
-                                          esPesable
-                                            ? item.peso_final
-                                              ? 'border-green-200 bg-green-50 text-green-700'
-                                              : 'border-yellow-200 bg-yellow-50 text-yellow-700'
-                                            : 'border-slate-200 bg-slate-50 text-slate-700'
-                                        }
-                                      >
-                                        {esPesable ? (item.peso_final ? 'Pesado' : 'Pendiente') : 'Sin balanza'}
-                                      </Badge>
-                                    </div>
-                                  )})}
-                                </div>
-                              </AccordionContent>
-                            </AccordionItem>
-                          </Accordion>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                )
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                                            </p>
+                                          </div>
+                                          <Badge
+                                            variant="outline"
+                                            className={
+                                              esPesable
+                                                ? item.peso_final
+                                                  ? 'border-green-200 bg-green-50 text-green-700'
+                                                  : 'border-yellow-200 bg-yellow-50 text-yellow-700'
+                                                : 'border-slate-200 bg-slate-50 text-slate-700'
+                                            }
+                                          >
+                                            {esPesable ? (item.peso_final ? 'Pesado' : 'Pendiente') : 'Sin balanza'}
+                                          </Badge>
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                </AccordionContent>
+                              </AccordionItem>
+                            </Accordion>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
     </div>
   )

@@ -462,8 +462,8 @@ BEGIN
                 'salida',
                 v_cantidad_stock,
                 'Conversión presupuesto a pedido ' || v_numero_pedido ||
-                CASE WHEN v_cantidad_stock != v_cantidad_a_consumir 
-                     THEN ' (' || v_cantidad_a_consumir || ' ' || v_unidad_venta || ' = ' || v_cantidad_stock || ' kg)' 
+                CASE WHEN v_cantidad_stock != v_cantidad_a_consumir
+                     THEN ' (' || v_cantidad_a_consumir || ' ' || v_unidad_venta || ' = ' || v_cantidad_stock || ' kg)'
                      ELSE '' END,
                 p_user_id,
                 v_pedido_id

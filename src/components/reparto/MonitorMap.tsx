@@ -217,6 +217,15 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
             const total = ordenVisitaFormateado.length
             const completadas = ordenVisitaFormateado.filter((c: any) => c.estado === 'entregado').length
 
+            // Determinar estado: solo completada si hay entregas Y todas están completadas
+            let estadoRuta: 'en_curso' | 'completada' | 'retrasada' = 'en_curso'
+            if (total > 0 && completadas === total) {
+              estadoRuta = 'completada'
+            } else if (total === 0) {
+              // Si no hay entregas, mantener como en_curso (no completada)
+              estadoRuta = 'en_curso'
+            }
+
             nuevasRutas.set(rutaPlanificada.id, {
               id: rutaPlanificada.id,
               numero: rutaPlanificada.numero_ruta || 'S/N',
@@ -227,7 +236,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
               ordenVisita: ordenVisitaFormateado,
               color: color,
               progreso: { completadas, total },
-              estado: completadas === total ? 'completada' : 'en_curso'
+              estado: estadoRuta
             })
 
             // Agregar a rutas activas para que se procesen los vehículos
@@ -270,6 +279,15 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
                 const total = ordenVisita.length
                 const completadas = ordenVisita.filter((c: any) => c.estado === 'entregado').length
 
+                // Determinar estado: solo completada si hay entregas Y todas están completadas
+                let estadoRuta: 'en_curso' | 'completada' | 'retrasada' = 'en_curso'
+                if (total > 0 && completadas === total) {
+                  estadoRuta = 'completada'
+                } else if (total === 0) {
+                  // Si no hay entregas, mantener como en_curso (no completada)
+                  estadoRuta = 'en_curso'
+                }
+
                 nuevasRutas.set(rutaId, {
                   id: rutaId,
                   numero: res.data.numero_ruta || 'S/N',
@@ -278,7 +296,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
                   ordenVisita: ordenVisita,
                   color: color,
                   progreso: { completadas, total },
-                  estado: completadas === total ? 'completada' : 'en_curso'
+                  estado: estadoRuta
                 })
               }
             }
@@ -398,13 +416,22 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
                 const total = ordenVisita.length
                 const completadas = ordenVisita.filter((c: any) => c.estado === 'entregado').length
 
+                // Determinar estado: solo completada si hay entregas Y todas están completadas
+                let estadoRuta: 'en_curso' | 'completada' | 'retrasada' = 'en_curso'
+                if (total > 0 && completadas === total) {
+                  estadoRuta = 'completada'
+                } else if (total === 0) {
+                  // Si no hay entregas, mantener como en_curso (no completada)
+                  estadoRuta = 'en_curso'
+                }
+
                 setRutas((prev) => {
                   const nuevas = new Map(prev)
                   nuevas.set(ruta.id, {
                     ...ruta,
                     ordenVisita: ordenVisita,
                     progreso: { completadas, total },
-                    estado: completadas === total ? 'completada' : 'en_curso'
+                    estado: estadoRuta
                   })
                   return nuevas
                 })

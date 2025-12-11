@@ -165,11 +165,11 @@ export async function GET(request: NextRequest) {
         (detallesRutaRaw || []).map(async (detalle: any) => {
           let clienteData = null
 
-          // Si el pedido tiene cliente_id, obtener cliente directamente
+          // Si el pedido tiene cliente_id, obtener cliente directamente con coordenadas
           if (detalle.pedido?.cliente_id) {
             const { data: cliente, error: clienteError } = await supabase
               .from('clientes')
-              .select('id, nombre, telefono, direccion')
+              .select('id, nombre, telefono, direccion, ST_AsGeoJSON(coordenadas)::jsonb as coordenadas')
               .eq('id', detalle.pedido.cliente_id)
               .single()
 
@@ -186,7 +186,8 @@ export async function GET(request: NextRequest) {
                   id,
                   nombre,
                   telefono,
-                  direccion
+                  direccion,
+                  ST_AsGeoJSON(coordenadas)::jsonb as coordenadas
                 )
               `)
               .eq('pedido_id', detalle.pedido_id)
@@ -194,7 +195,7 @@ export async function GET(request: NextRequest) {
               .single()
 
             if (!entregasError && entregas?.cliente) {
-              clienteData = entregas.cliente
+              clienteData = Array.isArray(entregas.cliente) ? entregas.cliente[0] : entregas.cliente
             }
           }
 
@@ -245,12 +246,33 @@ export async function GET(request: NextRequest) {
           }
         })
 
+        // Convertir coordenadas PostGIS a lat/lng si están disponibles
+        let lat = cliente.lat
+        let lng = cliente.lng
+        
+        // Si no hay coordenadas en orden_visita, intentar obtenerlas del cliente
+        if ((!lat || !lng) && clienteData?.coordenadas) {
+          const coords = clienteData.coordenadas
+          if (coords && typeof coords === 'object' && 'type' in coords && coords.type === 'Point' && Array.isArray(coords.coordinates)) {
+            // PostGIS GeoJSON: [lng, lat]
+            const [lngCoord, latCoord] = coords.coordinates
+            lat = latCoord
+            lng = lngCoord
+          } else if (coords && typeof coords === 'object' && 'lat' in coords && 'lng' in coords) {
+            // Formato directo
+            lat = coords.lat
+            lng = coords.lng
+          }
+        }
+
         return {
           ...cliente,
           id: detalle.id || cliente.id,
           cliente_nombre: clienteData?.nombre || cliente.cliente_nombre,
           telefono: clienteData?.telefono || cliente.telefono || null,
           direccion: clienteData?.direccion || cliente.direccion || null,
+          lat: lat,
+          lng: lng,
           estado_entrega: detalle.estado_entrega || cliente.estado || 'pendiente',
           pago_registrado: detalle.pago_registrado || false,
           monto_cobrado_registrado: detalle.monto_cobrado_registrado || 0,
@@ -280,6 +302,179 @@ export async function GET(request: NextRequest) {
     }))
 
     console.log('✅ [DEBUG] Rutas formateadas para envío:', rutasFormateadas.length)
+
+    // Si no hay rutas planificadas pero hay rutas activas, generar desde detalles_ruta
+    if (rutasFormateadas.length === 0) {
+      console.log('🔍 [DEBUG] No hay rutas planificadas, buscando rutas activas para generar puntos')
+      
+      // Obtener IDs de rutas que ya tienen planificación
+      const { data: rutasConPlanificacion } = await supabase
+        .from('rutas_planificadas')
+        .select('ruta_reparto_id')
+      
+      const rutasConPlanificacionIds = new Set(
+        (rutasConPlanificacion || []).map((r: any) => r.ruta_reparto_id).filter(Boolean)
+      )
+
+      // Buscar rutas activas (planificada o en_curso) que no tengan ruta_planificada
+      let rutasActivasQuery = supabase
+        .from('rutas_reparto')
+        .select(`
+          id,
+          numero_ruta,
+          estado,
+          fecha_ruta,
+          vehiculo_id,
+          repartidor_id,
+          zona_id,
+          usuarios!rutas_reparto_repartidor_id_fkey(nombre, apellido),
+          vehiculos!rutas_reparto_vehiculo_id_fkey(patente, marca, modelo)
+        `)
+        .in('estado', ['planificada', 'en_curso'])
+
+      // Filtrar por fecha si se proporciona
+      if (fecha) {
+        rutasActivasQuery = rutasActivasQuery.eq('fecha_ruta', fecha)
+      }
+
+      // Filtrar por zona si se proporciona
+      if (zonaId) {
+        rutasActivasQuery = rutasActivasQuery.eq('zona_id', zonaId)
+      }
+
+      const { data: rutasActivasRaw, error: rutasActivasError } = await rutasActivasQuery
+
+      // Filtrar rutas que no tengan ruta_planificada
+      const rutasActivas = (rutasActivasRaw || []).filter((ruta: any) => 
+        !rutasConPlanificacionIds.has(ruta.id)
+      )
+
+      if (!rutasActivasError && rutasActivas && rutasActivas.length > 0) {
+        console.log(`🔍 [DEBUG] Encontradas ${rutasActivas.length} rutas activas sin planificación, generando puntos desde detalles_ruta`)
+        
+        // Generar puntos para cada ruta activa
+        const rutasGeneradas = await Promise.all(rutasActivas.map(async (ruta: any) => {
+          // Obtener detalles_ruta con coordenadas
+          const { data: detallesRutaRaw, error: detallesError } = await supabase
+            .from('detalles_ruta')
+            .select(`
+              id,
+              orden_entrega,
+              estado_entrega,
+              pago_registrado,
+              monto_cobrado_registrado,
+              pedido_id,
+              pedido:pedidos(
+                id,
+                numero_pedido,
+                cliente_id,
+                cliente:clientes(
+                  id,
+                  nombre,
+                  telefono,
+                  direccion,
+                  ST_AsGeoJSON(coordenadas)::jsonb as coordenadas
+                ),
+                detalle_pedido:detalles_pedido(
+                  id,
+                  cantidad,
+                  producto:productos(
+                    id,
+                    nombre,
+                    codigo
+                  )
+                )
+              )
+            `)
+            .eq('ruta_id', ruta.id)
+            .order('orden_entrega', { ascending: true })
+
+          if (detallesError || !detallesRutaRaw || detallesRutaRaw.length === 0) {
+            return null
+          }
+
+          // Generar orden_visita desde detalles_ruta
+          const ordenVisita = detallesRutaRaw.map((detalle: any) => {
+            const pedido = detalle.pedido
+            const clienteData = Array.isArray(pedido?.cliente) ? pedido.cliente[0] : pedido?.cliente
+            
+            // Convertir coordenadas PostGIS a lat/lng
+            let lat: number | null = null
+            let lng: number | null = null
+            
+            if (clienteData?.coordenadas) {
+              const coords = clienteData.coordenadas
+              if (coords && typeof coords === 'object' && 'type' in coords && coords.type === 'Point' && Array.isArray(coords.coordinates)) {
+                const [lngCoord, latCoord] = coords.coordinates
+                lat = latCoord
+                lng = lngCoord
+              } else if (coords && typeof coords === 'object' && 'lat' in coords && 'lng' in coords) {
+                lat = coords.lat
+                lng = coords.lng
+              }
+            }
+
+            // Obtener productos
+            const detallesPedido = Array.isArray(pedido?.detalle_pedido) 
+              ? pedido.detalle_pedido 
+              : (pedido?.detalle_pedido ? [pedido.detalle_pedido] : [])
+            
+            const productos = detallesPedido.map((dp: any) => {
+              const producto = Array.isArray(dp.producto) ? dp.producto[0] : dp.producto
+              return {
+                nombre: producto?.nombre || 'Producto',
+                cantidad: dp.cantidad || 0,
+              }
+            })
+
+            return {
+              id: detalle.id,
+              detalle_ruta_id: detalle.id,
+              pedido_id: pedido?.id,
+              cliente_id: clienteData?.id,
+              cliente_nombre: clienteData?.nombre || 'Cliente',
+              telefono: clienteData?.telefono || null,
+              direccion: clienteData?.direccion || null,
+              lat: lat,
+              lng: lng,
+              orden: detalle.orden_entrega,
+              estado: detalle.estado_entrega || 'pendiente',
+              pago_registrado: detalle.pago_registrado || false,
+              monto_cobrado_registrado: detalle.monto_cobrado_registrado || 0,
+              productos: productos,
+            }
+          }).filter((punto: any) => punto.lat !== null && punto.lng !== null)
+
+          if (ordenVisita.length === 0) {
+            return null
+          }
+
+          const repartidorData = Array.isArray(ruta.usuarios) ? ruta.usuarios[0] : ruta.usuarios
+          const vehiculoData = Array.isArray(ruta.vehiculos) ? ruta.vehiculos[0] : ruta.vehiculos
+
+          return {
+            id: ruta.id,
+            numero_ruta: ruta.numero_ruta || 'S/N',
+            estado: ruta.estado,
+            vehiculo: vehiculoData || null,
+            repartidor: repartidorData ? {
+              nombre: repartidorData.nombre,
+              apellido: repartidorData.apellido
+            } : null,
+            zona_id: ruta.zona_id,
+            polyline: '', // No hay polyline si no está optimizada
+            orden_visita: ordenVisita,
+            distancia_total_km: null,
+            duracion_total_min: null,
+            created_at: new Date().toISOString()
+          }
+        }))
+
+        // Agregar rutas generadas a las formateadas
+        rutasFormateadas.push(...rutasGeneradas.filter((r: any) => r !== null))
+        console.log(`✅ [DEBUG] Agregadas ${rutasGeneradas.filter((r: any) => r !== null).length} rutas generadas desde detalles_ruta`)
+      }
+    }
 
     return NextResponse.json({
       success: true,

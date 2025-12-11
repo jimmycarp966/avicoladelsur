@@ -88,6 +88,8 @@ export function ProductoForm({ producto, onSuccess }: ProductoFormProps) {
   const unidadMedida = watch('unidad_medida')
 
   // Atajos contextuales para campos del formulario
+  // Nota: Los shortcuts sin modificadores están protegidos por useKeyboardShortcuts
+  // que ignora shortcuts cuando se está escribiendo en inputs
   useFormContextShortcuts({
     shortcuts: [
       { key: 'c', fieldId: 'codigo', description: 'Código' },

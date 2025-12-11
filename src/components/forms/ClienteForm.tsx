@@ -100,6 +100,8 @@ export function ClienteForm({ cliente, zonas = [], onSuccess }: ClienteFormProps
   const tipoCliente = watch('tipo_cliente')
 
   // Atajos contextuales para campos del formulario
+  // Nota: Los shortcuts sin modificadores están protegidos por useKeyboardShortcuts
+  // que ignora shortcuts cuando se está escribiendo en inputs
   useFormContextShortcuts({
     shortcuts: [
       { key: 'c', fieldId: 'codigo', description: 'Código' },
