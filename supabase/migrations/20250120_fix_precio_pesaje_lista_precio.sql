@@ -34,10 +34,17 @@ BEGIN
     END IF;
 
     -- Determinar qué lista_precio_id usar:
-    -- 1. Si el item tiene lista_precio_id específica, usar esa
-    -- 2. Si no, usar la lista_precio_id del presupuesto
-    -- 3. Si ninguna existe, usar precio_venta del producto como fallback
-    v_lista_precio_id := COALESCE(v_item.lista_precio_id, v_item.presupuesto_lista_precio_id);
+    -- REGLA: SIEMPRE usar la lista del item individual (si existe)
+    -- La lista del presupuesto es solo una "configuración rápida" como fallback
+    -- 1. PRIORIDAD: lista_precio_id del item individual (siempre la primera opción)
+    -- 2. FALLBACK: lista_precio_id del presupuesto (solo si el item no tiene lista propia)
+    -- 3. ÚLTIMO RECURSO: precio_venta del producto (si no hay ninguna lista)
+    v_lista_precio_id := v_item.lista_precio_id;
+    
+    -- Solo usar lista del presupuesto si el item NO tiene lista propia
+    IF v_lista_precio_id IS NULL THEN
+        v_lista_precio_id := v_item.presupuesto_lista_precio_id;
+    END IF;
 
     -- Calcular precio unitario final usando la lista de precios si está disponible
     IF v_lista_precio_id IS NOT NULL THEN
@@ -93,7 +100,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 COMMENT ON FUNCTION fn_actualizar_peso_item_presupuesto IS 
 'Actualiza el peso final de un item de presupuesto y recalcula el precio según la lista de precios.
-Prioridad: lista_precio_id del item > lista_precio_id del presupuesto > precio_venta del producto.';
+REGLA: SIEMPRE usar la lista del item individual. La lista del presupuesto es solo una "configuración rápida" como fallback.
+Prioridad: 1) lista_precio_id del item (SIEMPRE primera opción), 2) lista_precio_id del presupuesto (solo si item no tiene), 3) precio_venta del producto (último recurso).';
 
 COMMIT;
 
