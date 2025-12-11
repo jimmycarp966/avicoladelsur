@@ -26,13 +26,13 @@ interface Presupuesto {
   lista_precio?: {
     tipo?: string | null
   } | null
-  items?: Array<{ 
+  items?: Array<{
     pesable?: boolean
     peso_final?: number | null
     lista_precio?: {
       tipo?: string | null
     } | null
-    producto?: { 
+    producto?: {
       categoria?: string
       venta_mayor_habilitada?: boolean
     }
@@ -59,7 +59,7 @@ export function PresupuestosDiaAcciones({
     if (esVentaMayorista(presupuesto, item)) {
       return false
     }
-    
+
     if (item.pesable === true) {
       return true
     }
@@ -87,7 +87,7 @@ export function PresupuestosDiaAcciones({
     if (presupuestosConvertibles.length === 0) {
       const sinTurnoZona = presupuestos.filter((p) => !p.turno || !p.zona_id).length
       const conItemsSinPesar = presupuestos.filter((p) => p.turno && p.zona_id && tieneItemsSinPesar(p)).length
-      
+
       if (sinTurnoZona > 0 && conItemsSinPesar > 0) {
         showToast(
           'error',
@@ -115,7 +115,7 @@ export function PresupuestosDiaAcciones({
     // Verificar que todos los presupuestos convertibles no tengan items sin pesar
     // (ya están filtrados arriba, pero verificamos por seguridad)
     const totalPresupuestos = presupuestos.length
-    const cantidadConItemsSinPesar = presupuestos.filter((p) => 
+    const cantidadConItemsSinPesar = presupuestos.filter((p) =>
       p.turno && p.zona_id && tieneItemsSinPesar(p)
     ).length
 
@@ -200,11 +200,11 @@ export function PresupuestosDiaAcciones({
                   Se convertirán <strong>{cantidadMasiva}</strong> de{' '}
                   <strong>{cantidadTotal}</strong> presupuestos.
                 </p>
-                
+
                 <div className="flex items-start gap-2 text-blue-600 bg-blue-50 p-3 rounded-md">
                   <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
                   <span className="text-sm">
-                    Los presupuestos se agruparán automáticamente por <strong>turno + zona + fecha</strong> en un solo pedido. 
+                    Los presupuestos se agruparán automáticamente por <strong>turno + zona + fecha</strong> en un solo pedido.
                     Cada cliente tendrá su propia entrega dentro del pedido.
                   </span>
                 </div>
@@ -323,14 +323,11 @@ export function PresupuestoIndividualAccion({
           'success',
           result.message || 'Presupuesto convertido a pedido exitosamente'
         )
-        if (result.data?.pedido_id) {
-          router.push(`/almacen/pedidos/${result.data.pedido_id}`)
+        // Solo refrescar la página sin redirigir al pedido
+        if (onSuccess) {
+          onSuccess()
         } else {
-          if (onSuccess) {
-            onSuccess()
-          } else {
-            router.refresh()
-          }
+          router.refresh()
         }
       } else {
         console.error('❌ DEBUG Frontend - Error:', result)
@@ -363,8 +360,8 @@ export function PresupuestoIndividualAccion({
           !presupuesto.turno || !presupuesto.zona_id
             ? 'El presupuesto debe tener turno y zona asignados'
             : tieneItemsSinPesarIndividual()
-            ? 'Todos los productos pesables deben estar pesados antes de convertir a pedido'
-            : 'Convertir a pedido'
+              ? 'Todos los productos pesables deben estar pesados antes de convertir a pedido'
+              : 'Convertir a pedido'
         }
       >
         {isLoading ? (

@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
           )
         )
       `)
-      .eq('estado', 'en_curso')
+      .in('estado', ['en_curso', 'planificada'])
 
     // Filtrar por fecha solo si se proporciona
     if (fecha && fechaDesde) {
@@ -128,7 +128,7 @@ export async function GET(request: NextRequest) {
       })
 
       const rutasReparto = Array.isArray(ruta.rutas_reparto) ? ruta.rutas_reparto[0] : ruta.rutas_reparto
-      
+
       // Obtener detalles_ruta básicos primero
       const { data: detallesRutaRaw, error: detallesError } = await supabase
         .from('detalles_ruta')
@@ -218,7 +218,7 @@ export async function GET(request: NextRequest) {
       // Enriquecer orden_visita
       const ordenVisitaEnriquecido = (ruta.orden_visita || []).map((cliente: any) => {
         const detalle = detallesMap.get(cliente.orden)
-        
+
         if (!detalle || !detalle.pedido) {
           return {
             ...cliente,
@@ -232,12 +232,12 @@ export async function GET(request: NextRequest) {
 
         const pedido = detalle.pedido
         const clienteData = Array.isArray(pedido.cliente) ? pedido.cliente[0] : pedido.cliente
-        
+
         // Obtener productos
-        const detallesPedido = Array.isArray(pedido.detalle_pedido) 
-          ? pedido.detalle_pedido 
+        const detallesPedido = Array.isArray(pedido.detalle_pedido)
+          ? pedido.detalle_pedido
           : (pedido.detalle_pedido ? [pedido.detalle_pedido] : [])
-        
+
         const productos = detallesPedido.map((dp: any) => {
           const producto = Array.isArray(dp.producto) ? dp.producto[0] : dp.producto
           return {
@@ -249,7 +249,7 @@ export async function GET(request: NextRequest) {
         // Convertir coordenadas PostGIS a lat/lng si están disponibles
         let lat = cliente.lat
         let lng = cliente.lng
-        
+
         // Si no hay coordenadas en orden_visita, intentar obtenerlas del cliente
         if ((!lat || !lng) && clienteData?.coordenadas) {
           const coords = clienteData.coordenadas
@@ -306,12 +306,12 @@ export async function GET(request: NextRequest) {
     // Si no hay rutas planificadas pero hay rutas activas, generar desde detalles_ruta
     if (rutasFormateadas.length === 0) {
       console.log('🔍 [DEBUG] No hay rutas planificadas, buscando rutas activas para generar puntos')
-      
+
       // Obtener IDs de rutas que ya tienen planificación
       const { data: rutasConPlanificacion } = await supabase
         .from('rutas_planificadas')
         .select('ruta_reparto_id')
-      
+
       const rutasConPlanificacionIds = new Set(
         (rutasConPlanificacion || []).map((r: any) => r.ruta_reparto_id).filter(Boolean)
       )
@@ -345,13 +345,13 @@ export async function GET(request: NextRequest) {
       const { data: rutasActivasRaw, error: rutasActivasError } = await rutasActivasQuery
 
       // Filtrar rutas que no tengan ruta_planificada
-      const rutasActivas = (rutasActivasRaw || []).filter((ruta: any) => 
+      const rutasActivas = (rutasActivasRaw || []).filter((ruta: any) =>
         !rutasConPlanificacionIds.has(ruta.id)
       )
 
       if (!rutasActivasError && rutasActivas && rutasActivas.length > 0) {
         console.log(`🔍 [DEBUG] Encontradas ${rutasActivas.length} rutas activas sin planificación, generando puntos desde detalles_ruta`)
-        
+
         // Generar puntos para cada ruta activa
         const rutasGeneradas = await Promise.all(rutasActivas.map(async (ruta: any) => {
           // Obtener detalles_ruta con coordenadas
@@ -397,11 +397,11 @@ export async function GET(request: NextRequest) {
           const ordenVisita = detallesRutaRaw.map((detalle: any) => {
             const pedido = detalle.pedido
             const clienteData = Array.isArray(pedido?.cliente) ? pedido.cliente[0] : pedido?.cliente
-            
+
             // Convertir coordenadas PostGIS a lat/lng
             let lat: number | null = null
             let lng: number | null = null
-            
+
             if (clienteData?.coordenadas) {
               const coords = clienteData.coordenadas
               if (coords && typeof coords === 'object' && 'type' in coords && coords.type === 'Point' && Array.isArray(coords.coordinates)) {
@@ -415,10 +415,10 @@ export async function GET(request: NextRequest) {
             }
 
             // Obtener productos
-            const detallesPedido = Array.isArray(pedido?.detalle_pedido) 
-              ? pedido.detalle_pedido 
+            const detallesPedido = Array.isArray(pedido?.detalle_pedido)
+              ? pedido.detalle_pedido
               : (pedido?.detalle_pedido ? [pedido.detalle_pedido] : [])
-            
+
             const productos = detallesPedido.map((dp: any) => {
               const producto = Array.isArray(dp.producto) ? dp.producto[0] : dp.producto
               return {
