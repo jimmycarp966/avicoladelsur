@@ -707,13 +707,15 @@ export async function obtenerPresupuestoAction(presupuestoId: string) {
         *,
         cliente:clientes(*),
         zona:zonas(nombre),
+        lista_precio:listas_precios(tipo),
         usuario_vendedor_obj:usuarios!presupuestos_usuario_vendedor_fkey(nombre),
         usuario_almacen_obj:usuarios!presupuestos_usuario_almacen_fkey(nombre),
         usuario_repartidor_obj:usuarios!presupuestos_usuario_repartidor_fkey(nombre),
         items:presupuesto_items(
           *,
           producto:productos(*),
-          lote_reservado:lotes(*)
+        lote_reservado:lotes(*),
+        lista_precio:listas_precios(tipo)
         )
       `)
       .eq('id', presupuestoId)

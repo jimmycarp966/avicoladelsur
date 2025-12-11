@@ -78,8 +78,8 @@ const ProductoItemRow = memo(function ProductoItemRow({
                                  listaSeleccionada?.tipo === 'mayorista'
 
   // Determinar el placeholder/unidad a mostrar
-  const unidadDisplay = mostrarUnidadMayorista
-    ? `1 ${productoSeleccionado.unidad_mayor_nombre || 'caja'}`
+  const unidadDisplay = mostrarUnidadMayorista && productoSeleccionado?.unidad_mayor_nombre
+    ? `1 ${productoSeleccionado.unidad_mayor_nombre}`
     : '1.00'
 
   // Filtrar productos con debounce y límite de resultados
@@ -374,9 +374,9 @@ const ProductoItemRow = memo(function ProductoItemRow({
             />
           )}
         />
-        {mostrarUnidadMayorista && productoSeleccionado && (
+        {mostrarUnidadMayorista && productoSeleccionado && productoSeleccionado.kg_por_unidad_mayor && productoSeleccionado.unidad_mayor_nombre && (
           <p className="text-xs text-muted-foreground mt-1">
-            Equivale a {productoSeleccionado.kg_por_unidad_mayor || 20} kg por {productoSeleccionado.unidad_mayor_nombre || 'caja'}
+            Equivale a {productoSeleccionado.kg_por_unidad_mayor} kg por {productoSeleccionado.unidad_mayor_nombre}
           </p>
         )}
         {errors?.cantidad_solicitada && (

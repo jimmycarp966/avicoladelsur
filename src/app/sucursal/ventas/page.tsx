@@ -351,8 +351,8 @@ async function getVentasData(sidParam?: string) {
         stockDisponible: 0,
         // Campos de venta por mayor
         ventaMayorHabilitada: producto?.venta_mayor_habilitada || false,
-        unidadMayorNombre: producto?.unidad_mayor_nombre || 'caja',
-        kgPorUnidadMayor: producto?.kg_por_unidad_mayor || 20
+        unidadMayorNombre: producto?.unidad_mayor_nombre,
+        kgPorUnidadMayor: producto?.kg_por_unidad_mayor
       }
     }
 

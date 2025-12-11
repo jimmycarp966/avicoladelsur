@@ -377,11 +377,11 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
           // Obtener información del producto
           const producto = productos.find(p => p.id === item.producto_id)
           const ventaMayorHabilitada = producto?.venta_mayor_habilitada || false
-          const kgPorUnidadMayor = producto?.kg_por_unidad_mayor || 20
+          const kgPorUnidadMayor = producto?.kg_por_unidad_mayor
           
           // Si es lista mayorista y el producto tiene venta mayor habilitada, multiplicar precio por kg_por_unidad_mayor
           let nuevoPrecio = precioResult.data.precio
-          if (esListaMayorista && ventaMayorHabilitada && producto?.unidad_medida === 'kg') {
+          if (esListaMayorista && ventaMayorHabilitada && producto?.unidad_medida === 'kg' && kgPorUnidadMayor) {
             nuevoPrecio = precioResult.data.precio * kgPorUnidadMayor
           }
           
@@ -428,7 +428,7 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
       const listaSeleccionada = todasListas.find(l => l.id === listaId)
       const esListaMayorista = listaSeleccionada?.tipo === 'mayorista'
       const ventaMayorHabilitada = producto.venta_mayor_habilitada || false
-      const kgPorUnidadMayor = producto.kg_por_unidad_mayor || 20
+      const kgPorUnidadMayor = producto.kg_por_unidad_mayor
       // #region agent log
       fetch('http://127.0.0.1:7242/ingest/1672462a-0bab-407c-8bd1-baf6ccc7131f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run2',hypothesisId:'H4',location:'presupuesto-form.tsx:handleProductoChange:preCalculo',message:'Cambio de producto con lista',data:{index,productoId,listaId,listaTipo:listaSeleccionada?.tipo,esListaMayorista,ventaMayorHabilitada,kgPorUnidadMayor,unidad:producto.unidad_medida},timestamp:Date.now()})}).catch(()=>{})
       // #endregion
@@ -437,7 +437,7 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
       if (precioResult.success && precioResult.data) {
         // Si es lista mayorista y el producto tiene venta mayor habilitada, multiplicar precio por kg_por_unidad_mayor
         let precioFinal = precioResult.data.precio
-        if (esListaMayorista && ventaMayorHabilitada && producto.unidad_medida === 'kg') {
+        if (esListaMayorista && ventaMayorHabilitada && producto.unidad_medida === 'kg' && kgPorUnidadMayor) {
           precioFinal = precioResult.data.precio * kgPorUnidadMayor
         }
         
@@ -595,13 +595,13 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
         // Obtener información del producto
         const productoSeleccionado = productos.find(p => p.id === item.producto_id)
         const ventaMayorHabilitada = productoSeleccionado?.venta_mayor_habilitada || false
-        const kgPorUnidadMayor = productoSeleccionado?.kg_por_unidad_mayor || 20
+        const kgPorUnidadMayor = productoSeleccionado?.kg_por_unidad_mayor
         
         const precioResult = await obtenerPrecioProductoAction(listaAUsar, item.producto_id)
         if (precioResult.success && precioResult.data) {
           // Si es lista mayorista y el producto tiene venta mayor habilitada, multiplicar precio por kg_por_unidad_mayor
           let precioFinal = precioResult.data.precio
-          if (esListaMayorista && ventaMayorHabilitada && productoSeleccionado?.unidad_medida === 'kg') {
+          if (esListaMayorista && ventaMayorHabilitada && productoSeleccionado?.unidad_medida === 'kg' && kgPorUnidadMayor) {
             precioFinal = precioResult.data.precio * kgPorUnidadMayor
           }
           

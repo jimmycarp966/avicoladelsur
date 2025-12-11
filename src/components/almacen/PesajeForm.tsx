@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { PesajeItemCard } from './PesajeItemCard'
+import { useEffect } from 'react'
 
 interface ItemPesable {
   id: string
@@ -23,7 +24,14 @@ interface ItemPesable {
     codigo?: string
     categoria?: string
     precio_venta?: number
+    venta_mayor_habilitada?: boolean
+    kg_por_unidad_mayor?: number | null
+    unidad_mayor_nombre?: string
+    unidad_medida?: string | null
   }
+  lista_precio?: {
+    tipo?: string | null
+  } | null
 }
 
 interface Presupuesto {
@@ -34,6 +42,9 @@ interface Presupuesto {
   cliente?: {
     nombre?: string
   }
+  lista_precio?: {
+    tipo?: string | null
+  } | null
 }
 
 interface PesajeFormProps {
@@ -47,6 +58,12 @@ export function PesajeForm({ presupuesto, itemsPesables, presupuestoId }: Pesaje
   const [updatingItems, setUpdatingItems] = useState<Set<string>>(new Set())
   const [isFinalizing, setIsFinalizing] = useState(false)
   const [isConverting, setIsConverting] = useState(false)
+
+  // #region agent log
+  useEffect(() => {
+    fetch('http://127.0.0.1:7242/ingest/1672462a-0bab-407c-8bd1-baf6ccc7131f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run-debug-4',hypothesisId:'H6',location:'PesajeForm:mount',message:'PesajeForm mounted',data:{presupuestoId,listaTipo:presupuesto.lista_precio?.tipo,totalItems:itemsPesables.length,items:itemsPesables.slice(0,5).map(it=>({id:it.id,cant:it.cantidad_solicitada,reservada:it.cantidad_reservada,pesable:it.pesable,producto:{codigo:it.producto?.codigo,venta_mayor:it.producto?.venta_mayor_habilitada,kg_por_unidad_mayor:it.producto?.kg_por_unidad_mayor}}))},timestamp:Date.now()})}).catch(()=>{})
+  }, [presupuestoId, presupuesto.lista_precio?.tipo, itemsPesables])
+  // #endregion
 
   // Helper para determinar si un item es pesable
   function esItemPesable(item: ItemPesable): boolean {
@@ -258,6 +275,12 @@ export function PesajeForm({ presupuesto, itemsPesables, presupuestoId }: Pesaje
             <PesajeItemCard
               key={item.id}
               item={item}
+          esMayorista={
+            item.producto?.venta_mayor_habilitada === true &&
+            (item.lista_precio?.tipo === 'mayorista' || presupuesto.lista_precio?.tipo === 'mayorista')
+          }
+          kgPorUnidadMayor={item.producto?.kg_por_unidad_mayor}
+          unidadMayorNombre={item.producto?.unidad_mayor_nombre}
               estaPesado={estaPesado}
               estaActualizando={estaActualizando}
               onSimularPeso={async () => {

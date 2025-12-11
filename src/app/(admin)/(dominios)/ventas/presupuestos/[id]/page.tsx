@@ -10,6 +10,7 @@ import { PresupuestoDetalleSkeleton } from './presupuesto-detalle-skeleton'
 import { AsignarTurnoZonaForm } from './asignar-turno-zona-form'
 import { PresupuestoAccionesButtons } from './presupuesto-acciones-buttons'
 import { createClient } from '@/lib/supabase/server'
+import fs from 'fs'
 
 interface PresupuestoDetallePageProps {
   params: Promise<{
@@ -43,6 +44,26 @@ async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) 
   const presupuesto = result.data
   const itemsPesables = (presupuesto.items || []).filter((item: any) => item.pesable)
   const puedeFacturarDirecto = presupuesto.estado === 'pendiente' && itemsPesables.length === 0
+
+  const logPath = 'd:\\Daniel\\Paginas\\Clientes\\Avicola del Sur\\.cursor\\debug.log'
+  const logDetalle = (payload: any) => {
+    try {
+      fs.appendFileSync(
+        logPath,
+        JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'run-debug-5',
+          hypothesisId: 'H7',
+          location: 'presupuestos/[id]/page.tsx:itemRender',
+          message: 'Render item detalle presupuesto',
+          data: payload,
+          timestamp: Date.now(),
+        }) + '\n'
+      )
+    } catch (_) {
+      // ignore
+    }
+  }
 
   // Obtener zonas y zonas_dias para el formulario
   const { data: zonas } = await supabase
@@ -227,7 +248,32 @@ async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) 
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {presupuesto.items?.map((item: any) => (
+            {presupuesto.items?.map((item: any) => {
+              const esMayorista =
+                item.producto?.venta_mayor_habilitada === true &&
+                (item.lista_precio?.tipo === 'mayorista' || presupuesto.lista_precio?.tipo === 'mayorista')
+              const kgPorUnidadMayor = item.producto?.kg_por_unidad_mayor
+              const unidadMayorNombre = item.producto?.unidad_mayor_nombre
+              const solicitadoKg = esMayorista && kgPorUnidadMayor ? (item.cantidad_solicitada || 0) * kgPorUnidadMayor : item.cantidad_solicitada
+              const reservadoKg = esMayorista && kgPorUnidadMayor ? (item.cantidad_reservada || 0) * kgPorUnidadMayor : item.cantidad_reservada
+              const pesableUI = esMayorista ? false : item.pesable
+
+              logDetalle({
+                presupuestoId,
+                itemId: item.id,
+                listaGlobal: presupuesto.lista_precio?.tipo,
+                listaItem: item.lista_precio?.tipo,
+                esMayorista,
+                kgPorUnidadMayor,
+                solicitado: item.cantidad_solicitada,
+                reservado: item.cantidad_reservada,
+                solicitadoKg,
+                reservadoKg,
+                pesable: item.pesable,
+                pesableUI,
+              })
+
+              return (
               <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg">
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
@@ -235,7 +281,7 @@ async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) 
                     <span className="text-sm text-muted-foreground">
                       #{item.producto?.codigo || 'N/A'}
                     </span>
-                    {item.pesable && (
+                    {pesableUI && (
                       <Badge variant="outline" className="text-xs">
                         <Scale className="h-3 w-3 mr-1" />
                         BALANZA
@@ -243,10 +289,12 @@ async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) 
                     )}
                   </div>
                   <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                    <span>Solicitado: {item.cantidad_solicitada} kg</span>
+                    <span>
+                      Solicitado: {esMayorista && unidadMayorNombre && kgPorUnidadMayor ? `${item.cantidad_solicitada} ${unidadMayorNombre}${item.cantidad_solicitada !== 1 ? '(s)' : ''} ≈ ${solicitadoKg?.toFixed(1)} kg` : `${item.cantidad_solicitada} kg`}
+                    </span>
                     {item.cantidad_reservada > 0 && (
                       <span className="text-green-600">
-                        Reservado: {item.cantidad_reservada} kg
+                        Reservado: {esMayorista && unidadMayorNombre && kgPorUnidadMayor ? `${item.cantidad_reservada} ${unidadMayorNombre}${item.cantidad_reservada !== 1 ? '(s)' : ''} ≈ ${reservadoKg?.toFixed(1)} kg` : `${item.cantidad_reservada} kg`}
                       </span>
                     )}
                     {item.peso_final && (
@@ -267,7 +315,7 @@ async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) 
                   )}
                 </div>
               </div>
-            )) || (
+            )}) || (
               <p className="text-muted-foreground">No hay items en este presupuesto</p>
             )}
           </div>

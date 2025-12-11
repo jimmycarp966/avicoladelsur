@@ -4,15 +4,12 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { createClient } from '@/lib/supabase/server'
 import { getTodayArgentina } from '@/lib/utils'
 import { PresupuestosDiaSkeleton } from './presupuestos-dia-skeleton'
 import { PresupuestosDiaFiltros } from './presupuestos-dia-filtros'
@@ -20,6 +17,7 @@ import { PresupuestosDiaAcciones, PresupuestoIndividualAccion } from '@/componen
 import { TransferenciasDiaCard } from '@/components/almacen/TransferenciasDiaCard'
 import { obtenerTransferenciasDiaAction } from '@/actions/sucursales-transferencias.actions'
 import { PresupuestosDiaRealtime } from '@/components/almacen/PresupuestosDiaRealtime'
+import { obtenerPresupuestosDiaAction, esItemPesable, esVentaMayorista, calcularKgItem } from '@/actions/presupuestos-dia.actions'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 60 // Revalida cada 60 segundos
@@ -29,354 +27,60 @@ export const metadata = {
   description: 'Gestión de presupuestos para pesaje en almacén',
 }
 
-// Helper para determinar si es venta mayorista
-function esVentaMayorista(presupuesto: any, item: any): boolean {
-  // Verificar si la lista del presupuesto es mayorista
-  const tipoLista = presupuesto?.lista_precio?.tipo
-  if (tipoLista !== 'mayorista') {
-    return false
-  }
-
-  // Verificar si el producto tiene venta mayor habilitada
-  return item.producto?.venta_mayor_habilitada === true
-}
-
-// Helper para determinar si un item es pesable
-function esItemPesable(item: any, esVentaMayorista: boolean = false): boolean {
-  // Si es venta mayorista, NO es pesable (productos vienen en caja cerrada)
-  if (esVentaMayorista) {
-    return false
-  }
-
-  // Primero verificar el campo pesable del item
-  if (item.pesable === true) {
-    return true
-  }
-
-  // Si no está marcado como pesable, verificar la categoría del producto
-  const categoria = item.producto?.categoria
-  if (categoria) {
-    const categoriaUpper = categoria.toUpperCase().trim()
-    return categoriaUpper === 'BALANZA'
-  }
-
-  return false
-}
-
 async function PresupuestosDiaContent({
   searchParams,
 }: {
   searchParams?: { fecha?: string; zona_id?: string; turno?: string }
 }) {
-  const supabase = await createClient()
-  const presupuestoSelect = `
-      *,
-      cliente:clientes(nombre, telefono),
-      zona:zonas(nombre),
-      lista_precio:listas_precios(tipo),
-      items:presupuesto_items(
-        id,
-        cantidad_solicitada,
-        cantidad_reservada,
-        pesable,
-        peso_final,
-        producto:productos(nombre, codigo, categoria, venta_mayor_habilitada, unidad_medida)
-      )
-    `
-
   // Obtener parámetros de filtro
   const fecha = searchParams?.fecha || getTodayArgentina()
   const zonaId = searchParams?.zona_id
   const turno = searchParams?.turno
 
-  // Obtener zonas para el filtro
-  const { data: zonas } = await supabase
-    .from('zonas')
-    .select('id, nombre')
-    .eq('activo', true)
-    .order('nombre')
+  // Obtener datos usando el Server Action
+  const {
+    zonas,
+    presupuestos,
+    resumenDia,
+    listaPreparacion,
+    asignacionesResumen,
+    asignacionPorPresupuesto,
+    presupuestosPorZonaTurno,
+    estadisticas,
+  } = await obtenerPresupuestosDiaAction(fecha, zonaId, turno)
 
-  // Construir query con filtros
-  let query = supabase
-    .from('presupuestos')
-    .select(presupuestoSelect)
-    .eq('estado', 'en_almacen')
-    .eq('fecha_entrega_estimada', fecha)
-
-  if (zonaId) {
-    query = query.eq('zona_id', zonaId)
+  // #region agent log
+  // Log para verificar estructura de datos recibidos
+  if (presupuestos && presupuestos.length > 0) {
+    const primerPresupuesto = presupuestos[0]
+    const primerItem = primerPresupuesto?.items?.[0]
+    fetch('http://127.0.0.1:7242/ingest/1672462a-0bab-407c-8bd1-baf6ccc7131f', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        location: 'presupuestos-dia/page.tsx:51',
+        message: 'Estructura datos presupuesto recibidos',
+        data: {
+          totalPresupuestos: presupuestos.length,
+          primerPresupuestoId: primerPresupuesto?.id,
+          primerItemId: primerItem?.id,
+          primerItemTieneProducto: !!primerItem?.producto,
+          primerItemProductoNombre: primerItem?.producto?.nombre,
+          primerItemProductoCodigo: primerItem?.producto?.codigo,
+          primerItemProductoEstructura: primerItem?.producto ? Object.keys(primerItem.producto) : null,
+          primerItemEstructura: primerItem ? Object.keys(primerItem) : null,
+        },
+        timestamp: Date.now(),
+        sessionId: 'debug-session',
+        runId: 'run1',
+        hypothesisId: 'A',
+      }),
+    }).catch(() => {})
   }
-
-  if (turno) {
-    query = query.eq('turno', turno)
-  }
-
-  const { data: presupuestos, error } = await query.order('fecha_entrega_estimada', { ascending: true })
-
-  if (error) {
-    console.error('Error obteniendo presupuestos:', error)
-  }
+  // #endregion
 
   // Obtener transferencias del día
   const transferencias = await obtenerTransferenciasDiaAction(fecha, turno, zonaId)
-
-  const { data: presupuestosDiaData, error: presupuestosDiaError } = await supabase
-    .from('presupuestos')
-    .select(presupuestoSelect)
-    .eq('estado', 'en_almacen')
-    .eq('fecha_entrega_estimada', fecha)
-    .order('fecha_entrega_estimada', { ascending: true })
-
-  if (presupuestosDiaError) {
-    console.error('Error obteniendo resumen del día:', presupuestosDiaError)
-  }
-
-  const calcularKgItem = (item: any) => {
-    if (!item) return 0
-    if (item.pesable && item.peso_final) {
-      return item.peso_final
-    }
-    return item.cantidad_solicitada || 0
-  }
-
-  const presupuestosDelDia = presupuestosDiaData || []
-
-  const totalPresupuestosDia = presupuestosDelDia.length
-  const totalKgDia =
-    presupuestosDelDia.reduce(
-      (acc, presupuesto) =>
-        acc + (presupuesto.items?.reduce((sum: number, item: any) => sum + calcularKgItem(item), 0) || 0),
-      0,
-    ) || 0
-  const totalItemsPesablesPendientesDia =
-    presupuestosDelDia.reduce(
-      (acc, presupuesto) =>
-        acc + (presupuesto.items?.filter((item: any) => esItemPesable(item, esVentaMayorista(presupuesto, item)) && !item.peso_final).length || 0),
-      0,
-    ) || 0
-
-  const resumenPorZona = Object.values(
-    (presupuestosDelDia || []).reduce(
-      (acc: Record<string, { nombre: string; totalKg: number; totalPresupuestos: number }>, presupuesto: any) => {
-        const key = presupuesto.zona_id || 'sin-zona'
-        if (!acc[key]) {
-          acc[key] = {
-            nombre: presupuesto.zona?.nombre || 'Sin zona',
-            totalKg: 0,
-            totalPresupuestos: 0,
-          }
-        }
-        acc[key].totalPresupuestos += 1
-        acc[key].totalKg += presupuesto.items?.reduce((sum: number, item: any) => sum + calcularKgItem(item), 0) || 0
-        return acc
-      },
-      {},
-    ),
-  ).sort((a, b) => b.totalKg - a.totalKg)
-
-  const resumenPorTurno = Object.values(
-    (presupuestosDelDia || []).reduce(
-      (acc: Record<string, { nombre: string; totalKg: number; totalPresupuestos: number }>, presupuesto: any) => {
-        const key = presupuesto.turno || 'sin-turno'
-        if (!acc[key]) {
-          acc[key] = {
-            nombre: presupuesto.turno ? presupuesto.turno : 'Sin turno',
-            totalKg: 0,
-            totalPresupuestos: 0,
-          }
-        }
-        acc[key].totalPresupuestos += 1
-        acc[key].totalKg += presupuesto.items?.reduce((sum: number, item: any) => sum + calcularKgItem(item), 0) || 0
-        return acc
-      },
-      {},
-    ),
-  ).sort((a, b) => b.totalKg - a.totalKg)
-
-  const preparacionPorZonaTurno = (presupuestosDelDia || []).reduce(
-    (
-      acc: Record<
-        string,
-        {
-          zona: string
-          turno: string
-          productos: Record<
-            string,
-            {
-              nombre: string
-              pesable: boolean
-              totalCantidad: number
-              presupuestosIds: Set<string>
-            }
-          >
-          totalKgPesables: number
-        }
-      >,
-      presupuesto: any,
-    ) => {
-      const coincideZona = !zonaId || presupuesto.zona_id === zonaId
-      const coincideTurno = !turno || presupuesto.turno === turno
-
-      if (!coincideZona || !coincideTurno) {
-        return acc
-      }
-
-      const key = `${presupuesto.zona_id || 'sin-zona'}-${presupuesto.turno || 'sin-turno'}`
-      if (!acc[key]) {
-        acc[key] = {
-          zona: presupuesto.zona?.nombre || 'Sin zona',
-          turno: presupuesto.turno || 'Sin turno',
-          productos: {},
-          totalKgPesables: 0,
-        }
-      }
-
-      ; (presupuesto.items || []).forEach((item: any) => {
-        const productoKey = item.producto?.codigo || `${item.producto?.nombre || 'producto'}-${item.id}`
-        const cantidad = calcularKgItem(item)
-
-        const esMayorista = esVentaMayorista(presupuesto, item)
-        if (esItemPesable(item, esMayorista)) {
-          acc[key].totalKgPesables += cantidad
-        }
-
-        if (!acc[key].productos[productoKey]) {
-          acc[key].productos[productoKey] = {
-            nombre: item.producto?.nombre || 'Producto sin nombre',
-            pesable: esItemPesable(item, esMayorista),
-            totalCantidad: 0,
-            presupuestosIds: new Set<string>(),
-          }
-        }
-
-        acc[key].productos[productoKey].totalCantidad += cantidad
-        acc[key].productos[productoKey].presupuestosIds.add(presupuesto.id)
-      })
-
-      return acc
-    },
-    {},
-  )
-
-  const listaPreparacion = Object.entries(preparacionPorZonaTurno).map(([key, grupo]) => ({
-    key,
-    zona: grupo.zona,
-    turno: grupo.turno,
-    totalKgPesables: grupo.totalKgPesables,
-    productos: Object.values(grupo.productos)
-      .map((producto) => ({
-        nombre: producto.nombre,
-        pesable: producto.pesable,
-        totalCantidad: producto.totalCantidad,
-        presupuestos: producto.presupuestosIds.size,
-      }))
-      .sort((a, b) => b.totalCantidad - a.totalCantidad),
-  }))
-
-  const formatearCantidad = (cantidad: number, pesable: boolean) =>
-    pesable ? `${cantidad.toFixed(1)} kg` : `${cantidad.toFixed(0)} u`
-
-  const { data: sugerenciasVehiculos } = await supabase.rpc('fn_asignar_vehiculos_por_peso', {
-    p_fecha: fecha,
-    p_zona_id: zonaId || null,
-    p_turno: turno || null
-  })
-
-  const vehiculoIds = sugerenciasVehiculos?.map((s: any) => s.vehiculo_id).filter(Boolean) ?? []
-  let vehiculosAsignados: Record<string, any> = {}
-
-  if (vehiculoIds.length > 0) {
-    const { data: vehiculosData } = await supabase
-      .from('vehiculos')
-      .select('id, patente, marca, modelo, capacidad_kg')
-      .in('id', vehiculoIds)
-
-    vehiculosAsignados = Object.fromEntries((vehiculosData || []).map((v: any) => [v.id, v]))
-  }
-
-  const presupuestoInfoMap = new Map(
-    (presupuestos || []).map((p: any) => [p.id, { numero: p.numero_presupuesto }])
-  )
-
-  const asignacionesVehiculoMap: Record<string, {
-    vehiculo: any | null
-    peso_total: number
-    capacidad_restante: number
-    presupuestos: Array<{ id: string; numero: string; peso_estimado: number }>
-  }> = {}
-
-  const asignacionPorPresupuesto = new Map<string, {
-    vehiculo: any | null
-    peso_estimado: number
-    capacidad_restante: number
-  }>()
-
-    ; (sugerenciasVehiculos || []).forEach((sugerencia: any) => {
-      if (!sugerencia?.vehiculo_id || !sugerencia?.presupuesto_id) {
-        return
-      }
-
-      const vehiculo = vehiculosAsignados[sugerencia.vehiculo_id] || null
-      const presupuestoInfo = presupuestoInfoMap.get(sugerencia.presupuesto_id)
-      const pesoEstimado = Number(sugerencia.peso_estimado) || 0
-      const capacidadRestante = Number(sugerencia.capacidad_restante ?? (vehiculo?.capacidad_kg || 0))
-      const vehiculoKey = sugerencia.vehiculo_id
-
-      if (!asignacionesVehiculoMap[vehiculoKey]) {
-        asignacionesVehiculoMap[vehiculoKey] = {
-          vehiculo,
-          peso_total: 0,
-          capacidad_restante: capacidadRestante,
-          presupuestos: [],
-        }
-      }
-
-      asignacionesVehiculoMap[vehiculoKey].peso_total += pesoEstimado
-      asignacionesVehiculoMap[vehiculoKey].capacidad_restante = capacidadRestante
-
-      if (presupuestoInfo) {
-        asignacionesVehiculoMap[vehiculoKey].presupuestos.push({
-          id: sugerencia.presupuesto_id,
-          numero: presupuestoInfo.numero,
-          peso_estimado: pesoEstimado,
-        })
-      }
-
-      asignacionPorPresupuesto.set(sugerencia.presupuesto_id, {
-        vehiculo,
-        peso_estimado: pesoEstimado,
-        capacidad_restante: capacidadRestante,
-      })
-    })
-
-  const asignacionesResumen = Object.values(asignacionesVehiculoMap)
-
-  // Agrupar por zona y turno
-  const presupuestosPorZonaTurno = presupuestos?.reduce((acc: any, p: any) => {
-    const key = `${p.zona_id || 'sin-zona'}-${p.turno || 'sin-turno'}`
-    if (!acc[key]) {
-      acc[key] = {
-        zona: p.zona,
-        turno: p.turno,
-        presupuestos: [],
-        totalKg: 0,
-      }
-    }
-    acc[key].presupuestos.push(p)
-    acc[key].totalKg += p.items?.reduce((sum: number, item: any) =>
-      sum + calcularKgItem(item), 0) || 0
-    return acc
-  }, {}) || {}
-
-  // Calcular estadísticas
-  const totalPresupuestos = presupuestos?.length || 0
-  const totalItemsPesables = presupuestos?.reduce((acc, p) =>
-    acc + (p.items?.filter((item: any) => item.pesable && !item.peso_final).length || 0), 0
-  ) || 0
-  const totalKgEstimados = presupuestos?.reduce((acc, p) =>
-    acc + (p.items?.reduce((sum: number, item: any) =>
-      sum + calcularKgItem(item), 0) || 0), 0
-  ) || 0
 
   // Estadísticas de transferencias
   const totalTransferencias = transferencias?.length || 0
@@ -384,6 +88,21 @@ async function PresupuestosDiaContent({
     acc + (t.items?.reduce((sum: number, item: any) =>
       sum + (item.peso_preparado || item.cantidad_enviada || item.cantidad_solicitada || 0), 0) || 0), 0
   ) || 0
+
+  // Extraer estadísticas del día
+  const {
+    totalPresupuestosDia,
+    totalKgDia,
+    totalItemsPesablesPendientesDia,
+    resumenPorZona,
+    resumenPorTurno,
+  } = resumenDia
+
+  const { totalPresupuestos, totalItemsPesables, totalKgEstimados } = estadisticas
+
+  // Función helper para formatear cantidad
+  const formatearCantidad = (cantidad: number, pesable: boolean) =>
+    pesable ? `${cantidad.toFixed(1)} kg` : `${cantidad.toFixed(0)} u`
 
   return (
     <div className="space-y-6">
@@ -717,7 +436,7 @@ async function PresupuestosDiaContent({
                     const itemsPesables = presupuesto.items?.filter((item: any) => esItemPesable(item, esVentaMayorista(presupuesto, item))) || []
                     const itemsPesados = itemsPesables.filter((item: any) => item.peso_final)
                     const totalKg = presupuesto.items?.reduce((sum: number, item: any) =>
-                      sum + calcularKgItem(item), 0) || 0
+                      sum + calcularKgItem(presupuesto, item), 0) || 0
                     const asignacionVehiculo = asignacionPorPresupuesto.get(presupuesto.id)
 
                     // Calcular porcentaje fuera de la expresión inline
@@ -795,41 +514,96 @@ async function PresupuestosDiaContent({
                           {presupuesto.items?.length > 0 && (
                             <div className="mt-4">
                               <Accordion type="single" collapsible className="rounded-lg border border-slate-200">
-                                <AccordionItem value={`items-${presupuesto.id}`}>
+                                <AccordionItem value={`items-${presupuesto.id}`} className="border-b-0">
                                   <AccordionTrigger className="px-4 py-2 text-sm">
                                     Ver productos ({presupuesto.items.length})
                                   </AccordionTrigger>
-                                  <AccordionContent>
-                                    <div className="space-y-3 px-4 pb-4">
-                                      {presupuesto.items.map((item: any) => (
-                                        <div
-                                          key={item.id}
-                                          className="flex items-start justify-between gap-4 rounded-md border border-slate-100 bg-white/80 px-3 py-2 text-sm"
-                                        >
-                                          <div>
-                                            <p className="font-medium">
-                                              {(() => {
-                                                const esMayorista = esVentaMayorista(presupuesto, item)
-                                                const esPesableItem = esItemPesable(item, esMayorista)
-                                                const estaPendienteItem = esPesableItem && !item.peso_final
+                                  <AccordionContent className="px-4 pb-4 pt-0">
+                                    <div className="space-y-3 w-full overflow-visible">
+                                      {presupuesto.items.map((item: any) => {
+                                        // #region agent log
+                                        // Log para verificar que el item se está renderizando dentro del AccordionContent
+                                        fetch('http://127.0.0.1:7242/ingest/1672462a-0bab-407c-8bd1-baf6ccc7131f', {
+                                          method: 'POST',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({
+                                            location: 'presupuestos-dia/page.tsx:523',
+                                            message: 'Item renderizado dentro AccordionContent',
+                                            data: {
+                                              presupuestoId: presupuesto.id,
+                                              itemId: item.id,
+                                              nombreProducto: item.producto?.nombre || 'Producto',
+                                              totalItems: presupuesto.items.length,
+                                            },
+                                            timestamp: Date.now(),
+                                            sessionId: 'debug-session',
+                                            runId: 'run2',
+                                            hypothesisId: 'F',
+                                          }),
+                                        }).catch(() => {})
+                                        // #endregion
+                                        // Calcular valores una sola vez fuera del JSX (EXACTAMENTE igual que en ver detalles)
+                                        const esMayorista =
+                                          item.producto?.venta_mayor_habilitada === true &&
+                                          (item.lista_precio?.tipo === 'mayorista' || presupuesto.lista_precio?.tipo === 'mayorista')
+                                        const esPesableItem = esItemPesable(item, esMayorista)
+                                        const estaPendienteItem = esPesableItem && !item.peso_final
+                                        const kgPorUnidadMayor = item.producto?.kg_por_unidad_mayor
+                                        const unidadMayorNombre = item.producto?.unidad_mayor_nombre
+                                        const solicitadoKg = esMayorista && kgPorUnidadMayor ? (item.cantidad_solicitada || 0) * kgPorUnidadMayor : item.cantidad_solicitada
+                                        const reservadoKg = esMayorista && kgPorUnidadMayor ? (item.cantidad_reservada || 0) * kgPorUnidadMayor : item.cantidad_reservada
+                                        
+                                        const nombreProducto = item.producto?.nombre || 'Producto'
+                                        const codigoProducto = item.producto?.codigo
+                                        
+                                        // Calcular el texto que se mostrará (usando unidad_mayor_nombre del producto)
+                                        const textoSolicitado = esMayorista && unidadMayorNombre && kgPorUnidadMayor
+                                          ? `${item.cantidad_solicitada ?? 0} ${unidadMayorNombre}${(item.cantidad_solicitada ?? 0) !== 1 ? '(s)' : ''} ≈ ${solicitadoKg?.toFixed(1)} kg`
+                                          : `${item.cantidad_solicitada ?? 0} ${esPesableItem ? 'kg' : 'u'}`
 
-                                                return estaPendienteItem ? (
+                                        // #region agent log
+                                        // Log para verificar valores calculados y texto final
+                                        fetch('http://127.0.0.1:7242/ingest/1672462a-0bab-407c-8bd1-baf6ccc7131f', {
+                                          method: 'POST',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({
+                                            location: 'presupuestos-dia/page.tsx:556',
+                                            message: 'Valores calculados para mostrar cajas',
+                                            data: {
+                                              presupuestoId: presupuesto.id,
+                                              itemId: item.id,
+                                              nombreProducto,
+                                              esMayorista,
+                                              cantidad_solicitada: item.cantidad_solicitada,
+                                              cantidad_reservada: item.cantidad_reservada,
+                                              kgPorUnidadMayor,
+                                              unidadMayorNombre,
+                                              solicitadoKg,
+                                              reservadoKg,
+                                              textoSolicitado,
+                                              venta_mayor_habilitada: item.producto?.venta_mayor_habilitada,
+                                              lista_precio_item: item.lista_precio?.tipo,
+                                              lista_precio_presupuesto: presupuesto.lista_precio?.tipo,
+                                            },
+                                            timestamp: Date.now(),
+                                            sessionId: 'debug-session',
+                                            runId: 'run4',
+                                            hypothesisId: 'H',
+                                          }),
+                                        }).catch(() => {})
+                                        // #endregion
+
+                                        return (
+                                          <div
+                                            key={item.id}
+                                            className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 bg-white p-4 min-h-[80px]"
+                                          >
+                                            <div className="flex-1">
+                                              <div className="flex items-center gap-2 mb-2">
+                                                {estaPendienteItem ? (
                                                   <>
-                                                    <mark
-                                                      style={{
-                                                        backgroundColor: '#fef08a',
-                                                        padding: '2px 4px',
-                                                        borderRadius: '2px',
-                                                        boxDecorationBreak: 'clone',
-                                                        WebkitBoxDecorationBreak: 'clone',
-                                                        display: 'inline'
-                                                      }}
-                                                    >
-                                                      {item.producto?.nombre || 'Producto'}
-                                                    </mark>
-                                                    {item.producto?.codigo && (
+                                                    <h4 className="font-medium">
                                                       <mark
-                                                        className="ml-1 text-xs"
                                                         style={{
                                                           backgroundColor: '#fef08a',
                                                           padding: '2px 4px',
@@ -839,65 +613,75 @@ async function PresupuestosDiaContent({
                                                           display: 'inline'
                                                         }}
                                                       >
-                                                        ({item.producto.codigo})
+                                                        {nombreProducto}
                                                       </mark>
+                                                    </h4>
+                                                    {codigoProducto && (
+                                                      <span className="text-sm text-muted-foreground">
+                                                        <mark
+                                                          className="ml-1 text-xs"
+                                                          style={{
+                                                            backgroundColor: '#fef08a',
+                                                            padding: '2px 4px',
+                                                            borderRadius: '2px',
+                                                            boxDecorationBreak: 'clone',
+                                                            WebkitBoxDecorationBreak: 'clone',
+                                                            display: 'inline'
+                                                          }}
+                                                        >
+                                                          #{codigoProducto}
+                                                        </mark>
+                                                      </span>
                                                     )}
                                                   </>
                                                 ) : (
                                                   <>
-                                                    {item.producto?.nombre || 'Producto'}
-                                                    {item.producto?.codigo && (
-                                                      <span className="text-xs text-muted-foreground ml-1">
-                                                        ({item.producto.codigo})
+                                                    <h4 className="font-medium">{nombreProducto}</h4>
+                                                    {codigoProducto && (
+                                                      <span className="text-sm text-muted-foreground">
+                                                        #{codigoProducto}
                                                       </span>
                                                     )}
                                                   </>
-                                                )
-                                              })()}
-                                            </p>
-                                            <p className="text-xs text-muted-foreground">
-                                              {(() => {
-                                                const esMayorista = esVentaMayorista(presupuesto, item)
-                                                const esPesableItem = esItemPesable(item, esMayorista)
-                                                return (
-                                                  <>
-                                                    {esPesableItem ? 'Pesable' : 'Unidad'} • Solicitado:{' '}
-                                                    {item.cantidad_solicitada ?? 0} {esPesableItem ? 'kg' : 'u'}
-                                                    {esPesableItem && (
-                                                      <>
-                                                        {' '}•{' '}
-                                                        {item.peso_final
-                                                          ? `Final: ${item.peso_final} kg`
-                                                          : 'Pendiente de pesaje'}
-                                                      </>
-                                                    )}
-                                                  </>
-                                                )
-                                              })()}
-                                            </p>
-                                          </div>
-                                          <Badge
-                                            variant="outline"
-                                            className={
-                                              (() => {
-                                                const esMayorista = esVentaMayorista(presupuesto, item)
-                                                const esPesableItem = esItemPesable(item, esMayorista)
-                                                return esPesableItem
+                                                )}
+                                                {esPesableItem && (
+                                                  <Badge variant="outline" className="text-xs">
+                                                    <Scale className="h-3 w-3 mr-1" />
+                                                    BALANZA
+                                                  </Badge>
+                                                )}
+                                              </div>
+                                              <div className="flex flex-wrap items-center gap-2 mt-2 text-sm text-muted-foreground">
+                                                <span className="whitespace-nowrap">
+                                                  Solicitado: {textoSolicitado}
+                                                </span>
+                                                {item.cantidad_reservada > 0 && (
+                                                  <span className="text-green-600 whitespace-nowrap">
+                                                    Reservado: {esMayorista && unidadMayorNombre && kgPorUnidadMayor ? `${item.cantidad_reservada} ${unidadMayorNombre}${item.cantidad_reservada !== 1 ? '(s)' : ''} ≈ ${reservadoKg?.toFixed(1)} kg` : `${item.cantidad_reservada} kg`}
+                                                  </span>
+                                                )}
+                                                {item.peso_final && (
+                                                  <span className="text-blue-600 whitespace-nowrap">
+                                                    Pesado: {item.peso_final} kg
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </div>
+                                            <Badge
+                                              variant="outline"
+                                              className={
+                                                esPesableItem
                                                   ? item.peso_final
                                                     ? 'border-green-200 bg-green-50 text-green-700'
                                                     : 'border-yellow-200 bg-yellow-50 text-yellow-700'
                                                   : 'border-slate-200 bg-slate-50 text-slate-700'
-                                              })()
-                                            }
-                                          >
-                                            {(() => {
-                                              const esMayorista = esVentaMayorista(presupuesto, item)
-                                              const esPesableItem = esItemPesable(item, esMayorista)
-                                              return esPesableItem ? (item.peso_final ? 'Pesado' : 'Pendiente') : 'Sin balanza'
-                                            })()}
-                                          </Badge>
-                                        </div>
-                                      ))}
+                                              }
+                                            >
+                                              {esPesableItem ? (item.peso_final ? 'Pesado' : 'Pendiente') : 'Sin balanza'}
+                                            </Badge>
+                                          </div>
+                                        )
+                                      })}
                                     </div>
                                   </AccordionContent>
                                 </AccordionItem>
@@ -936,10 +720,10 @@ async function PresupuestosDiaContent({
             ) : (
               <div className="space-y-4">
                 {presupuestos.map((presupuesto: any) => {
-                  const itemsPesables = presupuesto.items?.filter((item: any) => item.pesable) || []
+                  const itemsPesables = presupuesto.items?.filter((item: any) => esItemPesable(item, esVentaMayorista(presupuesto, item))) || []
                   const itemsPesados = itemsPesables.filter((item: any) => item.peso_final)
                   const totalKg = presupuesto.items?.reduce((sum: number, item: any) =>
-                    sum + calcularKgItem(item), 0) || 0
+                    sum + calcularKgItem(presupuesto, item), 0) || 0
                   const asignacionVehiculo = asignacionPorPresupuesto.get(presupuesto.id)
 
                   // Calcular porcentaje fuera de la expresión inline
@@ -1036,34 +820,31 @@ async function PresupuestosDiaContent({
                                 <AccordionContent>
                                   <div className="space-y-3 px-4 pb-4">
                                     {presupuesto.items.map((item: any) => {
+                                      // Calcular valores una sola vez fuera del JSX
                                       const esMayorista = esVentaMayorista(presupuesto, item)
                                       const esPesable = esItemPesable(item, esMayorista)
                                       const estaPendiente = esPesable && !item.peso_final
+                                      const kgEquivalente = calcularKgItem(presupuesto, item)
+                                      const unidadMayorNombre = item.producto?.unidad_mayor_nombre
+                                      const cantidadSolicitada = item.cantidad_solicitada ?? 0
+                                      const solicitadoLabel = esMayorista && unidadMayorNombre
+                                        ? `${cantidadSolicitada} ${unidadMayorNombre}${cantidadSolicitada !== 1 ? '(s)' : ''} ≈ ${kgEquivalente.toFixed(1)} kg`
+                                        : `${cantidadSolicitada} ${esPesable ? 'kg' : 'u'}`
+                                      
+                                      const nombreProducto = item.producto?.nombre || 'Producto'
+                                      const codigoProducto = item.producto?.codigo
 
                                       return (
                                         <div
                                           key={item.id}
-                                          className="flex items-start justify-between gap-4 rounded-md border border-slate-100 bg-white/80 px-3 py-2 text-sm"
+                                          className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 bg-white p-4"
                                         >
-                                          <div>
-                                            <p className="font-medium">
+                                          <div className="flex-1">
+                                            <div className="flex items-center gap-2 mb-2">
                                               {estaPendiente ? (
                                                 <>
-                                                  <mark
-                                                    style={{
-                                                      backgroundColor: '#fef08a',
-                                                      padding: '2px 4px',
-                                                      borderRadius: '2px',
-                                                      boxDecorationBreak: 'clone',
-                                                      WebkitBoxDecorationBreak: 'clone',
-                                                      display: 'inline'
-                                                    }}
-                                                  >
-                                                    {item.producto?.nombre || 'Producto'}
-                                                  </mark>
-                                                  {item.producto?.codigo && (
+                                                  <h4 className="font-medium">
                                                     <mark
-                                                      className="ml-1 text-xs"
                                                       style={{
                                                         backgroundColor: '#fef08a',
                                                         padding: '2px 4px',
@@ -1073,33 +854,66 @@ async function PresupuestosDiaContent({
                                                         display: 'inline'
                                                       }}
                                                     >
-                                                      ({item.producto.codigo})
+                                                      {nombreProducto}
                                                     </mark>
+                                                  </h4>
+                                                  {codigoProducto && (
+                                                    <span className="text-sm text-muted-foreground">
+                                                      <mark
+                                                        className="ml-1 text-xs"
+                                                        style={{
+                                                          backgroundColor: '#fef08a',
+                                                          padding: '2px 4px',
+                                                          borderRadius: '2px',
+                                                          boxDecorationBreak: 'clone',
+                                                          WebkitBoxDecorationBreak: 'clone',
+                                                          display: 'inline'
+                                                        }}
+                                                      >
+                                                        #{codigoProducto}
+                                                      </mark>
+                                                    </span>
                                                   )}
                                                 </>
                                               ) : (
                                                 <>
-                                                  {item.producto?.nombre || 'Producto'}
-                                                  {item.producto?.codigo && (
-                                                    <span className="text-xs text-muted-foreground ml-1">
-                                                      ({item.producto.codigo})
+                                                  <h4 className="font-medium">{nombreProducto}</h4>
+                                                  {codigoProducto && (
+                                                    <span className="text-sm text-muted-foreground">
+                                                      #{codigoProducto}
                                                     </span>
                                                   )}
                                                 </>
                                               )}
-                                            </p>
-                                            <p className="text-xs text-muted-foreground">
-                                              {esPesable ? 'Pesable' : 'Unidad'} • Solicitado:{' '}
-                                              {item.cantidad_solicitada ?? 0} {esPesable ? 'kg' : 'u'}
                                               {esPesable && (
+                                                <Badge variant="outline" className="text-xs">
+                                                  <Scale className="h-3 w-3 mr-1" />
+                                                  BALANZA
+                                                </Badge>
+                                              )}
+                                            </div>
+                                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                              <span>
+                                                Solicitado: {solicitadoLabel}
+                                              </span>
+                                              {(esPesable || esMayorista) && (
                                                 <>
-                                                  {' '}•{' '}
-                                                  {item.peso_final
-                                                    ? `Final: ${item.peso_final} kg`
-                                                    : 'Pendiente de pesaje'}
+                                                  {item.peso_final ? (
+                                                    <span className="text-blue-600">
+                                                      Pesado: {item.peso_final} kg
+                                                    </span>
+                                                  ) : esMayorista ? (
+                                                    <span>
+                                                      Equivalente: {kgEquivalente.toFixed(1)} kg
+                                                    </span>
+                                                  ) : (
+                                                    <span className="text-yellow-600">
+                                                      Pendiente de pesaje
+                                                    </span>
+                                                  )}
                                                 </>
                                               )}
-                                            </p>
+                                            </div>
                                           </div>
                                           <Badge
                                             variant="outline"

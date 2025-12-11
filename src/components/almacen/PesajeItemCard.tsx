@@ -21,11 +21,15 @@ interface ItemPesable {
     codigo?: string
     categoria?: string
     precio_venta?: number
+    unidad_medida?: string | null
   }
 }
 
 interface PesajeItemCardProps {
   item: ItemPesable
+  esMayorista?: boolean
+  kgPorUnidadMayor?: number
+  unidadMayorNombre?: string
   estaPesado: boolean
   estaActualizando: boolean
   onSimularPeso: () => Promise<void>
@@ -34,6 +38,9 @@ interface PesajeItemCardProps {
 
 export function PesajeItemCard({
   item,
+  esMayorista = false,
+  kgPorUnidadMayor,
+  unidadMayorNombre,
   estaPesado,
   estaActualizando,
   onSimularPeso,
@@ -58,6 +65,12 @@ export function PesajeItemCard({
       setPesoInput(item.peso_final.toString())
     }
   }, [item.peso_final])
+
+  // #region agent log
+  useEffect(() => {
+    fetch('http://127.0.0.1:7242/ingest/1672462a-0bab-407c-8bd1-baf6ccc7131f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run-debug-4',hypothesisId:'H6',location:'PesajeItemCard:render',message:'Render item pesaje',data:{itemId:item.id,esMayorista,kgPorUnidadMayor,cant:item.cantidad_solicitada,reservada:item.cantidad_reservada,peso_final:item.peso_final,producto:{codigo:item.producto?.codigo,venta_mayor:item.producto?.venta_mayor_habilitada,unidad:item.producto?.unidad_medida}},timestamp:Date.now()})}).catch(()=>{})
+  }, [item.id, esMayorista, kgPorUnidadMayor, item.cantidad_solicitada, item.cantidad_reservada, item.peso_final, item.producto?.codigo, item.producto?.venta_mayor_habilitada, item.producto?.unidad_medida])
+  // #endregion
 
   // Sincronizar con cambios externos en el input (ej: simulación de peso)
   useEffect(() => {
@@ -93,8 +106,17 @@ export function PesajeItemCard({
               </div>
               <CardDescription>
                 Código: {item.producto?.codigo} |
-                Solicitado: {item.cantidad_solicitada}kg |
-                Reservado: {item.cantidad_reservada}kg
+                {esMayorista && unidadMayorNombre && kgPorUnidadMayor ? (
+                  <>
+                    Solicitado: {item.cantidad_solicitada} {unidadMayorNombre}{item.cantidad_solicitada !== 1 ? '(s)' : ''} ≈ {(item.cantidad_solicitada * kgPorUnidadMayor).toFixed(1)} kg |
+                    Reservado: {item.cantidad_reservada} {unidadMayorNombre}{item.cantidad_reservada !== 1 ? '(s)' : ''} ≈ {(item.cantidad_reservada * kgPorUnidadMayor).toFixed(1)} kg
+                  </>
+                ) : (
+                  <>
+                    Solicitado: {item.cantidad_solicitada}kg |
+                    Reservado: {item.cantidad_reservada}kg
+                  </>
+                )}
               </CardDescription>
             </div>
           </div>

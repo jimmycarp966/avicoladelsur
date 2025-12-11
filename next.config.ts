@@ -1,9 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Configuración de Turbopack
+  // Nota: Turbopack se habilita con --turbo flag, no en config
+
   // Configuración para Supabase
-  // IMPORTANTE: En Next.js 16 con Turbopack, serverExternalPackages es necesario
-  // pero NO debe haber conflicto con transpilePackages
   serverExternalPackages: ['@supabase/ssr'],
 
   // TEMPORAL: Deshabilitar TypeScript checking en build para evitar error interno de TS
