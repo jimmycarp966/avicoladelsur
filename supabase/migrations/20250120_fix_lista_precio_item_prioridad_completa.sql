@@ -9,6 +9,35 @@
 
 BEGIN;
 
+-- Eliminar TODAS las versiones existentes de las funciones para evitar conflictos
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    -- Eliminar todas las versiones de fn_crear_presupuesto
+    FOR r IN 
+        SELECT p.oid::regprocedure::text as func_signature
+        FROM pg_proc p
+        JOIN pg_namespace n ON p.pronamespace = n.oid
+        WHERE n.nspname = 'public'
+        AND p.proname = 'fn_crear_presupuesto'
+    LOOP
+        EXECUTE 'DROP FUNCTION IF EXISTS ' || r.func_signature || ' CASCADE';
+    END LOOP;
+    
+    -- Eliminar todas las versiones de fn_crear_presupuesto_basico
+    FOR r IN 
+        SELECT p.oid::regprocedure::text as func_signature
+        FROM pg_proc p
+        JOIN pg_namespace n ON p.pronamespace = n.oid
+        WHERE n.nspname = 'public'
+        AND p.proname = 'fn_crear_presupuesto_basico'
+    LOOP
+        EXECUTE 'DROP FUNCTION IF EXISTS ' || r.func_signature || ' CASCADE';
+    END LOOP;
+END
+$$;
+
 -- ===========================================
 -- 1. ACTUALIZAR fn_crear_presupuesto_desde_bot (en fix_pesable_mayorista)
 -- ===========================================
