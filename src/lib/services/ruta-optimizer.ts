@@ -44,6 +44,7 @@ export async function generateRutaOptimizada({
         pedido_id,
         orden_entrega,
         pedidos (
+          id,
           cliente_id,
           clientes (
             id,
@@ -71,23 +72,63 @@ export async function generateRutaOptimizada({
 
   for (const detalle of detalles as any[]) {
     const pedido = detalle.pedidos
-    const cliente = pedido?.clientes
-    const coords = cliente?.coordenadas
+    let cliente = pedido?.clientes
+    let coords = cliente?.coordenadas
 
-    if (!cliente || !coords) continue
+    // Si el pedido tiene cliente directo (pedido legacy)
+    if (cliente && coords) {
+      const { lat, lng } = parseCoordinates(coords)
+      if (lat !== null && lng !== null) {
+        waypoints.push({
+          lat,
+          lng,
+          id: detalle.id,
+          detalleRutaId: detalle.id,
+          pedidoId: detalle.pedido_id,
+          clienteId: cliente.id,
+          nombreCliente: cliente.nombre,
+        })
+      }
+    } else if (pedido?.id) {
+      // Si el pedido no tiene cliente directo, buscar en entregas (pedidos agrupados)
+      // Obtener TODAS las entregas del pedido para mostrar todos los clientes
+      const { data: entregas } = await supabase
+        .from('entregas')
+        .select(`
+          id,
+          cliente_id,
+          orden_entrega,
+          clientes (
+            id,
+            nombre,
+            coordenadas
+          )
+        `)
+        .eq('pedido_id', pedido.id)
+        .order('orden_entrega', { ascending: true })
 
-    const { lat, lng } = parseCoordinates(coords)
-    if (lat === null || lng === null) continue
+      if (entregas && entregas.length > 0) {
+        for (const entrega of entregas as any[]) {
+          const clienteEntrega = entrega.clientes
+          const coordsEntrega = clienteEntrega?.coordenadas
 
-    waypoints.push({
-      lat,
-      lng,
-      id: detalle.id,
-      detalleRutaId: detalle.id,
-      pedidoId: detalle.pedido_id,
-      clienteId: cliente.id,
-      nombreCliente: cliente.nombre,
-    })
+          if (!clienteEntrega || !coordsEntrega) continue
+
+          const { lat, lng } = parseCoordinates(coordsEntrega)
+          if (lat === null || lng === null) continue
+
+          waypoints.push({
+            lat,
+            lng,
+            id: entrega.id, // Usar ID de entrega como identificador único
+            detalleRutaId: detalle.id,
+            pedidoId: detalle.pedido_id,
+            clienteId: clienteEntrega.id,
+            nombreCliente: clienteEntrega.nombre,
+          })
+        }
+      }
+    }
   }
 
   if (waypoints.length === 0) {
@@ -103,11 +144,11 @@ export async function generateRutaOptimizada({
   }
   const destination = config.rutas.returnToBase
     ? {
-        lat: homeBase.lat,
-        lng: homeBase.lng,
-        id: 'home-base-destination',
-        nombreCliente: homeBase.nombre,
-      }
+      lat: homeBase.lat,
+      lng: homeBase.lng,
+      id: 'home-base-destination',
+      nombreCliente: homeBase.nombre,
+    }
     : waypoints[waypoints.length - 1]
 
   let ordenVisita: any[] = []
@@ -165,7 +206,7 @@ export async function generateRutaOptimizada({
         fecha: (ruta as any).fecha_ruta,
         zona_id: (ruta as any).zona_id,
         vehiculo_id: (ruta as any).vehiculo_id,
-        estado: 'en_curso',
+        estado: 'planificada',
         orden_visita: ordenVisita,
         polyline,
         distancia_total_km: distanciaTotal,
@@ -367,11 +408,11 @@ export async function generateRutaOptimizadaAvanzada({
   }
   const destination = config.rutas.returnToBase
     ? {
-        lat: homeBase.lat,
-        lng: homeBase.lng,
-        id: 'home-base-destination',
-        nombreCliente: homeBase.nombre,
-      }
+      lat: homeBase.lat,
+      lng: homeBase.lng,
+      id: 'home-base-destination',
+      nombreCliente: homeBase.nombre,
+    }
     : waypoints[waypoints.length - 1]
 
   // Guardar métricas originales para comparación
@@ -413,7 +454,7 @@ export async function generateRutaOptimizadaAvanzada({
 
     if (optimizationResult.success && optimizationResult.routes && optimizationResult.routes.length > 0) {
       const route = optimizationResult.routes[0]
-      
+
       // Mapear resultados a formato esperado
       const ordenVisita = route.shipments.map((shipment, index) => {
         const waypoint = waypoints.find(wp => wp.detalleRutaId === shipment.shipmentId)
@@ -439,11 +480,11 @@ export async function generateRutaOptimizadaAvanzada({
       const duracionTotal = route.totalTime || 0
 
       // Calcular ahorros
-      const ahorroDistancia = distanciaOriginal > 0 
-        ? ((distanciaOriginal - distanciaTotal) / distanciaOriginal) * 100 
+      const ahorroDistancia = distanciaOriginal > 0
+        ? ((distanciaOriginal - distanciaTotal) / distanciaOriginal) * 100
         : 0
-      const ahorroTiempo = tiempoOriginal > 0 
-        ? ((tiempoOriginal - duracionTotal) / tiempoOriginal) * 100 
+      const ahorroTiempo = tiempoOriginal > 0
+        ? ((tiempoOriginal - duracionTotal) / tiempoOriginal) * 100
         : 0
       const ahorroCombustible = distanciaTotal > 0 && distanciaOriginal > 0
         ? (distanciaOriginal - distanciaTotal) * 0.15 * 450 // Estimación: 0.15L/km * $450/L
@@ -497,7 +538,7 @@ export async function generateRutaOptimizadaAvanzada({
 
     if (fleetResult.success && fleetResult.routes && fleetResult.routes.length > 0) {
       const route = fleetResult.routes[0]
-      
+
       // Mapear resultados
       const ordenVisita = route.route
         .filter(r => r.type === 'delivery')
@@ -523,11 +564,11 @@ export async function generateRutaOptimizadaAvanzada({
       const distanciaTotal = route.totalDistance || 0
       const duracionTotal = route.totalTime || 0
 
-      const ahorroDistancia = distanciaOriginal > 0 
-        ? ((distanciaOriginal - distanciaTotal) / distanciaOriginal) * 100 
+      const ahorroDistancia = distanciaOriginal > 0
+        ? ((distanciaOriginal - distanciaTotal) / distanciaOriginal) * 100
         : 0
-      const ahorroTiempo = tiempoOriginal > 0 
-        ? ((tiempoOriginal - duracionTotal) / tiempoOriginal) * 100 
+      const ahorroTiempo = tiempoOriginal > 0
+        ? ((tiempoOriginal - duracionTotal) / tiempoOriginal) * 100
         : 0
       const ahorroCombustible = distanciaTotal > 0 && distanciaOriginal > 0
         ? (distanciaOriginal - distanciaTotal) * 0.15 * 450
@@ -558,11 +599,11 @@ export async function generateRutaOptimizadaAvanzada({
     usarGoogle: true
   })
 
-  const ahorroDistancia = distanciaOriginal > 0 
-    ? ((distanciaOriginal - basicResult.distanciaTotalKm) / distanciaOriginal) * 100 
+  const ahorroDistancia = distanciaOriginal > 0
+    ? ((distanciaOriginal - basicResult.distanciaTotalKm) / distanciaOriginal) * 100
     : 0
-  const ahorroTiempo = tiempoOriginal > 0 
-    ? ((tiempoOriginal - basicResult.duracionTotalMin) / tiempoOriginal) * 100 
+  const ahorroTiempo = tiempoOriginal > 0
+    ? ((tiempoOriginal - basicResult.duracionTotalMin) / tiempoOriginal) * 100
     : 0
   const ahorroCombustible = basicResult.distanciaTotalKm > 0 && distanciaOriginal > 0
     ? (distanciaOriginal - basicResult.distanciaTotalKm) * 0.15 * 450
