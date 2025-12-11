@@ -19,6 +19,7 @@ import { PresupuestosDiaFiltros } from './presupuestos-dia-filtros'
 import { PresupuestosDiaAcciones, PresupuestoIndividualAccion } from '@/components/almacen/PresupuestosDiaAcciones'
 import { TransferenciasDiaCard } from '@/components/almacen/TransferenciasDiaCard'
 import { obtenerTransferenciasDiaAction } from '@/actions/sucursales-transferencias.actions'
+import { PresupuestosDiaRealtime } from '@/components/almacen/PresupuestosDiaRealtime'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 60 // Revalida cada 60 segundos
@@ -367,6 +368,9 @@ async function PresupuestosDiaContent({
 
   return (
     <div className="space-y-6">
+      {/* Componente Realtime que actualiza la página automáticamente */}
+      <PresupuestosDiaRealtime fecha={fecha} zonaId={zonaId} turno={turno} />
+
       {/* Header */}
       <div className="relative overflow-hidden rounded-lg bg-gradient-to-br from-primary/5 via-white to-secondary/5 p-6 shadow-sm border border-primary/10">
         <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-10"></div>

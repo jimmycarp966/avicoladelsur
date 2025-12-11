@@ -56,6 +56,7 @@ import {
   validarLimiteCreditoAction,
 } from '@/actions/ventas-sucursal.actions'
 import { generarTicketTermicoAction } from '@/actions/pos-sucursal.actions'
+import { obtenerTodasListasActivasAction } from '@/actions/listas-precios.actions'
 
 // ===========================================
 // SCHEMAS Y TIPOS
@@ -64,12 +65,13 @@ import { generarTicketTermicoAction } from '@/actions/pos-sucursal.actions'
 const ventaSchema = z.object({
   clienteId: z.string().optional().or(z.literal('none')), // Opcional para venta genérica
   cajaId: z.string().min(1, 'Selecciona una caja'),
-  listaPrecioId: z.string().min(1, 'Selecciona una lista de precios'),
+  listaPrecioGlobal: z.string().uuid().min(1, 'Debes seleccionar una lista de precios global'), // Lista global obligatoria
   tipoComprobante: z.enum(['ticket', 'factura_a', 'factura_b']),
   items: z.array(z.object({
     productoId: z.string().min(1, 'Selecciona un producto'),
     cantidad: z.number().min(0.001, 'Cantidad requerida'),
     precioUnitario: z.number().min(0, 'Precio requerido'),
+    listaPrecioId: z.string().uuid().optional(), // Lista de precio por producto
   })).min(1, 'Agrega al menos un producto'),
   pagos: z.array(z.object({
     metodoPago: z.enum(['efectivo', 'transferencia', 'tarjeta', 'mercado_pago', 'cuenta_corriente']),
@@ -133,6 +135,14 @@ export function NuevaVentaForm({
   const [codigoBarras, setCodigoBarras] = useState('')
   const [cargandoPrecios, setCargandoPrecios] = useState<string | null>(null)
   const [validandoCredito, setValidandoCredito] = useState(false)
+  const [todasListas, setTodasListas] = useState<Array<{
+    id: string
+    codigo: string
+    nombre: string
+    tipo: string
+    margen_ganancia: number | null
+  }>>(listasPrecios || [])
+  const [cargandoListas, setCargandoListas] = useState(false)
   const [saldoCliente, setSaldoCliente] = useState<{
     saldo: number
     limite: number
@@ -145,17 +155,55 @@ export function NuevaVentaForm({
     setMounted(true)
   }, [])
 
+  // Cargar todas las listas activas (si no vienen del servidor o para refrescar)
+  useEffect(() => {
+    // Inicializar con las listas que vienen del servidor
+    if (listasPrecios && listasPrecios.length > 0 && todasListas.length === 0) {
+      const mapped = listasPrecios.map((lista: any) => ({
+        id: lista.id,
+        codigo: lista.codigo,
+        nombre: lista.nombre,
+        tipo: lista.tipo,
+        margen_ganancia: lista.margen_ganancia
+      }))
+      setTodasListas(mapped)
+    }
+    
+    // También cargar desde el servidor para asegurar que están actualizadas
+    const cargarListas = async () => {
+      setCargandoListas(true)
+      const result = await obtenerTodasListasActivasAction()
+      if (result.success && result.data) {
+        setTodasListas(result.data as any)
+      }
+      setCargandoListas(false)
+    }
+    cargarListas()
+  }, [listasPrecios])
+
   const form = useForm<VentaFormData>({
     resolver: zodResolver(ventaSchema),
     defaultValues: {
       clienteId: undefined,
       cajaId: cajas[0]?.id || '',
-      listaPrecioId: listasPrecios[0]?.id || '',
+      listaPrecioGlobal: undefined,
       tipoComprobante: 'ticket',
       items: [],
       pagos: [],
     },
   })
+
+  // Establecer lista mayorista como valor por defecto cuando las listas estén cargadas
+  useEffect(() => {
+    if (todasListas.length > 0 && !form.getValues('listaPrecioGlobal')) {
+      const listaMayorista = todasListas.find((lista: any) => lista.tipo === 'mayorista')
+      if (listaMayorista) {
+        console.log('🎯 Estableciendo lista mayorista por defecto:', listaMayorista.id)
+        form.setValue('listaPrecioGlobal', listaMayorista.id)
+        // No aplicamos la lista aquí porque aún no hay productos en el carrito
+      }
+    }
+  }, [todasListas, form])
 
   const { fields: itemsFields, append: appendItem, remove: removeItem } = useFieldArray({
     control: form.control,
@@ -169,8 +217,8 @@ export function NuevaVentaForm({
 
   const watchedItems = form.watch('items')
   const watchedPagos = form.watch('pagos')
-  const watchedListaPrecio = form.watch('listaPrecioId')
   const watchedCliente = form.watch('clienteId')
+  const watchedListaGlobal = form.watch('listaPrecioGlobal')
 
   // Calcular totales
   const subtotal = watchedItems.reduce((sum, item) => {
@@ -180,37 +228,141 @@ export function NuevaVentaForm({
   const totalPagos = watchedPagos.reduce((sum, pago) => sum + pago.monto, 0)
   const diferencia = subtotal - totalPagos
 
-  // Agregar método de pago
+  // Agregar método de pago adicional (por defecto efectivo, pero se puede cambiar)
   const agregarMetodoPago = useCallback(() => {
     appendPago({
-      metodoPago: 'efectivo',
+      metodoPago: 'efectivo', // Por defecto efectivo, pero el usuario puede cambiarlo
       monto: diferencia > 0 ? diferencia : 0,
     })
   }, [diferencia, appendPago])
 
-  // Actualizar precios cuando cambia la lista
+
+  // Agregar automáticamente método de pago en efectivo cuando se agrega el primer producto
   useEffect(() => {
-    if (watchedListaPrecio && watchedItems.length > 0) {
-      const actualizarPrecios = async () => {
-        setCargandoPrecios('actualizando')
-        for (let i = 0; i < watchedItems.length; i++) {
-          const item = watchedItems[i]
-          if (item.productoId) {
-            try {
-              const result = await obtenerPrecioProductoAction(watchedListaPrecio, item.productoId)
-              if (result.success && result.data) {
-                form.setValue(`items.${i}.precioUnitario`, result.data.precio)
-              }
-            } catch (error) {
-              console.error('Error al actualizar precio:', error)
+    // Si hay productos pero no hay métodos de pago, agregar uno automáticamente
+    if (watchedItems.length > 0 && pagosFields.length === 0) {
+      // Guardar el elemento activo antes de agregar el pago
+      const activeElement = document.activeElement as HTMLElement
+      
+      appendPago({
+        metodoPago: 'efectivo',
+        monto: subtotal > 0 ? subtotal : 0,
+      })
+      
+      // Restaurar el foco al elemento activo después de un pequeño delay
+      setTimeout(() => {
+        if (activeElement && activeElement !== document.body) {
+          activeElement.focus()
+        } else if (barcodeInputRef.current) {
+          // Si no hay elemento activo, enfocar el input de código de barras
+          barcodeInputRef.current.focus()
+        }
+      }, 0)
+    }
+    // Si no hay productos, eliminar todos los métodos de pago
+    else if (watchedItems.length === 0 && pagosFields.length > 0) {
+      // Eliminar todos los pagos
+      for (let i = pagosFields.length - 1; i >= 0; i--) {
+        removePago(i)
+      }
+    }
+  }, [watchedItems.length, pagosFields.length, appendPago, removePago, subtotal])
+
+  // Actualizar el monto del primer método de pago cuando cambia el subtotal (solo si hay un solo método de pago)
+  useEffect(() => {
+    if (watchedItems.length > 0 && pagosFields.length === 1) {
+      const montoActual = form.getValues('pagos.0.monto')
+      // Solo actualizar si el monto es diferente y el total de pagos es igual al subtotal (método único)
+      const totalPagos = watchedPagos.reduce((sum, pago) => sum + pago.monto, 0)
+      if (Math.abs(totalPagos - subtotal) < 0.01 && Math.abs(montoActual - subtotal) > 0.01) {
+        // Guardar el elemento activo antes de actualizar
+        const activeElement = document.activeElement as HTMLElement
+        form.setValue('pagos.0.monto', subtotal > 0 ? subtotal : 0)
+        // Restaurar el foco si estaba en un input de producto (no en campos de pago)
+        setTimeout(() => {
+          if (activeElement && activeElement !== document.body) {
+            // Solo restaurar si no está en un campo de pago
+            if (!activeElement.closest('[name*="pagos"]')) {
+              activeElement.focus()
             }
           }
-        }
-        setCargandoPrecios(null)
+        }, 0)
       }
-      actualizarPrecios()
     }
-  }, [watchedListaPrecio])
+  }, [subtotal, watchedItems.length, pagosFields.length, watchedPagos, form])
+
+  // Actualizar precio cuando cambia la lista de un item específico
+  const actualizarPrecioItem = useCallback(async (index: number, listaPrecioId: string) => {
+    const item = watchedItems[index]
+    if (!item?.productoId || !listaPrecioId) return
+
+    setCargandoPrecios(item.productoId)
+    try {
+      const result = await obtenerPrecioProductoAction(listaPrecioId, item.productoId)
+      if (result.success && result.data) {
+        form.setValue(`items.${index}.precioUnitario`, result.data.precio)
+        form.setValue(`items.${index}.listaPrecioId`, listaPrecioId)
+      }
+    } catch (error) {
+      console.error('Error al actualizar precio:', error)
+    } finally {
+      setCargandoPrecios(null)
+    }
+  }, [watchedItems, form])
+
+  // Aplicar lista global a todos los items que no tengan lista individual
+  // IMPORTANTE: La lista individual siempre tiene prioridad sobre la global
+  const aplicarListaGlobal = useCallback(async (listaGlobalId: string, listaGlobalAnterior?: string) => {
+    // Si no se proporciona el valor anterior, obtenerlo del formulario
+    const listaAnterior = listaGlobalAnterior || form.getValues('listaPrecioGlobal')
+    
+    console.log('🔄 aplicarListaGlobal llamado:', {
+      listaGlobalId,
+      listaAnterior,
+      itemsCount: watchedItems.length,
+      items: watchedItems.map((item, idx) => ({
+        index: idx,
+        productoId: item.productoId,
+        listaPrecioId: item.listaPrecioId,
+        precioUnitario: item.precioUnitario,
+        usaListaAnterior: item.listaPrecioId === listaAnterior,
+        tieneListaIndividual: item.listaPrecioId && item.listaPrecioId !== listaAnterior
+      }))
+    })
+    
+    // Aplicar lista global SOLO a items que no tienen lista individual O que estaban usando la global anterior
+    for (let i = 0; i < watchedItems.length; i++) {
+      const item = watchedItems[i]
+      
+      // Si el item tiene una lista individual diferente a la global anterior, NO la tocamos (prioridad individual)
+      if (item.listaPrecioId && listaAnterior && item.listaPrecioId !== listaAnterior) {
+        // Este item tiene una lista individual diferente, no aplicamos la global (prioridad)
+        console.log(`⏭️ Item ${i} tiene lista individual diferente, omitiendo`)
+        continue
+      }
+      
+      // Si no tiene lista individual O estaba usando la global anterior, aplicar la nueva global
+      if (item.productoId) {
+        console.log(`💰 Actualizando precio item ${i} con lista ${listaGlobalId}`)
+        setCargandoPrecios(item.productoId)
+        try {
+          const result = await obtenerPrecioProductoAction(listaGlobalId, item.productoId)
+          console.log(`📊 Resultado precio item ${i}:`, result)
+          if (result.success && result.data) {
+            console.log(`✅ Actualizando item ${i}: precio ${item.precioUnitario} → ${result.data.precio}`)
+            form.setValue(`items.${i}.precioUnitario`, result.data.precio)
+            form.setValue(`items.${i}.listaPrecioId`, listaGlobalId)
+          } else {
+            console.error(`❌ Error obteniendo precio item ${i}:`, result.error)
+          }
+        } catch (error) {
+          console.error(`❌ Error al actualizar precio item ${i}:`, error)
+        } finally {
+          setCargandoPrecios(null)
+        }
+      }
+    }
+  }, [watchedItems, form, productos])
 
   // Obtener información del cliente cuando se selecciona
   useEffect(() => {
@@ -286,16 +438,27 @@ export function NuevaVentaForm({
       form.setValue(`items.${itemExistente}.cantidad`, cantidadActual + 1)
       toast.success(`${producto.nombre} - Cantidad aumentada`)
     } else {
-      // Obtener precio de la lista actual
+      // Si hay lista global, usarla; sino usar precio_venta por defecto
       let precio = producto.precioVenta
-      if (watchedListaPrecio) {
+      let listaPrecioId = watchedListaGlobal
+
+      if (watchedListaGlobal) {
+        // Intentar obtener precio de la lista global
         try {
-          const result = await obtenerPrecioProductoAction(watchedListaPrecio, producto.id)
+          console.log('🔍 Obteniendo precio para producto agregado:', {
+            productoId: producto.id,
+            productoNombre: producto.nombre,
+            listaGlobalId: watchedListaGlobal,
+            precioBase: producto.precioVenta
+          })
+          const result = await obtenerPrecioProductoAction(watchedListaGlobal, producto.id)
+          console.log('📊 Resultado precio producto agregado:', result)
           if (result.success && result.data) {
             precio = result.data.precio
+            console.log(`✅ Precio actualizado: ${producto.precioVenta} → ${result.data.precio}`)
           }
         } catch (error) {
-          console.error('Error al obtener precio:', error)
+          console.error('❌ Error al obtener precio de lista global:', error)
         }
       }
 
@@ -304,6 +467,7 @@ export function NuevaVentaForm({
         productoId: producto.id,
         cantidad: 1,
         precioUnitario: precio,
+        listaPrecioId: listaPrecioId, // Usar lista global si existe
       })
       toast.success(`${producto.nombre} agregado`)
     }
@@ -312,7 +476,7 @@ export function NuevaVentaForm({
     if (barcodeInputRef.current) {
       barcodeInputRef.current.focus()
     }
-  }, [productos, watchedItems, watchedListaPrecio, form, appendItem])
+  }, [productos, watchedItems, form, appendItem, watchedListaGlobal])
 
   // Agregar producto por búsqueda
   const agregarProducto = useCallback(async (productoId: string) => {
@@ -325,16 +489,27 @@ export function NuevaVentaForm({
       return
     }
 
-    // Obtener precio de la lista
+    // Si hay lista global, usarla; sino usar precio_venta por defecto
     let precio = producto.precioVenta
-    if (watchedListaPrecio) {
+    let listaPrecioId = watchedListaGlobal
+
+    if (watchedListaGlobal) {
+      // Intentar obtener precio de la lista global
       try {
-        const result = await obtenerPrecioProductoAction(watchedListaPrecio, producto.id)
+        console.log('🔍 Obteniendo precio producto agregado (búsqueda):', {
+          productoId: producto.id,
+          productoNombre: producto.nombre,
+          listaGlobalId: watchedListaGlobal,
+          precioBase: producto.precioVenta
+        })
+        const result = await obtenerPrecioProductoAction(watchedListaGlobal, producto.id)
+        console.log('📊 Resultado precio producto agregado (búsqueda):', result)
         if (result.success && result.data) {
           precio = result.data.precio
+          console.log(`✅ Precio actualizado (búsqueda): ${producto.precioVenta} → ${result.data.precio}`)
         }
       } catch (error) {
-        console.error('Error al obtener precio:', error)
+        console.error('❌ Error al obtener precio de lista global:', error)
       }
     }
 
@@ -342,10 +517,11 @@ export function NuevaVentaForm({
       productoId: producto.id,
       cantidad: 1,
       precioUnitario: precio,
+      listaPrecioId: listaPrecioId, // Usar lista global si existe
     })
 
     setBusquedaProducto('')
-  }, [productos, watchedListaPrecio, appendItem])
+  }, [productos, appendItem, watchedListaGlobal])
 
   // Validar crédito antes de enviar
   const validarCredito = async (): Promise<boolean> => {
@@ -418,11 +594,12 @@ export function NuevaVentaForm({
       const result = await registrarVentaSucursalConControlAction({
         sucursalId,
         clienteId: data.clienteId || undefined,
-        listaPrecioId: data.listaPrecioId,
+        listaPrecioId: undefined, // Ya no se usa lista global
         items: data.items.map(item => ({
           productoId: item.productoId,
           cantidad: item.cantidad,
           precioUnitario: item.precioUnitario,
+          listaPrecioId: item.listaPrecioId, // Lista individual por producto
         })),
         cajaId: data.cajaId,
         pago: {
@@ -473,7 +650,6 @@ export function NuevaVentaForm({
         form.reset({
           clienteId: '',
           cajaId: cajas[0]?.id || '',
-          listaPrecioId: listasPrecios[0]?.id || '',
           tipoComprobante: 'ticket',
           items: [],
           pagos: [],
@@ -626,39 +802,6 @@ export function NuevaVentaForm({
             )}
           />
 
-          {/* Lista de precios */}
-          <FormField
-            control={form.control}
-            name="listaPrecioId"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="flex items-center gap-2">
-                  <Tag className="w-4 h-4" />
-                  Lista de Precios
-                </FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar lista" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {listasPrecios.map((lista) => (
-                      <SelectItem key={lista.id} value={lista.id}>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-xs">
-                            {lista.tipo}
-                          </Badge>
-                          {lista.nombre}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
 
           {/* Caja */}
           <FormField
@@ -682,6 +825,65 @@ export function NuevaVentaForm({
                   </SelectContent>
                 </Select>
                 <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Lista de precios global (obligatoria, por defecto para todos los productos) */}
+          <FormField
+            control={form.control}
+            name="listaPrecioGlobal"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Lista de Precios (Global) *</FormLabel>
+                <Select
+                  value={field.value || ''}
+                  onValueChange={async (value) => {
+                    // Guardar el valor anterior ANTES de actualizar el formulario
+                    const listaGlobalAnterior = field.value
+                    console.log('🔄 Cambiando lista global:', {
+                      anterior: listaGlobalAnterior,
+                      nueva: value,
+                      listaAnteriorNombre: todasListas.find(l => l.id === listaGlobalAnterior)?.nombre,
+                      listaNuevaNombre: todasListas.find(l => l.id === value)?.nombre
+                    })
+                    field.onChange(value)
+                    await aplicarListaGlobal(value, listaGlobalAnterior)
+                  }}
+                  disabled={cargandoListas || todasListas.length === 0}
+                >
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder={cargandoListas ? "Cargando listas..." : "Selecciona una lista"} />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {todasListas.map((lista) => (
+                      <SelectItem key={lista.id} value={lista.id}>
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant={
+                              lista.tipo === 'mayorista'
+                                ? 'default'
+                                : lista.tipo === 'minorista'
+                                ? 'secondary'
+                                : 'outline'
+                            }
+                            className="text-xs"
+                          >
+                            {lista.tipo}
+                          </Badge>
+                          {lista.nombre}
+                          {lista.margen_ganancia && ` (${lista.margen_ganancia}% margen)`}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+                <p className="text-xs text-muted-foreground">
+                  Se aplicará a todos los productos que no tengan lista individual. La lista individual siempre tiene prioridad.
+                </p>
               </FormItem>
             )}
           />
@@ -726,80 +928,179 @@ export function NuevaVentaForm({
               <div className="space-y-3">
                 {itemsFields.map((field, index) => {
                   const producto = productos.find(p => p.id === watchedItems[index]?.productoId)
+                  const itemListaId = watchedItems[index]?.listaPrecioId
+                  const listaActual = itemListaId ? todasListas.find(l => l.id === itemListaId) : null
+                  const usaListaGlobal = itemListaId === watchedListaGlobal && watchedListaGlobal !== undefined
+                  
                   return (
                     <div
                       key={field.id}
-                      className="flex items-center gap-4 p-3 border rounded-lg"
+                      className="border rounded-lg p-3 space-y-2"
                     >
-                      <div className="flex-1">
-                        <p className="font-medium">{producto?.nombre || 'Producto'}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {producto?.codigo} • Stock: {producto?.stockDisponible} {producto?.unidadMedida}
-                        </p>
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="font-medium">{producto?.nombre || 'Producto'}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {producto?.codigo} • Stock: {producto?.stockDisponible} {producto?.unidadMedida}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-medium">${watchedItems[index]?.precioUnitario?.toFixed(2) || '0.00'}</p>
+                          <p className="text-xs text-muted-foreground">/ {producto?.unidadMedida}</p>
+                        </div>
                       </div>
 
-                    <FormField
-                      control={form.control}
-                      name={`items.${index}.cantidad`}
-                      render={({ field }) => (
-                        <FormItem className="w-32">
-                          <FormControl>
-                            <Input
-                              type="number"
-                              step="0.001"
-                              min="0.001"
-                              {...field}
-                              value={field.value || ''}
-                              onChange={(e) => {
-                                const val = parseFloat(e.target.value) || 0
-                                field.onChange(val)
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault()
-                                  // Auto-focus siguiente campo o botón cobrar
-                                }
-                              }}
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-
+                      {/* Selector de lista de precio por producto */}
                       <FormField
                         control={form.control}
-                        name={`items.${index}.precioUnitario`}
-                        render={({ field }) => (
-                          <FormItem className="w-32">
-                            <FormControl>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                {...field}
-                                value={field.value || ''}
-                                onChange={(e) => {
-                                  const val = parseFloat(e.target.value) || 0
-                                  field.onChange(val)
+                        name={`items.${index}.listaPrecioId`}
+                        render={({ field }) => {
+                          // Obtener el valor del campo
+                          const currentValue = field.value
+                          // Solo validar si las listas ya se cargaron (no mientras están cargando)
+                          const listasCargadas = !cargandoListas && todasListas.length > 0
+                          // Verificar si el valor existe en todasListas (solo validar si ya se cargaron)
+                          const isValidValue = !currentValue || !listasCargadas || todasListas.some(l => l.id === currentValue)
+                          // Usar el valor actual si es válido, sino 'none'
+                          const displayValue = isValidValue && currentValue ? currentValue : 'none'
+                          
+                          return (
+                            <FormItem>
+                              <FormLabel className="text-xs text-muted-foreground">Lista de precio:</FormLabel>
+                              <Select
+                                value={displayValue}
+                                onValueChange={(listaId) => {
+                                  if (listaId === 'none') {
+                                    // Si se quita la lista individual, usar la lista global (que ahora siempre existe)
+                                    field.onChange(undefined)
+                                    const listaGlobal = watchedListaGlobal
+                                    if (listaGlobal) {
+                                      actualizarPrecioItem(index, listaGlobal)
+                                    }
+                                  } else {
+                                    // Establecer lista individual (tiene prioridad sobre la global)
+                                    field.onChange(listaId)
+                                    actualizarPrecioItem(index, listaId)
+                                  }
                                 }}
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
+                                disabled={cargandoListas}
+                              >
+                                <FormControl>
+                                  <SelectTrigger className="h-8 text-xs">
+                                    <SelectValue placeholder="Sin lista (precio base)" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="none">Sin lista (precio base)</SelectItem>
+                                  {todasListas.map((lista) => (
+                                    <SelectItem key={lista.id} value={lista.id}>
+                                      <div className="flex items-center gap-2">
+                                        <Badge
+                                          variant={
+                                            lista.tipo === 'mayorista'
+                                              ? 'default'
+                                              : lista.tipo === 'minorista'
+                                              ? 'secondary'
+                                              : 'outline'
+                                          }
+                                          className="text-xs"
+                                        >
+                                          {lista.tipo}
+                                        </Badge>
+                                        {lista.nombre}
+                                        {lista.margen_ganancia && ` (${lista.margen_ganancia}%)`}
+                                        {lista.id === watchedListaGlobal && (
+                                          <Badge variant="outline" className="text-xs ml-1">Global</Badge>
+                                        )}
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              {usaListaGlobal && (
+                                <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                                  <Tag className="w-3 h-3" /> Usando lista global
+                                </p>
+                              )}
+                              {listaActual && !usaListaGlobal && (
+                                <p className="text-xs text-muted-foreground">
+                                  Margen: {listaActual.margen_ganancia || 0}%
+                                </p>
+                              )}
+                              <FormMessage />
+                            </FormItem>
+                          )
+                        }}
                       />
 
-                      <div className="w-24 text-right font-medium">
-                        ${((watchedItems[index]?.cantidad || 0) * (watchedItems[index]?.precioUnitario || 0)).toFixed(2)}
-                      </div>
+                      <div className="flex items-center gap-2">
+                        <FormField
+                          control={form.control}
+                          name={`items.${index}.cantidad`}
+                          render={({ field }) => (
+                            <FormItem className="w-32">
+                              <FormLabel className="text-xs">Cantidad</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  step="0.001"
+                                  min="0.001"
+                                  {...field}
+                                  value={field.value || ''}
+                                  onChange={(e) => {
+                                    const val = parseFloat(e.target.value) || 0
+                                    field.onChange(val)
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault()
+                                    }
+                                  }}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
 
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeItem(index)}
-                      >
-                        <Trash2 className="w-4 h-4 text-destructive" />
-                      </Button>
+                        <FormField
+                          control={form.control}
+                          name={`items.${index}.precioUnitario`}
+                          render={({ field }) => (
+                            <FormItem className="w-32">
+                              <FormLabel className="text-xs">Precio</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  {...field}
+                                  value={field.value || ''}
+                                  onChange={(e) => {
+                                    const val = parseFloat(e.target.value) || 0
+                                    field.onChange(val)
+                                  }}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+
+                        <div className="flex-1 text-right">
+                          <p className="text-sm font-medium">
+                            ${((watchedItems[index]?.cantidad || 0) * (watchedItems[index]?.precioUnitario || 0)).toFixed(2)}
+                          </p>
+                        </div>
+
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeItem(index)}
+                          className="mt-6"
+                        >
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      </div>
                     </div>
                   )
                 })}
@@ -838,15 +1139,7 @@ export function NuevaVentaForm({
           <CardContent>
             {pagosFields.length === 0 ? (
               <div className="text-center py-4 text-muted-foreground">
-                <p>No hay métodos de pago agregados</p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="mt-2"
-                  onClick={agregarMetodoPago}
-                >
-                  Agregar Método de Pago
-                </Button>
+                <p>Agrega productos al carrito para generar el método de pago automáticamente</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -863,7 +1156,7 @@ export function NuevaVentaForm({
                           <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue />
+                                <SelectValue placeholder="Método de pago" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
@@ -874,6 +1167,7 @@ export function NuevaVentaForm({
                               <SelectItem value="cuenta_corriente">Cuenta Corriente</SelectItem>
                             </SelectContent>
                           </Select>
+                          <FormMessage />
                         </FormItem>
                       )}
                     />
@@ -991,7 +1285,7 @@ export function NuevaVentaForm({
 
         {/* Advertencias */}
         {watchedCliente && watchedPagos.some(p => p.metodoPago === 'cuenta_corriente') && saldoCliente?.bloqueado && (
-          <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800">
+          <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 mt-4">
             <AlertCircle className="w-5 h-5" />
             <p className="text-sm font-medium">Cliente bloqueado por deuda</p>
           </div>

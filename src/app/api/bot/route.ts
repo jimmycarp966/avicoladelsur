@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import { crearPresupuestoAction } from '@/actions/presupuestos.actions'
 import { crearReclamoBotAction, crearClienteDesdeBotAction } from '@/actions/ventas.actions'
 import { obtenerListasClienteAction, obtenerPrecioProductoAction } from '@/actions/listas-precios.actions'
+import { sendWhatsAppMessage, getWhatsAppProvider, isWhatsAppMetaAvailable } from '@/lib/services/whatsapp-meta'
+import type { MetaListSection } from '@/types/whatsapp-meta'
 
 // Tipos para las llamadas de Botpress
 interface BotpressWebhookPayload {
@@ -980,6 +982,65 @@ function getBaseUrl(): string {
   return 'https://avicoladelsur.vercel.app'
 }
 
+/**
+ * Función auxiliar para enviar mensajes con detección automática de proveedor
+ * Intenta usar botones si Meta está disponible, sino usa texto simple
+ */
+async function sendBotResponse(phoneNumber: string, message: string, options?: {
+  buttons?: Array<{ id: string; title: string }>
+  list?: { buttonText: string; sections: MetaListSection[] }
+  footer?: string
+}): Promise<void> {
+  const provider = getWhatsAppProvider()
+  const useButtons = isWhatsAppMetaAvailable() && (options?.buttons || options?.list)
+
+  if (useButtons && provider === 'meta') {
+    // Usar WhatsApp Meta con botones
+    const result = await sendWhatsAppMessage({
+      to: phoneNumber,
+      text: message,
+      buttons: options?.buttons,
+      list: options?.list,
+      footer: options?.footer,
+    })
+
+    if (!result.success) {
+      console.error('[Bot] Error enviando mensaje con botones, usando fallback:', result.error)
+      // Fallback a texto simple
+      await sendBotResponseText(phoneNumber, message)
+    }
+  } else {
+    // Usar método tradicional (Twilio o texto simple)
+    await sendBotResponseText(phoneNumber, message)
+  }
+}
+
+/**
+ * Envía respuesta de texto simple (Twilio o fallback)
+ */
+async function sendBotResponseText(phoneNumber: string, message: string): Promise<void> {
+  const provider = getWhatsAppProvider()
+
+  // Si es Twilio, la respuesta se envía en el XML de Twilio
+  // Si es Meta sin botones, usar el servicio de Meta
+  if (provider === 'meta') {
+    const result = await sendWhatsAppMessage({
+      to: phoneNumber,
+      text: message,
+    })
+    if (!result.success) {
+      console.error('[Bot] Error enviando mensaje de texto:', result.error)
+    }
+  }
+  // Si es Twilio, el mensaje se retorna en el XML (manejado en el código existente)
+}
+
+// ===========================================
+// CÓDIGO DE TWILIO (MANTENIDO COMO RESPALDO)
+// ===========================================
+// NOTA: Este código se mantiene comentado/activo como respaldo durante la migración gradual
+// Una vez que Meta esté completamente funcional, se puede deshabilitar cambiando WHATSAPP_PROVIDER
+
 // Función para manejar mensajes directos de Twilio
 async function handleTwilioWebhook(formData: FormData) {
   const body = formData.get('Body')?.toString().trim() || ''
@@ -988,7 +1049,7 @@ async function handleTwilioWebhook(formData: FormData) {
   // Extraer el número de teléfono (Twilio envía: whatsapp:+1234567890)
   const phoneNumber = from.replace('whatsapp:', '')
 
-  console.log('Mensaje de Twilio recibido:', { from: phoneNumber, body })
+  console.log('[Bot] Mensaje recibido (Twilio):', { from: phoneNumber, body })
 
   // Buscar cliente para personalizar mensajes
   const cliente = await findClienteByPhone(phoneNumber)
@@ -1064,13 +1125,31 @@ async function handleTwilioWebhook(formData: FormData) {
     }
 
     // Comando: Hola / Ayuda
-    if (bodyLower.includes('hola') || bodyLower.includes('ayuda') || bodyLower.includes('menu') || bodyLower.includes('inicio')) {
+    if (bodyLower.includes('hola') || bodyLower.includes('ayuda') || bodyLower.includes('menu') || bodyLower.includes('inicio') || body === 'btn_menu') {
       const saludo = nombreCliente ? `¡Hola ${nombreCliente}! 👋` : '¡Hola! 👋'
-      responseMessage = `${saludo} Bienvenido a *Avícola del Sur*
+      const menuText = `${saludo} Bienvenido a *Avícola del Sur*
 
 🏡 Tu distribuidor de confianza
 
 🛒 *Menú Principal*
+
+Selecciona una opción:`
+
+      // Si Meta está disponible, usar botones; sino texto
+      if (isWhatsAppMetaAvailable()) {
+        // Enviar mensaje con botones y retornar respuesta vacía (el mensaje ya se envió)
+        await sendBotResponse(phoneNumber, menuText, {
+          buttons: [
+            { id: 'btn_productos', title: '📦 Ver Productos' },
+            { id: 'btn_presupuesto', title: '🛒 Crear Presupuesto' },
+            { id: 'btn_estado', title: '📊 Consultar Estado' },
+          ],
+          footer: 'Escribe *ayuda* para ver este menú',
+        })
+        responseMessage = '' // Ya se envió con botones
+      } else {
+        // Fallback a texto tradicional
+        responseMessage = `${menuText}
 
 1️⃣ Ver productos disponibles
 2️⃣ Crear presupuesto
@@ -1081,9 +1160,65 @@ async function handleTwilioWebhook(formData: FormData) {
 📝 *Responde con el número* de la opción que deseas.
 
 ❓ Escribe *ayuda* en cualquier momento para ver este menú`
+      }
     }
-    // Comando: Opciones del menú numérico
-    else if (body === '1' || bodyLower === 'opcion 1') {
+    // Manejar selección de producto desde lista (prod_CODIGO)
+    else if (body.startsWith('prod_')) {
+      const codigo = body.replace('prod_', '').toUpperCase()
+      responseMessage = `📦 *Producto: ${codigo}*
+
+Para ordenar este producto, escribe:
+*${codigo} [CANTIDAD]*
+
+Ejemplo: *${codigo} 5*`
+    }
+    // Manejar selección de pedido desde lista (pedido_NUMERO)
+    else if (body.startsWith('pedido_')) {
+      const numeroPedido = body.replace('pedido_', '').toUpperCase()
+      const pedido = await getPedidoStatus(numeroPedido)
+
+      if (!pedido) {
+        responseMessage = `❌ Pedido *${numeroPedido}* no encontrado.`
+      } else {
+        const estadosEmoji: Record<string, string> = {
+          pendiente: '⏳',
+          confirmado: '✅',
+          preparando: '📦',
+          enviado: '🚚',
+          entregado: '🎉',
+          cancelado: '❌'
+        }
+
+        const estadosTexto: Record<string, string> = {
+          pendiente: 'Pendiente de confirmación',
+          confirmado: 'Confirmado',
+          preparando: 'En preparación',
+          enviado: 'En camino',
+          entregado: 'Entregado',
+          cancelado: 'Cancelado'
+        }
+
+        const emoji = estadosEmoji[pedido.estado] || '📋'
+        const estadoTexto = estadosTexto[pedido.estado] || pedido.estado
+
+        responseMessage = `${emoji} *Estado de Pedido*
+
+📋 Número: *${pedido.numero_pedido}*
+🔄 Estado: *${estadoTexto}*
+📅 Fecha: ${new Date(pedido.fecha_pedido).toLocaleDateString('es-AR')}
+💰 Total: $${pedido.total}`
+
+        if (pedido.fecha_entrega_estimada) {
+          responseMessage += `\n🚚 Entrega estimada: ${new Date(pedido.fecha_entrega_estimada).toLocaleDateString('es-AR')}`
+        }
+
+        if (pedido.fecha_entrega_real) {
+          responseMessage += `\n✅ Entregado: ${new Date(pedido.fecha_entrega_real).toLocaleDateString('es-AR')}`
+        }
+      }
+    }
+    // Comando: Opciones del menú numérico o botones
+    else if (body === '1' || bodyLower === 'opcion 1' || body === 'btn_productos') {
       // Consultar productos directamente con stock disponible desde la vista
       // Mostrar TODOS los productos activos, incluso sin stock
       const supabase = await createClient()
@@ -1107,40 +1242,131 @@ async function handleTwilioWebhook(formData: FormData) {
       } else {
         const categorias = [...new Set(productos.map(p => p.categoria || 'Otros'))]
 
-        responseMessage = `📦 *Catálogo de Productos*\n\n`
+        if (isWhatsAppMetaAvailable() && categorias.length > 1) {
+          // Usar List Message para navegar por categorías
+          const sections: MetaListSection[] = categorias.map(categoria => ({
+            title: categoria,
+            rows: productos
+              .filter(p => (p.categoria || 'Otros') === categoria)
+              .slice(0, 10) // Máximo 10 por sección
+              .map(p => {
+                const stock = Number(p.stock_disponible) || 0
+                const stockEmoji = stock > 50 ? '🟢' : stock > 20 ? '🟡' : stock > 0 ? '🔴' : '⚪'
+                return {
+                  id: `prod_${p.codigo}`,
+                  title: `${stockEmoji} ${p.nombre}`,
+                  description: `$${p.precio_venta}/${p.unidad_medida} | Stock: ${stock > 0 ? Math.floor(stock) : 'Sin stock'}`,
+                }
+              }),
+          }))
 
-        categorias.forEach(categoria => {
-          responseMessage += `*${categoria}:*\n`
-          productos
-            .filter(p => (p.categoria || 'Otros') === categoria)
-            .forEach((p) => {
-              const stock = Number(p.stock_disponible) || 0
-              const stockEmoji = stock > 50 ? '🟢' : stock > 20 ? '🟡' : stock > 0 ? '🔴' : '⚪'
-              responseMessage += `${stockEmoji} *[${p.codigo}]* ${p.nombre}\n`
-              if (stock > 0) {
-                responseMessage += `   💰 $${p.precio_venta}/${p.unidad_medida} | Stock: ${Math.floor(stock)}\n\n`
-              } else {
-                responseMessage += `   💰 $${p.precio_venta}/${p.unidad_medida} | Stock: Sin stock disponible\n\n`
-              }
-            })
-        })
+          await sendBotResponse(phoneNumber, `📦 *Catálogo de Productos*\n\nSelecciona una categoría para ver productos:`, {
+            list: {
+              buttonText: 'Ver Categorías',
+              sections,
+            },
+            footer: 'Para ordenar: [CODIGO] [CANTIDAD]',
+          })
+          responseMessage = ''
+        } else {
+          // Fallback a texto tradicional
+          responseMessage = `📦 *Catálogo de Productos*\n\n`
 
-        responseMessage += `\n💬 Para ordenar responde:\n*[CODIGO] [CANTIDAD]*\nEj: POLLO001 5`
+          categorias.forEach(categoria => {
+            responseMessage += `*${categoria}:*\n`
+            productos
+              .filter(p => (p.categoria || 'Otros') === categoria)
+              .forEach((p) => {
+                const stock = Number(p.stock_disponible) || 0
+                const stockEmoji = stock > 50 ? '🟢' : stock > 20 ? '🟡' : stock > 0 ? '🔴' : '⚪'
+                responseMessage += `${stockEmoji} *[${p.codigo}]* ${p.nombre}\n`
+                if (stock > 0) {
+                  responseMessage += `   💰 $${p.precio_venta}/${p.unidad_medida} | Stock: ${Math.floor(stock)}\n\n`
+                } else {
+                  responseMessage += `   💰 $${p.precio_venta}/${p.unidad_medida} | Stock: Sin stock disponible\n\n`
+                }
+              })
+          })
+
+          responseMessage += `\n💬 Para ordenar responde:\n*[CODIGO] [CANTIDAD]*\nEj: POLLO001 5`
+        }
       }
     }
-    else if (body === '2' || bodyLower === 'opcion 2') {
-      responseMessage = `🛒 *Crear Presupuesto*
+    else if (body === '2' || bodyLower === 'opcion 2' || body === 'btn_presupuesto') {
+      const presupuestoText = `🛒 *Crear Presupuesto*
 
 Para crear un presupuesto escribe:
 *[CODIGO] [CANTIDAD]*
 
 Ejemplo:
-*POLLO001 5*
+*POLLO001 5*`
+
+      if (isWhatsAppMetaAvailable()) {
+        await sendBotResponse(phoneNumber, presupuestoText, {
+          buttons: [
+            { id: 'btn_productos', title: '📦 Ver Productos' },
+            { id: 'btn_menu', title: '🏠 Menú Principal' },
+          ],
+          footer: 'Escribe *1* o *productos* para ver el catálogo',
+        })
+        responseMessage = ''
+      } else {
+        responseMessage = `${presupuestoText}
 
 Para ver los productos disponibles, escribe *1* o *productos*`
+      }
     }
-    else if (body === '3' || bodyLower === 'opcion 3') {
-      responseMessage = '🚧 Consulta de pedidos en desarrollo.\n\nPronto podrás consultar el estado de tus pedidos.'
+    else if (body === '3' || bodyLower === 'opcion 3' || body === 'btn_estado') {
+      const cliente = await findClienteByPhone(phoneNumber)
+      if (!cliente) {
+        responseMessage = '❌ No encontramos tu cuenta. Comunícate con un asesor.'
+      } else {
+        // Obtener pedidos del cliente
+        const supabase = await createClient()
+        const { data: pedidos } = await supabase
+          .from('pedidos')
+          .select('numero_pedido, estado, fecha_pedido, total')
+          .eq('cliente_id', cliente.id)
+          .order('fecha_pedido', { ascending: false })
+          .limit(5)
+
+        if (!pedidos || pedidos.length === 0) {
+          responseMessage = '📊 No tienes pedidos registrados.\n\nCrea tu primer presupuesto escribiendo el código y cantidad.'
+        } else {
+          let estadoText = `📊 *Estado de tus Pedidos*\n\n`
+          pedidos.forEach((p, idx) => {
+            const estadoEmoji = p.estado === 'entregado' ? '✅' : p.estado === 'enviado' ? '🚛' : p.estado === 'confirmado' ? '⏳' : '📋'
+            estadoText += `${estadoEmoji} *${p.numero_pedido}*\n`
+            estadoText += `   Estado: ${p.estado}\n`
+            estadoText += `   Fecha: ${new Date(p.fecha_pedido).toLocaleDateString('es-AR')}\n`
+            estadoText += `   Total: $${Number(p.total).toFixed(2)}\n\n`
+          })
+
+          if (isWhatsAppMetaAvailable() && pedidos.length > 0) {
+            // Crear lista con pedidos
+            const sections: MetaListSection[] = [{
+              title: 'Tus Pedidos',
+              rows: pedidos.slice(0, 10).map(p => ({
+                id: `pedido_${p.numero_pedido}`,
+                title: `${p.numero_pedido}`,
+                description: `${p.estado} - $${Number(p.total).toFixed(2)}`,
+              })),
+            }]
+
+            await sendBotResponse(phoneNumber, estadoText, {
+              list: {
+                buttonText: 'Ver Detalles',
+                sections,
+              },
+              footer: 'Selecciona un pedido para ver detalles',
+            })
+            responseMessage = ''
+          } else {
+            estadoText += `💬 Para ver detalles de un pedido, escribe:\n*estado [NUMERO_PEDIDO]*\nEj: estado PED-20250101-000001`
+            responseMessage = estadoText
+          }
+        }
+      }
     }
     else if (body === '4' || bodyLower === 'opcion 4') {
       const cliente = await findClienteByPhone(phoneNumber)
@@ -1166,8 +1392,8 @@ Para ver los productos disponibles, escribe *1* o *productos*`
         }
       }
     }
-    // Confirmación de pedido
-    else if (bodyLower === 'si' || bodyLower === 'sí' || bodyLower === 'confirmar' || bodyLower === 'confirmo') {
+    // Confirmación de pedido (acepta respuestas de botones también)
+    else if (bodyLower === 'si' || bodyLower === 'sí' || bodyLower === 'confirmar' || bodyLower === 'confirmo' || body === 'btn_confirmar_si') {
       const pending = pendingConfirmations.get(phoneNumber)
 
       if (!pending) {
@@ -1288,8 +1514,8 @@ ${detalleProductos}
         }
       }
     }
-    // Cancelar pedido
-    else if (bodyLower === 'no' || bodyLower === 'cancelar') {
+    // Cancelar pedido (acepta respuestas de botones también)
+    else if (bodyLower === 'no' || bodyLower === 'cancelar' || body === 'btn_confirmar_no') {
       if (pendingConfirmations.has(phoneNumber)) {
         pendingConfirmations.delete(phoneNumber)
         responseMessage = '❌ Pedido cancelado.\n\nEscribe *menu* para volver a empezar.'
@@ -1391,12 +1617,24 @@ POLLO003 3*`
               timestamp: Date.now()
             })
 
-            responseMessage = `📦 *Resumen de tu pedido:*\n\n`
+            const resumenText = `📦 *Resumen de tu pedido:*\n\n`
+            let resumenDetalle = ''
             productos.forEach(p => {
-              responseMessage += `• ${p.nombre}: ${p.cantidad} ${p.unidad}\n  $${p.precio} x ${p.cantidad} = $${(p.precio * p.cantidad).toFixed(2)}\n\n`
+              resumenDetalle += `• ${p.nombre}: ${p.cantidad} ${p.unidad}\n  $${p.precio} x ${p.cantidad} = $${(p.precio * p.cantidad).toFixed(2)}\n\n`
             })
-            responseMessage += `💰 *Total: $${totalPreview.toFixed(2)}*\n\n`
-            responseMessage += `¿Confirmas este pedido?\n\nResponde *SÍ* para confirmar o *NO* para cancelar.`
+            resumenDetalle += `💰 *Total: $${totalPreview.toFixed(2)}*`
+
+            if (isWhatsAppMetaAvailable()) {
+              await sendBotResponse(phoneNumber, `${resumenText}${resumenDetalle}\n\n¿Confirmas este pedido?`, {
+                buttons: [
+                  { id: 'btn_confirmar_si', title: '✅ Sí, Confirmar' },
+                  { id: 'btn_confirmar_no', title: '❌ No, Cancelar' },
+                ],
+              })
+              responseMessage = ''
+            } else {
+              responseMessage = `${resumenText}${resumenDetalle}\n\n¿Confirmas este pedido?\n\nResponde *SÍ* para confirmar o *NO* para cancelar.`
+            }
           }
         }
       }
@@ -1457,16 +1695,28 @@ POLLO003 3*`
             })
 
             const total = cantidad * producto!.precio_venta
-            responseMessage = `📦 *Resumen de tu pedido:*
+            const resumenText = `📦 *Resumen de tu pedido:*
 
 • ${producto!.nombre}
   ${cantidad} ${producto!.unidad_medida} x $${producto!.precio_venta}
   
-💰 *Total: $${total.toFixed(2)}*
+💰 *Total: $${total.toFixed(2)}*`
+
+            if (isWhatsAppMetaAvailable()) {
+              await sendBotResponse(phoneNumber, `${resumenText}\n\n¿Confirmas este pedido?`, {
+                buttons: [
+                  { id: 'btn_confirmar_si', title: '✅ Sí, Confirmar' },
+                  { id: 'btn_confirmar_no', title: '❌ No, Cancelar' },
+                ],
+              })
+              responseMessage = ''
+            } else {
+              responseMessage = `${resumenText}
 
 ¿Confirmas este pedido?
 
 Responde *SÍ* para confirmar o *NO* para cancelar.`
+            }
           }
         }
       }
@@ -1857,11 +2107,26 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
     }
 
   } catch (error: any) {
-    console.error('Error procesando mensaje:', error)
+    console.error('[Bot] Error procesando mensaje:', error)
     responseMessage = 'Error al procesar tu mensaje. Intenta de nuevo.'
   }
 
-  // Responder con TwiML
+  // Determinar proveedor y enviar respuesta apropiadamente
+  const provider = getWhatsAppProvider()
+
+  // Si el mensaje ya se envió con botones (responseMessage vacío), solo retornar OK
+  if (!responseMessage && provider === 'meta') {
+    return new NextResponse('OK', { status: 200 })
+  }
+
+  // Si es Meta pero aún hay mensaje de texto, enviarlo
+  if (provider === 'meta' && responseMessage) {
+    await sendBotResponseText(phoneNumber, responseMessage)
+    return new NextResponse('OK', { status: 200 })
+  }
+
+  // Si es Twilio, retornar XML tradicional
+  // NOTA: Este código se mantiene como respaldo durante la migración gradual
   return new Response(
     `<?xml version="1.0" encoding="UTF-8"?>
 <Response>

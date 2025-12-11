@@ -5,9 +5,9 @@ import { PedidoFormSkeleton } from '@/app/(admin)/(dominios)/almacen/pedidos/nue
 // import { getPedidoById } from '@/actions/ventas.actions' // TODO: Implementar cuando esté disponible
 
 interface EditarPedidoPageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 export const dynamic = 'force-dynamic'

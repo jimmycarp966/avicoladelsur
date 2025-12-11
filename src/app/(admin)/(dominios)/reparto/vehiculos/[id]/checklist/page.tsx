@@ -14,9 +14,9 @@ export const metadata = {
 }
 
 interface ChecklistPageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 async function ChecklistContent({ vehiculoId }: { vehiculoId: string }) {

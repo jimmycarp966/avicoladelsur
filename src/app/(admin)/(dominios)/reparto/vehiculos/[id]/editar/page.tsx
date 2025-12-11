@@ -8,9 +8,9 @@ import { obtenerVehiculoPorIdAction } from '@/actions/reparto.actions'
 import { Loader2 } from 'lucide-react'
 
 interface EditarVehiculoPageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 export const dynamic = 'force-dynamic'

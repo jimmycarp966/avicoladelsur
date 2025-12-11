@@ -12,6 +12,7 @@ export interface ItemVentaSucursal {
   productoId: string
   cantidad: number
   precioUnitario?: number
+  listaPrecioId?: string // Lista de precio por producto
 }
 
 export interface PagoMetodo {
@@ -22,7 +23,7 @@ export interface PagoMetodo {
 export interface RegistrarVentaSucursalParams {
   sucursalId: string
   clienteId?: string // Opcional para venta genérica
-  listaPrecioId: string
+  listaPrecioId?: string // Opcional, solo para compatibilidad (ya no se usa globalmente)
   items: ItemVentaSucursal[]
   cajaId?: string // Opcional
   pago?: {
@@ -120,11 +121,12 @@ export async function registrarVentaSucursalConControlAction(
       return { success: false, error: 'Usuario no encontrado en el sistema' }
     }
 
-    // Preparar items para la función RPC
+    // Preparar items para la función RPC (incluyendo lista_precio_id por item)
     const itemsJson = params.items.map(item => ({
       producto_id: item.productoId,
       cantidad: item.cantidad,
-      precio_unitario: item.precioUnitario
+      precio_unitario: item.precioUnitario,
+      lista_precio_id: item.listaPrecioId || params.listaPrecioId || null // Usar lista individual o global (compatibilidad)
     }))
 
     // Preparar pagos (soporte para multipago)
@@ -155,7 +157,7 @@ export async function registrarVentaSucursalConControlAction(
       p_sucursal_id: params.sucursalId,
       p_cliente_id: params.clienteId || null, // Puede ser NULL
       p_usuario_id: userData.id,
-      p_lista_precio_id: params.listaPrecioId,
+      p_lista_precio_id: params.listaPrecioId || null, // Opcional, ya no se usa globalmente
       p_items: itemsJson,
       p_pago: pagoJson,
       p_caja_id: params.cajaId || null

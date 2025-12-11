@@ -8,9 +8,9 @@ import { createClient } from '@/lib/supabase/server'
 export const dynamic = 'force-dynamic'
 
 interface SeguimientoPageProps {
-  params: {
+  params: Promise<{
     numero: string
-  }
+  }>
 }
 
 async function SeguimientoContent({ numero }: { numero: string }) {
@@ -304,6 +304,7 @@ async function SeguimientoContent({ numero }: { numero: string }) {
 }
 
 export default async function SeguimientoPage({ params }: SeguimientoPageProps) {
+  const { numero } = await params
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center">
@@ -313,7 +314,7 @@ export default async function SeguimientoPage({ params }: SeguimientoPageProps) 
         </div>
       </div>
     }>
-      <SeguimientoContent numero={params.numero} />
+      <SeguimientoContent numero={numero} />
     </Suspense>
   )
 }

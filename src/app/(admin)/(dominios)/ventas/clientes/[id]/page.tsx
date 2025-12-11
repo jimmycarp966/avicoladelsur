@@ -9,9 +9,9 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { obtenerClientePorIdAction } from '@/actions/ventas.actions'
 
 interface ClienteDetallePageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 export const dynamic = 'force-dynamic'

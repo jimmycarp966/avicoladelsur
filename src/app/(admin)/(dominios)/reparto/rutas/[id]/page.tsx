@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import RutaMap from '@/components/reparto/RutaMap'
 import { iniciarRutaAction, finalizarRutaAction } from '@/actions/reparto.actions'
+import { RutaDetalleRealtime } from '@/components/reparto/RutaDetalleRealtime'
 
 export const dynamic = 'force-dynamic'
 

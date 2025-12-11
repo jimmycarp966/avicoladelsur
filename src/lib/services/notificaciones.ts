@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { sendWhatsAppMessage, isWhatsAppMetaAvailable } from '@/lib/services/whatsapp-meta'
 
 /**
  * Envía notificación de estado por WhatsApp al cliente
@@ -109,18 +110,71 @@ Disculpá las molestias. Podés hacer un nuevo pedido cuando quieras.`
                 break
         }
 
-        // Aquí iría la integración con Twilio API para enviar el mensaje
-        // Por ahora solo registramos en logs
-        console.log(`[WhatsApp Notification] To: ${cliente.whatsapp}, Message: ${mensaje}`)
+        // Enviar notificación usando WhatsApp Meta o Twilio según configuración
+        const useButtons = isWhatsAppMetaAvailable()
 
-        // TODO: Integrar con Twilio WhatsApp API
-        // const twilioResponse = await fetch('https://api.twilio.com/2010-04-01/Accounts/...', {
-        //   method: 'POST',
-        //   headers: { ... },
-        //   body: { ... }
-        // })
+        let buttons: Array<{ id: string; title: string }> | undefined
+        let footer: string | undefined
 
-        return { success: true, message: 'Notificación enviada (pendiente integración Twilio)' }
+        // Agregar botones según el tipo de notificación
+        switch (tipo) {
+          case 'presupuesto_creado':
+            if (useButtons) {
+              buttons = [
+                { id: `ver_presupuesto_${data.numero}`, title: '📋 Ver Detalles' },
+                { id: 'btn_menu', title: '🏠 Menú Principal' },
+              ]
+              footer = 'Selecciona una opción'
+            }
+            break
+          case 'pedido_confirmado':
+            if (useButtons) {
+              buttons = [
+                { id: `rastrear_pedido_${data.numero}`, title: '🚛 Rastrear Pedido' },
+                { id: 'btn_menu', title: '🏠 Menú Principal' },
+              ]
+              footer = 'Te avisaremos cuando salga para entrega'
+            }
+            break
+          case 'en_camino':
+            if (useButtons) {
+              buttons = [
+                { id: `rastrear_pedido_${data.numero}`, title: '📍 Ver Ubicación' },
+                { id: 'btn_menu', title: '🏠 Menú Principal' },
+              ]
+              footer = 'Estimamos llegar en las próximas horas'
+            }
+            break
+          case 'entregado':
+            if (useButtons) {
+              buttons = [
+                { id: `calificar_entrega_${data.numero}`, title: '⭐ Calificar' },
+                { id: 'btn_menu', title: '🏠 Menú Principal' },
+              ]
+              footer = '¿Todo OK? Escribinos si tenés alguna consulta'
+            }
+            break
+        }
+
+        // Enviar mensaje con botones si están disponibles
+        const result = await sendWhatsAppMessage({
+          to: cliente.whatsapp,
+          text: mensaje,
+          buttons,
+          footer,
+        })
+
+        if (result.success) {
+          console.log(`[WhatsApp Notification] Enviada exitosamente a ${cliente.whatsapp}, Tipo: ${tipo}`)
+          
+          // Registrar notificación en BD
+          await registrarNotificacion(clienteId, tipo, mensaje, data.numero)
+
+          return { success: true, message: 'Notificación enviada exitosamente', messageId: result.messageId }
+        } else {
+          console.error(`[WhatsApp Notification] Error enviando a ${cliente.whatsapp}:`, result.error)
+          return { success: false, error: result.error || 'Error enviando notificación' }
+        }
     } catch (error: any) {
         console.error('Error enviando notificación WhatsApp:', error)
         return { success: false, error: error.message }

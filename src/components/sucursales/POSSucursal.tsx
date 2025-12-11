@@ -76,6 +76,7 @@ interface ItemCarrito {
   cantidad: number
   precioUnitario: number
   subtotal: number
+  listaPrecioId?: string // Lista de precio individual por producto
 }
 
 interface POSSucursalProps {
@@ -100,7 +101,6 @@ export function POSSucursal({
   // Estado
   const [busquedaProducto, setBusquedaProducto] = useState('')
   const [clienteSeleccionado, setClienteSeleccionado] = useState<string>('')
-  const [listaPrecioSeleccionada, setListaPrecioSeleccionada] = useState<string>('')
   const [carrito, setCarrito] = useState<ItemCarrito[]>([])
   const [cantidadInput, setCantidadInput] = useState<Record<string, string>>({})
   const [cargandoPrecio, setCargandoPrecio] = useState<string | null>(null)
@@ -113,17 +113,15 @@ export function POSSucursal({
       p.codigo.toLowerCase().includes(busquedaProducto.toLowerCase())
   )
 
-  // Lista de precio seleccionada
-  const listaActual = listasPrecio.find((l) => l.id === listaPrecioSeleccionada)
 
   // Totales
   const totalCarrito = carrito.reduce((sum, item) => sum + item.subtotal, 0)
   const cantidadTotalKg = carrito.reduce((sum, item) => sum + item.cantidad, 0)
 
-  // Obtener precio cuando cambia la lista
+  // Obtener precio de un producto con una lista específica
   const obtenerPrecioProducto = useCallback(
-    async (productoId: string): Promise<number> => {
-      if (!listaPrecioSeleccionada) {
+    async (productoId: string, listaPrecioId?: string): Promise<number> => {
+      if (!listaPrecioId) {
         const producto = productos.find((p) => p.id === productoId)
         return producto?.precioVenta || 0
       }
@@ -131,7 +129,7 @@ export function POSSucursal({
       setCargandoPrecio(productoId)
       try {
         const result = await obtenerPrecioProductoAction(
-          listaPrecioSeleccionada,
+          listaPrecioId,
           productoId
         )
         if (result.success && result.data) {
@@ -146,30 +144,32 @@ export function POSSucursal({
       const producto = productos.find((p) => p.id === productoId)
       return producto?.precioVenta || 0
     },
-    [listaPrecioSeleccionada, productos]
+    [productos]
   )
 
-  // Actualizar precios cuando cambia la lista
-  useEffect(() => {
-    if (carrito.length > 0 && listaPrecioSeleccionada) {
-      const actualizarPrecios = async () => {
-        const carritoActualizado = await Promise.all(
-          carrito.map(async (item) => {
-            const nuevoPrecio = await obtenerPrecioProducto(item.productoId)
-            return {
-              ...item,
-              precioUnitario: nuevoPrecio,
-              subtotal: item.cantidad * nuevoPrecio,
-            }
-          })
-        )
-        setCarrito(carritoActualizado)
-      }
-      actualizarPrecios()
-    }
-  }, [listaPrecioSeleccionada])
+  // Actualizar precio cuando cambia la lista de un item específico
+  const actualizarPrecioItem = useCallback(async (productoId: string, listaPrecioId: string) => {
+    const item = carrito.find((i) => i.productoId === productoId)
+    if (!item) return
 
-  // Agregar producto al carrito
+    // Si listaPrecioId es vacío o 'none', usar undefined para precio base
+    const listaIdParaPrecio = listaPrecioId === '' || listaPrecioId === 'none' ? undefined : listaPrecioId
+    const nuevoPrecio = await obtenerPrecioProducto(productoId, listaIdParaPrecio)
+    setCarrito(
+      carrito.map((i) =>
+        i.productoId === productoId
+          ? {
+              ...i,
+              listaPrecioId: listaIdParaPrecio, // undefined si no hay lista
+              precioUnitario: nuevoPrecio,
+              subtotal: i.cantidad * nuevoPrecio,
+            }
+          : i
+      )
+    )
+  }, [carrito, obtenerPrecioProducto])
+
+  // Agregar producto al carrito (sin lista, se puede seleccionar después)
   const agregarAlCarrito = async (producto: Producto) => {
     const cantidadStr = cantidadInput[producto.id] || '1'
     const cantidad = parseFloat(cantidadStr)
@@ -193,7 +193,8 @@ export function POSSucursal({
       return
     }
 
-    const precioUnitario = await obtenerPrecioProducto(producto.id)
+    // Usar precio_venta por defecto (sin lista)
+    const precioUnitario = producto.precioVenta
 
     if (existente) {
       setCarrito(
@@ -202,7 +203,7 @@ export function POSSucursal({
             ? {
                 ...item,
                 cantidad: cantidadTotal,
-                subtotal: cantidadTotal * precioUnitario,
+                subtotal: cantidadTotal * (item.listaPrecioId ? item.precioUnitario : precioUnitario),
               }
             : item
         )
@@ -216,6 +217,7 @@ export function POSSucursal({
           cantidad,
           precioUnitario,
           subtotal: cantidad * precioUnitario,
+          // Sin listaPrecioId inicial, se puede seleccionar después
         },
       ])
     }
@@ -265,11 +267,6 @@ export function POSSucursal({
       return
     }
 
-    if (!listaPrecioSeleccionada) {
-      toast.error('Selecciona una lista de precios')
-      return
-    }
-
     if (carrito.length === 0) {
       toast.error('El carrito está vacío')
       return
@@ -281,11 +278,12 @@ export function POSSucursal({
       const result = await registrarVentaSucursalConControlAction({
         sucursalId,
         clienteId: clienteSeleccionado,
-        listaPrecioId: listaPrecioSeleccionada,
+        listaPrecioId: undefined, // Ya no se usa lista global
         items: carrito.map((item) => ({
           productoId: item.productoId,
           cantidad: item.cantidad,
           precioUnitario: item.precioUnitario,
+          listaPrecioId: item.listaPrecioId, // Lista individual por producto
         })),
         pago: {
           pagos: [{
@@ -346,37 +344,6 @@ export function POSSucursal({
                   onChange={(e) => setBusquedaProducto(e.target.value)}
                   className="w-full"
                 />
-              </div>
-              <div className="w-64">
-                <Select
-                  value={listaPrecioSeleccionada}
-                  onValueChange={setListaPrecioSeleccionada}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Lista de precios" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {listasPrecio.map((lista) => (
-                      <SelectItem key={lista.id} value={lista.id}>
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            variant={
-                              lista.tipo === 'mayorista'
-                                ? 'default'
-                                : lista.tipo === 'minorista'
-                                ? 'secondary'
-                                : 'outline'
-                            }
-                            className="text-xs"
-                          >
-                            {lista.tipo}
-                          </Badge>
-                          {lista.nombre}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
             </div>
           </CardContent>
@@ -505,25 +472,6 @@ export function POSSucursal({
           </CardContent>
         </Card>
 
-        {/* Lista de precio activa */}
-        {listaActual && (
-          <Card className="border-primary/50">
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-3">
-                <Tag className="w-5 h-5 text-primary" />
-                <div>
-                  <p className="font-medium">{listaActual.nombre}</p>
-                  <p className="text-sm text-muted-foreground">
-                    Tipo: {listaActual.tipo}
-                    {listaActual.margenGanancia && (
-                      <> • Margen: {listaActual.margenGanancia}%</>
-                    )}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Carrito */}
         <Card>
@@ -543,64 +491,119 @@ export function POSSucursal({
                 <p>El carrito está vacío</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {carrito.map((item) => (
-                  <div
-                    key={item.productoId}
-                    className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">
-                        {item.producto.nombre}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        ${item.precioUnitario.toFixed(2)} x {item.cantidad.toFixed(2)}{' '}
-                        {item.producto.unidadMedida}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        className="h-7 w-7"
-                        onClick={() =>
-                          actualizarCantidad(item.productoId, item.cantidad - 0.5)
-                        }
+              <div>
+                <div className="space-y-3">
+                  {carrito.map((item) => {
+                    const listaActual = item.listaPrecioId ? listasPrecio.find((l) => l.id === item.listaPrecioId) : null
+                    
+                    return (
+                      <div
+                        key={item.productoId}
+                        className="border rounded-lg p-3 space-y-2"
                       >
-                        <Minus className="w-3 h-3" />
-                      </Button>
-                      <span className="w-12 text-center text-sm font-medium">
-                        {item.cantidad.toFixed(2)}
-                      </span>
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        className="h-7 w-7"
-                        onClick={() =>
-                          actualizarCantidad(item.productoId, item.cantidad + 0.5)
-                        }
-                      >
-                        <Plus className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-7 w-7 text-destructive"
-                        onClick={() => eliminarDelCarrito(item.productoId)}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
-                    <div className="w-20 text-right font-medium">
-                      ${item.subtotal.toFixed(2)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                        <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">
+                            {item.producto.nombre}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {item.producto.codigo}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-medium text-sm">
+                            ${item.precioUnitario.toFixed(2)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            / {item.producto.unidadMedida}
+                          </p>
+                        </div>
+                        </div>
+                        {/* Selector de lista de precio por producto */}
+                        <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Lista de precio:</Label>
+                        <Select
+                          value={item.listaPrecioId || 'none'}
+                          onValueChange={(listaId) => {
+                            actualizarPrecioItem(item.productoId, listaId)
+                          }}
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="Sin lista (precio base)" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Sin lista (precio base)</SelectItem>
+                            {listasPrecio.map((lista) => (
+                              <SelectItem key={lista.id} value={lista.id}>
+                                <div className="flex items-center gap-2">
+                                  <Badge
+                                    variant={
+                                      lista.tipo === 'mayorista'
+                                        ? 'default'
+                                        : lista.tipo === 'minorista'
+                                        ? 'secondary'
+                                        : 'outline'
+                                    }
+                                    className="text-xs"
+                                  >
+                                    {lista.tipo}
+                                  </Badge>
+                                  {lista.nombre}
+                                  {lista.margenGanancia && ` (${lista.margenGanancia}%)`}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {listaActual && (
+                          <p className="text-xs text-muted-foreground">
+                            Margen: {listaActual.margenGanancia || 0}%
+                          </p>
+                        )}
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1">
+                          <Button
+                          size="icon"
+                          variant="outline"
+                          className="h-7 w-7"
+                          onClick={() =>
+                            actualizarCantidad(item.productoId, item.cantidad - 0.5)
+                          }
+                        >
+                          <Minus className="w-3 h-3" />
+                        </Button>
+                        <span className="w-12 text-center text-sm font-medium">
+                          {item.cantidad.toFixed(2)}
+                        </span>
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          className="h-7 w-7"
+                          onClick={() =>
+                            actualizarCantidad(item.productoId, item.cantidad + 0.5)
+                          }
+                        >
+                          <Plus className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-destructive"
+                          onClick={() => eliminarDelCarrito(item.productoId)}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                          </div>
+                        </div>
+                        <div className="w-20 text-right font-medium">
+                          ${item.subtotal.toFixed(2)}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
 
-            {carrito.length > 0 && (
-              <>
                 <Separator className="my-4" />
 
                 {/* Resumen */}
@@ -633,8 +636,7 @@ export function POSSucursal({
                   onClick={procesarVenta}
                   disabled={
                     procesandoVenta ||
-                    !clienteSeleccionado ||
-                    !listaPrecioSeleccionada
+                    !clienteSeleccionado
                   }
                 >
                   {procesandoVenta ? (
@@ -657,13 +659,7 @@ export function POSSucursal({
                     Selecciona un cliente para continuar
                   </p>
                 )}
-                {!listaPrecioSeleccionada && (
-                  <p className="text-xs text-amber-600 flex items-center gap-1 mt-1">
-                    <AlertCircle className="w-3 h-3" />
-                    Selecciona una lista de precios
-                  </p>
-                )}
-              </>
+              </div>
             )}
           </CardContent>
         </Card>

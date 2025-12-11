@@ -14,9 +14,9 @@ export const metadata = {
 }
 
 interface MantenimientoPageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 async function MantenimientoContent({ vehiculoId }: { vehiculoId: string }) {

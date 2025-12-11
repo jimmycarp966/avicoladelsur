@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { PedidosTableSkeleton } from './pedidos-table-skeleton'
 import { PedidosTableWrapper } from './pedidos-table-wrapper'
+import { PedidosRealtime } from '@/components/almacen/PedidosRealtime'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 300 // Revalida cada 5 minutos
@@ -17,6 +18,9 @@ export const metadata = {
 export default function PedidosPage() {
   return (
     <div className="space-y-6">
+      {/* Componente Realtime que actualiza la página automáticamente */}
+      <PedidosRealtime />
+
       {/* Header - Estilo limpio y profesional */}
       <div className="bg-white rounded-lg border border-border p-6 shadow-sm">
         <div className="flex items-center justify-between">

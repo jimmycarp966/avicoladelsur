@@ -445,3 +445,7 @@ CREATE TRIGGER trg_evaluar_stock_bajo
 
 COMMIT;
 
+
+
+
+

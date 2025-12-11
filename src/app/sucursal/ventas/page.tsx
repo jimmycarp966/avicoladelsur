@@ -384,15 +384,18 @@ async function getVentasData(sidParam?: string) {
       codigo: c.codigo || ''
     })),
     cajas: cajas || [] as Caja[],
-    listasPrecios: (listasPrecios || []).filter(lista => {
-      // Filtrar por vigencia si está activada
-      if (lista.vigencia_activa) {
-        const desdeValida = !lista.fecha_vigencia_desde || lista.fecha_vigencia_desde <= hoy
-        const hastaValida = !lista.fecha_vigencia_hasta || lista.fecha_vigencia_hasta >= hoy
-        return desdeValida && hastaValida
-      }
-      return true
-    }),
+    listasPrecios: (() => {
+      const filtered = (listasPrecios || []).filter(lista => {
+        // Filtrar por vigencia si está activada
+        if (lista.vigencia_activa) {
+          const desdeValida = !lista.fecha_vigencia_desde || lista.fecha_vigencia_desde <= hoy
+          const hastaValida = !lista.fecha_vigencia_hasta || lista.fecha_vigencia_hasta >= hoy
+          return desdeValida && hastaValida
+        }
+        return true
+      })
+      return filtered
+    })(),
     estadisticas,
     sucursalId: sucursalIdFinal,
     esAdmin,

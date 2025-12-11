@@ -5,9 +5,9 @@ import { ProductoFormSkeleton } from '@/app/(admin)/(dominios)/almacen/productos
 import { obtenerProductoPorIdAction } from '@/actions/almacen.actions'
 
 interface EditarProductoPageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 export const dynamic = 'force-dynamic'

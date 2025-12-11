@@ -11,9 +11,9 @@ import { obtenerProductoPorIdAction } from '@/actions/almacen.actions'
 import { PreciosProductoListas } from '@/components/productos/precios-producto-listas'
 
 interface ProductoDetallePageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 export const dynamic = 'force-dynamic'

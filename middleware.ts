@@ -60,6 +60,7 @@ export async function middleware(request: NextRequest) {
   const { data: { user }, error } = await supabase.auth.getUser()
 
   const { pathname } = request.nextUrl
+  const timestamp = new Date().toISOString()
 
   // Rutas públicas (no requieren autenticación)
   const publicRoutes = [
@@ -79,11 +80,55 @@ export async function middleware(request: NextRequest) {
     return response
   }
 
+  // Logs de autenticación en middleware
+  if (error) {
+    console.error(`[MIDDLEWARE AUTH LOG ${timestamp}] Error al obtener usuario:`, {
+      pathname,
+      error: error.message,
+      status: error.status || 'N/A',
+      reason: 'Error al verificar autenticación en middleware',
+    })
+  }
+
   // Si no hay usuario autenticado, redirigir a login
   if (!user) {
+    console.warn(`[MIDDLEWARE AUTH LOG ${timestamp}] Redirigiendo a login - No hay usuario:`, {
+      pathname,
+      reason: 'Usuario no autenticado',
+    })
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('redirect', pathname)
     return NextResponse.redirect(loginUrl)
+  }
+
+  // Obtener sesión para verificar expiración
+  const { data: { session } } = await supabase.auth.getSession()
+  if (session?.expires_at) {
+    const expiresAt = new Date(session.expires_at * 1000)
+    const now = new Date()
+    const isExpired = expiresAt < now
+    const minutesUntilExpiry = Math.round((expiresAt.getTime() - now.getTime()) / 1000 / 60)
+
+    if (isExpired) {
+      console.warn(`[MIDDLEWARE AUTH LOG ${timestamp}] Redirigiendo a login - Token expirado:`, {
+        pathname,
+        userId: user.id,
+        expiresAt: expiresAt.toISOString(),
+        reason: 'Token de acceso expirado',
+      })
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set('redirect', pathname)
+      return NextResponse.redirect(loginUrl)
+    }
+
+    // Log solo si quedan menos de 10 minutos para expirar
+    if (minutesUntilExpiry < 10 && minutesUntilExpiry > 0) {
+      console.log(`[MIDDLEWARE AUTH LOG ${timestamp}] Token próximo a expirar:`, {
+        pathname,
+        userId: user.id,
+        minutesUntilExpiry,
+      })
+    }
   }
 
   // Obtener datos del usuario de la tabla usuarios
@@ -95,6 +140,15 @@ export async function middleware(request: NextRequest) {
 
   // Si hay error o usuario no existe/inactivo, redirigir a login
   if (userError || !userData || !userData.activo) {
+    console.warn(`[MIDDLEWARE AUTH LOG ${timestamp}] Redirigiendo a login - Usuario inválido:`, {
+      pathname,
+      userId: user.id,
+      userEmail: user.email,
+      error: userError?.message || 'N/A',
+      encontrado: !!userData,
+      activo: userData?.activo ?? false,
+      reason: userError ? 'Error al consultar usuario' : !userData ? 'Usuario no encontrado' : 'Usuario inactivo',
+    })
     const loginUrl = new URL('/login', request.url)
     return NextResponse.redirect(loginUrl)
   }

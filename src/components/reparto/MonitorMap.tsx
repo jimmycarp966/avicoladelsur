@@ -22,6 +22,7 @@ import { getRouteColor, getColorName } from '@/lib/colors'
 import RutasSidebar from './RutasSidebar'
 import { toast } from 'sonner'
 import { config } from '@/lib/config'
+import { useRealtime } from '@/lib/hooks/useRealtime'
 
 // Tipos
 interface UbicacionVehiculo {
@@ -301,15 +302,136 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
     }
   }, [fecha, zonaId, ubicaciones.length])
 
-  // Polling logic
+  // Función helper para actualizar marcador de vehículo en el mapa
+  const actualizarMarcadorVehiculo = useCallback((ubicacion: UbicacionVehiculo) => {
+    if (!mapInstanceRef.current || !window.google) return
+
+    const markerKey = `vehiculo-${ubicacion.vehiculo_id}`
+    const existingMarker = markersRef.current.get(markerKey)
+
+    if (existingMarker) {
+      // Actualizar posición del marcador existente
+      existingMarker.setPosition({
+        lat: ubicacion.lat,
+        lng: ubicacion.lng
+      })
+    }
+    // Si no existe, se creará en el efecto que renderiza los marcadores
+  }, [])
+
+  // Ref para mantener referencia actualizada de rutas
+  const rutasRef = useRef<Map<string, RutaData>>(new Map())
+  useEffect(() => {
+    rutasRef.current = rutas
+  }, [rutas])
+
+  // Cargar datos iniciales
   useEffect(() => {
     fetchData()
+  }, [fetchData])
+
+  // Realtime: Suscribirse a nuevas ubicaciones GPS
+  useRealtime({
+    table: 'ubicaciones_repartidores',
+    event: 'INSERT',
+    onInsert: (payload) => {
+      const nuevaUbicacion = payload.new as UbicacionVehiculo
+      
+      // Actualizar ubicaciones en tiempo real
+      setUbicaciones((prev) => {
+        // Buscar si ya existe una ubicación para este vehículo
+        const index = prev.findIndex((u) => u.vehiculo_id === nuevaUbicacion.vehiculo_id)
+        
+        if (index >= 0) {
+          // Actualizar ubicación existente
+          const nuevas = [...prev]
+          nuevas[index] = nuevaUbicacion
+          return nuevas
+        } else {
+          // Agregar nueva ubicación
+          return [...prev, nuevaUbicacion]
+        }
+      })
+
+      // Actualizar marcador en el mapa si está cargado
+      if (mapInstanceRef.current && window.google) {
+        actualizarMarcadorVehiculo(nuevaUbicacion)
+      }
+    },
+    onError: (error) => {
+      console.error('[MonitorMap] Error en Realtime de ubicaciones:', error)
+      // Fallback a polling si Realtime falla
+      if (!intervalRef.current) {
+        const interval = setInterval(() => {
+          if (!isPollingPaused && document.visibilityState === 'visible') {
+            fetchData()
+          }
+        }, 30000)
+        intervalRef.current = interval
+      }
+    }
+  })
+
+  // Realtime: Suscribirse a actualizaciones de entregas (para actualizar estado de clientes)
+  useRealtime({
+    table: 'entregas',
+    event: 'UPDATE',
+    onUpdate: (payload) => {
+      // Cuando una entrega cambia de estado, actualizar el mapa
+      // Esto requiere recargar los datos de la ruta afectada
+      const entrega = payload.new as any
+      
+      // Si hay una ruta activa, recargar sus datos
+      if (entrega.pedido_id) {
+        // Buscar la ruta que contiene esta entrega usando la ref
+        const ruta = Array.from(rutasRef.current.values()).find((r) => 
+          r.ordenVisita.some((c) => c.id === entrega.id)
+        )
+        
+        if (ruta) {
+          // Recargar datos de la ruta específica
+          fetch(`/api/rutas/${ruta.id}/recorrido`)
+            .then((res) => res.json())
+            .then((res) => {
+              if (res.success && res.data) {
+                const ordenVisita = res.data.ordenVisita || []
+                const total = ordenVisita.length
+                const completadas = ordenVisita.filter((c: any) => c.estado === 'entregado').length
+
+                setRutas((prev) => {
+                  const nuevas = new Map(prev)
+                  nuevas.set(ruta.id, {
+                    ...ruta,
+                    ordenVisita: ordenVisita,
+                    progreso: { completadas, total },
+                    estado: completadas === total ? 'completada' : 'en_curso'
+                  })
+                  return nuevas
+                })
+              }
+            })
+            .catch((err) => console.error('Error recargando ruta:', err))
+        }
+      }
+    }
+  })
+
+  // Polling fallback: Solo si Realtime no está disponible o está pausado
+  useEffect(() => {
+    // Mantener polling como fallback pero con intervalo más largo (60s)
+    // Solo se ejecuta si está pausado o como respaldo
+    if (isPollingPaused) {
+      return
+    }
 
     const interval = setInterval(() => {
-      if (!isPollingPaused && document.visibilityState === 'visible') {
+      // Solo hacer polling si la pestaña está visible
+      // Esto es un fallback, Realtime debería manejar las actualizaciones
+      if (document.visibilityState === 'visible') {
+        // Recargar datos completos cada 60 segundos como respaldo
         fetchData()
       }
-    }, 30000) // 30 segundos (reducido para mejor rendimiento)
+    }, 60000) // 60 segundos (más largo porque Realtime maneja las actualizaciones)
 
     intervalRef.current = interval
     return () => clearInterval(interval)

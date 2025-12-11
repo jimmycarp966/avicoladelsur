@@ -68,6 +68,46 @@ export async function obtenerListasPreciosAction(filtros?: {
   }
 }
 
+// Obtener todas las listas activas (sin filtrar por cliente)
+// Usar cuando se necesita seleccionar cualquier lista disponible
+export async function obtenerTodasListasActivasAction(): Promise<ApiResponse> {
+  try {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+      .from('listas_precios')
+      .select('*')
+      .eq('activa', true)
+      .order('tipo', { ascending: true })
+      .order('nombre', { ascending: true })
+
+    if (error) {
+      devError('Error obteniendo listas activas:', error)
+      return { success: false, error: 'Error al obtener listas activas' }
+    }
+
+    // Filtrar por vigencia si está activada
+    const hoy = new Date().toISOString().split('T')[0]
+    const listasValidas = data?.filter((lista) => {
+      // Si vigencia_activa está desactivada o es false, la lista está siempre vigente
+      if (!lista.vigencia_activa) {
+        return true
+      }
+
+      // Si vigencia_activa está activada, validar fechas
+      const desdeValida = !lista.fecha_vigencia_desde || lista.fecha_vigencia_desde <= hoy
+      const hastaValida = !lista.fecha_vigencia_hasta || lista.fecha_vigencia_hasta >= hoy
+      
+      return desdeValida && hastaValida
+    }) || []
+
+    return { success: true, data: listasValidas }
+  } catch (error) {
+    devError('Error en obtenerTodasListasActivasAction:', error)
+    return { success: false, error: 'Error interno del servidor' }
+  }
+}
+
 // Obtener una lista de precios por ID
 export async function obtenerListaPrecioAction(listaPrecioId: string): Promise<ApiResponse> {
   try {

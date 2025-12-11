@@ -10,9 +10,9 @@ import { CerrarCierreCajaForm } from './cerrar-cierre-caja-form'
 export const dynamic = 'force-dynamic'
 
 interface CerrarCierreCajaPageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 async function CerrarCierreCajaContent({ cierreId }: { cierreId: string }) {

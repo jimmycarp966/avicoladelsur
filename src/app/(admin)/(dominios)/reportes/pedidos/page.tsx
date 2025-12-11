@@ -10,9 +10,10 @@ export const revalidate = 3600 // Revalida cada hora
 export default async function ReportePedidosPage({
   searchParams,
 }: {
-  searchParams: { [key: string]: string | string[] | undefined }
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
   const supabase = await createClient()
+  const resolvedSearchParams = await searchParams
 
   // Obtener datos para filtros
   const [zonasResult, vendedoresResult] = await Promise.all([
@@ -29,16 +30,16 @@ export default async function ReportePedidosPage({
   const vendedores = vendedoresResult.data || []
 
   // Filtros por defecto (últimos 30 días)
-  const fechaHasta = (searchParams.fechaHasta as string) || getTodayArgentina()
+  const fechaHasta = (resolvedSearchParams.fechaHasta as string) || getTodayArgentina()
   const fechaDesde =
-    (searchParams.fechaDesde as string) || format(subDays(new Date(fechaHasta), 29), 'yyyy-MM-dd')
+    (resolvedSearchParams.fechaDesde as string) || format(subDays(new Date(fechaHasta), 29), 'yyyy-MM-dd')
 
   const filtros = {
     fechaDesde,
     fechaHasta,
-    zonaId: (searchParams.zonaId as string) || null,
-    vendedorId: (searchParams.vendedorId as string) || null,
-    estado: (searchParams.estado as string) || null,
+    zonaId: (resolvedSearchParams.zonaId as string) || null,
+    vendedorId: (resolvedSearchParams.vendedorId as string) || null,
+    estado: (resolvedSearchParams.estado as string) || null,
   }
 
   // Obtener datos de reportes

@@ -19,6 +19,16 @@ export const config = {
     authToken: process.env.TWILIO_AUTH_TOKEN,
     whatsappNumber: process.env.TWILIO_WHATSAPP_NUMBER,
   },
+  whatsappMeta: {
+    accessToken: process.env.WHATSAPP_META_ACCESS_TOKEN,
+    phoneNumberId: process.env.WHATSAPP_META_PHONE_NUMBER_ID,
+    appId: process.env.WHATSAPP_META_APP_ID,
+    appSecret: process.env.WHATSAPP_META_APP_SECRET,
+    verifyToken: process.env.WHATSAPP_META_VERIFY_TOKEN,
+    webhookUrl: process.env.WHATSAPP_META_WEBHOOK_URL,
+    provider: process.env.WHATSAPP_PROVIDER || 'auto',
+    enableButtons: process.env.WHATSAPP_ENABLE_BUTTONS !== 'false',
+  },
   rutas: {
     homeBase: {
       nombre: 'Casa Central Monteros',

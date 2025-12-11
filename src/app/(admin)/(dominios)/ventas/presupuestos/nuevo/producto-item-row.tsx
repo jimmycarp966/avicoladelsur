@@ -25,6 +25,11 @@ interface ProductoItemRowProps {
   register: UseFormRegister<any>
   control: Control<any>
   watchedItem?: any
+  todasListas?: Array<{ id: string; codigo: string; nombre: string; tipo: string; margen_ganancia: number | null }>
+  listaId?: string
+  usaListaGlobal?: boolean
+  listaGlobalId?: string
+  onListaChange?: (index: number, listaId: string) => void
 }
 
 const ProductoItemRow = memo(function ProductoItemRow({
@@ -42,6 +47,11 @@ const ProductoItemRow = memo(function ProductoItemRow({
   register,
   control,
   watchedItem,
+  todasListas = [],
+  listaId,
+  usaListaGlobal = false,
+  listaGlobalId,
+  onListaChange,
 }: ProductoItemRowProps) {
   const debouncedSearch = useDebounce(productoSearch, 300)
 
@@ -57,7 +67,7 @@ const ProductoItemRow = memo(function ProductoItemRow({
 
   return (
     <div className="grid gap-4 md:grid-cols-12 p-4 border rounded-lg" data-product-index={index}>
-      <div className="md:col-span-5">
+      <div className="md:col-span-4">
         <Label htmlFor={`producto_${index}`}>Producto *</Label>
         <div className="relative">
           <Select
@@ -124,7 +134,38 @@ const ProductoItemRow = memo(function ProductoItemRow({
         )}
       </div>
 
-      <div className="md:col-span-3">
+      <div className="md:col-span-2">
+        <Label>Lista Precio</Label>
+        <Select
+          value={listaId || ''}
+          onValueChange={(value) => {
+            onListaChange?.(index, value)
+          }}
+          disabled={!todasListas.length}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder={usaListaGlobal ? `Global: ${todasListas.find(l => l.id === listaGlobalId)?.codigo || ''}` : 'Sin lista'} />
+          </SelectTrigger>
+          <SelectContent>
+            {listaGlobalId && (
+              <SelectItem value="">
+                Usar lista global ({todasListas.find(l => l.id === listaGlobalId)?.codigo || ''})
+              </SelectItem>
+            )}
+            {todasListas.map((lista) => (
+              <SelectItem key={lista.id} value={lista.id}>
+                {lista.codigo} - {lista.nombre} {lista.margen_ganancia && `(${lista.margen_ganancia}%)`}
+                {usaListaGlobal && lista.id === listaGlobalId && ' (Global)'}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {usaListaGlobal && listaGlobalId && (
+          <p className="text-xs text-muted-foreground mt-1">Usando lista global</p>
+        )}
+      </div>
+
+      <div className="md:col-span-2">
         <Label>Cantidad *</Label>
         <Input
           type="number"
@@ -138,7 +179,7 @@ const ProductoItemRow = memo(function ProductoItemRow({
         )}
       </div>
 
-      <div className="md:col-span-3">
+      <div className="md:col-span-2">
         <Label>Precio Unit. *</Label>
         <Controller
           name={`items.${index}.precio_unit_est`}
@@ -164,7 +205,7 @@ const ProductoItemRow = memo(function ProductoItemRow({
         )}
       </div>
 
-      <div className="md:col-span-1 flex items-end">
+      <div className="md:col-span-2 flex items-end justify-end gap-2">
         {canRemove && (
           <Button
             type="button"

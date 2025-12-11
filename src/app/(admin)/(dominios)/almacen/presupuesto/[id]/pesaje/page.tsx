@@ -8,9 +8,9 @@ import { PesajeSkeleton } from './pesaje-skeleton'
 import { PesajeForm } from '@/components/almacen/PesajeForm'
 
 interface PesajePageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 async function PesajeContent({ presupuestoId }: { presupuestoId: string }) {

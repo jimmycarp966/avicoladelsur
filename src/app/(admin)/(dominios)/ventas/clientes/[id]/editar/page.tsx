@@ -6,9 +6,9 @@ import { ClienteFormSkeleton } from '@/app/(admin)/(dominios)/ventas/clientes/nu
 import { createClient } from '@/lib/supabase/server'
 
 interface EditarClientePageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 export const dynamic = 'force-dynamic'

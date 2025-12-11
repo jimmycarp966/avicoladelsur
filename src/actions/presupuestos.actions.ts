@@ -16,11 +16,12 @@ const crearPresupuestoSchema = z.object({
   zona_id: z.string().uuid().optional(),
   fecha_entrega_estimada: z.string().optional(),
   observaciones: z.string().optional(),
-  lista_precio_id: z.string().uuid().optional(),
+  lista_precio_id: z.string().uuid().optional(), // Lista global (por defecto)
   items: z.array(z.object({
     producto_id: z.string().uuid(),
     cantidad_solicitada: z.number().positive(),
     precio_unit_est: z.number().positive(),
+    lista_precio_id: z.string().uuid().optional(), // Lista individual por producto
   })),
 })
 
@@ -71,20 +72,22 @@ export async function crearPresupuestoAction(formData: FormData) {
       items: JSON.parse(rawData.items as string),
     })
 
-    // Preparar items para RPC
+    // Preparar items para RPC (incluyendo lista_precio_id por item)
     const itemsJson = data.items.map(item => ({
       producto_id: item.producto_id,
       cantidad: item.cantidad_solicitada,
       precio_unitario: item.precio_unit_est,
+      lista_precio_id: item.lista_precio_id || data.lista_precio_id || null, // Usar lista individual o global
     }))
 
-    // Llamar RPC para crear presupuesto (ahora con asignación automática de turno)
+    // Llamar RPC para crear presupuesto (ahora con asignación automática de turno y lista_precio_id por item)
     const { data: result, error } = await supabase.rpc('fn_crear_presupuesto_desde_bot', {
       p_cliente_id: data.cliente_id,
       p_items: itemsJson,
       p_observaciones: data.observaciones,
       p_zona_id: data.zona_id,
       p_fecha_entrega_estimada: data.fecha_entrega_estimada || null,
+      p_lista_precio_id: data.lista_precio_id || null, // Lista global (opcional)
     })
 
     if (error) {

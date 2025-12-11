@@ -14,7 +14,7 @@ import { PasarARutaButton } from '@/components/pedidos/PasarARutaButton'
 import { AsignarVehiculoSelect } from '@/components/pedidos/AsignarVehiculoSelect'
 
 interface PedidoDetallePageProps {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 export const dynamic = 'force-dynamic'

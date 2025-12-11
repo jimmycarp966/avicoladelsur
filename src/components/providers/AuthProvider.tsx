@@ -91,9 +91,38 @@ export function AuthProvider({ children }: AuthProviderProps) {
     )
   }
 
+  // Función helper para logs de sesión
+  const logSessionInfo = (context: string, session: any, additionalInfo?: any) => {
+    const timestamp = new Date().toISOString()
+    const sessionInfo = session ? {
+      expiresAt: session.expires_at ? new Date(session.expires_at * 1000).toISOString() : 'N/A',
+      expiresIn: session.expires_at ? Math.round((session.expires_at * 1000 - Date.now()) / 1000 / 60) + ' minutos' : 'N/A',
+      tokenType: session.token_type || 'N/A',
+      hasAccessToken: !!session.access_token,
+      hasRefreshToken: !!session.refresh_token,
+      userId: session.user?.id || 'N/A',
+      userEmail: session.user?.email || 'N/A',
+    } : null
+
+    console.log(`[AUTH LOG ${timestamp}] ${context}`, {
+      sessionInfo,
+      ...additionalInfo,
+    })
+  }
+
   // Función para obtener datos del usuario desde la base de datos
   const fetchUserData = async (userId: string): Promise<Usuario | null> => {
     try {
+      // Verificar primero que haya una sesión activa antes de consultar BD
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        console.warn(`[AUTH LOG ${new Date().toISOString()}] No hay sesión activa al intentar obtener datos del usuario:`, {
+          userId,
+          reason: 'Sesión ya cerrada',
+        })
+        return null
+      }
+
       const { data, error } = await supabase
         .from('usuarios')
         .select('*')
@@ -101,23 +130,46 @@ export function AuthProvider({ children }: AuthProviderProps) {
         .single()
 
       if (error) {
-        console.error('Error fetching user data:', error)
+        console.error(`[AUTH LOG ${new Date().toISOString()}] Error fetching user data:`, {
+          userId,
+          error: error.message || 'Error desconocido',
+          code: error.code || 'N/A',
+          details: error.details || 'N/A',
+          hint: error.hint || 'N/A',
+          fullError: JSON.stringify(error, Object.getOwnPropertyNames(error)),
+        })
         return null
       }
 
       if (!data) {
-        console.error('User data not found for ID:', userId)
+        console.error(`[AUTH LOG ${new Date().toISOString()}] User data not found:`, {
+          userId,
+          reason: 'No se encontró registro en tabla usuarios',
+        })
         return null
       }
 
       if (!data.activo) {
-        console.error('User is inactive:', userId)
+        console.error(`[AUTH LOG ${new Date().toISOString()}] User is inactive:`, {
+          userId,
+          email: data.email,
+          nombre: data.nombre,
+          rol: data.rol,
+          activo: data.activo,
+          reason: 'Usuario marcado como inactivo en la base de datos',
+        })
         return null
       }
 
       return data
     } catch (error) {
-      console.error('Error fetching user data:', error)
+      console.error(`[AUTH LOG ${new Date().toISOString()}] Exception fetching user data:`, {
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        errorType: error?.constructor?.name || typeof error,
+        fullError: error instanceof Error ? JSON.stringify(error, Object.getOwnPropertyNames(error)) : String(error),
+      })
       return null
     }
   }
@@ -125,29 +177,57 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Función para refrescar datos del usuario
   const refreshUser = async () => {
     try {
+      console.log(`[AUTH LOG ${new Date().toISOString()}] Refreshing user...`)
+      
       const { data: { user: authUser }, error } = await supabase.auth.getUser()
 
       if (error || !authUser) {
+        console.error(`[AUTH LOG ${new Date().toISOString()}] Error getting user on refresh:`, {
+          error: error?.message || 'No user returned',
+          code: error?.status || 'N/A',
+          reason: 'No se pudo obtener el usuario autenticado',
+        })
         setUser(null)
         setSession(null)
         setLoading(false)
         return
       }
 
+      // Obtener sesión actual para verificar expiración
+      const { data: { session } } = await supabase.auth.getSession()
+      logSessionInfo('Refresh user - Sesión actual', session, {
+        userId: authUser.id,
+        userEmail: authUser.email,
+      })
+
       const userData = await fetchUserData(authUser.id)
 
       if (!userData) {
         // Usuario no encontrado o inactivo
+        console.warn(`[AUTH LOG ${new Date().toISOString()}] Cerrando sesión - Usuario no válido:`, {
+          userId: authUser.id,
+          userEmail: authUser.email,
+          reason: 'Usuario no encontrado en BD o marcado como inactivo',
+        })
         await supabase.auth.signOut()
         setUser(null)
         setSession(null)
         showToast('error', 'Usuario no encontrado o inactivo')
       } else {
+        console.log(`[AUTH LOG ${new Date().toISOString()}] Usuario refrescado exitosamente:`, {
+          userId: userData.id,
+          nombre: userData.nombre,
+          rol: userData.rol,
+          activo: userData.activo,
+        })
         setUser(userData)
         setSession(authUser)
       }
     } catch (error) {
-      console.error('Error refreshing user:', error)
+      console.error(`[AUTH LOG ${new Date().toISOString()}] Exception refreshing user:`, {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      })
       setUser(null)
       setSession(null)
     } finally {
@@ -268,16 +348,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }
 
   // Función de logout
-  const logout = async () => {
+  const logout = async (reason?: string) => {
     try {
+      const timestamp = new Date().toISOString()
+      console.log(`[AUTH LOG ${timestamp}] Iniciando logout:`, {
+        userId: user?.id || 'N/A',
+        userEmail: user?.email || 'N/A',
+        reason: reason || 'Logout manual',
+        activo: user?.activo ?? 'N/A',
+      })
+
       setLoading(true)
       await supabase.auth.signOut()
       storeLogout()
+      
+      console.log(`[AUTH LOG ${timestamp}] Logout completado exitosamente`)
       showToast('info', 'Sesión cerrada exitosamente')
       router.push('/login')
       router.refresh()
     } catch (error: any) {
-      console.error('Logout error:', error)
+      console.error(`[AUTH LOG ${new Date().toISOString()}] Error en logout:`, {
+        error: error?.message || String(error),
+        reason: reason || 'Error desconocido',
+      })
       showToast('error', 'Error al cerrar sesión')
     } finally {
       setLoading(false)
@@ -289,26 +382,78 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Obtener sesión inicial
     const getInitialSession = async () => {
       try {
+        console.log(`[AUTH LOG ${new Date().toISOString()}] Obteniendo sesión inicial...`)
+        
         const { data: { session }, error } = await supabase.auth.getSession()
 
         if (error) {
-          console.error('Error getting session:', error)
+          console.error(`[AUTH LOG ${new Date().toISOString()}] Error getting initial session:`, {
+            error: error.message,
+            code: error.status || 'N/A',
+            reason: 'Error al obtener la sesión inicial',
+          })
           setLoading(false)
           return
         }
 
+        logSessionInfo('Sesión inicial obtenida', session)
+
         if (session?.user) {
+          // Verificar si el token está expirado
+          if (session.expires_at) {
+            const expiresAt = new Date(session.expires_at * 1000)
+            const now = new Date()
+            const isExpired = expiresAt < now
+            
+            console.log(`[AUTH LOG ${new Date().toISOString()}] Estado del token:`, {
+              expiresAt: expiresAt.toISOString(),
+              now: now.toISOString(),
+              isExpired,
+              minutesUntilExpiry: isExpired ? 0 : Math.round((expiresAt.getTime() - now.getTime()) / 1000 / 60),
+            })
+
+            if (isExpired) {
+              console.warn(`[AUTH LOG ${new Date().toISOString()}] Token expirado, intentando refrescar...`)
+              // Intentar refrescar la sesión
+              const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession()
+              if (refreshError || !refreshedSession) {
+                console.error(`[AUTH LOG ${new Date().toISOString()}] Error al refrescar sesión expirada:`, {
+                  error: refreshError?.message || 'No se pudo refrescar',
+                  reason: 'Token expirado y no se pudo refrescar',
+                })
+                await supabase.auth.signOut()
+                setLoading(false)
+                return
+              }
+              logSessionInfo('Sesión refrescada después de expiración', refreshedSession)
+            }
+          }
+
           const userData = await fetchUserData(session.user.id)
           if (userData) {
+            console.log(`[AUTH LOG ${new Date().toISOString()}] Sesión inicial establecida:`, {
+              userId: userData.id,
+              nombre: userData.nombre,
+              rol: userData.rol,
+            })
             setUser(userData)
             setSession(session.user)
           } else {
             // Usuario no válido
+            console.warn(`[AUTH LOG ${new Date().toISOString()}] Cerrando sesión inicial - Usuario no válido:`, {
+              userId: session.user.id,
+              reason: 'Usuario no encontrado o inactivo en BD',
+            })
             await supabase.auth.signOut()
           }
+        } else {
+          console.log(`[AUTH LOG ${new Date().toISOString()}] No hay sesión inicial`)
         }
       } catch (error) {
-        console.error('Error getting initial session:', error)
+        console.error(`[AUTH LOG ${new Date().toISOString()}] Exception getting initial session:`, {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        })
       } finally {
         setLoading(false)
       }
@@ -319,17 +464,41 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Escuchar cambios en la autenticación
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.email)
+        const timestamp = new Date().toISOString()
+        console.log(`[AUTH LOG ${timestamp}] Auth state changed:`, {
+          event,
+          userEmail: session?.user?.email || 'N/A',
+          userId: session?.user?.id || 'N/A',
+        })
+
+        logSessionInfo(`Auth state change: ${event}`, session)
 
         if (event === 'SIGNED_IN' && session?.user) {
+          console.log(`[AUTH LOG ${timestamp}] Usuario inició sesión`)
           const userData = await fetchUserData(session.user.id)
           if (userData) {
             setUser(userData)
             setSession(session.user)
+          } else {
+            console.warn(`[AUTH LOG ${timestamp}] Usuario inició sesión pero no es válido en BD`)
+            await supabase.auth.signOut()
           }
         } else if (event === 'SIGNED_OUT') {
+          console.log(`[AUTH LOG ${timestamp}] Usuario cerró sesión (evento SIGNED_OUT)`)
           setUser(null)
           setSession(null)
+        } else if (event === 'TOKEN_REFRESHED') {
+          console.log(`[AUTH LOG ${timestamp}] Token refrescado automáticamente`)
+          logSessionInfo('Token refrescado', session)
+          if (session?.user) {
+            const userData = await fetchUserData(session.user.id)
+            if (userData) {
+              setUser(userData)
+              setSession(session.user)
+            }
+          }
+        } else if (event === 'USER_UPDATED') {
+          console.log(`[AUTH LOG ${timestamp}] Usuario actualizado`)
         }
 
         setLoading(false)
@@ -343,17 +512,114 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Efecto para verificar usuario activo periódicamente
   useEffect(() => {
-    if (!user) return
+    if (!user) {
+      console.log(`[AUTH LOG ${new Date().toISOString()}] Verificación periódica no iniciada - No hay usuario`)
+      return
+    }
+
+    const userId = user.id
+    console.log(`[AUTH LOG ${new Date().toISOString()}] Iniciando verificación periódica de usuario:`, {
+      userId,
+      intervalo: '30 segundos',
+    })
 
     const interval = setInterval(async () => {
-      const currentUserData = await fetchUserData(user.id)
-      if (!currentUserData || !currentUserData.activo) {
-        // Usuario desactivado, cerrar sesión
-        await logout()
+      const timestamp = new Date().toISOString()
+      
+      // Verificar primero que el usuario todavía existe en el estado local
+      // Esto evita ejecutar verificaciones si ya se cerró la sesión
+      const currentUser = user
+      if (!currentUser) {
+        console.log(`[AUTH LOG ${timestamp}] Verificación periódica cancelada - Usuario ya no existe en estado local`)
+        return
+      }
+
+      console.log(`[AUTH LOG ${timestamp}] Verificación periódica de usuario...`)
+      
+      // Verificar también el estado de la sesión
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      
+      if (sessionError) {
+        console.error(`[AUTH LOG ${timestamp}] Error al obtener sesión en verificación periódica:`, {
+          error: sessionError.message,
+          code: sessionError.status || 'N/A',
+          reason: 'Error al verificar sesión',
+        })
+        await logout('Error al verificar sesión')
+        return
+      }
+
+      if (!session) {
+        console.warn(`[AUTH LOG ${timestamp}] No hay sesión activa en verificación periódica`)
+        await logout('Sesión no encontrada')
+        return
+      }
+
+      // Verificar que el usuario de la sesión coincida con el usuario local
+      if (session.user?.id !== currentUser.id) {
+        console.warn(`[AUTH LOG ${timestamp}] Usuario de sesión no coincide con usuario local:`, {
+          sessionUserId: session.user?.id || 'N/A',
+          localUserId: currentUser.id,
+          reason: 'Usuario de sesión cambiado',
+        })
+        await logout('Usuario de sesión no coincide')
+        return
+      }
+
+      // Verificar expiración del token
+      if (session.expires_at) {
+        const expiresAt = new Date(session.expires_at * 1000)
+        const now = new Date()
+        const minutesUntilExpiry = Math.round((expiresAt.getTime() - now.getTime()) / 1000 / 60)
+        
+        console.log(`[AUTH LOG ${timestamp}] Estado del token en verificación periódica:`, {
+          expiresAt: expiresAt.toISOString(),
+          minutesUntilExpiry,
+          isExpired: expiresAt < now,
+        })
+
+        if (expiresAt < now) {
+          console.warn(`[AUTH LOG ${timestamp}] Token expirado en verificación periódica`)
+          await logout('Token expirado')
+          return
+        }
+      }
+
+      // Verificar datos del usuario en BD (solo si todavía tenemos usuario local)
+      try {
+        const currentUserData = await fetchUserData(currentUser.id)
+        if (!currentUserData || !currentUserData.activo) {
+          // Usuario desactivado, cerrar sesión
+          console.warn(`[AUTH LOG ${timestamp}] Usuario desactivado o no encontrado en verificación periódica:`, {
+            userId: currentUser.id,
+            encontrado: !!currentUserData,
+            activo: currentUserData?.activo ?? false,
+            reason: 'Usuario desactivado en BD o no encontrado',
+          })
+          await logout('Usuario desactivado o no encontrado')
+        } else {
+          console.log(`[AUTH LOG ${timestamp}] Verificación periódica OK:`, {
+            userId: currentUserData.id,
+            activo: currentUserData.activo,
+          })
+        }
+      } catch (error) {
+        // Si hay un error al obtener datos del usuario, no cerrar sesión automáticamente
+        // Solo loguear el error para diagnóstico
+        console.error(`[AUTH LOG ${timestamp}] Error en verificación periódica (no se cierra sesión):`, {
+          userId: currentUser.id,
+          error: error instanceof Error ? error.message : String(error),
+          reason: 'Error al consultar BD, pero sesión sigue activa',
+        })
       }
     }, 30000) // Verificar cada 30 segundos
 
-    return () => clearInterval(interval)
+    return () => {
+      console.log(`[AUTH LOG ${new Date().toISOString()}] Deteniendo verificación periódica de usuario:`, {
+        userId: userId || 'N/A',
+      })
+      clearInterval(interval)
+    }
   }, [user])
 
   const value: AuthContextType = {

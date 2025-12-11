@@ -5,6 +5,7 @@ import { getSucursalUsuarioConAdmin } from '@/lib/utils'
 import { AlertasContent } from '@/components/shared/AlertasContent'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
+import { AlertasStockRealtime } from '@/components/sucursal/AlertasStockRealtime'
 
 interface PageProps {
   searchParams: Promise<{
@@ -108,7 +109,17 @@ export default async function SucursalAlertsPage({ searchParams }: PageProps) {
       )
     }
 
-    return <AlertasContent data={data} />
+    // Obtener sucursalId para el componente Realtime
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const { sucursalId } = await getSucursalUsuarioConAdmin(supabase, user?.id || '', user?.email || '', params.sid)
+
+    return (
+      <>
+        {sucursalId && <AlertasStockRealtime sucursalId={sucursalId} />}
+        <AlertasContent data={data} />
+      </>
+    )
   } catch (error) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">

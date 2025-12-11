@@ -12,9 +12,9 @@ import { PresupuestoAccionesButtons } from './presupuesto-acciones-buttons'
 import { createClient } from '@/lib/supabase/server'
 
 interface PresupuestoDetallePageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) {

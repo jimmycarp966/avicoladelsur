@@ -1,4 +1,5 @@
 import { obtenerMovimientosCajaAction, listarCajasAction } from '@/actions/tesoreria.actions'
+import { MovimientosRealtime } from '@/components/tesoreria/MovimientosRealtime'
 import { MovimientoCajaForm } from '@/components/forms/MovimientoCajaForm'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -18,6 +19,9 @@ export default async function MovimientosPage() {
 
   return (
     <div className="space-y-6">
+      {/* Componente Realtime que actualiza la página automáticamente */}
+      <MovimientosRealtime />
+
       <div className="relative overflow-hidden rounded-lg bg-gradient-to-br from-success/5 via-white to-secondary/5 p-6 shadow-sm border border-success/10">
         <div className="absolute top-0 right-0 w-64 h-64 bg-success/5 rounded-full blur-3xl -z-10" />
         <div className="flex items-center justify-between">

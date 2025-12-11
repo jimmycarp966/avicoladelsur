@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { TransferenciasTable } from '@/components/sucursales/TransferenciasTable'
 import { TransferenciasPendientesRecepcion } from '@/components/sucursales/TransferenciasPendientesRecepcion'
 import { getSucursalUsuarioConAdmin } from '@/lib/utils'
+import { TransferenciasRealtime } from '@/components/sucursal/TransferenciasRealtime'
 
 interface PageProps {
   searchParams: Promise<{
@@ -155,8 +156,16 @@ export default async function SucursalTransferenciasPage({ searchParams }: PageP
       )
     }
 
+    // Obtener sucursalId para el componente Realtime
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const { sucursalId } = await getSucursalUsuarioConAdmin(supabase, user?.id || '', user?.email || '', params.sid)
+
     return (
       <div className="space-y-6">
+        {/* Componente Realtime que actualiza la página automáticamente */}
+        {sucursalId && <TransferenciasRealtime sucursalId={sucursalId} />}
+
         {/* Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>

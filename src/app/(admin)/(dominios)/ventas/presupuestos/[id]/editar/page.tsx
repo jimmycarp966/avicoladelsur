@@ -7,9 +7,9 @@ import { obtenerPresupuestoAction } from '@/actions/presupuestos.actions'
 import { EditarPresupuestoForm } from './editar-presupuesto-form'
 
 interface EditarPresupuestoPageProps {
-  params: {
+  params: Promise<{
     id: string
-  }
+  }>
 }
 
 async function EditarPresupuestoContent({ presupuestoId }: { presupuestoId: string }) {
