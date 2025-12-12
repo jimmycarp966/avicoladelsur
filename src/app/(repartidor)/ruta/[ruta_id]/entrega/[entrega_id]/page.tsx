@@ -19,7 +19,7 @@ export default async function EntregaDetallePage({ params }: PageProps) {
     notFound()
   }
 
-  const { data: entrega, error } = await supabase
+  const { data: entregaRaw, error } = await supabase
     .from('detalles_ruta')
     .select(`
       *,
@@ -30,6 +30,7 @@ export default async function EntregaDetallePage({ params }: PageProps) {
         pago_estado,
         metodos_pago,
         instrucciones_repartidor,
+        cliente_id,
         cliente:clientes(
           id,
           nombre,
@@ -62,7 +63,7 @@ export default async function EntregaDetallePage({ params }: PageProps) {
     .eq('id', entrega_id)
     .single()
 
-  if (error || !entrega || entrega.ruta_id !== ruta_id || entrega.ruta?.repartidor_id !== user.id) {
+  if (error || !entregaRaw || entregaRaw.ruta_id !== ruta_id || entregaRaw.ruta?.repartidor_id !== user.id) {
     return (
       <div className="p-4">
         <Card>
@@ -76,6 +77,50 @@ export default async function EntregaDetallePage({ params }: PageProps) {
         </Card>
       </div>
     )
+  }
+
+  // Si el pedido no tiene cliente (pedido agrupado), buscar desde entregas
+  let entrega = entregaRaw as any
+  const pedidoCliente = Array.isArray(entrega.pedido?.cliente)
+    ? entrega.pedido.cliente[0]
+    : entrega.pedido?.cliente
+
+  if (!pedidoCliente && entrega.pedido_id) {
+    const { data: entregaData } = await supabase
+      .from('entregas')
+      .select(`
+        cliente_id,
+        total,
+        direccion,
+        instruccion_repartidor,
+        cliente:clientes(
+          id,
+          nombre,
+          telefono,
+          direccion,
+          zona_entrega,
+          coordenadas
+        )
+      `)
+      .eq('pedido_id', entrega.pedido_id)
+      .limit(1)
+      .single()
+
+    if (entregaData?.cliente) {
+      const clienteFromEntrega = Array.isArray(entregaData.cliente)
+        ? entregaData.cliente[0]
+        : entregaData.cliente
+
+      entrega = {
+        ...entrega,
+        pedido: {
+          ...entrega.pedido,
+          cliente: clienteFromEntrega,
+          total: entregaData.total || entrega.pedido?.total,
+          instrucciones_repartidor: entregaData.instruccion_repartidor || entrega.pedido?.instrucciones_repartidor,
+        }
+      }
+    }
   }
 
   return <EntregaDetalleContent entrega={entrega} />
