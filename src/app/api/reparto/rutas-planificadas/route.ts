@@ -389,7 +389,14 @@ export async function GET(request: NextRequest) {
             .eq('ruta_id', ruta.id)
             .order('orden_entrega', { ascending: true })
 
+          console.log('[DEBUG] detallesRutaRaw para ruta', ruta.id, ':', {
+            count: detallesRutaRaw?.length,
+            error: detallesError,
+            data: detallesRutaRaw
+          })
+
           if (detallesError || !detallesRutaRaw || detallesRutaRaw.length === 0) {
+            console.log('[DEBUG] No hay detalles_ruta para ruta', ruta.id, '- retornando null')
             return null
           }
 
