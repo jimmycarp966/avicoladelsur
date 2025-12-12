@@ -368,23 +368,62 @@ export async function generateRutaOptimizadaAvanzada({
 
   for (const detalle of detalles as any[]) {
     const pedido = detalle.pedidos
-    const cliente = pedido?.clientes
-    const coords = cliente?.coordenadas
+    let cliente = pedido?.clientes
+    let coords = cliente?.coordenadas
 
-    if (!cliente || !coords) continue
+    // Si el pedido tiene cliente directo (pedido legacy)
+    if (cliente && coords) {
+      const { lat, lng } = parseCoordinates(coords)
+      if (lat !== null && lng !== null) {
+        waypoints.push({
+          lat,
+          lng,
+          id: detalle.id,
+          detalleRutaId: detalle.id,
+          pedidoId: detalle.pedido_id,
+          clienteId: cliente.id,
+          nombreCliente: cliente.nombre,
+        })
+      }
+    } else if (detalle.pedido_id) {
+      // Si el pedido no tiene cliente directo, buscar en entregas (pedidos agrupados)
+      const { data: entregas } = await supabase
+        .from('entregas')
+        .select(`
+          id,
+          cliente_id,
+          orden_entrega,
+          clientes (
+            id,
+            nombre,
+            coordenadas
+          )
+        `)
+        .eq('pedido_id', detalle.pedido_id)
+        .order('orden_entrega', { ascending: true })
 
-    const { lat, lng } = parseCoordinates(coords)
-    if (lat === null || lng === null) continue
+      if (entregas && entregas.length > 0) {
+        for (const entrega of entregas as any[]) {
+          const clienteEntrega = entrega.clientes
+          const coordsEntrega = clienteEntrega?.coordenadas
 
-    waypoints.push({
-      lat,
-      lng,
-      id: detalle.id,
-      detalleRutaId: detalle.id,
-      pedidoId: detalle.pedido_id,
-      clienteId: cliente.id,
-      nombreCliente: cliente.nombre,
-    })
+          if (!clienteEntrega || !coordsEntrega) continue
+
+          const { lat, lng } = parseCoordinates(coordsEntrega)
+          if (lat === null || lng === null) continue
+
+          waypoints.push({
+            lat,
+            lng,
+            id: entrega.id,
+            detalleRutaId: detalle.id,
+            pedidoId: detalle.pedido_id,
+            clienteId: clienteEntrega.id,
+            nombreCliente: clienteEntrega.nombre,
+          })
+        }
+      }
+    }
   }
 
   if (waypoints.length === 0) {
