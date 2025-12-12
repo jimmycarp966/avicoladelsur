@@ -19,6 +19,7 @@ interface ItemPesable {
   cantidad_reservada: number
   subtotal_est: number
   subtotal_final?: number | null
+  precio_unit_est?: number | null // Precio de la lista de precios asignada
   producto?: {
     nombre?: string
     codigo?: string
@@ -33,6 +34,7 @@ interface ItemPesable {
     tipo?: string | null
   } | null
 }
+
 
 interface Presupuesto {
   id: string
@@ -61,7 +63,7 @@ export function PesajeForm({ presupuesto, itemsPesables, presupuestoId }: Pesaje
 
   // #region agent log
   useEffect(() => {
-    fetch('http://127.0.0.1:7242/ingest/1672462a-0bab-407c-8bd1-baf6ccc7131f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run-debug-4',hypothesisId:'H6',location:'PesajeForm:mount',message:'PesajeForm mounted',data:{presupuestoId,listaTipo:presupuesto.lista_precio?.tipo,totalItems:itemsPesables.length,items:itemsPesables.slice(0,5).map(it=>({id:it.id,cant:it.cantidad_solicitada,reservada:it.cantidad_reservada,pesable:it.pesable,producto:{codigo:it.producto?.codigo,venta_mayor:it.producto?.venta_mayor_habilitada,kg_por_unidad_mayor:it.producto?.kg_por_unidad_mayor}}))},timestamp:Date.now()})}).catch(()=>{})
+    fetch('http://127.0.0.1:7242/ingest/1672462a-0bab-407c-8bd1-baf6ccc7131f', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'run-debug-4', hypothesisId: 'H6', location: 'PesajeForm:mount', message: 'PesajeForm mounted', data: { presupuestoId, listaTipo: presupuesto.lista_precio?.tipo, totalItems: itemsPesables.length, items: itemsPesables.slice(0, 5).map(it => ({ id: it.id, cant: it.cantidad_solicitada, reservada: it.cantidad_reservada, pesable: it.pesable, producto: { codigo: it.producto?.codigo, venta_mayor: it.producto?.venta_mayor_habilitada, kg_por_unidad_mayor: it.producto?.kg_por_unidad_mayor } })) }, timestamp: Date.now() }) }).catch(() => { })
   }, [presupuestoId, presupuesto.lista_precio?.tipo, itemsPesables])
   // #endregion
 
@@ -82,7 +84,7 @@ export function PesajeForm({ presupuesto, itemsPesables, presupuestoId }: Pesaje
     if (esVentaMayorista(item)) {
       return false
     }
-    
+
     if (item.pesable === true) {
       return true
     }
@@ -291,12 +293,12 @@ export function PesajeForm({ presupuesto, itemsPesables, presupuestoId }: Pesaje
             <PesajeItemCard
               key={item.id}
               item={item}
-          esMayorista={
-            item.producto?.venta_mayor_habilitada === true &&
-            (item.lista_precio?.tipo === 'mayorista' || presupuesto.lista_precio?.tipo === 'mayorista')
-          }
-          kgPorUnidadMayor={item.producto?.kg_por_unidad_mayor}
-          unidadMayorNombre={item.producto?.unidad_mayor_nombre}
+              esMayorista={
+                item.producto?.venta_mayor_habilitada === true &&
+                (item.lista_precio?.tipo === 'mayorista' || presupuesto.lista_precio?.tipo === 'mayorista')
+              }
+              kgPorUnidadMayor={item.producto?.kg_por_unidad_mayor}
+              unidadMayorNombre={item.producto?.unidad_mayor_nombre}
               estaPesado={estaPesado}
               estaActualizando={estaActualizando}
               onSimularPeso={async () => {
