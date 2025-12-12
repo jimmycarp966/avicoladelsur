@@ -427,9 +427,13 @@ export async function GET(request: NextRequest) {
                 .eq('id', clienteId)
                 .single()
 
+              console.log('[DEBUG] Consulta cliente:', { clienteId, cliente, clienteError })
+
               if (!clienteError && cliente) {
                 clienteData = cliente
                 console.log('[DEBUG] Cliente cargado:', clienteData?.nombre)
+              } else {
+                console.error('[DEBUG] Error al cargar cliente:', clienteError)
               }
             }
 
