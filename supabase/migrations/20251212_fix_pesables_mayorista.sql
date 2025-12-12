@@ -41,6 +41,7 @@ DECLARE
     v_entrega_id UUID;
     v_orden_entrega INTEGER;
     v_cliente RECORD;
+    v_item_lista_tipo VARCHAR(50);
 BEGIN
     -- Obtener presupuesto base
     SELECT * INTO v_presupuesto
@@ -109,29 +110,37 @@ BEGIN
     -- IMPORTANTE: Excluir items de venta mayorista (no requieren pesaje)
     -- Un item es pesable "real" si:
     --   1. Tiene pesable = true
-    --   2. NO es venta mayorista (producto.venta_mayor_habilitada = false O lista no es mayorista)
+    --   2. NO es venta mayorista (verificar lista del item O lista del presupuesto)
     -- =====================================================
     SELECT COUNT(*) INTO v_total_pesables
     FROM presupuesto_items pi
     JOIN productos p ON p.id = pi.producto_id
+    LEFT JOIN listas_precios lp_item ON lp_item.id = pi.lista_precio_id
+    LEFT JOIN listas_precios lp_pres ON lp_pres.id = v_presupuesto.lista_precio_id
     WHERE pi.presupuesto_id = p_presupuesto_id 
       AND pi.pesable = true
-      -- Excluir si es venta mayorista
+      -- Excluir si es venta mayorista (por lista del item O lista del presupuesto)
       AND NOT (
-          v_es_venta_mayor 
-          AND COALESCE(p.venta_mayor_habilitada, false) = true
+          COALESCE(p.venta_mayor_habilitada, false) = true
+          AND (
+              COALESCE(lp_item.tipo, lp_pres.tipo, v_lista_tipo) IN ('mayorista', 'distribuidor')
+          )
       );
 
     SELECT COUNT(*) INTO v_pesables_pesados
     FROM presupuesto_items pi
     JOIN productos p ON p.id = pi.producto_id
+    LEFT JOIN listas_precios lp_item ON lp_item.id = pi.lista_precio_id
+    LEFT JOIN listas_precios lp_pres ON lp_pres.id = v_presupuesto.lista_precio_id
     WHERE pi.presupuesto_id = p_presupuesto_id 
       AND pi.pesable = true 
       AND pi.peso_final IS NOT NULL
       -- Excluir si es venta mayorista
       AND NOT (
-          v_es_venta_mayor 
-          AND COALESCE(p.venta_mayor_habilitada, false) = true
+          COALESCE(p.venta_mayor_habilitada, false) = true
+          AND (
+              COALESCE(lp_item.tipo, lp_pres.tipo, v_lista_tipo) IN ('mayorista', 'distribuidor')
+          )
       );
 
     IF v_total_pesables > 0 AND v_pesables_pesados < v_total_pesables THEN
@@ -240,7 +249,10 @@ BEGIN
     -- INSERTAR DETALLES DEL PEDIDO CON LÓGICA VENTA MAYOR
     -- =====================================================
     FOR v_item IN
-        SELECT * FROM presupuesto_items WHERE presupuesto_id = p_presupuesto_id
+        SELECT pi.*, lp.tipo as lista_tipo_item
+        FROM presupuesto_items pi
+        LEFT JOIN listas_precios lp ON lp.id = pi.lista_precio_id
+        WHERE pi.presupuesto_id = p_presupuesto_id
     LOOP
         SELECT
             id, unidad_medida,
@@ -251,10 +263,13 @@ BEGIN
         FROM productos
         WHERE id = v_item.producto_id;
 
+        -- Determinar si ESTE item específico es venta mayor
+        v_item_lista_tipo := COALESCE(v_item.lista_tipo_item, v_lista_tipo);
+
         -- Para venta mayor, la cantidad ya representa cajas, usar directamente
         -- Para venta normal, usar peso_final si es pesable
         v_cantidad_a_consumir := CASE
-            WHEN v_es_venta_mayor AND v_producto.venta_mayor_habilitada THEN 
+            WHEN v_item_lista_tipo IN ('mayorista', 'distribuidor') AND v_producto.venta_mayor_habilitada THEN 
                 v_item.cantidad_solicitada  -- Cantidad en cajas
             WHEN v_item.pesable THEN 
                 COALESCE(v_item.peso_final, v_item.cantidad_solicitada)
@@ -263,7 +278,7 @@ BEGIN
         END;
 
         -- Lógica de conversión para venta por mayor
-        IF v_es_venta_mayor
+        IF v_item_lista_tipo IN ('mayorista', 'distribuidor')
            AND v_producto.venta_mayor_habilitada
            AND v_producto.unidad_medida = 'kg' THEN
             v_cantidad_stock := v_cantidad_a_consumir * v_producto.kg_por_unidad_mayor;
@@ -281,7 +296,8 @@ BEGIN
             v_cantidad_stock,
             COALESCE(v_item.precio_unit_final, v_item.precio_unit_est),
             COALESCE(v_item.subtotal_final, v_item.subtotal_est),
-            CASE WHEN v_item.pesable AND NOT (v_es_venta_mayor AND v_producto.venta_mayor_habilitada) 
+            CASE WHEN v_item.pesable 
+                      AND NOT (v_item_lista_tipo IN ('mayorista', 'distribuidor') AND v_producto.venta_mayor_habilitada)
                  THEN v_cantidad_stock 
                  ELSE NULL 
             END,
@@ -371,9 +387,6 @@ BEGIN
         WHERE id = v_entrega_id;
     END IF;
 
-    -- NO asignar automáticamente a ruta, se hará manualmente desde el panel de pedidos
-    -- PERFORM fn_asignar_pedido_a_ruta(v_pedido_id);
-
     RETURN jsonb_build_object(
         'success', true,
         'pedido_id', v_pedido_id,
@@ -404,6 +417,7 @@ COMMENT ON FUNCTION fn_convertir_presupuesto_a_pedido IS
 'Convierte presupuesto a pedido usando lógica de agrupación por turno/zona/fecha.
 Múltiples presupuestos del mismo turno/zona/fecha se agregan como entregas al mismo pedido.
 Incluye soporte para venta por mayor con conversión automática de unidades.
-FIX: Los items mayoristas NO se cuentan como pesables pendientes.';
+FIX 12/12/2025: Los items mayoristas NO se cuentan como pesables pendientes.
+Verifica la lista de precio por ITEM (no solo del presupuesto) para determinar si es mayorista.';
 
 COMMIT;

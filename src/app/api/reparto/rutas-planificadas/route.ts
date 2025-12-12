@@ -394,9 +394,34 @@ export async function GET(request: NextRequest) {
           }
 
           // Generar orden_visita desde detalles_ruta
-          const ordenVisita = detallesRutaRaw.map((detalle: any) => {
+          // Para cada detalle, obtener cliente (del pedido o de entregas para pedidos agrupados)
+          const ordenVisita = await Promise.all(detallesRutaRaw.map(async (detalle: any) => {
             const pedido = detalle.pedido
-            const clienteData = Array.isArray(pedido?.cliente) ? pedido.cliente[0] : pedido?.cliente
+            let clienteData = Array.isArray(pedido?.cliente) ? pedido.cliente[0] : pedido?.cliente
+
+            // Si el pedido no tiene cliente (pedido agrupado), buscar en entregas
+            if (!clienteData && detalle.pedido_id) {
+              const { data: entregaData } = await supabase
+                .from('entregas')
+                .select(`
+                  cliente_id,
+                  direccion,
+                  cliente:clientes(
+                    id,
+                    nombre,
+                    telefono,
+                    direccion,
+                    ST_AsGeoJSON(coordenadas)::jsonb as coordenadas
+                  )
+                `)
+                .eq('pedido_id', detalle.pedido_id)
+                .limit(1)
+                .single()
+
+              if (entregaData?.cliente) {
+                clienteData = Array.isArray(entregaData.cliente) ? entregaData.cliente[0] : entregaData.cliente
+              }
+            }
 
             // Convertir coordenadas PostGIS a lat/lng
             let lat: number | null = null
@@ -443,11 +468,15 @@ export async function GET(request: NextRequest) {
               monto_cobrado_registrado: detalle.monto_cobrado_registrado || 0,
               productos: productos,
             }
-          }).filter((punto: any) => punto.lat !== null && punto.lng !== null)
+          }))
 
-          if (ordenVisita.length === 0) {
+          // Filtrar puntos sin coordenadas
+          const ordenVisitaFiltrado = ordenVisita.filter((punto: any) => punto.lat !== null && punto.lng !== null)
+
+          if (ordenVisitaFiltrado.length === 0) {
             return null
           }
+
 
           const repartidorData = Array.isArray(ruta.usuarios) ? ruta.usuarios[0] : ruta.usuarios
           const vehiculoData = Array.isArray(ruta.vehiculos) ? ruta.vehiculos[0] : ruta.vehiculos
@@ -463,7 +492,7 @@ export async function GET(request: NextRequest) {
             } : null,
             zona_id: ruta.zona_id,
             polyline: '', // No hay polyline si no está optimizada
-            orden_visita: ordenVisita,
+            orden_visita: ordenVisitaFiltrado,
             distancia_total_km: null,
             duracion_total_min: null,
             created_at: new Date().toISOString()
