@@ -354,7 +354,8 @@ export async function GET(request: NextRequest) {
 
         // Generar puntos para cada ruta activa
         const rutasGeneradas = await Promise.all(rutasActivas.map(async (ruta: any) => {
-          // Obtener detalles_ruta con coordenadas
+          // Obtener detalles_ruta - SIN ST_AsGeoJSON en consulta anidada (Supabase no lo soporta)
+          // Las coordenadas las obtendremos por separado para cada cliente
           const { data: detallesRutaRaw, error: detallesError } = await supabase
             .from('detalles_ruta')
             .select(`
@@ -368,13 +369,6 @@ export async function GET(request: NextRequest) {
                 id,
                 numero_pedido,
                 cliente_id,
-                cliente:clientes(
-                  id,
-                  nombre,
-                  telefono,
-                  direccion,
-                  ST_AsGeoJSON(coordenadas)::jsonb as coordenadas
-                ),
                 detalle_pedido:detalles_pedido(
                   id,
                   cantidad,
@@ -401,36 +395,41 @@ export async function GET(request: NextRequest) {
           }
 
           // Generar orden_visita desde detalles_ruta
-          // Para cada detalle, obtener cliente (del pedido o de entregas para pedidos agrupados)
+          // Para cada detalle, obtener cliente por separado (evitando consultas anidadas con ST_AsGeoJSON)
           const ordenVisita = await Promise.all(detallesRutaRaw.map(async (detalle: any) => {
             const pedido = detalle.pedido
-            let clienteData = Array.isArray(pedido?.cliente) ? pedido.cliente[0] : pedido?.cliente
+            let clienteData: any = null
+            let clienteId: string | null = pedido?.cliente_id || null
 
-            // Si el pedido no tiene cliente (pedido agrupado), buscar en entregas
-            if (!clienteData && detalle.pedido_id) {
+            // Si el pedido no tiene cliente_id (pedido agrupado), buscar en entregas
+            if (!clienteId && detalle.pedido_id) {
               console.log('[DEBUG] Buscando cliente en entregas para pedido_id:', detalle.pedido_id)
               const { data: entregaData, error: entregaError } = await supabase
                 .from('entregas')
-                .select(`
-                  cliente_id,
-                  direccion,
-                  cliente:clientes(
-                    id,
-                    nombre,
-                    telefono,
-                    direccion,
-                    ST_AsGeoJSON(coordenadas)::jsonb as coordenadas
-                  )
-                `)
+                .select('cliente_id')
                 .eq('pedido_id', detalle.pedido_id)
                 .limit(1)
                 .single()
 
               console.log('[DEBUG] Resultado entrega:', { entregaData, entregaError })
 
-              if (entregaData?.cliente) {
-                clienteData = Array.isArray(entregaData.cliente) ? entregaData.cliente[0] : entregaData.cliente
-                console.log('[DEBUG] Cliente encontrado:', clienteData?.nombre)
+              if (entregaData?.cliente_id) {
+                clienteId = entregaData.cliente_id
+                console.log('[DEBUG] Cliente ID encontrado:', clienteId)
+              }
+            }
+
+            // Si tenemos cliente_id, obtener datos del cliente con coordenadas
+            if (clienteId) {
+              const { data: cliente, error: clienteError } = await supabase
+                .from('clientes')
+                .select('id, nombre, telefono, direccion, ST_AsGeoJSON(coordenadas)::jsonb as coordenadas')
+                .eq('id', clienteId)
+                .single()
+
+              if (!clienteError && cliente) {
+                clienteData = cliente
+                console.log('[DEBUG] Cliente cargado:', clienteData?.nombre)
               }
             }
 
