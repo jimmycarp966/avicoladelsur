@@ -72,59 +72,58 @@ export async function generateRutaOptimizada({
 
   for (const detalle of detalles as any[]) {
     const pedido = detalle.pedidos
-    let cliente = pedido?.clientes
-    let coords = cliente?.coordenadas
+    const clienteId = pedido?.cliente_id
 
-    // Si el pedido tiene cliente directo (pedido legacy)
-    if (cliente && coords) {
-      const { lat, lng } = parseCoordinates(coords)
-      if (lat !== null && lng !== null) {
-        waypoints.push({
-          lat,
-          lng,
-          id: detalle.id,
-          detalleRutaId: detalle.id,
-          pedidoId: detalle.pedido_id,
-          clienteId: cliente.id,
-          nombreCliente: cliente.nombre,
-        })
+    // Si el pedido tiene cliente_id, usar RPC para obtener coordenadas
+    if (clienteId) {
+      const { data: clienteRpc, error: clienteError } = await supabase
+        .rpc('fn_get_cliente_con_coordenadas', { p_cliente_id: clienteId })
+        .single()
+
+      if (!clienteError && clienteRpc) {
+        const clienteData = clienteRpc as any
+        if (clienteData.lat !== null && clienteData.lng !== null) {
+          waypoints.push({
+            lat: clienteData.lat,
+            lng: clienteData.lng,
+            id: detalle.id,
+            detalleRutaId: detalle.id,
+            pedidoId: detalle.pedido_id,
+            clienteId: clienteData.id,
+            nombreCliente: clienteData.nombre,
+          })
+        }
       }
     } else if (pedido?.id) {
       // Si el pedido no tiene cliente directo, buscar en entregas (pedidos agrupados)
-      // Obtener TODAS las entregas del pedido para mostrar todos los clientes
       const { data: entregas } = await supabase
         .from('entregas')
-        .select(`
-          id,
-          cliente_id,
-          orden_entrega,
-          clientes (
-            id,
-            nombre,
-            coordenadas
-          )
-        `)
+        .select('id, cliente_id, orden_entrega')
         .eq('pedido_id', pedido.id)
         .order('orden_entrega', { ascending: true })
 
       if (entregas && entregas.length > 0) {
         for (const entrega of entregas as any[]) {
-          const clienteEntrega = entrega.clientes
-          const coordsEntrega = clienteEntrega?.coordenadas
+          if (!entrega.cliente_id) continue
 
-          if (!clienteEntrega || !coordsEntrega) continue
+          // Usar RPC para obtener coordenadas ya procesadas
+          const { data: clienteRpc, error: clienteError } = await supabase
+            .rpc('fn_get_cliente_con_coordenadas', { p_cliente_id: entrega.cliente_id })
+            .single()
 
-          const { lat, lng } = parseCoordinates(coordsEntrega)
-          if (lat === null || lng === null) continue
+          if (clienteError || !clienteRpc) continue
+
+          const clienteData = clienteRpc as any
+          if (clienteData.lat === null || clienteData.lng === null) continue
 
           waypoints.push({
-            lat,
-            lng,
-            id: entrega.id, // Usar ID de entrega como identificador único
+            lat: clienteData.lat,
+            lng: clienteData.lng,
+            id: entrega.id,
             detalleRutaId: detalle.id,
             pedidoId: detalle.pedido_id,
-            clienteId: clienteEntrega.id,
-            nombreCliente: clienteEntrega.nombre,
+            clienteId: clienteData.id,
+            nombreCliente: clienteData.nombre,
           })
         }
       }
@@ -368,58 +367,58 @@ export async function generateRutaOptimizadaAvanzada({
 
   for (const detalle of detalles as any[]) {
     const pedido = detalle.pedidos
-    let cliente = pedido?.clientes
-    let coords = cliente?.coordenadas
+    const clienteId = pedido?.cliente_id
 
-    // Si el pedido tiene cliente directo (pedido legacy)
-    if (cliente && coords) {
-      const { lat, lng } = parseCoordinates(coords)
-      if (lat !== null && lng !== null) {
-        waypoints.push({
-          lat,
-          lng,
-          id: detalle.id,
-          detalleRutaId: detalle.id,
-          pedidoId: detalle.pedido_id,
-          clienteId: cliente.id,
-          nombreCliente: cliente.nombre,
-        })
+    // Si el pedido tiene cliente_id, usar RPC para obtener coordenadas
+    if (clienteId) {
+      const { data: clienteRpc, error: clienteError } = await supabase
+        .rpc('fn_get_cliente_con_coordenadas', { p_cliente_id: clienteId })
+        .single()
+
+      if (!clienteError && clienteRpc) {
+        const clienteData = clienteRpc as any
+        if (clienteData.lat !== null && clienteData.lng !== null) {
+          waypoints.push({
+            lat: clienteData.lat,
+            lng: clienteData.lng,
+            id: detalle.id,
+            detalleRutaId: detalle.id,
+            pedidoId: detalle.pedido_id,
+            clienteId: clienteData.id,
+            nombreCliente: clienteData.nombre,
+          })
+        }
       }
     } else if (detalle.pedido_id) {
       // Si el pedido no tiene cliente directo, buscar en entregas (pedidos agrupados)
       const { data: entregas } = await supabase
         .from('entregas')
-        .select(`
-          id,
-          cliente_id,
-          orden_entrega,
-          clientes (
-            id,
-            nombre,
-            coordenadas
-          )
-        `)
+        .select('id, cliente_id, orden_entrega')
         .eq('pedido_id', detalle.pedido_id)
         .order('orden_entrega', { ascending: true })
 
       if (entregas && entregas.length > 0) {
         for (const entrega of entregas as any[]) {
-          const clienteEntrega = entrega.clientes
-          const coordsEntrega = clienteEntrega?.coordenadas
+          if (!entrega.cliente_id) continue
 
-          if (!clienteEntrega || !coordsEntrega) continue
+          // Usar RPC para obtener coordenadas ya procesadas
+          const { data: clienteRpc, error: clienteError } = await supabase
+            .rpc('fn_get_cliente_con_coordenadas', { p_cliente_id: entrega.cliente_id })
+            .single()
 
-          const { lat, lng } = parseCoordinates(coordsEntrega)
-          if (lat === null || lng === null) continue
+          if (clienteError || !clienteRpc) continue
+
+          const clienteData = clienteRpc as any
+          if (clienteData.lat === null || clienteData.lng === null) continue
 
           waypoints.push({
-            lat,
-            lng,
+            lat: clienteData.lat,
+            lng: clienteData.lng,
             id: entrega.id,
             detalleRutaId: detalle.id,
             pedidoId: detalle.pedido_id,
-            clienteId: clienteEntrega.id,
-            nombreCliente: clienteEntrega.nombre,
+            clienteId: clienteData.id,
+            nombreCliente: clienteData.nombre,
           })
         }
       }
