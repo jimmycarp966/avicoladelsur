@@ -286,3 +286,4 @@ Muestra aclaración clara en movimientos: (X unidad_mayor)';
 COMMIT;
 
 
+

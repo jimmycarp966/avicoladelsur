@@ -262,3 +262,4 @@ export function StockMinimoTable({ productos, sucursalId }: StockMinimoTableProp
 
 
 
+

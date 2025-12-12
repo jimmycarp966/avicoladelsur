@@ -400,6 +400,8 @@ export async function GET(request: NextRequest) {
             const pedido = detalle.pedido
             let clienteData: any = null
             let clienteId: string | null = pedido?.cliente_id || null
+            let lat: number | null = null
+            let lng: number | null = null
 
             // Si el pedido no tiene cliente_id (pedido agrupado), buscar en entregas
             if (!clienteId && detalle.pedido_id) {
@@ -419,37 +421,23 @@ export async function GET(request: NextRequest) {
               }
             }
 
-            // Si tenemos cliente_id, obtener datos del cliente con coordenadas
+            // Si tenemos cliente_id, obtener datos del cliente con coordenadas via RPC
             if (clienteId) {
-              const { data: cliente, error: clienteError } = await supabase
-                .from('clientes')
-                .select('id, nombre, telefono, direccion, ST_AsGeoJSON(coordenadas)::jsonb as coordenadas')
-                .eq('id', clienteId)
+              // Usamos RPC porque Supabase no soporta ST_AsGeoJSON en consultas directas
+              const { data: clienteRpc, error: clienteError } = await supabase
+                .rpc('fn_get_cliente_con_coordenadas', { p_cliente_id: clienteId })
                 .single()
 
-              console.log('[DEBUG] Consulta cliente:', { clienteId, cliente, clienteError })
+              console.log('[DEBUG] Consulta cliente RPC:', { clienteId, clienteRpc, clienteError })
 
-              if (!clienteError && cliente) {
-                clienteData = cliente
-                console.log('[DEBUG] Cliente cargado:', clienteData?.nombre)
+              if (!clienteError && clienteRpc) {
+                clienteData = clienteRpc as any
+                // Ya tenemos lat/lng directamente del RPC
+                lat = (clienteRpc as any).lat
+                lng = (clienteRpc as any).lng
+                console.log('[DEBUG] Cliente cargado:', clienteData?.nombre, 'lat:', lat, 'lng:', lng)
               } else {
                 console.error('[DEBUG] Error al cargar cliente:', clienteError)
-              }
-            }
-
-            // Convertir coordenadas PostGIS a lat/lng
-            let lat: number | null = null
-            let lng: number | null = null
-
-            if (clienteData?.coordenadas) {
-              const coords = clienteData.coordenadas
-              if (coords && typeof coords === 'object' && 'type' in coords && coords.type === 'Point' && Array.isArray(coords.coordinates)) {
-                const [lngCoord, latCoord] = coords.coordinates
-                lat = latCoord
-                lng = lngCoord
-              } else if (coords && typeof coords === 'object' && 'lat' in coords && 'lng' in coords) {
-                lat = coords.lat
-                lng = coords.lng
               }
             }
 
