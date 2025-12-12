@@ -125,34 +125,26 @@ async function RutaHojaPage({ params }: { params: Promise<{ ruta_id: string }> }
           }
         }
       } else {
-        // Si el pedido no tiene cliente_id, buscar en entregas
+        // Si el pedido no tiene cliente_id, buscar en entregas (pedido agrupado)
         const { data: entregas, error: entregasError } = await supabase
           .from('entregas')
-          .select(`
-            cliente_id,
-            coordenadas,
-            cliente:clientes(
-              id,
-              nombre,
-              telefono,
-              direccion,
-              zona_entrega,
-              ST_AsGeoJSON(coordenadas)::jsonb as coordenadas
-            )
-          `)
+          .select('cliente_id, coordenadas')
           .eq('pedido_id', detalle.pedido_id)
           .limit(1)
           .single()
 
-        if (!entregasError && entregas) {
-          // Usar cliente desde entregas
-          // cliente viene como array en relaciones de Supabase
-          const entregasAny = entregas as any
-          const clienteFromEntrega = Array.isArray(entregasAny.cliente) ? entregasAny.cliente[0] : entregasAny.cliente
-          if (clienteFromEntrega) {
-            clienteData = clienteFromEntrega
+        if (!entregasError && entregas?.cliente_id) {
+          // Obtener cliente con ST_AsGeoJSON en consulta directa (no anidada)
+          const { data: cliente, error: clienteError } = await supabase
+            .from('clientes')
+            .select('id, nombre, telefono, direccion, zona_entrega, ST_AsGeoJSON(coordenadas)::jsonb as coordenadas')
+            .eq('id', entregas.cliente_id)
+            .single()
+
+          if (!clienteError && cliente) {
+            clienteData = cliente
             // Convertir coordenadas desde entregas o desde cliente
-            const coords = entregasAny.coordenadas || clienteFromEntrega.coordenadas
+            const coords = (entregas as any).coordenadas || (cliente as any).coordenadas
             if (coords) {
               if (coords && typeof coords === 'object' && 'type' in coords && coords.type === 'Point' && Array.isArray(coords.coordinates)) {
                 const [lng, lat] = coords.coordinates
