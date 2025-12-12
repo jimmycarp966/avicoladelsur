@@ -205,7 +205,7 @@ export async function generateRutaOptimizada({
         fecha: (ruta as any).fecha_ruta,
         zona_id: (ruta as any).zona_id,
         vehiculo_id: (ruta as any).vehiculo_id,
-        estado: 'planificada',
+        estado: 'optimizada',
         orden_visita: ordenVisita,
         polyline,
         distancia_total_km: distanciaTotal,
