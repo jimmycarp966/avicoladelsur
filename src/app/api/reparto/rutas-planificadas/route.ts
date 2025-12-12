@@ -401,7 +401,8 @@ export async function GET(request: NextRequest) {
 
             // Si el pedido no tiene cliente (pedido agrupado), buscar en entregas
             if (!clienteData && detalle.pedido_id) {
-              const { data: entregaData } = await supabase
+              console.log('[DEBUG] Buscando cliente en entregas para pedido_id:', detalle.pedido_id)
+              const { data: entregaData, error: entregaError } = await supabase
                 .from('entregas')
                 .select(`
                   cliente_id,
@@ -418,8 +419,11 @@ export async function GET(request: NextRequest) {
                 .limit(1)
                 .single()
 
+              console.log('[DEBUG] Resultado entrega:', { entregaData, entregaError })
+
               if (entregaData?.cliente) {
                 clienteData = Array.isArray(entregaData.cliente) ? entregaData.cliente[0] : entregaData.cliente
+                console.log('[DEBUG] Cliente encontrado:', clienteData?.nombre)
               }
             }
 
