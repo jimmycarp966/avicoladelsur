@@ -177,25 +177,25 @@ export async function GET(request: NextRequest) {
               clienteData = cliente
             }
           } else {
-            // Si el pedido no tiene cliente_id, buscar en entregas
+            // Si el pedido no tiene cliente_id, buscar en entregas (pedido agrupado)
             const { data: entregas, error: entregasError } = await supabase
               .from('entregas')
-              .select(`
-                cliente_id,
-                cliente:clientes(
-                  id,
-                  nombre,
-                  telefono,
-                  direccion,
-                  ST_AsGeoJSON(coordenadas)::jsonb as coordenadas
-                )
-              `)
+              .select('cliente_id')
               .eq('pedido_id', detalle.pedido_id)
               .limit(1)
               .single()
 
-            if (!entregasError && entregas?.cliente) {
-              clienteData = Array.isArray(entregas.cliente) ? entregas.cliente[0] : entregas.cliente
+            if (!entregasError && entregas?.cliente_id) {
+              // Obtener cliente con ST_AsGeoJSON en consulta directa (no anidada)
+              const { data: cliente, error: clienteError } = await supabase
+                .from('clientes')
+                .select('id, nombre, telefono, direccion, ST_AsGeoJSON(coordenadas)::jsonb as coordenadas')
+                .eq('id', entregas.cliente_id)
+                .single()
+
+              if (!clienteError && cliente) {
+                clienteData = cliente
+              }
             }
           }
 
