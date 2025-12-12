@@ -68,6 +68,14 @@ BEGIN
     );
     RAISE NOTICE 'Detalles de ruta borrados';
     
+    -- 5.5 Limpiar referencia ruta_activa_id en vehiculos_estado
+    UPDATE vehiculos_estado
+    SET ruta_activa_id = NULL
+    WHERE ruta_activa_id IN (
+        SELECT id FROM rutas_reparto WHERE fecha_ruta IN (v_fecha_hoy, v_fecha_manana)
+    );
+    RAISE NOTICE 'Referencias ruta_activa_id en vehiculos_estado limpiadas';
+    
     -- 6. Borrar rutas de reparto
     DELETE FROM rutas_reparto 
     WHERE fecha_ruta IN (v_fecha_hoy, v_fecha_manana);

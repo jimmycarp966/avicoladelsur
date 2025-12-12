@@ -264,8 +264,13 @@ export function PresupuestoIndividualAccion({
   const [isLoading, setIsLoading] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
 
-  // Helper para determinar si un item es pesable
+  // Helper para determinar si un item es pesable (incluyendo verificación mayorista)
   const esItemPesableItem = (item: any): boolean => {
+    // Si es venta mayorista, NO es pesable (productos vienen en caja cerrada)
+    if (esVentaMayorista(presupuesto, item)) {
+      return false
+    }
+
     if (item.pesable === true) {
       return true
     }
