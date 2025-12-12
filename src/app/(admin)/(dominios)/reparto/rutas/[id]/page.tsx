@@ -196,7 +196,7 @@ export default async function RutaDetallePage({
     detalles_ruta: rutaData.detalles_ruta?.map((detalle: any) => {
       if (detalle.pedido?.cliente?.coordenadas) {
         const coords = detalle.pedido.cliente.coordenadas
-        
+
         // Log para debug
         console.log('🗺️ [RutaDetallePage] Coordenadas raw del cliente:', {
           detalleId: detalle.id,
@@ -207,7 +207,7 @@ export default async function RutaDetallePage({
           tieneType: coords && typeof coords === 'object' && 'type' in coords,
           type: coords && typeof coords === 'object' && 'type' in coords ? coords.type : null,
         })
-        
+
         // Si es un objeto GeoJSON Point de PostGIS, convertir a { lat, lng }
         if (coords && typeof coords === 'object' && 'type' in coords && coords.type === 'Point' && Array.isArray(coords.coordinates)) {
           const [lng, lat] = coords.coordinates
@@ -223,7 +223,7 @@ export default async function RutaDetallePage({
             },
           }
         }
-        
+
         // Si ya está en formato { lat, lng }, mantenerlo
         if (coords && typeof coords === 'object' && 'lat' in coords && 'lng' in coords) {
           console.log('✅ [RutaDetallePage] Coordenadas ya en formato correcto:', coords)
@@ -244,11 +244,11 @@ export default async function RutaDetallePage({
       return detalle
     }),
   }
-  
+
   console.log('🗺️ [RutaDetallePage] Ruta procesada:', {
     totalEntregas: ruta.detalles_ruta?.length || 0,
-    entregasConCoordenadas: ruta.detalles_ruta?.filter((d: any) => 
-      d.pedido?.cliente?.coordenadas && 
+    entregasConCoordenadas: ruta.detalles_ruta?.filter((d: any) =>
+      d.pedido?.cliente?.coordenadas &&
       (typeof d.pedido.cliente.coordenadas === 'object' && ('lat' in d.pedido.cliente.coordenadas || 'type' in d.pedido.cliente.coordenadas))
     ).length || 0,
   })
@@ -264,7 +264,7 @@ export default async function RutaDetallePage({
   const entregasCompletadas = entregas.filter(
     (entrega: any) => entrega.estado_entrega === 'entregado',
   ).length
-  
+
   // Calcular recaudación
   const entregasConPago = entregas.filter((e: any) => e.pago_registrado && e.monto_cobrado_registrado > 0)
   const recaudacionRegistrada = ruta.recaudacion_total_registrada || 0
@@ -320,6 +320,13 @@ export default async function RutaDetallePage({
               Finalizar ruta
             </Button>
           </form>
+
+          <Button asChild variant="secondary">
+            <Link href={`/reparto/rutas/${ruta.id}/optimizar`}>
+              <MapPinned className="mr-2 h-4 w-4" />
+              Optimizar Ruta
+            </Link>
+          </Button>
 
           <Button asChild variant="outline">
             <Link href={`/reparto/rutas/${ruta.id}/editar`}>Editar</Link>
@@ -426,7 +433,7 @@ export default async function RutaDetallePage({
                     ${recaudacionRegistrada.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
-                
+
                 {Object.keys(pagosPorMetodo).length > 0 && (
                   <div>
                     <p className="text-sm font-medium mb-2">Desglose por método:</p>
