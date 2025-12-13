@@ -1,5 +1,4 @@
 import { getCurrentUser } from '@/actions/auth.actions'
-import { obtenerRutasPorVehiculoAction } from '@/actions/reparto.actions'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -25,36 +24,25 @@ export default async function RutaDiariaPage() {
     )
   }
 
-  // Obtener vehículo asignado al repartidor
-  const { data: usuario } = await supabase
-    .from('usuarios')
-    .select('vehiculo_asignado')
-    .eq('id', user.id)
-    .single()
+  // Obtener todas las rutas asignadas al repartidor directamente por repartidor_id
+  const { data: rutas, error: rutasError } = await supabase
+    .from('rutas_reparto')
+    .select(`
+      *,
+      vehiculo:vehiculos(patente, marca, modelo),
+      zona:zonas(nombre)
+    `)
+    .eq('repartidor_id', user.id)
+    .order('fecha_ruta', { ascending: false })
+    .limit(20)
 
-  if (!usuario?.vehiculo_asignado) {
-    return (
-      <div className="p-4">
-        <Card>
-          <CardContent className="p-8 text-center">
-            <Truck className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium">No hay vehículo asignado</h3>
-            <p className="text-muted-foreground">
-              Contacta al administrador para asignar un vehículo
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    )
+  if (rutasError) {
+    console.error('Error obteniendo rutas:', rutasError)
   }
-
-  // Obtener todas las rutas del vehículo del repartidor (sin filtrar por fecha)
-  const rutasResponse = await obtenerRutasPorVehiculoAction(usuario.vehiculo_asignado, undefined)
-  const rutas = rutasResponse.success && rutasResponse.data ? (rutasResponse.data as any[]) : []
 
   // Obtener detalles de entregas para cada ruta
   const rutasConDetalles = await Promise.all(
-    rutas.map(async (ruta: any) => {
+    (rutas || []).map(async (ruta: any) => {
       const { data: detalles } = await supabase
         .from('detalles_ruta')
         .select(`
