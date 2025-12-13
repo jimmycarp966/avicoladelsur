@@ -354,12 +354,12 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
     event: 'INSERT',
     onInsert: (payload) => {
       const nuevaUbicacion = payload.new as UbicacionVehiculo
-      
+
       // Actualizar ubicaciones en tiempo real
       setUbicaciones((prev) => {
         // Buscar si ya existe una ubicación para este vehículo
         const index = prev.findIndex((u) => u.vehiculo_id === nuevaUbicacion.vehiculo_id)
-        
+
         if (index >= 0) {
           // Actualizar ubicación existente
           const nuevas = [...prev]
@@ -398,14 +398,14 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
       // Cuando una entrega cambia de estado, actualizar el mapa
       // Esto requiere recargar los datos de la ruta afectada
       const entrega = payload.new as any
-      
+
       // Si hay una ruta activa, recargar sus datos
       if (entrega.pedido_id) {
         // Buscar la ruta que contiene esta entrega usando la ref
-        const ruta = Array.from(rutasRef.current.values()).find((r) => 
+        const ruta = Array.from(rutasRef.current.values()).find((r) =>
           r.ordenVisita.some((c) => c.id === entrega.id)
         )
-        
+
         if (ruta) {
           // Recargar datos de la ruta específica
           fetch(`/api/rutas/${ruta.id}/recorrido`)
@@ -665,7 +665,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
       if (ruta.polyline && typeof ruta.polyline === 'string' && ruta.polyline.trim().length > 0) {
         try {
           console.log(`🎨 [DEBUG] Decodificando polyline para ruta ${ruta.numero}...`)
-          
+
           // Verificar si es formato simple (lat,lng;lat,lng) o formato codificado de Google
           if (ruta.polyline.includes(';')) {
             // Formato simple: convertir a array de puntos
@@ -684,7 +684,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
             // Formato codificado de Google Maps
             path = window.google.maps.geometry.encoding.decodePath(ruta.polyline)
           }
-          
+
           if (!path || !Array.isArray(path) || path.length === 0) {
             console.warn(`⚠️ [DEBUG] Polyline decodificada está vacía o inválida para ruta ${ruta.numero}`)
             path = null
@@ -697,17 +697,17 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
         }
       }
 
-      // Si no hay polyline válido, generar uno desde los puntos de la ruta
-      if (!path || path.length === 0) {
+      // Si no hay polyline válido o tiene menos de 2 puntos (se necesitan al menos 2 para dibujar línea)
+      if (!path || path.length < 2) {
         console.log(`🎨 [DEBUG] Generando polyline dinámicamente desde puntos de la ruta ${ruta.numero}`)
-        
+
         // Construir path desde: casa central -> clientes (en orden) -> casa central
         const puntosRuta: any[] = []
-        
+
         // 1. Agregar casa central (origen)
         const homeBase = config.rutas.homeBase
         puntosRuta.push(new window.google.maps.LatLng(homeBase.lat, homeBase.lng))
-        
+
         // 2. Agregar clientes en orden de visita
         const clientesOrdenados = [...ruta.ordenVisita].sort((a, b) => (a.orden || 0) - (b.orden || 0))
         clientesOrdenados.forEach(cliente => {
@@ -715,12 +715,12 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
             puntosRuta.push(new window.google.maps.LatLng(cliente.lat, cliente.lng))
           }
         })
-        
+
         // 3. Agregar casa central de nuevo (destino) si returnToBase está activo
         if (config.rutas.returnToBase) {
           puntosRuta.push(new window.google.maps.LatLng(homeBase.lat, homeBase.lng))
         }
-        
+
         if (puntosRuta.length > 0) {
           path = puntosRuta
           console.log(`🎨 [DEBUG] Polyline generado con ${path.length} puntos (casa central + ${clientesOrdenados.length} clientes)`)
@@ -792,10 +792,10 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
       // Marcadores de Clientes
       // Si la ruta está seleccionada, mostrar TODOS los clientes
       // Si no está seleccionada, limitar a 10 por rendimiento
-      const clientesLimitados = selectedRutaId === ruta.id 
-        ? ruta.ordenVisita 
+      const clientesLimitados = selectedRutaId === ruta.id
+        ? ruta.ordenVisita
         : ruta.ordenVisita.slice(0, 10)
-      
+
       clientesLimitados.forEach((cliente) => {
         if (!cliente.lat || !cliente.lng) return
 
@@ -854,7 +854,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
     if (rutas.size > 0 && window.google.maps.Marker) {
       const homeBase = config.rutas.homeBase
       const homeBaseMarkerId = 'home-base'
-      
+
       // Verificar si ya existe el marcador para no duplicarlo
       if (!markersRef.current.has(homeBaseMarkerId)) {
         const homeBaseMarker = new window.google.maps.Marker({
@@ -1028,8 +1028,8 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
 
     const checkGoogleMaps = () => {
       if (
-        window.google && 
-        window.google.maps && 
+        window.google &&
+        window.google.maps &&
         window.google.maps.Map &&
         window.google.maps.Marker &&
         window.google.maps.Polyline &&
@@ -1069,8 +1069,8 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
         // Pequeño delay para asegurar que todo esté listo
         setTimeout(() => {
           if (
-            window.google && 
-            window.google.maps && 
+            window.google &&
+            window.google.maps &&
             window.google.maps.Map &&
             window.google.maps.Marker &&
             window.google.maps.Polyline &&
@@ -1124,7 +1124,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
           updateMapElements()
         }
       }, 50)
-      
+
       return () => clearTimeout(timeoutId)
     }
   }, [mapsLoaded, updateMapElements])
@@ -1234,7 +1234,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
   // Efecto para centrar cuando se selecciona una ruta
   useEffect(() => {
     if (!mapInstanceRef.current || !window.google || !window.google.maps) return
-    
+
     if (selectedRutaId && rutas.has(selectedRutaId)) {
       const ruta = rutas.get(selectedRutaId)
       if (!ruta) return
@@ -1284,8 +1284,8 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
 
       // Agregar vehículos de esta ruta si están disponibles (solo coordenadas válidas)
       ubicaciones.forEach(ubicacion => {
-        if (ubicacion.ruta_activa_id === selectedRutaId && 
-            isValidCoordinate(ubicacion.lat, ubicacion.lng)) {
+        if (ubicacion.ruta_activa_id === selectedRutaId &&
+          isValidCoordinate(ubicacion.lat, ubicacion.lng)) {
           bounds.extend({ lat: ubicacion.lat, lng: ubicacion.lng })
           hasPoints = true
         }
@@ -1296,14 +1296,14 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
         // Validar que los bounds sean válidos y no demasiado grandes
         const northEast = bounds.getNorthEast()
         const southWest = bounds.getSouthWest()
-        
+
         // Calcular la diferencia en grados
         const latDiff = Math.abs(northEast.lat() - southWest.lat())
         const lngDiff = Math.abs(northEast.lng() - southWest.lng())
-        
+
         // Si los bounds son demasiado grandes (>1 grado = ~111km), usar fallback
         const boundsTooLarge = latDiff > 1.0 || lngDiff > 1.0
-        
+
         if (boundsTooLarge) {
           console.warn('⚠️ [DEBUG] Bounds demasiado grandes, usando fallback centrado en clientes')
           // Usar el primer cliente o primer punto de polyline como centro
@@ -1319,15 +1319,15 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
           mapInstanceRef.current.fitBounds(bounds, {
             padding: 50 // Padding en píxeles alrededor de los bounds
           })
-          
+
           // Ajustar zoom después de fitBounds con límites
           setTimeout(() => {
             if (mapInstanceRef.current) {
               const currentZoom = mapInstanceRef.current.getZoom()
-              
+
               if (currentZoom) {
                 let adjustedZoom = currentZoom
-                
+
                 // Límite superior: no más de zoom 15 (muy cercano)
                 if (currentZoom > 15) {
                   adjustedZoom = 15
@@ -1336,7 +1336,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
                 else if (currentZoom < 11) {
                   adjustedZoom = 11
                 }
-                
+
                 if (adjustedZoom !== currentZoom) {
                   mapInstanceRef.current.setZoom(adjustedZoom)
                   console.log('📍 [DEBUG] Zoom ajustado de', currentZoom, 'a', adjustedZoom)
@@ -1377,7 +1377,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
     setSelectedCliente({ cliente, rutaId })
     setIsModalOpen(true)
     setSelectedRutaId(rutaId)
-    
+
     // Centrar mapa en el cliente
     if (mapInstanceRef.current && cliente.lat && cliente.lng) {
       const position = { lat: cliente.lat, lng: cliente.lng }
@@ -1434,18 +1434,17 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
                   {clientesRutaSeleccionada.map((cliente) => {
                     const numeroColor = getNumeroColor(cliente, rutas.get(selectedRutaId)?.color || '#000000')
                     const isEntregadoYCobrado = cliente.estado === 'entregado' && cliente.pago_registrado
-                    
+
                     return (
                       <button
                         key={cliente.id}
                         onClick={() => handleClienteClick(cliente, selectedRutaId)}
-                        className={`w-full p-3 rounded-lg border-2 transition-all hover:shadow-md ${
-                          isEntregadoYCobrado 
-                            ? 'border-black bg-black/5' 
+                        className={`w-full p-3 rounded-lg border-2 transition-all hover:shadow-md ${isEntregadoYCobrado
+                            ? 'border-black bg-black/5'
                             : cliente.estado === 'entregado'
-                            ? 'border-gray-400 bg-gray-50'
-                            : 'border-primary/20 bg-background hover:border-primary/40'
-                        }`}
+                              ? 'border-gray-400 bg-gray-50'
+                              : 'border-primary/20 bg-background hover:border-primary/40'
+                          }`}
                       >
                         <div className="flex items-center gap-3">
                           <div
