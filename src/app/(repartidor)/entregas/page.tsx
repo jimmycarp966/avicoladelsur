@@ -6,72 +6,61 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { createClient } from '@/lib/supabase/server'
 import { RepartoSkeleton } from './reparto-skeleton'
-import { obtenerRutasPorVehiculoAction } from '@/actions/reparto.actions'
 import { FiltrosClient } from './filtros-client'
+import { getCurrentUser } from '@/actions/auth.actions'
 
 export const dynamic = 'force-dynamic'
 
 async function RepartoContent({ searchParams }: { searchParams: { fecha?: string; turno?: string } }) {
   const supabase = await createClient()
+  const user = await getCurrentUser()
 
-  // Obtener usuario actual (repartidor)
-  const { data: { user } } = await supabase.auth.getUser()
   if (!user) return <div>No autorizado</div>
-
-  // Obtener vehículo asignado al repartidor
-  const { data: usuario } = await supabase
-    .from('usuarios')
-    .select('vehiculo_asignado')
-    .eq('id', user.id)
-    .single()
-
-  if (!usuario?.vehiculo_asignado) {
-    return (
-      <div className="p-4">
-        <Card>
-          <CardContent className="p-8 text-center">
-            <Truck className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium">No hay vehículo asignado</h3>
-            <p className="text-muted-foreground">
-              Contacta al administrador para asignar un vehículo
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
 
   // Filtros
   const fechaFiltro = searchParams.fecha || undefined
   const turnoFiltro = searchParams.turno || undefined
 
-  // Obtener rutas del vehículo del repartidor (sin filtrar por fecha si no se especifica)
-  const rutasResponse = await obtenerRutasPorVehiculoAction(usuario.vehiculo_asignado, fechaFiltro)
-  
-  if (!rutasResponse.success) {
-    console.error('Error obteniendo rutas:', rutasResponse.error)
+  // Obtener rutas asignadas al repartidor directamente por repartidor_id
+  let query = supabase
+    .from('rutas_reparto')
+    .select(`
+      *,
+      vehiculo:vehiculos(patente, marca, modelo),
+      zona:zonas(nombre)
+    `)
+    .eq('repartidor_id', user.id)
+    .order('fecha_ruta', { ascending: false })
+    .limit(20)
+
+  if (fechaFiltro) {
+    query = query.eq('fecha_ruta', fechaFiltro)
   }
-  
-  const rutas = rutasResponse.success && rutasResponse.data ? (rutasResponse.data as any[]) : []
+
+  const { data: rutas, error: rutasError } = await query
+
+  if (rutasError) {
+    console.error('Error obteniendo rutas:', rutasError)
+  }
 
   // Filtrar por turno si se especifica
-  const rutasFiltradas = turnoFiltro 
-    ? rutas.filter((r: any) => r.turno === turnoFiltro)
-    : rutas
+  const rutasFiltradas = turnoFiltro
+    ? (rutas || []).filter((r: any) => r.turno === turnoFiltro)
+    : (rutas || [])
 
   // Obtener todas las entregas de las rutas activas (incluir también 'completada' para ver historial)
-  const rutasActivas = rutasFiltradas.filter((r: any) => 
+  const rutasActivas = rutasFiltradas.filter((r: any) =>
     ['planificada', 'en_curso', 'completada'].includes(r.estado)
   )
 
   // Obtener detalles de ruta con información completa
   const rutaIds = rutasActivas.map((r: any) => r.id)
-  
+
   // Obtener detalles básicos primero
   const { data: detallesRutaRaw, error: detallesError } = rutaIds.length > 0
     ? await supabase
-        .from('detalles_ruta')
-        .select(`
+      .from('detalles_ruta')
+      .select(`
           id,
           orden_entrega,
           estado_entrega,
@@ -97,8 +86,8 @@ async function RepartoContent({ searchParams }: { searchParams: { fecha?: string
             vehiculo:vehiculos(patente, marca, modelo)
           )
         `)
-        .in('ruta_id', rutaIds)
-        .order('orden_entrega')
+      .in('ruta_id', rutaIds)
+      .order('orden_entrega')
     : { data: [], error: null }
 
   if (detallesError) {
@@ -198,13 +187,13 @@ async function RepartoContent({ searchParams }: { searchParams: { fecha?: string
           <div>
             <h1 className="text-2xl font-bold">Reparto del Día</h1>
             <p className="text-muted-foreground">
-              {fechaFiltro 
+              {fechaFiltro
                 ? new Date(fechaFiltro).toLocaleDateString('es-AR', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  })
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })
                 : 'Todas las fechas'}
             </p>
           </div>
@@ -251,18 +240,18 @@ async function RepartoContent({ searchParams }: { searchParams: { fecha?: string
             <CardContent className="p-8 text-center">
               <Truck className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
               <h3 className="text-lg font-medium">
-                {rutas.length === 0 
-                  ? 'No hay rutas asignadas' 
+                {rutas.length === 0
+                  ? 'No hay rutas asignadas'
                   : rutasActivas.length === 0
-                  ? 'No hay rutas activas'
-                  : 'No hay entregas en las rutas activas'}
+                    ? 'No hay rutas activas'
+                    : 'No hay entregas en las rutas activas'}
               </h3>
               <p className="text-muted-foreground">
-                {rutas.length === 0 
+                {rutas.length === 0
                   ? 'Esperando asignación de ruta por el administrador'
                   : rutasActivas.length === 0
-                  ? `Hay ${rutas.length} ruta(s) pero ninguna está en estado activo (planificada/en_curso)`
-                  : `Hay ${rutasActivas.length} ruta(s) activa(s) pero no tienen entregas asignadas. Contacta al administrador.`}
+                    ? `Hay ${rutas.length} ruta(s) pero ninguna está en estado activo (planificada/en_curso)`
+                    : `Hay ${rutasActivas.length} ruta(s) activa(s) pero no tienen entregas asignadas. Contacta al administrador.`}
               </p>
               {rutas.length > 0 && (
                 <div className="mt-4 text-sm text-muted-foreground">
@@ -281,7 +270,7 @@ async function RepartoContent({ searchParams }: { searchParams: { fecha?: string
             const ruta = grupo.ruta
             const entregasRuta = grupo.entregas
             const entregasCompletadasRuta = entregasRuta.filter((e: any) => e.estado === 'entregado').length
-            
+
             return (
               <div key={rutaId} className="space-y-3">
                 {/* Header de Ruta */}
@@ -320,96 +309,96 @@ async function RepartoContent({ searchParams }: { searchParams: { fecha?: string
 
                 {/* Entregas de esta ruta */}
                 {entregasRuta.map((entrega: any) => (
-            <Card key={entrega.id} className="hover:shadow-md transition-shadow">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline">#{entrega.orden_entrega}</Badge>
-                    <span className="font-semibold">{entrega.numero_pedido}</span>
-                    <Badge
-                      variant={entrega.pago_estado === 'pagado' ? 'default' : 'secondary'}
-                      className="text-xs"
-                    >
-                      {entrega.pago_estado === 'pagado' ? 'Pagado' : 'Pendiente'}
-                    </Badge>
-                  </div>
-                    <Badge variant="outline" className="text-xs">
-                      <MapPin className="mr-1 h-3 w-3" />
-                      {entrega.ruta?.numero_ruta || 'Ruta'}
-                    </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {/* Información del cliente */}
-                  <div>
-                    <h4 className="font-medium">{entrega.cliente?.nombre || 'Cliente'}</h4>
-                    <p className="text-sm text-muted-foreground">
-                      📍 {entrega.cliente?.direccion || 'Dirección no disponible'}
-                    </p>
-                    {entrega.cliente?.telefono && (
-                      <p className="text-sm text-muted-foreground">
-                        📞 {entrega.cliente.telefono}
-                      </p>
-                    )}
-                  </div>
+                  <Card key={entrega.id} className="hover:shadow-md transition-shadow">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline">#{entrega.orden_entrega}</Badge>
+                          <span className="font-semibold">{entrega.numero_pedido}</span>
+                          <Badge
+                            variant={entrega.pago_estado === 'pagado' ? 'default' : 'secondary'}
+                            className="text-xs"
+                          >
+                            {entrega.pago_estado === 'pagado' ? 'Pagado' : 'Pendiente'}
+                          </Badge>
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          <MapPin className="mr-1 h-3 w-3" />
+                          {entrega.ruta?.numero_ruta || 'Ruta'}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {/* Información del cliente */}
+                        <div>
+                          <h4 className="font-medium">{entrega.cliente?.nombre || 'Cliente'}</h4>
+                          <p className="text-sm text-muted-foreground">
+                            📍 {entrega.cliente?.direccion || 'Dirección no disponible'}
+                          </p>
+                          {entrega.cliente?.telefono && (
+                            <p className="text-sm text-muted-foreground">
+                              📞 {entrega.cliente.telefono}
+                            </p>
+                          )}
+                        </div>
 
-                  {/* Información del pedido */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4 text-sm">
-                      <span className="flex items-center gap-1">
-                        <DollarSign className="h-4 w-4" />
-                        ${entrega.total?.toFixed(2) || '0.00'}
-                      </span>
-                      {entrega.ruta?.vehiculo?.patente && (
-                        <span className="flex items-center gap-1">
-                          <Truck className="h-4 w-4" />
-                          {entrega.ruta.vehiculo.patente}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                        {/* Información del pedido */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4 text-sm">
+                            <span className="flex items-center gap-1">
+                              <DollarSign className="h-4 w-4" />
+                              ${entrega.total?.toFixed(2) || '0.00'}
+                            </span>
+                            {entrega.ruta?.vehiculo?.patente && (
+                              <span className="flex items-center gap-1">
+                                <Truck className="h-4 w-4" />
+                                {entrega.ruta.vehiculo.patente}
+                              </span>
+                            )}
+                          </div>
+                        </div>
 
-                  {/* Instrucciones del repartidor */}
-                  {entrega.instrucciones && (
-                    <div className="bg-yellow-50 p-3 rounded-md">
-                      <p className="text-sm">
-                        <FileText className="inline h-4 w-4 mr-1" />
-                        {entrega.instrucciones}
-                      </p>
-                    </div>
-                  )}
+                        {/* Instrucciones del repartidor */}
+                        {entrega.instrucciones && (
+                          <div className="bg-yellow-50 p-3 rounded-md">
+                            <p className="text-sm">
+                              <FileText className="inline h-4 w-4 mr-1" />
+                              {entrega.instrucciones}
+                            </p>
+                          </div>
+                        )}
 
-                  {/* Acciones */}
-                  <div className="flex gap-2 pt-2">
-                    <Button variant="outline" size="sm" className="flex-1" asChild>
-                      <Link href={`/ruta/${rutaId}/entrega/${entrega.id}`}>
-                        <MapPin className="mr-2 h-4 w-4" />
-                        Gestionar
-                      </Link>
-                    </Button>
-                    {entrega.estado !== 'entregado' && (
-                      <Button
-                        size="sm"
-                        className="flex-1 bg-green-600 hover:bg-green-700"
-                        asChild
-                      >
-                        <Link href={`/ruta/${rutaId}`}>
-                          <CheckCircle className="mr-2 h-4 w-4" />
-                          Ir a ruta
-                        </Link>
-                      </Button>
-                    )}
-                    {entrega.estado === 'entregado' && (
-                      <Badge variant="default" className="flex-1 justify-center">
-                        <CheckCircle className="mr-2 h-4 w-4" />
-                        Entregado
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                        {/* Acciones */}
+                        <div className="flex gap-2 pt-2">
+                          <Button variant="outline" size="sm" className="flex-1" asChild>
+                            <Link href={`/ruta/${rutaId}/entrega/${entrega.id}`}>
+                              <MapPin className="mr-2 h-4 w-4" />
+                              Gestionar
+                            </Link>
+                          </Button>
+                          {entrega.estado !== 'entregado' && (
+                            <Button
+                              size="sm"
+                              className="flex-1 bg-green-600 hover:bg-green-700"
+                              asChild
+                            >
+                              <Link href={`/ruta/${rutaId}`}>
+                                <CheckCircle className="mr-2 h-4 w-4" />
+                                Ir a ruta
+                              </Link>
+                            </Button>
+                          )}
+                          {entrega.estado === 'entregado' && (
+                            <Badge variant="default" className="flex-1 justify-center">
+                              <CheckCircle className="mr-2 h-4 w-4" />
+                              Entregado
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
             )
