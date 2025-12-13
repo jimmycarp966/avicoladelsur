@@ -1,12 +1,11 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, MapPinned } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import RutaMap from '@/components/reparto/RutaMap'
-import GpsTracker from '@/components/reparto/GpsTracker'
+import RutaMapaClient from '@/components/reparto/RutaMapaClient'
 
 export const dynamic = 'force-dynamic'
 
@@ -182,57 +181,21 @@ async function RutaMapaContent({ rutaId }: { rutaId: string }) {
         </Badge>
       </div>
 
-      <Card>
-        <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <MapPinned className="h-4 w-4" />
-            Ruta optimizada
-          </CardTitle>
-          <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground md:grid-cols-4">
-            <div>
-              <span className="text-xs uppercase tracking-wide block">Vehículo</span>
-              <p className="font-semibold text-foreground">
-                {ruta.vehiculo?.patente} • {ruta.vehiculo?.marca} {ruta.vehiculo?.modelo}
-              </p>
-            </div>
-            <div>
-              <span className="text-xs uppercase tracking-wide block">Turno</span>
-              <p className="font-semibold text-foreground">
-                {ruta.turno === 'mañana' ? 'Mañana' : 'Tarde'}
-              </p>
-            </div>
-            <div>
-              <span className="text-xs uppercase tracking-wide block">Zona</span>
-              <p className="font-semibold text-foreground">
-                {ruta.zona?.nombre || 'Sin zona'}
-              </p>
-            </div>
-            <div>
-              <span className="text-xs uppercase tracking-wide block">Entregas</span>
-              <p className="font-semibold text-foreground">
-                {ruta.detalles_ruta?.length || 0}
-              </p>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <RutaMap
-            rutaId={ruta.id}
-            entregas={ruta.detalles_ruta || []}
-            showGpsTracking={puedeTrackear}
-            repartidorId={ruta.repartidor_id}
-            vehiculoId={ruta.vehiculo_id}
-          />
-        </CardContent>
-      </Card>
-
-      {puedeTrackear && (
-        <GpsTracker
-          repartidorId={ruta.repartidor_id}
-          vehiculoId={ruta.vehiculo_id}
-          rutaId={ruta.id}
-        />
-      )}
+      <RutaMapaClient
+        ruta={{
+          id: ruta.id,
+          numero_ruta: ruta.numero_ruta,
+          fecha_ruta: ruta.fecha_ruta,
+          turno: ruta.turno,
+          estado: ruta.estado,
+          repartidor_id: ruta.repartidor_id,
+          vehiculo_id: ruta.vehiculo_id,
+          zona: ruta.zona,
+          vehiculo: ruta.vehiculo,
+          detalles_ruta: ruta.detalles_ruta,
+        }}
+        puedeTrackear={puedeTrackear}
+      />
     </div>
   )
 }
