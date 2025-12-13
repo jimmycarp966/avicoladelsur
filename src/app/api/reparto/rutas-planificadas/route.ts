@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
           )
         )
       `)
-      .in('estado', ['en_curso', 'planificada'])
+      .in('estado', ['en_curso', 'planificada', 'optimizada'])
 
     // Filtrar por fecha solo si se proporciona
     if (fecha && fechaDesde) {
