@@ -699,31 +699,103 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
 
       // Si no hay polyline válido o tiene menos de 2 puntos (se necesitan al menos 2 para dibujar línea)
       if (!path || path.length < 2) {
-        console.log(`🎨 [DEBUG] Generando polyline dinámicamente desde puntos de la ruta ${ruta.numero}`)
+        console.log(`🎨 [DEBUG] Polyline insuficiente, solicitando ruta real a Google Directions para ${ruta.numero}`)
 
-        // Construir path desde: casa central -> clientes (en orden) -> casa central
-        const puntosRuta: any[] = []
-
-        // 1. Agregar casa central (origen)
+        // Construir waypoints desde: casa central -> clientes (en orden) -> casa central
         const homeBase = config.rutas.homeBase
-        puntosRuta.push(new window.google.maps.LatLng(homeBase.lat, homeBase.lng))
-
-        // 2. Agregar clientes en orden de visita
         const clientesOrdenados = [...ruta.ordenVisita].sort((a, b) => (a.orden || 0) - (b.orden || 0))
-        clientesOrdenados.forEach(cliente => {
-          if (cliente.lat && cliente.lng && !isNaN(cliente.lat) && !isNaN(cliente.lng)) {
-            puntosRuta.push(new window.google.maps.LatLng(cliente.lat, cliente.lng))
+        const clientesValidos = clientesOrdenados.filter(c => c.lat && c.lng && !isNaN(c.lat) && !isNaN(c.lng))
+
+        if (clientesValidos.length > 0 && window.google.maps.DirectionsService) {
+          try {
+            const directionsService = new window.google.maps.DirectionsService()
+
+            const origin = { lat: homeBase.lat, lng: homeBase.lng }
+            const destination = config.rutas.returnToBase
+              ? { lat: homeBase.lat, lng: homeBase.lng }
+              : { lat: clientesValidos[clientesValidos.length - 1].lat, lng: clientesValidos[clientesValidos.length - 1].lng }
+
+            // Preparar waypoints (puntos intermedios)
+            const waypoints = clientesValidos.map(c => ({
+              location: { lat: c.lat, lng: c.lng },
+              stopover: true
+            }))
+
+            // Si volvemos a la base, todos los clientes son waypoints
+            // Si no, el último cliente es el destino
+            const waypointsToUse = config.rutas.returnToBase
+              ? waypoints
+              : waypoints.slice(0, -1)
+
+            console.log(`🗺️ [DEBUG] Solicitando Directions: origen=${JSON.stringify(origin)}, destino=${JSON.stringify(destination)}, waypoints=${waypointsToUse.length}`)
+
+            directionsService.route({
+              origin,
+              destination,
+              waypoints: waypointsToUse,
+              optimizeWaypoints: false, // Mantener el orden que definimos
+              travelMode: window.google.maps.TravelMode.DRIVING
+            }, (result: any, status: any) => {
+              if (status === 'OK' && result.routes && result.routes.length > 0) {
+                console.log(`✅ [DEBUG] Directions OK para ruta ${ruta.numero}`)
+
+                // Crear polyline desde el resultado de Directions
+                const routePath = result.routes[0].overview_path
+
+                if (routePath && routePath.length > 0) {
+                  const directionsPolyline = new window.google.maps.Polyline({
+                    path: routePath,
+                    geodesic: true,
+                    strokeColor: ruta.color,
+                    strokeOpacity: selectedRutaId === ruta.id ? 0.9 : 0.7,
+                    strokeWeight: selectedRutaId === ruta.id ? 6 : 4,
+                    zIndex: selectedRutaId === ruta.id ? 10 : 1,
+                    map: mapInstanceRef.current
+                  })
+
+                  polylinesRef.current.set(`ruta-directions-${ruta.id}`, directionsPolyline)
+                  console.log(`🎨 [DEBUG] Polyline de Directions dibujada con ${routePath.length} puntos`)
+                }
+              } else {
+                console.warn(`⚠️ [DEBUG] Directions falló para ruta ${ruta.numero}: ${status}`)
+                // Fallback: dibujar línea recta
+                drawStraightLineFallback()
+              }
+            })
+          } catch (err: any) {
+            console.error(`❌ [DEBUG] Error solicitando Directions:`, err)
+            drawStraightLineFallback()
           }
-        })
 
-        // 3. Agregar casa central de nuevo (destino) si returnToBase está activo
-        if (config.rutas.returnToBase) {
+          // Función para dibujar línea recta como fallback
+          function drawStraightLineFallback() {
+            const puntosRuta: any[] = []
+            puntosRuta.push(new window.google.maps.LatLng(homeBase.lat, homeBase.lng))
+            clientesValidos.forEach(cliente => {
+              puntosRuta.push(new window.google.maps.LatLng(cliente.lat, cliente.lng))
+            })
+            if (config.rutas.returnToBase) {
+              puntosRuta.push(new window.google.maps.LatLng(homeBase.lat, homeBase.lng))
+            }
+            path = puntosRuta
+            console.log(`🎨 [DEBUG] Fallback: línea recta con ${path.length} puntos`)
+          }
+        } else {
+          // Si no hay clientes válidos o no está disponible DirectionsService, usar línea recta
+          const puntosRuta: any[] = []
           puntosRuta.push(new window.google.maps.LatLng(homeBase.lat, homeBase.lng))
-        }
-
-        if (puntosRuta.length > 0) {
-          path = puntosRuta
-          console.log(`🎨 [DEBUG] Polyline generado con ${path.length} puntos (casa central + ${clientesOrdenados.length} clientes)`)
+          clientesOrdenados.forEach(cliente => {
+            if (cliente.lat && cliente.lng && !isNaN(cliente.lat) && !isNaN(cliente.lng)) {
+              puntosRuta.push(new window.google.maps.LatLng(cliente.lat, cliente.lng))
+            }
+          })
+          if (config.rutas.returnToBase) {
+            puntosRuta.push(new window.google.maps.LatLng(homeBase.lat, homeBase.lng))
+          }
+          if (puntosRuta.length > 0) {
+            path = puntosRuta
+            console.log(`🎨 [DEBUG] Polyline simple generado con ${path.length} puntos`)
+          }
         }
       }
 
@@ -1440,10 +1512,10 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
                         key={cliente.id}
                         onClick={() => handleClienteClick(cliente, selectedRutaId)}
                         className={`w-full p-3 rounded-lg border-2 transition-all hover:shadow-md ${isEntregadoYCobrado
-                            ? 'border-black bg-black/5'
-                            : cliente.estado === 'entregado'
-                              ? 'border-gray-400 bg-gray-50'
-                              : 'border-primary/20 bg-background hover:border-primary/40'
+                          ? 'border-black bg-black/5'
+                          : cliente.estado === 'entregado'
+                            ? 'border-gray-400 bg-gray-50'
+                            : 'border-primary/20 bg-background hover:border-primary/40'
                           }`}
                       >
                         <div className="flex items-center gap-3">
