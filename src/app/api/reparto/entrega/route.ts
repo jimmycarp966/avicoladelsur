@@ -11,8 +11,12 @@ const registrarEntregaSchema = z.object({
   comprobante_url: z.string().url().optional(),
   metodo_pago: z.enum(['efectivo', 'transferencia', 'qr', 'tarjeta', 'cuenta_corriente']).optional(),
   numero_transaccion: z.string().optional(),
-  monto_cobrado: z.number().positive().optional(),
+  monto_cobrado: z.number().min(0).optional(),
   notas_entrega: z.string().optional(),
+  // Nuevos campos para estados adicionales
+  es_pago_parcial: z.boolean().optional(),
+  motivo_rechazo: z.string().optional(),
+  estado_entrega: z.enum(['pendiente', 'entregado', 'rechazado']).optional(),
 })
 
 export async function POST(request: NextRequest) {
@@ -100,10 +104,27 @@ export async function POST(request: NextRequest) {
     }
 
     // Registrar información de pago según el caso:
+    // - Si es_pago_parcial: Pagó parcialmente
+    // - Si motivo_rechazo: Rechazó el pedido
     // - Si monto_cobrado > 0: Ya pagó
     // - Si monto_cobrado = 0 pero hay metodo_pago: Pendiente de pago
     // - Si monto_cobrado = 0 y no hay metodo_pago: Pagará después (solo notas)
-    if (data.monto_cobrado && data.monto_cobrado > 0) {
+
+    if (data.motivo_rechazo) {
+      // Pedido rechazado
+      updateData.pago_registrado = true // Marcamos como "registrado" para que se pueda ver el estado
+      updateData.metodo_pago_registrado = null
+      updateData.monto_cobrado_registrado = 0
+      updateData.notas_pago = `Rechazado: ${data.motivo_rechazo}. ${data.notas_entrega || ''}`
+      updateData.estado_entrega = 'rechazado'
+    } else if (data.es_pago_parcial && data.monto_cobrado !== undefined && data.monto_cobrado > 0) {
+      // Pago parcial
+      updateData.pago_registrado = true
+      updateData.metodo_pago_registrado = data.metodo_pago || 'efectivo'
+      updateData.monto_cobrado_registrado = data.monto_cobrado
+      updateData.numero_transaccion_registrado = data.numero_transaccion || null
+      updateData.notas_pago = `Pago parcial. ${data.notas_entrega || ''}`
+    } else if (data.monto_cobrado && data.monto_cobrado > 0) {
       // Ya pagó - registrar monto y método
       updateData.pago_registrado = true
       updateData.metodo_pago_registrado = data.metodo_pago || 'efectivo'

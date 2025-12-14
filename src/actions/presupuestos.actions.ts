@@ -17,6 +17,7 @@ const crearPresupuestoSchema = z.object({
   fecha_entrega_estimada: z.string().optional(),
   observaciones: z.string().optional(),
   lista_precio_id: z.string().uuid().optional(), // Lista global (por defecto)
+  tipo_venta: z.enum(['reparto', 'retira_casa_central']).default('reparto'),
   items: z.array(z.object({
     producto_id: z.string().uuid(),
     cantidad_solicitada: z.number().positive(),
@@ -69,6 +70,7 @@ export async function crearPresupuestoAction(formData: FormData) {
       fecha_entrega_estimada: rawData.fecha_entrega_estimada || undefined,
       observaciones: rawData.observaciones || undefined,
       lista_precio_id: rawData.lista_precio_id || undefined,
+      tipo_venta: rawData.tipo_venta || 'reparto',
       items: JSON.parse(rawData.items as string),
     })
 
@@ -109,12 +111,15 @@ export async function crearPresupuestoAction(formData: FormData) {
       result_completo: result
     })
 
-    // Asignar usuario vendedor y lista de precios
-    const updateData: { usuario_vendedor: string; lista_precio_id?: string } = {
+    // Asignar usuario vendedor, lista de precios, y tipo de venta
+    const updateData: { usuario_vendedor: string; lista_precio_id?: string; tipo_venta?: string } = {
       usuario_vendedor: user.id,
     }
     if (data.lista_precio_id) {
       updateData.lista_precio_id = data.lista_precio_id
+    }
+    if (data.tipo_venta) {
+      updateData.tipo_venta = data.tipo_venta
     }
     await supabase
       .from('presupuestos')
@@ -262,7 +267,7 @@ export async function confirmarPresupuestoAction(formData: FormData) {
       .select('id, numero_presupuesto, turno, zona_id, fecha_entrega_estimada, estado')
       .eq('id', data.presupuesto_id)
       .single()
-    
+
     devLog('🔍 DEBUG confirmarPresupuestoAction - Presupuesto:', JSON.stringify(presupuestoDebug, null, 2))
 
     // Llamar RPC para convertir presupuesto a pedido
@@ -283,8 +288,8 @@ export async function confirmarPresupuestoAction(formData: FormData) {
 
     if (error) {
       devError('❌ Error convirtiendo presupuesto:', error)
-      return { 
-        success: false, 
+      return {
+        success: false,
         message: `Error al convertir presupuesto: ${error.message || error.code || 'Error desconocido'}`,
         debug: { error, presupuesto: presupuestoDebug }
       }
@@ -292,8 +297,8 @@ export async function confirmarPresupuestoAction(formData: FormData) {
 
     if (!result || !result.success) {
       devError('❌ RPC devolvió error:', result?.error)
-      return { 
-        success: false, 
+      return {
+        success: false,
         message: result?.error || 'Error en la conversión del presupuesto',
         debug: { result, presupuesto: presupuestoDebug }
       }
@@ -730,7 +735,7 @@ export async function obtenerPresupuestoAction(presupuestoId: string) {
         errorHint: presupuestoError.hint,
         errorCompleto: presupuestoError
       })
-      
+
       // Si el error es "no encontrado", dar mensaje más claro
       if (presupuestoError.code === 'PGRST116' || presupuestoError.message?.includes('No rows')) {
         return {
@@ -767,7 +772,7 @@ export async function obtenerPresupuestoAction(presupuestoId: string) {
         .select('numero_pedido')
         .eq('id', presupuestoData.pedido_convertido_id)
         .single()
-      
+
       if (pedidoData) {
         pedidoConvertido = { numero_pedido: pedidoData.numero_pedido }
       }

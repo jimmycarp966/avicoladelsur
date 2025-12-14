@@ -1,25 +1,18 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import {
   MapPin,
-  CheckCircle,
   DollarSign,
-  Camera,
   FileText,
-  Package,
-  X,
   Phone,
-  Navigation
+  Navigation,
+  CheckCircle
 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { toast } from 'sonner'
-import { actualizarEstadoEntrega } from '@/actions/reparto.actions'
 
 interface EntregaCardProps {
   entrega: any
@@ -28,25 +21,13 @@ interface EntregaCardProps {
 }
 
 export function EntregaCard({ entrega, rutaId, rutaEstado }: EntregaCardProps) {
-  const router = useRouter()
-  const [loading, setLoading] = useState(false)
   const pedido = entrega.pedido
   const cliente = pedido?.cliente
 
-  const handleMarcarEntregado = async () => {
-    setLoading(true)
-    const result = await actualizarEstadoEntrega(entrega.id, 'entregado')
-    setLoading(false)
-
-    if (result.success) {
-      toast.success('Entrega marcada como completada')
-      router.refresh()
-    } else {
-      toast.error(result.error || 'Error al marcar entrega')
-    }
-  }
-
-  const puedeEditar = rutaEstado === 'en_curso' && entrega.estado_entrega !== 'entregado'
+  // Puede editar si la ruta está en curso y la entrega no está completada ni rechazada
+  const puedeEditar = rutaEstado === 'en_curso' &&
+    entrega.estado_entrega !== 'entregado' &&
+    entrega.estado_entrega !== 'rechazado'
 
   return (
     <Card className={entrega.estado_entrega === 'entregado' ? 'opacity-75' : ''}>
@@ -151,26 +132,20 @@ export function EntregaCard({ entrega, rutaId, rutaEstado }: EntregaCardProps) {
               <Separator />
               <div className="flex gap-2">
                 <Button
-                  variant="outline"
+                  variant="default"
                   size="sm"
                   className="flex-1"
                   asChild
                 >
                   <Link href={`/ruta/${rutaId}/entrega/${entrega.id}`}>
                     <FileText className="mr-2 h-4 w-4" />
-                    Gestionar
+                    Gestionar Entrega
                   </Link>
                 </Button>
-                <Button
-                  size="sm"
-                  className="flex-1 bg-green-600 hover:bg-green-700"
-                  onClick={handleMarcarEntregado}
-                  disabled={loading}
-                >
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                  {loading ? 'Marcando...' : 'Entregar'}
-                </Button>
               </div>
+              <p className="text-xs text-muted-foreground text-center">
+                Debes registrar el pago antes de marcar como entregado
+              </p>
             </>
           )}
 
@@ -180,7 +155,7 @@ export function EntregaCard({ entrega, rutaId, rutaEstado }: EntregaCardProps) {
               <div className="flex items-center justify-center">
                 <Badge variant="default" className="bg-green-600">
                   <CheckCircle className="mr-2 h-4 w-4" />
-                  Entregado {entrega.fecha_hora_entrega && 
+                  Entregado {entrega.fecha_hora_entrega &&
                     new Date(entrega.fecha_hora_entrega).toLocaleTimeString('es-AR', {
                       hour: '2-digit',
                       minute: '2-digit'
@@ -199,7 +174,7 @@ export function EntregaCard({ entrega, rutaId, rutaEstado }: EntregaCardProps) {
               className="w-full"
               asChild
             >
-              <Link 
+              <Link
                 href={`https://www.google.com/maps/dir/?api=1&destination=${cliente.coordenadas.lat},${cliente.coordenadas.lng}`}
                 target="_blank"
               >

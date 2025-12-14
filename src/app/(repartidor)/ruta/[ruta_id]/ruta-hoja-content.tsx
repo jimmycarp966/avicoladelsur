@@ -41,14 +41,16 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
 
   const entregas = ruta.detalles_ruta || []
   const entregasOrdenadas = [...entregas].sort((a, b) => a.orden_entrega - b.orden_entrega)
-  const entregasCompletadas = entregas.filter((e: any) => e.estado_entrega === 'entregado').length
-  const entregasPendientes = entregas.filter((e: any) => 
-    e.estado_entrega === 'pendiente' || !e.estado_entrega
+  const entregasCompletadas = entregas.filter((e: any) =>
+    e.estado_entrega === 'entregado' || e.estado_entrega === 'rechazado'
+  ).length
+  const entregasPendientes = entregas.filter((e: any) =>
+    e.estado_entrega === 'pendiente' || e.estado_entrega === 'en_camino' || !e.estado_entrega
   ).length
   const totalCobrar = entregas
     .filter((e: any) => e.pedido?.pago_estado !== 'pagado')
     .reduce((sum: number, e: any) => sum + (e.pedido?.total || 0), 0)
-  
+
   // Debug: Log si no hay entregas
   if (entregas.length === 0) {
     console.warn('⚠️ Ruta sin entregas:', {
@@ -58,7 +60,7 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
       detalles_ruta: ruta.detalles_ruta
     })
   }
-  
+
   // Calcular recaudación registrada
   const entregasConPago = entregas.filter((e: any) => e.pago_registrado && e.monto_cobrado_registrado > 0)
   const recaudacionRegistrada = ruta.recaudacion_total_registrada || 0
@@ -70,11 +72,15 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
 
   // Verificar que todas las entregas completadas tengan estado de pago definido
   // Una entrega tiene estado definido si:
-  // - Tiene pago_registrado = true (ya pagó)
+  // - Tiene pago_registrado = true (ya pagó, pago parcial, o rechazo)
   // - O tiene metodo_pago_registrado pero monto = 0 (pendiente)
   // - O tiene notas_pago indicando que pagará después
+  // - O fue rechazada (estado_entrega = 'rechazado')
   const entregasSinEstadoPago = entregas.filter((e: any) => {
-    if (e.estado_entrega !== 'entregado') return false // Solo verificar entregas completadas
+    // Verificar entregas completadas (entregado o rechazado)
+    if (e.estado_entrega !== 'entregado' && e.estado_entrega !== 'rechazado') return false
+    // Las rechazadas siempre tienen pago_registrado = true
+    if (e.estado_entrega === 'rechazado') return false
     // Si tiene pago registrado con monto > 0, está definido
     if (e.pago_registrado && e.monto_cobrado_registrado > 0) return false
     // Si tiene método de pago registrado (aunque monto sea 0), está definido
@@ -88,8 +94,8 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
   // Permitir iniciar rutas en estado 'planificada' o 'en_curso' (rutas iniciadas desde almacén)
   // El botón aparecerá si tiene checklist_inicio_id completado
   const puedeIniciar = (ruta.estado === 'planificada' || ruta.estado === 'en_curso') && ruta.checklist_inicio_id
-  const puedeFinalizar = ruta.estado === 'en_curso' && 
-    entregasPendientes === 0 && 
+  const puedeFinalizar = ruta.estado === 'en_curso' &&
+    entregasPendientes === 0 &&
     entregasSinEstadoPago.length === 0 &&
     ruta.checklist_fin_id
 
@@ -157,12 +163,12 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
               })}
             </p>
           </div>
-          <Badge 
+          <Badge
             variant={ruta.estado === 'en_curso' ? 'default' : 'secondary'}
             className="text-sm"
           >
-            {ruta.estado === 'en_curso' ? 'En Curso' : 
-             ruta.estado === 'completada' ? 'Completada' : 'Planificada'}
+            {ruta.estado === 'en_curso' ? 'En Curso' :
+              ruta.estado === 'completada' ? 'Completada' : 'Planificada'}
           </Badge>
         </div>
 
@@ -246,11 +252,11 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
                 )}
               </CardTitle>
               <CardDescription>
-                {ruta.validada_por_tesorero 
+                {ruta.validada_por_tesorero
                   ? 'Esta ruta fue validada por tesorería y los fondos fueron acreditados en caja'
                   : ruta.estado === 'completada'
-                  ? 'La ruta está completada. Esperando validación de tesorería.'
-                  : 'Pagos registrados durante la ruta'}
+                    ? 'La ruta está completada. Esperando validación de tesorería.'
+                    : 'Pagos registrados durante la ruta'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -260,7 +266,7 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
                   ${recaudacionRegistrada.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                 </span>
               </div>
-              
+
               {Object.keys(pagosPorMetodo).length > 0 && (
                 <div>
                   <p className="text-sm font-medium mb-2">Desglose por método de pago:</p>

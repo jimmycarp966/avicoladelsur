@@ -36,7 +36,7 @@ export function calcularKgItem(presupuesto: any, item: any): number {
     const calculado = (item.peso_final ?? cant * kgPorUnidadMayor)
     return calculado
   }
-  
+
   // Si es mayorista pero no tiene kg_por_unidad_mayor configurado, retornar cantidad solicitada
   if (esMayorista && !kgPorUnidadMayor) {
     return item.cantidad_solicitada || 0
@@ -74,11 +74,13 @@ export async function obtenerPresupuestosDiaAction(fecha: string, zonaId?: strin
     .order('nombre')
 
   // Construir query con filtros
+  // Solo mostrar presupuestos de tipo 'reparto' (excluir los que retiran en casa central)
   let query = supabase
     .from('presupuestos')
     .select(presupuestoSelect)
     .eq('estado', 'en_almacen')
     .eq('fecha_entrega_estimada', fecha)
+    .or('tipo_venta.eq.reparto,tipo_venta.is.null') // Incluir null para backwards compatibility
 
   if (zonaId) {
     query = query.eq('zona_id', zonaId)
@@ -117,7 +119,7 @@ export async function obtenerPresupuestosDiaAction(fecha: string, zonaId?: strin
         runId: 'run1',
         hypothesisId: 'D',
       }),
-    }).catch(() => {})
+    }).catch(() => { })
   }
   // #endregion
 
@@ -126,12 +128,13 @@ export async function obtenerPresupuestosDiaAction(fecha: string, zonaId?: strin
     throw error
   }
 
-  // Obtener resumen del día completo (sin filtros)
+  // Obtener resumen del día completo (sin filtros de zona/turno, pero solo reparto)
   const { data: presupuestosDiaData, error: presupuestosDiaError } = await supabase
     .from('presupuestos')
     .select(presupuestoSelect)
     .eq('estado', 'en_almacen')
     .eq('fecha_entrega_estimada', fecha)
+    .or('tipo_venta.eq.reparto,tipo_venta.is.null') // Solo reparto
     .order('fecha_entrega_estimada', { ascending: true })
 
   if (presupuestosDiaError) {
@@ -307,43 +310,43 @@ export async function obtenerPresupuestosDiaAction(fecha: string, zonaId?: strin
     capacidad_restante: number
   }>()
 
-  ; (sugerenciasVehiculos || []).forEach((sugerencia: any) => {
-    if (!sugerencia?.vehiculo_id || !sugerencia?.presupuesto_id) {
-      return
-    }
-
-    const vehiculo = vehiculosAsignados[sugerencia.vehiculo_id] || null
-    const pesoEstimado = Number(sugerencia.peso_estimado) || 0
-    const capacidadRestante = Number(sugerencia.capacidad_restante ?? (vehiculo?.capacidad_kg || 0))
-    const vehiculoKey = sugerencia.vehiculo_id
-
-    if (!asignacionesVehiculoMap[vehiculoKey]) {
-      asignacionesVehiculoMap[vehiculoKey] = {
-        vehiculo,
-        peso_total: 0,
-        capacidad_restante: capacidadRestante,
-        presupuestos: [],
+    ; (sugerenciasVehiculos || []).forEach((sugerencia: any) => {
+      if (!sugerencia?.vehiculo_id || !sugerencia?.presupuesto_id) {
+        return
       }
-    }
 
-    asignacionesVehiculoMap[vehiculoKey].peso_total += pesoEstimado
-    asignacionesVehiculoMap[vehiculoKey].capacidad_restante = capacidadRestante
+      const vehiculo = vehiculosAsignados[sugerencia.vehiculo_id] || null
+      const pesoEstimado = Number(sugerencia.peso_estimado) || 0
+      const capacidadRestante = Number(sugerencia.capacidad_restante ?? (vehiculo?.capacidad_kg || 0))
+      const vehiculoKey = sugerencia.vehiculo_id
 
-    const presupuestoInfo = presupuestos?.find(p => p.id === sugerencia.presupuesto_id)
-    if (presupuestoInfo) {
-      asignacionesVehiculoMap[vehiculoKey].presupuestos.push({
-        id: sugerencia.presupuesto_id,
-        numero: presupuestoInfo.numero_presupuesto,
+      if (!asignacionesVehiculoMap[vehiculoKey]) {
+        asignacionesVehiculoMap[vehiculoKey] = {
+          vehiculo,
+          peso_total: 0,
+          capacidad_restante: capacidadRestante,
+          presupuestos: [],
+        }
+      }
+
+      asignacionesVehiculoMap[vehiculoKey].peso_total += pesoEstimado
+      asignacionesVehiculoMap[vehiculoKey].capacidad_restante = capacidadRestante
+
+      const presupuestoInfo = presupuestos?.find(p => p.id === sugerencia.presupuesto_id)
+      if (presupuestoInfo) {
+        asignacionesVehiculoMap[vehiculoKey].presupuestos.push({
+          id: sugerencia.presupuesto_id,
+          numero: presupuestoInfo.numero_presupuesto,
+          peso_estimado: pesoEstimado,
+        })
+      }
+
+      asignacionPorPresupuesto.set(sugerencia.presupuesto_id, {
+        vehiculo,
         peso_estimado: pesoEstimado,
+        capacidad_restante: capacidadRestante,
       })
-    }
-
-    asignacionPorPresupuesto.set(sugerencia.presupuesto_id, {
-      vehiculo,
-      peso_estimado: pesoEstimado,
-      capacidad_restante: capacidadRestante,
     })
-  })
 
   const asignacionesResumen = Object.values(asignacionesVehiculoMap)
 

@@ -43,7 +43,7 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
   const cliente = pedido?.cliente
   const productos = pedido?.detalle_pedido || []
 
-  const [estadoPago, setEstadoPago] = useState<'pagado' | 'pendiente' | 'pagara_despues' | ''>(
+  const [estadoPago, setEstadoPago] = useState<'pagado' | 'pendiente' | 'pagara_despues' | 'pago_parcial' | 'rechazado' | ''>(
     entrega.pago_registrado ? 'pagado' : ''
   )
   const [metodoPago, setMetodoPago] = useState(entrega.metodo_pago_registrado || 'efectivo')
@@ -54,6 +54,8 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
   const [comprobanteUrl, setComprobanteUrl] = useState(entrega.comprobante_url_registrado || '')
   const [notasEntrega, setNotasEntrega] = useState(entrega.notas_pago || entrega.notas_entrega || '')
   const [metodoPagoFuturo, setMetodoPagoFuturo] = useState('efectivo')
+  const [montoParcial, setMontoParcial] = useState(0)
+  const [motivoRechazo, setMotivoRechazo] = useState('')
   const [pagoLoading, setPagoLoading] = useState(false)
 
   const [productoId, setProductoId] = useState(productos[0]?.producto_id || '')
@@ -75,7 +77,7 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
     }
 
     setPagoLoading(true)
-    
+
     // Preparar datos según el estado de pago
     const bodyData: any = {
       pedido_id: pedido.id,
@@ -95,6 +97,16 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
     } else if (estadoPago === 'pagara_despues') {
       // Si pagará después, no registrar monto
       bodyData.monto_cobrado = 0
+    } else if (estadoPago === 'pago_parcial') {
+      // Pago parcial: registrar método y monto parcial
+      bodyData.metodo_pago = metodoPago
+      bodyData.monto_cobrado = Number(montoParcial) || 0
+      bodyData.es_pago_parcial = true
+    } else if (estadoPago === 'rechazado') {
+      // Pedido rechazado: registrar motivo
+      bodyData.monto_cobrado = 0
+      bodyData.motivo_rechazo = motivoRechazo || 'Sin motivo especificado'
+      bodyData.estado_entrega = 'rechazado'
     }
 
     const response = await fetch('/api/reparto/entrega', {
@@ -285,9 +297,11 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
                   required
                 >
                   <option value="">Selecciona un estado</option>
-                  <option value="pagado">Ya pagó</option>
+                  <option value="pagado">Ya pagó (total)</option>
+                  <option value="pago_parcial">Pagó parcialmente</option>
                   <option value="pendiente">Pendiente de pago</option>
                   <option value="pagara_despues">Pagará después</option>
+                  <option value="rechazado">Rechazó el pedido</option>
                 </select>
               </div>
 
@@ -359,6 +373,64 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
                 </div>
               )}
 
+              {estadoPago === 'pago_parcial' && (
+                <>
+                  <div className="space-y-1">
+                    <Label>Método de pago *</Label>
+                    <select
+                      className="w-full rounded-md border px-3 py-2 text-sm"
+                      value={metodoPago}
+                      onChange={(e) => setMetodoPago(e.target.value)}
+                      required
+                    >
+                      <option value="efectivo">Efectivo</option>
+                      <option value="transferencia">Transferencia</option>
+                      <option value="qr">QR</option>
+                      <option value="tarjeta">Tarjeta</option>
+                      <option value="cuenta_corriente">Cuenta corriente</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label>Monto cobrado (parcial) *</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={montoParcial}
+                      onChange={(e) => setMontoParcial(parseFloat(e.target.value) || 0)}
+                      placeholder={`Total del pedido: $${pedido?.total || 0}`}
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Restante: ${((pedido?.total || 0) - montoParcial).toFixed(2)}
+                    </p>
+                  </div>
+                </>
+              )}
+
+              {estadoPago === 'rechazado' && (
+                <div className="space-y-1">
+                  <Label>Motivo del rechazo *</Label>
+                  <select
+                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    value={motivoRechazo}
+                    onChange={(e) => setMotivoRechazo(e.target.value)}
+                    required
+                  >
+                    <option value="">Selecciona un motivo</option>
+                    <option value="cliente_ausente">Cliente ausente</option>
+                    <option value="no_tiene_dinero">No tiene dinero</option>
+                    <option value="producto_incorrecto">Producto incorrecto</option>
+                    <option value="cambio_de_opinion">Cambió de opinión</option>
+                    <option value="direccion_incorrecta">Dirección incorrecta</option>
+                    <option value="otro">Otro motivo</option>
+                  </select>
+                  <div className="bg-red-50 border border-red-200 rounded-md p-2 text-xs text-red-800 mt-2">
+                    ⚠️ El pedido quedará registrado como rechazado y el stock se repondrá automáticamente.
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-1">
                 <Label>Notas</Label>
                 <Textarea
@@ -373,7 +445,7 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
                 <div className="bg-blue-50 border border-blue-200 rounded-md p-2 text-sm text-blue-800">
                   <p className="font-semibold">Pago ya registrado</p>
                   <p className="text-xs">
-                    Método: {entrega.metodo_pago_registrado || 'N/A'} | 
+                    Método: {entrega.metodo_pago_registrado || 'N/A'} |
                     Monto: ${entrega.monto_cobrado_registrado || 0}
                   </p>
                   <p className="text-xs mt-1">
@@ -504,23 +576,30 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
           </Badge>
 
           {entrega.estado_entrega !== 'entregado' && (
-            <Button
-              onClick={handleMarcarEntregado}
-              disabled={estadoLoading}
-              className="w-full bg-green-600 hover:bg-green-700"
-            >
-              {estadoLoading ? (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                  Enviando...
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                  Marcar como entregado
-                </>
+            <>
+              <Button
+                onClick={handleMarcarEntregado}
+                disabled={estadoLoading || !entrega.pago_registrado}
+                className="w-full bg-green-600 hover:bg-green-700"
+              >
+                {estadoLoading ? (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    Enviando...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Marcar como entregado
+                  </>
+                )}
+              </Button>
+              {!entrega.pago_registrado && (
+                <p className="text-xs text-orange-600 text-center">
+                  ⚠️ Debes registrar el estado de pago antes de marcar como entregado
+                </p>
               )}
-            </Button>
+            </>
           )}
         </CardContent>
       </Card>
