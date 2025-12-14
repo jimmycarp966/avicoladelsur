@@ -243,7 +243,13 @@ scripts/                         # Scripts de automatización
 - **App nativa-like**: Dashboard, entregas, GPS tracking
 - **Hoja ruta digital**: `/repartidor/ruta/[ruta_id]` con optimización visual
 - **GPS tracking**: Envío automático cada 5s durante reparto activo
-- **Registro de pagos**: Estados "Ya pagó", "Pendiente de pago", "Pagará después" con método y monto
+- **Registro de pagos**: 5 estados disponibles:
+  - "Ya pagó" (monto completo)
+  - "Pendiente de pago" (método definido)
+  - "Pagará después" (sin método)
+  - "Pagó parcialmente" (monto parcial con saldo)
+  - "Rechazó el pedido" (con motivo de rechazo)
+- **Pago obligatorio**: Se requiere registrar estado de pago ANTES de marcar como entregado
 - **Validación requerida**: Todas las entregas deben tener estado de pago definido antes de finalizar ruta
 - **Firma digital**: QR verificación + subida automática a Storage
 
@@ -364,7 +370,8 @@ Sistema completo de presupuestos que transforma el proceso operativo:
 - 👥 **Clientes Deudores**: Todos los clientes son deudores hasta confirmar reparto
 - 💳 **Múltiples Métodos de Pago**: Soporte para efectivo, transferencia, QR, tarjeta, cuenta corriente con recargos
 - 🚚 **Asignación Automática**: Vehículos asignados automáticamente según peso y capacidad
-- 🔍 **Selectores Buscables**: Búsqueda por código o nombre en selectores de clientes y productos
+- **Selectores Buscables**: Búsqueda por código o nombre en selectores de clientes y productos
+- 🆕 **Tipo de Venta**: Campo `tipo_venta` en presupuestos para diferenciar entre "Reparto" (entrega a domicilio) y "Retira en Casa Central" (sin rutas ni reparto)
 - 📦 **Pedidos en Almacén**: Módulo de Pedidos movido de Ventas a Almacén para mejor organización operativa
 
 ### Cómo Probar la Demo

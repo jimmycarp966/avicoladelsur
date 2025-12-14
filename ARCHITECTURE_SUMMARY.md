@@ -106,6 +106,7 @@ supabase/                         # Scripts SQL y migraciones
 
 ### 💰 **Ventas (CRM)**: Gestión de Clientes y Pedidos
 - **Clientes**: Con zonas entrega, límites crédito, bloqueo automático, listas de precios asignadas
+- **Presupuestos**: Campo `tipo_venta` ("Reparto" o "Retira en Casa Central") para diferenciar flujos
 - **Pedidos**: Desde web/bot, con estados completos y referencias pago
 - **Cotizaciones**: Conversión automática a pedidos aprobados
 - **Reclamos**: Seguimiento con estados y asignación
@@ -127,7 +128,13 @@ supabase/                         # Scripts SQL y migraciones
 - **GPS Tracking**: PWA móvil envía ubicación cada 5s durante reparto activo
 - **Alertas Automáticas**: Desvío (>200m) y cliente saltado (<100m sin entrega)
 - **PWA Móvil**: Hoja ruta digital con GPS, entregas y registro de pagos
-- **Registro de Pagos**: Repartidores registran estado de pago (Ya pagó/Pendiente/Pagará después) durante la ruta
+- **Registro de Pagos**: Repartidores registran estado de pago durante la ruta:
+  - **Ya pagó**: Monto completo cobrado
+  - **Pendiente**: Se define método de pago futuro
+  - **Pagará después**: Sin monto ni método definido
+  - **Pagó parcialmente**: Monto parcial con saldo pendiente
+  - **Rechazó el pedido**: Pedido no entregado con motivo de rechazo
+- **Pago Obligatorio**: El botón "Marcar como entregado" requiere primero registrar el estado de pago
 - **Validación de Cobros**: Sistema de validación donde tesorero verifica y acredita cobros antes de afectar caja
 - **Firma Digital**: Verificación con QR y subida automática a Supabase Storage
 - **Generación de Datos Mock**: Sistema completo para crear datos de prueba (rutas, clientes, GPS) para testing del monitor GPS, optimizado para Vercel Free (10s timeout) con logs detallados
