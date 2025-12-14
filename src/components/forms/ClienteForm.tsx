@@ -52,7 +52,7 @@ export function ClienteForm({ cliente, zonas = [], onSuccess }: ClienteFormProps
   const [isLoading, setIsLoading] = useState(false)
   const isEditing = !!cliente
   const submitButtonRef = useRef<HTMLButtonElement>(null)
-  const [listasAsignadas, setListasAsignadas] = useState<Array<{ 
+  const [listasAsignadas, setListasAsignadas] = useState<Array<{
     id: string
     lista_precio: { id: string; nombre: string; codigo: string; tipo: string }
     es_automatica: boolean
@@ -189,7 +189,7 @@ export function ClienteForm({ cliente, zonas = [], onSuccess }: ClienteFormProps
       setIsLoading(true)
 
       const { crearClienteAction, actualizarClienteAction } = await import('@/actions/ventas.actions')
-      
+
       const result = isEditing
         ? await actualizarClienteAction(cliente.id, data)
         : await crearClienteAction(data)
@@ -269,16 +269,20 @@ export function ClienteForm({ cliente, zonas = [], onSuccess }: ClienteFormProps
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="tipo_cliente">Tipo de Cliente *</Label>
-              <select
-                id="tipo_cliente"
-                {...register('tipo_cliente')}
+              <Select
+                value={watch('tipo_cliente')}
+                onValueChange={(value) => setValue('tipo_cliente', value as 'minorista' | 'mayorista' | 'distribuidor')}
                 disabled={isLoading}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <option value="minorista">Minorista</option>
-                <option value="mayorista">Mayorista</option>
-                <option value="distribuidor">Distribuidor</option>
-              </select>
+                <SelectTrigger id="tipo_cliente" className="w-full">
+                  <SelectValue placeholder="Seleccionar tipo..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="minorista">Minorista</SelectItem>
+                  <SelectItem value="mayorista">Mayorista</SelectItem>
+                  <SelectItem value="distribuidor">Distribuidor</SelectItem>
+                </SelectContent>
+              </Select>
               {errors.tipo_cliente && (
                 <p className="text-sm text-destructive">{errors.tipo_cliente.message}</p>
               )}
@@ -549,7 +553,7 @@ export function ClienteForm({ cliente, zonas = [], onSuccess }: ClienteFormProps
       )}
 
       {/* Acciones */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sticky bottom-4 bg-background/95 backdrop-blur-sm p-4 rounded-lg border border-primary/10 shadow-lg">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sticky bottom-4 bg-background/95 backdrop-blur-md p-4 rounded-xl border border-border shadow-lg shadow-black/10 -mx-2">
         <Button type="button" variant="outline" asChild disabled={isLoading} className="hover:bg-primary/5 hover:text-primary hover:border-primary/30 w-full sm:w-auto order-2 sm:order-1">
           <Link href="/ventas/clientes">
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -557,11 +561,11 @@ export function ClienteForm({ cliente, zonas = [], onSuccess }: ClienteFormProps
           </Link>
         </Button>
 
-        <Button 
+        <Button
           ref={submitButtonRef}
-          type="submit" 
-          disabled={isLoading} 
-          className="bg-primary hover:bg-primary/90 shadow-sm w-full sm:w-auto order-1 sm:order-2"
+          type="submit"
+          disabled={isLoading}
+          className="bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg transition-all w-full sm:w-auto order-1 sm:order-2"
         >
           {isLoading ? (
             <>

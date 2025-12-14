@@ -5,6 +5,7 @@
   from {
     height: 0;
   }
+
   to {
     height: var(--radix-accordion-content-height);
   }
@@ -14,6 +15,7 @@
   from {
     height: var(--radix-accordion-content-height);
   }
+
   to {
     height: 0;
   }
@@ -27,13 +29,19 @@
   animation: accordion-up 0.2s ease-out;
 }
 
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-inter);
-  
+
   /* Colores principales */
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
@@ -43,7 +51,7 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
-  
+
   /* Colores adicionales */
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
@@ -51,7 +59,7 @@
   --color-warning-foreground: var(--warning-foreground);
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
-  
+
   /* Muted y otros */
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
@@ -62,14 +70,14 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  
+
   /* Charts */
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-  
+
   /* Sidebar */
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
@@ -79,7 +87,7 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  
+
   /* Radius */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -89,18 +97,18 @@
 
 :root {
   --radius: 0.625rem;
-  
+
   /* Colores de fondo - Profesional Corporativo */
   --background: #FAFAFA;
   --foreground: #1F2937;
-  
+
   /* Cards y superficies */
   --card: #ffffff;
   --card-foreground: #1F2937;
   --card-border: rgba(0, 0, 0, 0.06);
   --popover: #ffffff;
   --popover-foreground: #1F2937;
-  
+
   /* Primary - Verde oscuro de la página web */
   --primary: #2F7058;
   --primary-foreground: #ffffff;
@@ -108,59 +116,59 @@
   --primary-light: #D9EBC6;
   --primary-lighter: #E8F3ED;
   --primary-dark: #255a47;
-  
+
   /* Secondary - Amarillo/Crema de la página web */
   --secondary: #FCDE8D;
   --secondary-foreground: #334155;
   --secondary-light: #FEF4D6;
   --secondary-lighter: #FFF9E8;
-  
+
   /* Accent - Rojo de la página web */
   --accent: #CB3433;
   --accent-foreground: #ffffff;
   --accent-hover: #e03d3c;
   --accent-light: #FEF2F2;
   --accent-lighter: #FFF7F7;
-  
+
   /* Neutral warm - Mantener beige para compatibilidad */
   --neutral-warm: #FCDE8D;
   --neutral-warm-dark: #F4D574;
   --neutral-medium: #7A7A7A;
   --neutral-gold: #FCDE8D;
   --neutral-gold-light: #FEF4D6;
-  
+
   /* Muted - Grises sutiles para profesionalismo */
   --muted: #F3F4F6;
   --muted-foreground: #6B7280;
-  
+
   /* Destructive - Rojo de la página web */
   --destructive: #CB3433;
   --destructive-foreground: #ffffff;
-  
+
   /* Success - Verde oscuro de la página web */
   --success: #2F7058;
   --success-foreground: #ffffff;
-  
+
   /* Warning - Amarillo/Crema de la página web */
   --warning: #FCDE8D;
   --warning-foreground: #334155;
-  
+
   /* Info - Gris medio de la página web */
   --info: #43474E;
   --info-foreground: #ffffff;
-  
+
   /* Bordes y inputs - Muy sutiles */
   --border: #E5E7EB;
   --input: #F3F4F6;
   --ring: #2F7058;
-  
+
   /* Charts - Usando paleta de la página web */
   --chart-1: #2F7058;
   --chart-2: #FCDE8D;
   --chart-3: #CB3433;
   --chart-4: #D9EBC6;
   --chart-5: #43474E;
-  
+
   /* Sidebar - Verde oscuro como la página web */
   --sidebar: #2F7058;
   --sidebar-foreground: #FFFFFF;
@@ -176,13 +184,13 @@
   /* Fondos oscuros con tono verde */
   --background: #0E131B;
   --foreground: #F5F7F9;
-  
+
   /* Cards y superficies */
   --card: #1a1f1c;
   --card-foreground: #F5F7F9;
   --popover: #1a1f1c;
   --popover-foreground: #F5F7F9;
-  
+
   /* Primary - Verde más claro para modo oscuro */
   --primary: #3d8a6f;
   --primary-foreground: #ffffff;
@@ -190,59 +198,59 @@
   --primary-light: #1a2f24;
   --primary-lighter: #152419;
   --primary-dark: #255a47;
-  
+
   /* Secondary - Amarillo/Crema más oscuro para modo oscuro */
   --secondary: #F4D574;
   --secondary-foreground: #0E131B;
   --secondary-light: #2d2518;
   --secondary-lighter: #1f1a10;
-  
+
   /* Accent - Rojo más claro para modo oscuro */
   --accent: #e03d3c;
   --accent-foreground: #ffffff;
   --accent-hover: #f04d4c;
   --accent-light: #2f1215;
   --accent-lighter: #1f0c0f;
-  
+
   /* Neutral warm - Ajustado para oscuro */
   --neutral-warm: #2d2518;
   --neutral-warm-dark: #221c12;
   --neutral-medium: #7A7A7A;
   --neutral-gold: #F4D574;
   --neutral-gold-light: #3a3020;
-  
+
   /* Muted */
   --muted: #1f2420;
   --muted-foreground: #7A7A7A;
-  
+
   /* Destructive */
   --destructive: #e03d3c;
   --destructive-foreground: #ffffff;
-  
+
   /* Success */
   --success: #3d8a6f;
   --success-foreground: #ffffff;
-  
+
   /* Warning */
   --warning: #F4D574;
   --warning-foreground: #0E131B;
-  
+
   /* Info */
   --info: #43474E;
   --info-foreground: #ffffff;
-  
+
   /* Bordes y inputs */
   --border: #2d3330;
   --input: #2d3330;
   --ring: #3d8a6f;
-  
+
   /* Charts */
   --chart-1: #3d8a6f;
   --chart-2: #F4D574;
   --chart-3: #e03d3c;
   --chart-4: #1a2f24;
   --chart-5: #43474E;
-  
+
   /* Sidebar */
   --sidebar: #1a1f1c;
   --sidebar-foreground: #F5F7F9;
@@ -258,6 +266,7 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply text-foreground;
     background-color: #FAFAFA !important;
@@ -318,25 +327,18 @@ body:has(.login-page) .login-page {
   box-shadow: 2px 0 4px rgba(0, 0, 0, 0.08) !important;
 }
 
-/* Cards - Estilo Profesional Corporativo */
+/* Cards - Estilo Profesional Corporativo (base styles, hover handled by component) */
 [data-slot="card"] {
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 
-              0 1px 2px 0 rgba(0, 0, 0, 0.06) !important;
+  box-shadow: 0 2px 8px 0 rgba(0, 0, 0, 0.06),
+    0 1px 3px 0 rgba(0, 0, 0, 0.04) !important;
   border: 1px solid rgba(0, 0, 0, 0.06) !important;
-  transition: all 0.2s ease-in-out !important;
   background: #ffffff !important;
-}
-
-[data-slot="card"]:hover {
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 
-              0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
-  transform: translateY(-1px) !important;
 }
 
 /* Cards específicas del sistema */
 .rounded-lg.bg-gradient-to-br {
-  box-shadow: 0 2px 4px 0 rgba(47, 112, 88, 0.1), 
-              0 1px 3px -1px rgba(47, 112, 88, 0.1) !important;
+  box-shadow: 0 2px 4px 0 rgba(47, 112, 88, 0.1),
+    0 1px 3px -1px rgba(47, 112, 88, 0.1) !important;
 }
 
 /* Estilos para Leaflet (mapas) */

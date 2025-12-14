@@ -33,7 +33,7 @@ interface AdminSidebarProps {
 }
 
 // Función para obtener badges dinámicos - versión cliente
-function getBadges(): {[key: string]: number} {
+function getBadges(): { [key: string]: number } {
   // En producción, esto debería venir de una API route
   return {}
 }
@@ -171,7 +171,7 @@ interface NavigationItemProps {
   pathname: string
   user: Usuario | null
   onClose?: () => void
-  badges: {[key: string]: number}
+  badges: { [key: string]: number }
 }
 
 function NavigationItem({ item, pathname, user, onClose, badges }: NavigationItemProps) {
@@ -216,7 +216,7 @@ function NavigationItem({ item, pathname, user, onClose, badges }: NavigationIte
 
       {/* Submenú */}
       {item.children && isActive && (
-        <div className="mt-2 ml-4 space-y-1 border-l-2 border-white/20 pl-4">
+        <div className="mt-2 ml-4 space-y-1 border-l-2 border-white/20 pl-4 animate-in fade-in slide-in-from-top-2 duration-200">
           {item.children.map((child) => {
             const childIsActive = pathname === child.href
             return (
@@ -247,7 +247,7 @@ function NavigationItem({ item, pathname, user, onClose, badges }: NavigationIte
 
 export function AdminSidebar({ onClose, user }: AdminSidebarProps) {
   const pathname = usePathname()
-  const [badges, setBadges] = useState<{[key: string]: number}>({})
+  const [badges, setBadges] = useState<{ [key: string]: number }>({})
 
   useEffect(() => {
     setBadges(getBadges())
