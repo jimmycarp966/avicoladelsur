@@ -1,12 +1,16 @@
 'use client'
 
+import { useState } from 'react'
 import {
   MapPin,
   DollarSign,
   FileText,
   Phone,
   Navigation,
-  CheckCircle
+  CheckCircle,
+  ChevronDown,
+  ChevronUp,
+  AlertCircle
 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -21,6 +25,7 @@ interface EntregaCardProps {
 }
 
 export function EntregaCard({ entrega, rutaId, rutaEstado }: EntregaCardProps) {
+  const [productosExpandidos, setProductosExpandidos] = useState(false)
   const pedido = entrega.pedido
   const cliente = pedido?.cliente
 
@@ -28,6 +33,10 @@ export function EntregaCard({ entrega, rutaId, rutaEstado }: EntregaCardProps) {
   const puedeEditar = rutaEstado === 'en_curso' &&
     entrega.estado_entrega !== 'entregado' &&
     entrega.estado_entrega !== 'rechazado'
+
+  // Calcular monto pendiente de cobro
+  const estaPagado = pedido?.pago_estado === 'pagado'
+  const montoPendiente = !estaPagado ? (pedido?.total || 0) : 0
 
   return (
     <Card className={entrega.estado_entrega === 'entregado' ? 'opacity-75' : ''}>
@@ -42,7 +51,7 @@ export function EntregaCard({ entrega, rutaId, rutaEstado }: EntregaCardProps) {
                 Entregado
               </Badge>
             )}
-            {pedido?.pago_estado === 'pagado' && (
+            {estaPagado && (
               <Badge variant="secondary" className="bg-blue-100">
                 <DollarSign className="mr-1 h-3 w-3" />
                 Pagado
@@ -61,10 +70,14 @@ export function EntregaCard({ entrega, rutaId, rutaEstado }: EntregaCardProps) {
               {cliente?.direccion || 'Dirección no disponible'}
             </p>
             {cliente?.telefono && (
-              <p className="text-sm text-muted-foreground flex items-center gap-1">
+              <a
+                href={`tel:${cliente.telefono}`}
+                className="text-sm text-primary flex items-center gap-1 hover:underline"
+              >
                 <Phone className="h-3 w-3" />
                 {cliente.telefono}
-              </p>
+                <span className="text-xs text-muted-foreground ml-1">(llamar)</span>
+              </a>
             )}
             {cliente?.zona_entrega && (
               <Badge variant="outline" className="mt-1 text-xs">
@@ -81,6 +94,18 @@ export function EntregaCard({ entrega, rutaId, rutaEstado }: EntregaCardProps) {
               <span className="text-muted-foreground">Total:</span>
               <span className="font-semibold">${pedido?.total?.toFixed(2) || '0.00'}</span>
             </div>
+            {/* Monto pendiente de cobro */}
+            {!estaPagado && montoPendiente > 0 && (
+              <div className="flex items-center justify-between text-sm bg-amber-50 dark:bg-amber-950 p-2 rounded-md border border-amber-200 dark:border-amber-800">
+                <span className="text-amber-700 dark:text-amber-300 flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  Pendiente de cobro:
+                </span>
+                <span className="font-bold text-amber-700 dark:text-amber-300">
+                  ${montoPendiente.toFixed(2)}
+                </span>
+              </div>
+            )}
             {Array.isArray(pedido?.metodos_pago) && pedido.metodos_pago.length > 0 && (
               <div className="text-sm">
                 <span className="text-muted-foreground">Métodos de pago:</span>
@@ -104,12 +129,26 @@ export function EntregaCard({ entrega, rutaId, rutaEstado }: EntregaCardProps) {
             )}
           </div>
 
-          {/* Productos del pedido */}
+          {/* Productos del pedido - Expandible */}
           {pedido?.detalle_pedido && pedido.detalle_pedido.length > 0 && (
             <div className="space-y-1">
-              <p className="text-xs font-medium text-muted-foreground">Productos:</p>
+              <button
+                type="button"
+                onClick={() => setProductosExpandidos(!productosExpandidos)}
+                className="w-full flex items-center justify-between text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <span>Productos ({pedido.detalle_pedido.length})</span>
+                {productosExpandidos ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </button>
               <div className="space-y-1">
-                {pedido.detalle_pedido.slice(0, 3).map((detalle: any) => (
+                {(productosExpandidos
+                  ? pedido.detalle_pedido
+                  : pedido.detalle_pedido.slice(0, 3)
+                ).map((detalle: any) => (
                   <div key={detalle.id} className="text-xs flex items-center justify-between">
                     <span>{detalle.producto?.nombre || detalle.producto?.codigo}</span>
                     <span className="text-muted-foreground">
@@ -117,10 +156,14 @@ export function EntregaCard({ entrega, rutaId, rutaEstado }: EntregaCardProps) {
                     </span>
                   </div>
                 ))}
-                {pedido.detalle_pedido.length > 3 && (
-                  <p className="text-xs text-muted-foreground">
+                {!productosExpandidos && pedido.detalle_pedido.length > 3 && (
+                  <button
+                    type="button"
+                    onClick={() => setProductosExpandidos(true)}
+                    className="text-xs text-primary hover:underline"
+                  >
                     +{pedido.detalle_pedido.length - 3} productos más
-                  </p>
+                  </button>
                 )}
               </div>
             </div>
