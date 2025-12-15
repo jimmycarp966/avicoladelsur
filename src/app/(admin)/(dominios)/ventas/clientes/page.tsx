@@ -45,10 +45,10 @@ export default function ClientesPage() {
           </CardHeader>
           <CardContent>
             <div className="text-4xl font-bold text-primary mb-2">
-              <Suspense fallback="...">89</Suspense>
+              -
             </div>
             <p className="text-sm text-muted-foreground font-medium">
-              +5 desde el mes pasado
+              Total registrados
             </p>
           </CardContent>
         </Card>
@@ -62,10 +62,10 @@ export default function ClientesPage() {
           </CardHeader>
           <CardContent>
             <div className="text-4xl font-bold text-success mb-2">
-              <Suspense fallback="...">87</Suspense>
+              -
             </div>
             <p className="text-sm text-muted-foreground font-medium">
-              98% del total
+              Con pedidos recientes
             </p>
           </CardContent>
         </Card>
@@ -79,10 +79,10 @@ export default function ClientesPage() {
           </CardHeader>
           <CardContent>
             <div className="text-4xl font-bold text-secondary mb-2">
-              <Suspense fallback="...">12</Suspense>
+              -
             </div>
             <p className="text-sm text-muted-foreground font-medium">
-              13% del total
+              Tipo mayorista
             </p>
           </CardContent>
         </Card>
@@ -96,10 +96,10 @@ export default function ClientesPage() {
           </CardHeader>
           <CardContent>
             <div className="text-4xl font-bold text-info mb-2">
-              <Suspense fallback="...">23</Suspense>
+              -
             </div>
             <p className="text-sm text-muted-foreground font-medium">
-              +15% vs ayer
+              Hoy
             </p>
           </CardContent>
         </Card>

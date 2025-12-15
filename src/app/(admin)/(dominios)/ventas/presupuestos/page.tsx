@@ -45,7 +45,7 @@ export default function PresupuestosPage() {
           </CardHeader>
           <CardContent>
             <div className="text-4xl font-bold text-primary mb-2">
-              <Suspense fallback="...">89</Suspense>
+              -
             </div>
             <p className="text-sm text-muted-foreground font-medium">
               Este mes
@@ -62,7 +62,7 @@ export default function PresupuestosPage() {
           </CardHeader>
           <CardContent>
             <div className="text-4xl font-bold text-warning mb-2">
-              <Suspense fallback="...">23</Suspense>
+              -
             </div>
             <p className="text-sm text-muted-foreground font-medium">
               Requieren atención
@@ -79,7 +79,7 @@ export default function PresupuestosPage() {
           </CardHeader>
           <CardContent>
             <div className="text-4xl font-bold text-secondary mb-2">
-              <Suspense fallback="...">12</Suspense>
+              -
             </div>
             <p className="text-sm text-muted-foreground font-medium">
               Pesaje pendiente
@@ -96,7 +96,7 @@ export default function PresupuestosPage() {
           </CardHeader>
           <CardContent>
             <div className="text-4xl font-bold text-success mb-2">
-              <Suspense fallback="...">8</Suspense>
+              -
             </div>
             <p className="text-sm text-muted-foreground font-medium">
               Convertidos a pedidos
@@ -113,7 +113,7 @@ export default function PresupuestosPage() {
           </CardHeader>
           <CardContent>
             <div className="text-4xl font-bold text-destructive mb-2">
-              <Suspense fallback="...">3</Suspense>
+              -
             </div>
             <p className="text-sm text-muted-foreground font-medium">
               Este mes

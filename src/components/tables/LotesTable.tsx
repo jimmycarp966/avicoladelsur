@@ -61,22 +61,12 @@ export function LotesTable({ data, onView, onEdit, onDelete, onAdjust }: LotesTa
       header: 'Producto',
       cell: ({ row }) => {
         const productoId = row.getValue('producto_id') as string
-        // En producción, aquí se haría una consulta para obtener el producto
-        // Por ahora, simulamos con datos conocidos
-        const productosMock = {
-          '1': { nombre: 'Pollo Entero', codigo: 'POLLO001' },
-          '2': { nombre: 'Pechuga de Pollo', codigo: 'POLLO002' },
-          '3': { nombre: 'Huevos Blancos', codigo: 'HUEVO001' },
-          '4': { nombre: 'Alas de Pollo', codigo: 'POLLO003' },
-        }
-
-        const producto = productosMock[productoId as keyof typeof productosMock]
-        if (!producto) return <span className="text-muted-foreground text-base">Sin producto</span>
-
+        // TODO: Implementar join con tabla productos para mostrar nombre
+        // Por ahora mostramos el ID
         return (
           <div>
-            <div className="font-semibold text-foreground text-base">{producto.nombre}</div>
-            <div className="text-sm text-muted-foreground mt-0.5">Código: {producto.codigo}</div>
+            <div className="font-semibold text-foreground text-base">Producto</div>
+            <div className="text-sm text-muted-foreground mt-0.5">ID: {productoId?.slice(0, 8)}...</div>
           </div>
         )
       },
