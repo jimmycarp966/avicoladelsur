@@ -273,8 +273,8 @@ function TemplateButton({
         <button
             onClick={onClick}
             className={`flex flex-col items-center gap-1 p-3 rounded-xl transition-all duration-300 ${isActive
-                    ? "bg-white/20 border-white/40 scale-105"
-                    : "bg-white/5 border-white/10 hover:bg-white/10"
+                ? "bg-white/20 border-white/40 scale-105"
+                : "bg-white/5 border-white/10 hover:bg-white/10"
                 } border backdrop-blur-md`}
         >
             <div className={`${isActive ? "text-white" : "text-white/60"}`}>{icon}</div>
@@ -306,31 +306,65 @@ export default function HandGestureDemo() {
     const [status, setStatus] = useState("Iniciando...");
     const [handsDetected, setHandsDetected] = useState(0);
     const [showColorPicker, setShowColorPicker] = useState(false);
+    const [gestureInfo, setGestureInfo] = useState(""); // Debug info
     const particleCount = 2000;
 
     const handLandmarkerRef = useRef<HandLandmarker | null>(null);
     const requestRef = useRef<number>(0);
+    const targetScaleRef = useRef<number>(1); // For smoothing
 
-    // Calculate if hand is making a fist
+    // Calculate if hand is making a fist - IMPROVED VERSION
     const isFist = useCallback((landmarks: NormalizedLandmark[]): boolean => {
-        // Check if fingers are curled (tips below knuckles)
+        // More robust fist detection using distances instead of just Y comparison
+        const wrist = landmarks[0];
         const fingerTips = [8, 12, 16, 20]; // Index, Middle, Ring, Pinky tips
-        const fingerKnuckles = [6, 10, 14, 18]; // Corresponding knuckles
+        const fingerBases = [5, 9, 13, 17]; // MCP joints
 
         let curledCount = 0;
         for (let i = 0; i < 4; i++) {
-            if (landmarks[fingerTips[i]].y > landmarks[fingerKnuckles[i]].y) {
+            const tip = landmarks[fingerTips[i]];
+            const base = landmarks[fingerBases[i]];
+
+            // Calculate distance from tip to wrist vs base to wrist
+            const tipDist = Math.hypot(tip.x - wrist.x, tip.y - wrist.y);
+            const baseDist = Math.hypot(base.x - wrist.x, base.y - wrist.y);
+
+            // If fingertip is closer to wrist than base, finger is curled
+            if (tipDist < baseDist * 1.2) {
                 curledCount++;
             }
         }
         return curledCount >= 3;
     }, []);
 
+    // Check if hand is open (all fingers extended)
+    const isOpenHand = useCallback((landmarks: NormalizedLandmark[]): boolean => {
+        const wrist = landmarks[0];
+        const fingerTips = [8, 12, 16, 20];
+        const fingerBases = [5, 9, 13, 17];
+
+        let extendedCount = 0;
+        for (let i = 0; i < 4; i++) {
+            const tip = landmarks[fingerTips[i]];
+            const base = landmarks[fingerBases[i]];
+            const tipDist = Math.hypot(tip.x - wrist.x, tip.y - wrist.y);
+            const baseDist = Math.hypot(base.x - wrist.x, base.y - wrist.y);
+
+            if (tipDist > baseDist * 1.3) {
+                extendedCount++;
+            }
+        }
+        return extendedCount >= 3;
+    }, []);
+
     // Calculate distance between two hands
     const calculateHandDistance = useCallback((hand1: NormalizedLandmark[], hand2: NormalizedLandmark[]): number => {
-        const palm1 = hand1[0]; // Wrist
-        const palm2 = hand2[0];
-        return Math.hypot(palm1.x - palm2.x, palm1.y - palm2.y);
+        // Use palm center (average of wrist and middle finger base) for more stability
+        const palm1x = (hand1[0].x + hand1[9].x) / 2;
+        const palm1y = (hand1[0].y + hand1[9].y) / 2;
+        const palm2x = (hand2[0].x + hand2[9].x) / 2;
+        const palm2y = (hand2[0].y + hand2[9].y) / 2;
+        return Math.hypot(palm1x - palm2x, palm1y - palm2y);
     }, []);
 
     useEffect(() => {
@@ -347,7 +381,7 @@ export default function HandGestureDemo() {
                         delegate: "GPU",
                     },
                     runningMode: "VIDEO",
-                    numHands: 2, // Detect both hands!
+                    numHands: 1, // Single hand only
                 });
 
                 setIsLoaded(true);
@@ -416,30 +450,48 @@ export default function HandGestureDemo() {
         const results = handLandmarkerRef.current.detectForVideo(videoRef.current, startTimeMs);
 
         if (results?.landmarks && results.landmarks.length > 0) {
-            setHandsDetected(results.landmarks.length);
+            const landmarks = results.landmarks[0];
+            setHandsDetected(1);
 
-            if (results.landmarks.length === 2) {
-                // Two hands detected - calculate distance for scale
-                const distance = calculateHandDistance(results.landmarks[0], results.landmarks[1]);
-                // Map distance (0.1 - 0.8) to scale (0.5 - 2.0)
-                const newScale = THREE.MathUtils.mapLinear(distance, 0.1, 0.8, 0.5, 2.5);
-                setParticleScale(THREE.MathUtils.clamp(newScale, 0.3, 3));
+            // Get hand position (palm center)
+            const palmY = landmarks[9].y; // Middle finger base - good center reference
 
-                // Check if both fists are closed for contraction effect
-                const bothFists = isFist(results.landmarks[0]) && isFist(results.landmarks[1]);
-                if (bothFists) {
-                    setParticleScale(prev => Math.max(0.3, prev * 0.95));
-                }
-            } else if (results.landmarks.length === 1) {
-                // Single hand - fist controls scale
-                if (isFist(results.landmarks[0])) {
-                    setParticleScale(prev => Math.max(0.3, prev * 0.98));
-                } else {
-                    setParticleScale(prev => Math.min(2, prev * 1.01));
-                }
+            // Check gestures
+            const fist = isFist(landmarks);
+            const open = isOpenHand(landmarks);
+
+            // Update gesture info for feedback
+            if (fist) {
+                setGestureInfo("✊ PUÑO - Contrayendo");
+            } else if (open) {
+                setGestureInfo("🖐️ ABIERTA - Expandiendo");
+            } else {
+                setGestureInfo("👋 Moviendo...");
             }
+
+            // Calculate target scale based on hand position Y (0=top, 1=bottom)
+            // Hand up = bigger, hand down = smaller
+            let targetScale = THREE.MathUtils.mapLinear(palmY, 0.8, 0.2, 0.5, 2.5);
+            targetScale = THREE.MathUtils.clamp(targetScale, 0.3, 3);
+
+            // Modify scale based on gesture
+            if (fist) {
+                targetScale *= 0.6; // Contract more when fist
+            } else if (open) {
+                targetScale *= 1.3; // Expand more when open
+            }
+
+            // Store target for smoothing
+            targetScaleRef.current = targetScale;
+
+            // Smooth interpolation toward target
+            setParticleScale(prev => {
+                const smoothing = 0.1; // Lower = smoother but slower
+                return prev + (targetScaleRef.current - prev) * smoothing;
+            });
         } else {
             setHandsDetected(0);
+            setGestureInfo("Sin mano detectada");
         }
 
         requestRef.current = requestAnimationFrame(predictWebcam);
@@ -488,8 +540,13 @@ export default function HandGestureDemo() {
                     <div className="flex flex-col items-end gap-2">
                         <div className={`px-4 py-2 rounded-full text-sm font-mono backdrop-blur-md border ${handsDetected > 0 ? "bg-green-500/20 border-green-500/40 text-green-400" : "bg-white/10 border-white/20"
                             }`}>
-                            {handsDetected > 0 ? `${handsDetected} mano${handsDetected > 1 ? "s" : ""} detectada${handsDetected > 1 ? "s" : ""}` : "Sin manos"}
+                            {handsDetected > 0 ? "Mano detectada" : "Sin mano"}
                         </div>
+                        {gestureInfo && handsDetected > 0 && (
+                            <div className="px-3 py-1 rounded-full text-sm font-bold bg-purple-500/30 border border-purple-500/50 text-purple-300">
+                                {gestureInfo}
+                            </div>
+                        )}
                         <div className="text-xs text-white/50 font-mono">
                             Escala: {particleScale.toFixed(2)}x
                         </div>
@@ -586,9 +643,10 @@ export default function HandGestureDemo() {
                     {/* Instructions */}
                     {permissionGranted && (
                         <div className="text-center text-white/50 text-sm">
-                            <span className="mr-4">✋ Separa las manos → Expande</span>
-                            <span className="mr-4">🤲 Junta las manos → Comprime</span>
-                            <span>✊ Puños cerrados → Contrae</span>
+                            <span className="mr-4">☝️ Mano arriba → Expande</span>
+                            <span className="mr-4">👇 Mano abajo → Comprime</span>
+                            <span className="mr-4">🖐️ Mano abierta → Más expansión</span>
+                            <span>✊ Puño → Más contracción</span>
                         </div>
                     )}
                 </div>
