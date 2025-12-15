@@ -1,12 +1,8 @@
 "use client";
 
-import React, { useEffect, useRef, useState, Suspense } from "react";
+import React, { useEffect, useRef, useState, useCallback, Suspense } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import {
-    Environment,
-    Float,
-    ContactShadows,
-} from "@react-three/drei";
+import { OrbitControls, Environment } from "@react-three/drei";
 import {
     HandLandmarker,
     FilesetResolver,
@@ -14,166 +10,350 @@ import {
 } from "@mediapipe/tasks-vision";
 import * as THREE from "three";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, Camera, MousePointer2, Hand, Grab } from "lucide-react";
+import { Loader2, Camera, Heart, Flower2, Sparkles, CircleDot, Flame, Star } from "lucide-react";
 
 // --- Types ---
-type ShapeType = "box" | "sphere" | "torus";
+type ShapeTemplate = "heart" | "flower" | "saturn" | "buddha" | "fireworks" | "spiral";
 
-// --- 3D Components ---
+interface HandData {
+    landmarks: NormalizedLandmark[];
+    isFist: boolean;
+}
 
-function InteractiveObject({
-    position,
-    rotation,
-    isPinching,
-    shape,
-}: {
-    position: [number, number, number];
-    rotation: [number, number, number];
-    isPinching: boolean;
-    shape: ShapeType;
-}) {
-    const meshRef = useRef<THREE.Mesh>(null);
-    const [hovered, setHover] = useState(false);
+// --- Shape Generators ---
+const generateHeartPoints = (count: number): Float32Array => {
+    const positions = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+        const t = (i / count) * Math.PI * 2;
+        const x = 16 * Math.pow(Math.sin(t), 3);
+        const y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+        const z = (Math.random() - 0.5) * 5;
+        positions[i * 3] = x * 0.1 + (Math.random() - 0.5) * 0.3;
+        positions[i * 3 + 1] = y * 0.1 + (Math.random() - 0.5) * 0.3;
+        positions[i * 3 + 2] = z * 0.1;
+    }
+    return positions;
+};
 
-    // Smooth interpolation for physics-like movement
-    useFrame((state, delta) => {
-        if (meshRef.current) {
-            // Position: SIEMPRE seguir la posición de la mano
-            const targetPos = new THREE.Vector3(...position);
-            
-            // Lerp position - más rápido cuando está agarrando
-            const lerpSpeed = isPinching ? 0.3 : 0.15;
-            meshRef.current.position.lerp(targetPos, lerpSpeed);
+const generateFlowerPoints = (count: number): Float32Array => {
+    const positions = new Float32Array(count * 3);
+    const petals = 6;
+    for (let i = 0; i < count; i++) {
+        const angle = (i / count) * Math.PI * 2 * petals;
+        const r = 2 + Math.sin(angle * petals) * 1.5;
+        const x = Math.cos(angle) * r;
+        const y = Math.sin(angle) * r;
+        const z = (Math.random() - 0.5) * 1;
+        positions[i * 3] = x + (Math.random() - 0.5) * 0.3;
+        positions[i * 3 + 1] = y + (Math.random() - 0.5) * 0.3;
+        positions[i * 3 + 2] = z;
+    }
+    return positions;
+};
 
-            // Rotation: SIEMPRE seguir la rotación de la mano
-            const targetRot = new THREE.Euler(...rotation);
+const generateSaturnPoints = (count: number): Float32Array => {
+    const positions = new Float32Array(count * 3);
+    const planetParticles = Math.floor(count * 0.4);
+    // Planet (sphere)
+    for (let i = 0; i < planetParticles; i++) {
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+        const r = 1.2;
+        positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+        positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+        positions[i * 3 + 2] = r * Math.cos(phi);
+    }
+    // Rings
+    for (let i = planetParticles; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const r = 2 + Math.random() * 1.5;
+        positions[i * 3] = Math.cos(angle) * r;
+        positions[i * 3 + 1] = (Math.random() - 0.5) * 0.2;
+        positions[i * 3 + 2] = Math.sin(angle) * r;
+    }
+    return positions;
+};
 
-            // Lerp Rotation - más rápido cuando está agarrando
-            const rotLerpSpeed = isPinching ? 0.15 : 0.08;
-            meshRef.current.rotation.x = THREE.MathUtils.lerp(meshRef.current.rotation.x, targetRot.x, rotLerpSpeed);
-            meshRef.current.rotation.y = THREE.MathUtils.lerp(meshRef.current.rotation.y, targetRot.y, rotLerpSpeed);
-            meshRef.current.rotation.z = THREE.MathUtils.lerp(meshRef.current.rotation.z, targetRot.z, rotLerpSpeed);
+const generateBuddhaPoints = (count: number): Float32Array => {
+    const positions = new Float32Array(count * 3);
+    // Simplified Buddha silhouette using layered shapes
+    for (let i = 0; i < count; i++) {
+        const section = Math.random();
+        let x, y, z;
+        if (section < 0.3) {
+            // Head (circle)
+            const angle = Math.random() * Math.PI * 2;
+            const r = Math.random() * 0.8;
+            x = Math.cos(angle) * r;
+            y = 2.5 + Math.sin(angle) * r * 0.8;
+            z = (Math.random() - 0.5) * 0.5;
+        } else if (section < 0.7) {
+            // Body (wider ellipse)
+            const angle = Math.random() * Math.PI * 2;
+            const r = Math.random() * 1.5;
+            x = Math.cos(angle) * r;
+            y = Math.sin(angle) * r * 0.6;
+            z = (Math.random() - 0.5) * 0.8;
+        } else {
+            // Lotus base
+            const angle = Math.random() * Math.PI * 2;
+            const r = 1 + Math.random() * 0.8;
+            x = Math.cos(angle) * r;
+            y = -1.5 + Math.sin(angle * 3) * 0.3;
+            z = (Math.random() - 0.5) * 0.3;
         }
+        positions[i * 3] = x + (Math.random() - 0.5) * 0.2;
+        positions[i * 3 + 1] = y + (Math.random() - 0.5) * 0.2;
+        positions[i * 3 + 2] = z;
+    }
+    return positions;
+};
+
+const generateFireworksPoints = (count: number): Float32Array => {
+    const positions = new Float32Array(count * 3);
+    const numBursts = 5;
+    const particlesPerBurst = Math.floor(count / numBursts);
+    for (let burst = 0; burst < numBursts; burst++) {
+        const cx = (Math.random() - 0.5) * 6;
+        const cy = (Math.random() - 0.5) * 4 + 1;
+        const cz = (Math.random() - 0.5) * 2;
+        for (let i = 0; i < particlesPerBurst; i++) {
+            const idx = burst * particlesPerBurst + i;
+            if (idx >= count) break;
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos(2 * Math.random() - 1);
+            const r = Math.random() * 1.5;
+            positions[idx * 3] = cx + r * Math.sin(phi) * Math.cos(theta);
+            positions[idx * 3 + 1] = cy + r * Math.sin(phi) * Math.sin(theta);
+            positions[idx * 3 + 2] = cz + r * Math.cos(phi);
+        }
+    }
+    return positions;
+};
+
+const generateSpiralPoints = (count: number): Float32Array => {
+    const positions = new Float32Array(count * 3);
+    const arms = 3;
+    for (let i = 0; i < count; i++) {
+        const arm = i % arms;
+        const t = (i / count) * 8;
+        const angle = t + (arm * Math.PI * 2) / arms;
+        const r = t * 0.5;
+        const x = Math.cos(angle) * r;
+        const y = Math.sin(angle) * r;
+        const z = (Math.random() - 0.5) * 0.5;
+        positions[i * 3] = x + (Math.random() - 0.5) * 0.3;
+        positions[i * 3 + 1] = y + (Math.random() - 0.5) * 0.3;
+        positions[i * 3 + 2] = z;
+    }
+    return positions;
+};
+
+const shapeGenerators: Record<ShapeTemplate, (count: number) => Float32Array> = {
+    heart: generateHeartPoints,
+    flower: generateFlowerPoints,
+    saturn: generateSaturnPoints,
+    buddha: generateBuddhaPoints,
+    fireworks: generateFireworksPoints,
+    spiral: generateSpiralPoints,
+};
+
+// --- Particle System Component ---
+function ParticleCloud({
+    shape,
+    color,
+    scale,
+    particleCount,
+}: {
+    shape: ShapeTemplate;
+    color: string;
+    scale: number;
+    particleCount: number;
+}) {
+    const pointsRef = useRef<THREE.Points>(null);
+    const positionsRef = useRef<Float32Array | null>(null);
+    const targetPositionsRef = useRef<Float32Array | null>(null);
+    const velocitiesRef = useRef<Float32Array | null>(null);
+
+    // Initialize or update shape
+    useEffect(() => {
+        const newPositions = shapeGenerators[shape](particleCount);
+        targetPositionsRef.current = newPositions;
+
+        if (!positionsRef.current || positionsRef.current.length !== newPositions.length) {
+            positionsRef.current = new Float32Array(newPositions);
+            velocitiesRef.current = new Float32Array(particleCount * 3);
+        }
+    }, [shape, particleCount]);
+
+    useFrame((state, delta) => {
+        if (!pointsRef.current || !positionsRef.current || !targetPositionsRef.current || !velocitiesRef.current) return;
+
+        const positions = pointsRef.current.geometry.attributes.position.array as Float32Array;
+        const targets = targetPositionsRef.current;
+        const velocities = velocitiesRef.current;
+
+        // Spring physics for smooth transitions
+        const stiffness = 2.0;
+        const damping = 0.85;
+
+        for (let i = 0; i < particleCount * 3; i++) {
+            const force = (targets[i] * scale - positions[i]) * stiffness;
+            velocities[i] = velocities[i] * damping + force * delta;
+            positions[i] += velocities[i];
+        }
+
+        // Rotation animation
+        pointsRef.current.rotation.y += delta * 0.1;
+        pointsRef.current.geometry.attributes.position.needsUpdate = true;
     });
 
-    const material = (
-        <meshStandardMaterial
-            color={isPinching ? "#CB3433" : hovered ? "#FCDE8D" : "#2F7058"}
-            roughness={0.2}
-            metalness={0.6}
-            emissive={isPinching ? "#CB3433" : "#000000"}
-            emissiveIntensity={isPinching ? 0.5 : 0}
-        />
-    );
+    const initialPositions = shapeGenerators[shape](particleCount);
 
     return (
-        <Float speed={isPinching ? 0 : 2} rotationIntensity={isPinching ? 0 : 0.5} floatIntensity={isPinching ? 0 : 0.5}>
-            <mesh
-                ref={meshRef}
-                scale={isPinching ? 1.2 : 1}
-                onPointerOver={() => setHover(true)}
-                onPointerOut={() => setHover(false)}
-            >
-                {shape === "box" && <boxGeometry args={[1.5, 1.5, 1.5]} />}
-                {shape === "sphere" && <sphereGeometry args={[1, 32, 32]} />}
-                {shape === "torus" && <torusGeometry args={[0.8, 0.4, 16, 100]} />}
-                {material}
-                {/* Wireframe overlay */}
-                <mesh scale={[1.02, 1.02, 1.02]}>
-                    {shape === "box" && <boxGeometry args={[1.5, 1.5, 1.5]} />}
-                    {shape === "sphere" && <sphereGeometry args={[1, 32, 32]} />}
-                    {shape === "torus" && <torusGeometry args={[0.8, 0.4, 16, 100]} />}
-                    <meshBasicMaterial wireframe color="white" transparent opacity={0.3} />
-                </mesh>
-            </mesh>
-        </Float>
+        <points ref={pointsRef}>
+            <bufferGeometry>
+                <bufferAttribute
+                    attach="attributes-position"
+                    count={particleCount}
+                    array={initialPositions}
+                    itemSize={3}
+                />
+            </bufferGeometry>
+            <pointsMaterial
+                size={0.08}
+                color={color}
+                transparent
+                opacity={0.9}
+                sizeAttenuation
+                blending={THREE.AdditiveBlending}
+                depthWrite={false}
+            />
+        </points>
     );
 }
 
-function SceneContent({
-    handPosition,
-    handRotation,
-    isPinching,
+function Scene({
     shape,
+    color,
+    scale,
+    particleCount,
 }: {
-    handPosition: { x: number; y: number; z: number };
-    handRotation: { x: number; y: number; z: number };
-    isPinching: boolean;
-    shape: ShapeType;
+    shape: ShapeTemplate;
+    color: string;
+    scale: number;
+    particleCount: number;
 }) {
-    // Map normalized coordinates to world space
-    // We include Z for depth now!
-    const targetX = (handPosition.x - 0.5) * -12; // Invert X for mirror
-    const targetY = (handPosition.y - 0.5) * -8;
-    const targetZ = handPosition.z * -20; // Depth factor
-
     return (
         <>
-            <ambientLight intensity={0.6} />
-            <pointLight position={[10, 10, 10]} intensity={1.5} color="#FCDE8D" />
-            <pointLight position={[-10, -10, -10]} intensity={1} color="#2F7058" />
-            <directionalLight position={[0, 5, 5]} intensity={1} />
-
-            <InteractiveObject
-                position={[targetX, targetY, targetZ]}
-                rotation={[handRotation.x, handRotation.y, handRotation.z]}
-                isPinching={isPinching}
-                shape={shape}
-            />
-
-            <ContactShadows position={[0, -4.5, 0]} opacity={0.6} scale={20} blur={2.5} far={5} color="#1a2f24" />
-            <Environment preset="forest" />
+            <ambientLight intensity={0.3} />
+            <pointLight position={[10, 10, 10]} intensity={1} />
+            <ParticleCloud shape={shape} color={color} scale={scale} particleCount={particleCount} />
+            <OrbitControls enableZoom={false} enablePan={false} autoRotate autoRotateSpeed={0.5} />
+            <Environment preset="night" />
         </>
     );
 }
 
-// --- Main Component ---
+// --- Template Button ---
+function TemplateButton({
+    template,
+    icon,
+    label,
+    isActive,
+    onClick,
+}: {
+    template: ShapeTemplate;
+    icon: React.ReactNode;
+    label: string;
+    isActive: boolean;
+    onClick: () => void;
+}) {
+    return (
+        <button
+            onClick={onClick}
+            className={`flex flex-col items-center gap-1 p-3 rounded-xl transition-all duration-300 ${isActive
+                    ? "bg-white/20 border-white/40 scale-105"
+                    : "bg-white/5 border-white/10 hover:bg-white/10"
+                } border backdrop-blur-md`}
+        >
+            <div className={`${isActive ? "text-white" : "text-white/60"}`}>{icon}</div>
+            <span className={`text-xs ${isActive ? "text-white" : "text-white/60"}`}>{label}</span>
+        </button>
+    );
+}
 
+// --- Color Presets ---
+const colorPresets = [
+    { name: "Rojo", color: "#ff3366" },
+    { name: "Azul", color: "#3366ff" },
+    { name: "Verde", color: "#33ff66" },
+    { name: "Dorado", color: "#ffcc33" },
+    { name: "Púrpura", color: "#9933ff" },
+    { name: "Cyan", color: "#33ffff" },
+    { name: "Rosa", color: "#ff66cc" },
+    { name: "Blanco", color: "#ffffff" },
+];
+
+// --- Main Component ---
 export default function HandGestureDemo() {
     const videoRef = useRef<HTMLVideoElement>(null);
     const [isLoaded, setIsLoaded] = useState(false);
     const [permissionGranted, setPermissionGranted] = useState(false);
-    const [handPosition, setHandPosition] = useState({ x: 0.5, y: 0.5, z: 0 });
-    const [handRotation, setHandRotation] = useState({ x: 0, y: 0, z: 0 });
-    const [isPinching, setIsPinching] = useState(false);
-    const [currentShape, setCurrentShape] = useState<ShapeType>("box");
+    const [currentShape, setCurrentShape] = useState<ShapeTemplate>("heart");
+    const [particleColor, setParticleColor] = useState("#ff3366");
+    const [particleScale, setParticleScale] = useState(1);
     const [status, setStatus] = useState("Iniciando...");
-    const [gestureName, setGestureName] = useState("Esperando...");
-
-    // Cooldown for shape switching to prevent rapid toggling
-    const lastSwitchTime = useRef(0);
-    const requestRef = useRef<number>(0);
+    const [handsDetected, setHandsDetected] = useState(0);
+    const [showColorPicker, setShowColorPicker] = useState(false);
+    const particleCount = 2000;
 
     const handLandmarkerRef = useRef<HandLandmarker | null>(null);
+    const requestRef = useRef<number>(0);
+
+    // Calculate if hand is making a fist
+    const isFist = useCallback((landmarks: NormalizedLandmark[]): boolean => {
+        // Check if fingers are curled (tips below knuckles)
+        const fingerTips = [8, 12, 16, 20]; // Index, Middle, Ring, Pinky tips
+        const fingerKnuckles = [6, 10, 14, 18]; // Corresponding knuckles
+
+        let curledCount = 0;
+        for (let i = 0; i < 4; i++) {
+            if (landmarks[fingerTips[i]].y > landmarks[fingerKnuckles[i]].y) {
+                curledCount++;
+            }
+        }
+        return curledCount >= 3;
+    }, []);
+
+    // Calculate distance between two hands
+    const calculateHandDistance = useCallback((hand1: NormalizedLandmark[], hand2: NormalizedLandmark[]): number => {
+        const palm1 = hand1[0]; // Wrist
+        const palm2 = hand2[0];
+        return Math.hypot(palm1.x - palm2.x, palm1.y - palm2.y);
+    }, []);
 
     useEffect(() => {
         const setupMediaPipe = async () => {
             try {
                 setStatus("Cargando modelo IA...");
-                console.log("[HandGesture] Iniciando carga de MediaPipe...");
-                
                 const vision = await FilesetResolver.forVisionTasks(
                     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
                 );
-                console.log("[HandGesture] FilesetResolver cargado");
 
-                handLandmarkerRef.current = await HandLandmarker.createFromOptions(
-                    vision,
-                    {
-                        baseOptions: {
-                            modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
-                            delegate: "GPU",
-                        },
-                        runningMode: "VIDEO",
-                        numHands: 1,
-                    }
-                );
-                console.log("[HandGesture] HandLandmarker creado exitosamente");
+                handLandmarkerRef.current = await HandLandmarker.createFromOptions(vision, {
+                    baseOptions: {
+                        modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
+                        delegate: "GPU",
+                    },
+                    runningMode: "VIDEO",
+                    numHands: 2, // Detect both hands!
+                });
 
                 setIsLoaded(true);
-                setStatus("Esperando cámara...");
+                setStatus("Modelo listo. Activa la cámara.");
             } catch (error) {
-                console.error("[HandGesture] Error MediaPipe:", error);
+                console.error("Error MediaPipe:", error);
                 setStatus("Error de carga. Recarga la página.");
             }
         };
@@ -181,329 +361,275 @@ export default function HandGestureDemo() {
         setupMediaPipe();
 
         return () => {
-            console.log("[HandGesture] Limpiando recursos...");
             if (handLandmarkerRef.current) {
                 handLandmarkerRef.current.close();
-                handLandmarkerRef.current = null;
             }
             if (requestRef.current) {
                 cancelAnimationFrame(requestRef.current);
-                requestRef.current = 0;
             }
         };
     }, []);
 
     const enableCam = async () => {
-        console.log("Attempting to enable camera...");
         if (!handLandmarkerRef.current) {
-            console.error("handLandmarker not ready");
-            setStatus("Error: Modelo IA no listo. Recarga la página.");
+            setStatus("Error: Modelo no listo.");
             return;
         }
 
-        setStatus("Solicitando permiso... Mira la barra de dirección 🔒");
+        setStatus("Solicitando permiso de cámara...");
 
         try {
-            // Simplest constraint to maximize compatibility
             const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            console.log("Camera access granted:", stream.id);
 
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
-                
-                // Esperar a que el video esté listo antes de iniciar la detección
                 videoRef.current.addEventListener("loadeddata", () => {
-                    console.log("[HandGesture] Video loaded, dimensiones:", videoRef.current?.videoWidth, "x", videoRef.current?.videoHeight);
                     setPermissionGranted(true);
                     setStatus("¡Cámara activa!");
-                    // Iniciar el loop de detección después de un pequeño delay para asegurar que el video esté reproduciéndose
-                    setTimeout(() => {
-                        if (requestRef.current) {
-                            cancelAnimationFrame(requestRef.current);
-                        }
-                        console.log("[HandGesture] Iniciando loop de detección...");
-                        predictWebcam();
-                    }, 100);
+                    setTimeout(() => predictWebcam(), 100);
                 }, { once: true });
-                
-                // También iniciar cuando el video empiece a reproducirse
-                videoRef.current.addEventListener("playing", () => {
-                    console.log("[HandGesture] Video playing, ensuring detection loop is running...");
-                    if (!requestRef.current) {
-                        predictWebcam();
-                    }
-                }, { once: true });
-                
-                // Forzar reproducción del video
-                videoRef.current.play().catch(err => {
-                    console.error("[HandGesture] Error al reproducir video:", err);
-                });
+                videoRef.current.play();
             }
         } catch (err: any) {
-            console.error("Error accessing webcam:", err);
-
-            // Helpful error messages for the user
-            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                setStatus("⛔ Permiso denegado. Haz clic en el candado 🔒 de la barra de URL y permite la cámara.");
-            } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-                setStatus("📷 No se encontró ninguna cámara.");
-            } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
-                setStatus("⚠️ La cámara está siendo usada por otra aplicación.");
+            if (err.name === "NotAllowedError") {
+                setStatus("⛔ Permiso denegado. Permite la cámara.");
+            } else if (err.name === "NotFoundError") {
+                setStatus("📷 No se encontró cámara.");
             } else {
-                setStatus(`Error: ${err.message || 'Desconocido'}`);
+                setStatus(`Error: ${err.message}`);
             }
-        }
-    };
-
-    const detectGestures = (landmarks: NormalizedLandmark[]) => {
-        // 1. PINCH: Distance between Thumb Tip (4) and Index Tip (8)
-        const thumbTip = landmarks[4];
-        const indexTip = landmarks[8];
-        const pinchDist = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
-        const isPinchingNow = pinchDist < 0.08; // INCREASED THRESHOLD: Was 0.05
-
-        // 2. ROTATION/ORIENTATION
-        const wrist = landmarks[0];
-        const middleMCP = landmarks[9];
-
-        // Simple mapping for demo purposes
-        const indexMCP = landmarks[5];
-        const pinkyMCP = landmarks[17];
-
-        // Roll calculation
-        const roll = Math.atan2(pinkyMCP.y - indexMCP.y, pinkyMCP.x - indexMCP.x);
-
-        // Pitch/Yaw based on hand tilt relative to screen plane
-        const pitch = (middleMCP.y - wrist.y) * 3;
-        const yaw = (middleMCP.x - wrist.x) * -3;
-
-        setHandRotation({ x: pitch, y: yaw, z: roll });
-
-        // 3. VICTORY SIGN (Changing Shapes)
-        // Relaxed logic: Index and Middle tips above their PIP joints; Ring and Pinky tips below their PIP joints
-        const isIndexExtended = landmarks[8].y < landmarks[6].y;
-        const isMiddleExtended = landmarks[12].y < landmarks[10].y;
-        const isRingCurled = landmarks[16].y > landmarks[14].y;
-        const isPinkyCurled = landmarks[20].y > landmarks[18].y;
-
-        const isVictory = isIndexExtended && isMiddleExtended && isRingCurled && isPinkyCurled && !isPinchingNow;
-
-        // SIEMPRE actualizar la posición de la mano (usando el índice como referencia)
-        setHandPosition({ x: indexTip.x, y: indexTip.y, z: indexTip.z });
-
-        if (isPinchingNow) {
-            setGestureName("AGARRANDO");
-            setIsPinching(true);
-        } else if (isVictory) {
-            setGestureName("CAMBIO DE FORMA");
-            setIsPinching(false);
-
-            // Cooldown check
-            const now = Date.now();
-            if (now - lastSwitchTime.current > 1500) { // Increased cooldown slightly to avoid double triggers
-                console.log("Shape switch triggered!");
-                setCurrentShape(prev => {
-                    if (prev === 'box') return 'sphere';
-                    if (prev === 'sphere') return 'torus';
-                    return 'box';
-                });
-                lastSwitchTime.current = now;
-            }
-        } else {
-            setGestureName("Rastreo Activo");
-            setIsPinching(false);
         }
     };
 
     const predictWebcam = () => {
         if (!videoRef.current || !handLandmarkerRef.current) {
-            console.warn("[HandGesture] Video or handLandmarker not ready");
-            requestRef.current = window.requestAnimationFrame(predictWebcam);
+            requestRef.current = requestAnimationFrame(predictWebcam);
             return;
         }
 
-        // Verificar que el video esté reproduciéndose y tenga dimensiones válidas
-        if (videoRef.current.readyState < 2) {
-            // Video aún no está listo, reintentar en el siguiente frame
-            requestRef.current = window.requestAnimationFrame(predictWebcam);
-            return;
-        }
-
-        // Verificar que el video tenga dimensiones válidas
-        if (videoRef.current.videoWidth === 0 || videoRef.current.videoHeight === 0) {
-            requestRef.current = window.requestAnimationFrame(predictWebcam);
+        if (videoRef.current.readyState < 2 || videoRef.current.videoWidth === 0) {
+            requestRef.current = requestAnimationFrame(predictWebcam);
             return;
         }
 
         const startTimeMs = performance.now();
-        
-        try {
-            const results = handLandmarkerRef.current.detectForVideo(videoRef.current, startTimeMs);
-            
-            if (results && results.landmarks && results.landmarks.length > 0) {
-                detectGestures(results.landmarks[0]);
-            } else {
-                // Feedback when hands are lost
-                setGestureName("NO SE DETECTA MANO");
-                setIsPinching(false);
+        const results = handLandmarkerRef.current.detectForVideo(videoRef.current, startTimeMs);
+
+        if (results?.landmarks && results.landmarks.length > 0) {
+            setHandsDetected(results.landmarks.length);
+
+            if (results.landmarks.length === 2) {
+                // Two hands detected - calculate distance for scale
+                const distance = calculateHandDistance(results.landmarks[0], results.landmarks[1]);
+                // Map distance (0.1 - 0.8) to scale (0.5 - 2.0)
+                const newScale = THREE.MathUtils.mapLinear(distance, 0.1, 0.8, 0.5, 2.5);
+                setParticleScale(THREE.MathUtils.clamp(newScale, 0.3, 3));
+
+                // Check if both fists are closed for contraction effect
+                const bothFists = isFist(results.landmarks[0]) && isFist(results.landmarks[1]);
+                if (bothFists) {
+                    setParticleScale(prev => Math.max(0.3, prev * 0.95));
+                }
+            } else if (results.landmarks.length === 1) {
+                // Single hand - fist controls scale
+                if (isFist(results.landmarks[0])) {
+                    setParticleScale(prev => Math.max(0.3, prev * 0.98));
+                } else {
+                    setParticleScale(prev => Math.min(2, prev * 1.01));
+                }
             }
-        } catch (error) {
-            console.error("[HandGesture] Error en detectForVideo:", error);
-            setGestureName("ERROR DE DETECCIÓN");
+        } else {
+            setHandsDetected(0);
         }
-        
-        // Continuar el loop
-        requestRef.current = window.requestAnimationFrame(predictWebcam);
+
+        requestRef.current = requestAnimationFrame(predictWebcam);
     };
 
     return (
-        <div className="fixed inset-0 w-full h-full bg-[#0E131B] overflow-hidden text-[#F5F7F9] font-sans select-none z-[50]">
-            {/* Webcam Feed - Visible now for debugging/positioning */}
+        <div className="fixed inset-0 w-full h-full bg-gradient-to-br from-[#0a0a1a] via-[#1a1a2e] to-[#0a0a1a] overflow-hidden text-white font-sans select-none">
+            {/* Hidden Video */}
             <video
                 ref={videoRef}
-                className={`absolute inset-0 w-full h-full object-cover transform -scale-x-100 transition-opacity duration-1000 ${permissionGranted ? 'opacity-20' : 'opacity-0'}`}
+                className="absolute opacity-0 pointer-events-none"
                 autoPlay
                 playsInline
                 muted
             />
 
-            {/* 3D Scene */}
-            <div className="absolute inset-0 z-10 cursor-move">
-                <Canvas shadows camera={{ position: [0, 0, 8], fov: 45 }}>
+            {/* 3D Canvas */}
+            <div className="absolute inset-0">
+                <Canvas camera={{ position: [0, 0, 10], fov: 50 }}>
                     <Suspense fallback={null}>
-                        <SceneContent
-                            handPosition={handPosition}
-                            handRotation={handRotation}
-                            isPinching={isPinching}
+                        <Scene
                             shape={currentShape}
+                            color={particleColor}
+                            scale={particleScale}
+                            particleCount={particleCount}
                         />
                     </Suspense>
                 </Canvas>
             </div>
 
             {/* UI Overlay */}
-            <div className="absolute inset-0 z-20 pointer-events-none p-6 md:p-12 flex flex-col justify-between">
+            <div className="absolute inset-0 pointer-events-none p-6 flex flex-col justify-between">
                 {/* Header */}
                 <div className="flex justify-between items-start pointer-events-auto">
                     <div>
-                        <motion.div
-                            layoutId="logo"
-                            className="flex items-center gap-2 mb-2"
-                        >
-                            <div className="w-8 h-8 rounded-lg bg-[#2F7058] grid place-items-center overflow-hidden">
-                                <img src="/images/favicon.svg" alt="Avícola Logo" className="w-6 h-6 object-contain" />
-                            </div>
-                            <span className="font-bold tracking-tight text-[#2F7058] bg-[#FCDE8D] px-2 py-0.5 rounded text-xs">EXPERIMENTAL</span>
-                        </motion.div>
-
-                        <motion.h1
-                            layoutId="title"
-                            className="text-3xl md:text-5xl font-black italic tracking-tighter text-white uppercase drop-shadow-sm"
-                        >
-                            <span className="text-[#FCDE8D]">Avícola</span> 3D
-                        </motion.h1>
-                        <motion.p
-                            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                            className="text-[#9ca3af] mt-2 font-mono text-sm max-w-sm"
-                        >
-                            Control gestual para logística.
-                        </motion.p>
+                        <div className="flex items-center gap-2 mb-2">
+                            <Sparkles className="w-6 h-6 text-purple-400" />
+                            <span className="font-bold text-purple-400 text-sm">PARTICLE SYSTEM</span>
+                        </div>
+                        <h1 className="text-3xl md:text-4xl font-black tracking-tight">
+                            Control <span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-500">Gestual</span>
+                        </h1>
                     </div>
 
-                    <div className="flex flex-col gap-2 items-end">
-                        <div className={`px-4 py-2 rounded-lg font-bold font-mono tracking-widest text-xs border backdrop-blur-md transition-colors duration-300 flex items-center gap-2
-                    ${isPinching ? 'bg-[#CB3433]/20 border-[#CB3433] text-[#CB3433]' : 'bg-[#2F7058]/20 border-[#2F7058] text-[#2F7058] bg-white/5'}`}>
-                            {isPinching ? <Grab size={16} /> : <Hand size={16} />}
-                            {gestureName}
+                    {/* Status */}
+                    <div className="flex flex-col items-end gap-2">
+                        <div className={`px-4 py-2 rounded-full text-sm font-mono backdrop-blur-md border ${handsDetected > 0 ? "bg-green-500/20 border-green-500/40 text-green-400" : "bg-white/10 border-white/20"
+                            }`}>
+                            {handsDetected > 0 ? `${handsDetected} mano${handsDetected > 1 ? "s" : ""} detectada${handsDetected > 1 ? "s" : ""}` : "Sin manos"}
                         </div>
-                        <div className="text-xs text-[#FCDE8D] font-mono opacity-80">
-                            SHAPE: {currentShape.toUpperCase()}
-                        </div>
-                        {/* Debug info */}
-                        <div className="text-xs text-[#9ca3af] font-mono opacity-60 mt-2 text-right">
-                            POS: ({handPosition.x.toFixed(2)}, {handPosition.y.toFixed(2)}, {handPosition.z.toFixed(2)})
+                        <div className="text-xs text-white/50 font-mono">
+                            Escala: {particleScale.toFixed(2)}x
                         </div>
                     </div>
                 </div>
 
-                {/* Start Prompt */}
-                <AnimatePresence>
-                    {!permissionGranted && (
-                        <motion.div
-                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                            className="fixed inset-0 flex items-center justify-center pointer-events-auto bg-black/80 backdrop-blur-md z-[100]"
+                {/* Bottom Controls */}
+                <div className="pointer-events-auto">
+                    {/* Template Selection */}
+                    <div className="flex justify-center gap-2 mb-4 flex-wrap">
+                        <TemplateButton
+                            template="heart"
+                            icon={<Heart size={20} />}
+                            label="Corazón"
+                            isActive={currentShape === "heart"}
+                            onClick={() => setCurrentShape("heart")}
+                        />
+                        <TemplateButton
+                            template="flower"
+                            icon={<Flower2 size={20} />}
+                            label="Flor"
+                            isActive={currentShape === "flower"}
+                            onClick={() => setCurrentShape("flower")}
+                        />
+                        <TemplateButton
+                            template="saturn"
+                            icon={<CircleDot size={20} />}
+                            label="Saturno"
+                            isActive={currentShape === "saturn"}
+                            onClick={() => setCurrentShape("saturn")}
+                        />
+                        <TemplateButton
+                            template="buddha"
+                            icon={<span className="text-lg">🧘</span>}
+                            label="Buda"
+                            isActive={currentShape === "buddha"}
+                            onClick={() => setCurrentShape("buddha")}
+                        />
+                        <TemplateButton
+                            template="fireworks"
+                            icon={<Flame size={20} />}
+                            label="Fuegos"
+                            isActive={currentShape === "fireworks"}
+                            onClick={() => setCurrentShape("fireworks")}
+                        />
+                        <TemplateButton
+                            template="spiral"
+                            icon={<Star size={20} />}
+                            label="Espiral"
+                            isActive={currentShape === "spiral"}
+                            onClick={() => setCurrentShape("spiral")}
+                        />
+                    </div>
+
+                    {/* Color Picker */}
+                    <div className="flex justify-center gap-2 mb-4">
+                        {colorPresets.map((preset) => (
+                            <button
+                                key={preset.color}
+                                onClick={() => setParticleColor(preset.color)}
+                                className={`w-8 h-8 rounded-full border-2 transition-all ${particleColor === preset.color ? "border-white scale-110" : "border-transparent hover:scale-105"
+                                    }`}
+                                style={{ backgroundColor: preset.color }}
+                                title={preset.name}
+                            />
+                        ))}
+                        <button
+                            onClick={() => setShowColorPicker(!showColorPicker)}
+                            className="w-8 h-8 rounded-full border-2 border-dashed border-white/50 flex items-center justify-center text-white/50 hover:border-white hover:text-white transition-all"
                         >
-                            <div className="bg-neutral-900 border border-neutral-800 p-8 rounded-2xl max-w-md w-full text-center shadow-2xl relative overflow-hidden group">
-                                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            +
+                        </button>
+                    </div>
 
-                                <div className="w-20 h-20 bg-neutral-800 rounded-full flex items-center justify-center mx-auto mb-6 relative">
-                                    {isLoaded ? (
-                                        <Camera size={40} className="text-blue-400" />
-                                    ) : (
-                                        <Loader2 size={40} className="animate-spin text-purple-400" />
-                                    )}
-                                    {isLoaded && <div className="absolute inset-0 rounded-full animate-ping bg-blue-500/20" />}
-                                </div>
+                    {/* Custom Color Picker */}
+                    <AnimatePresence>
+                        {showColorPicker && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: 20 }}
+                                className="flex justify-center mb-4"
+                            >
+                                <input
+                                    type="color"
+                                    value={particleColor}
+                                    onChange={(e) => setParticleColor(e.target.value)}
+                                    className="w-32 h-10 rounded-lg cursor-pointer"
+                                />
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
 
-                                <h2 className="text-2xl font-bold mb-2 text-[#FCDE8D]">Activación Requerida</h2>
-                                <p className="text-[#9ca3af] mb-8 font-light">{status}</p>
-
-                                <button
-                                    onClick={() => {
-                                        console.log("Button clicked!");
-                                        enableCam();
-                                    }}
-                                    disabled={!isLoaded || status.includes("Solicitando")}
-                                    className="w-full cursor-pointer bg-[#2F7058] hover:bg-[#3d8a6f] text-white disabled:opacity-50 disabled:cursor-not-allowed font-bold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#2F7058]/20 active:scale-95 z-50 relative"
-                                >
-                                    {isLoaded ? "INICIAR EXPERIENCIA" : "CARGANDO MODELOS..."}
-                                </button>
-                            </div>
-                        </motion.div>
+                    {/* Instructions */}
+                    {permissionGranted && (
+                        <div className="text-center text-white/50 text-sm">
+                            <span className="mr-4">✋ Separa las manos → Expande</span>
+                            <span className="mr-4">🤲 Junta las manos → Comprime</span>
+                            <span>✊ Puños cerrados → Contrae</span>
+                        </div>
                     )}
-                </AnimatePresence>
+                </div>
+            </div>
 
-                {/* Instructions Footer */}
-                {permissionGranted && (
+            {/* Start Modal */}
+            <AnimatePresence>
+                {!permissionGranted && (
                     <motion.div
-                        initial={{ opacity: 0, y: 50 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.5 }}
-                        className="grid grid-cols-3 gap-4 pointer-events-auto"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 flex items-center justify-center pointer-events-auto bg-black/80 backdrop-blur-md z-50"
                     >
-                        <InstructionCard
-                            icon={<Grab className="text-[#CB3433]" />}
-                            title="Agarrar y Mover"
-                            desc='Junta pulgar e índice ("Pinch") para tomar control del objeto.'
-                            active={isPinching}
-                        />
-                        <InstructionCard
-                            icon={<div className="flex"><Hand className="text-[#2F7058] -mr-2" /><Hand className="text-[#2F7058] opacity-50" /></div>}
-                            title="Rotar Muñeca"
-                            desc="Gira tu mano para rotar el objeto en 3D."
-                            active={!isPinching && gestureName === 'Rastreo Activo'}
-                        />
-                        <InstructionCard
-                            icon={<span className="text-xl font-bold text-[#FCDE8D]">✌️</span>}
-                            title="Cambiar Forma"
-                            desc='Haz el gesto de "Amor y Paz" para cambiar la geometría.'
-                            active={gestureName === 'CAMBIO DE FORMA'}
-                        />
+                        <div className="bg-white/10 border border-white/20 p-8 rounded-2xl max-w-md w-full text-center backdrop-blur-xl">
+                            <div className="w-20 h-20 bg-gradient-to-br from-pink-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                                {isLoaded ? (
+                                    <Camera size={40} className="text-white" />
+                                ) : (
+                                    <Loader2 size={40} className="animate-spin text-white" />
+                                )}
+                            </div>
+
+                            <h2 className="text-2xl font-bold mb-2">Sistema de Partículas 3D</h2>
+                            <p className="text-white/60 mb-6">{status}</p>
+
+                            <button
+                                onClick={enableCam}
+                                disabled={!isLoaded}
+                                className="w-full bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed font-bold py-4 px-6 rounded-xl transition-all"
+                            >
+                                {isLoaded ? "INICIAR EXPERIENCIA" : "CARGANDO..."}
+                            </button>
+
+                            <p className="text-white/40 text-xs mt-4">
+                                Requiere cámara para control gestual
+                            </p>
+                        </div>
                     </motion.div>
                 )}
-            </div>
+            </AnimatePresence>
         </div>
     );
-}
-
-function InstructionCard({ icon, title, desc, active }: { icon: React.ReactNode, title: string, desc: string, active: boolean }) {
-    return (
-        <div className={`bg-neutral-900/80 backdrop-blur-md p-4 rounded-xl border transition-all duration-300 ${active ? 'border-white/40 bg-neutral-800' : 'border-white/5 opacity-60'}`}>
-            <div className="flex items-center gap-3 mb-2">
-                {icon}
-                <span className="font-bold text-sm text-white">{title}</span>
-            </div>
-            <p className="text-xs text-neutral-400 leading-relaxed">{desc}</p>
-        </div>
-    )
 }
