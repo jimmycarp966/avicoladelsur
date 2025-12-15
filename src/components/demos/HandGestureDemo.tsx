@@ -215,9 +215,7 @@ function ParticleCloud({
             <bufferGeometry>
                 <bufferAttribute
                     attach="attributes-position"
-                    count={particleCount}
-                    array={initialPositions}
-                    itemSize={3}
+                    args={[initialPositions, 3]}
                 />
             </bufferGeometry>
             <pointsMaterial
@@ -453,32 +451,33 @@ export default function HandGestureDemo() {
             const landmarks = results.landmarks[0];
             setHandsDetected(1);
 
-            // Get hand position (palm center)
-            const palmY = landmarks[9].y; // Middle finger base - good center reference
+            // Calculate hand "openness" - average distance of fingertips to palm center
+            const palmCenter = landmarks[9]; // Middle finger MCP
+            const fingerTips = [4, 8, 12, 16, 20]; // Thumb, Index, Middle, Ring, Pinky tips
 
-            // Check gestures
+            let totalDistance = 0;
+            for (const tipIndex of fingerTips) {
+                const tip = landmarks[tipIndex];
+                const dist = Math.hypot(tip.x - palmCenter.x, tip.y - palmCenter.y);
+                totalDistance += dist;
+            }
+            const avgDistance = totalDistance / fingerTips.length;
+
+            // Map average distance to scale
+            // Tight hand ~0.08, Open hand ~0.25
+            let targetScale = THREE.MathUtils.mapLinear(avgDistance, 0.06, 0.22, 0.4, 2.5);
+            targetScale = THREE.MathUtils.clamp(targetScale, 0.3, 3);
+
+            // Determine gesture for feedback
             const fist = isFist(landmarks);
             const open = isOpenHand(landmarks);
 
-            // Update gesture info for feedback
             if (fist) {
-                setGestureInfo("✊ PUÑO - Contrayendo");
+                setGestureInfo(`✊ CERRADA (${avgDistance.toFixed(2)})`);
             } else if (open) {
-                setGestureInfo("🖐️ ABIERTA - Expandiendo");
+                setGestureInfo(`🖐️ ABIERTA (${avgDistance.toFixed(2)})`);
             } else {
-                setGestureInfo("👋 Moviendo...");
-            }
-
-            // Calculate target scale based on hand position Y (0=top, 1=bottom)
-            // Hand up = bigger, hand down = smaller
-            let targetScale = THREE.MathUtils.mapLinear(palmY, 0.8, 0.2, 0.5, 2.5);
-            targetScale = THREE.MathUtils.clamp(targetScale, 0.3, 3);
-
-            // Modify scale based on gesture
-            if (fist) {
-                targetScale *= 0.6; // Contract more when fist
-            } else if (open) {
-                targetScale *= 1.3; // Expand more when open
+                setGestureInfo(`👋 Intermedio (${avgDistance.toFixed(2)})`);
             }
 
             // Store target for smoothing
@@ -486,7 +485,7 @@ export default function HandGestureDemo() {
 
             // Smooth interpolation toward target
             setParticleScale(prev => {
-                const smoothing = 0.1; // Lower = smoother but slower
+                const smoothing = 0.15; // Slightly faster response
                 return prev + (targetScaleRef.current - prev) * smoothing;
             });
         } else {
@@ -643,10 +642,8 @@ export default function HandGestureDemo() {
                     {/* Instructions */}
                     {permissionGranted && (
                         <div className="text-center text-white/50 text-sm">
-                            <span className="mr-4">☝️ Mano arriba → Expande</span>
-                            <span className="mr-4">👇 Mano abajo → Comprime</span>
-                            <span className="mr-4">🖐️ Mano abierta → Más expansión</span>
-                            <span>✊ Puño → Más contracción</span>
+                            <span className="mr-4">🖐️ Abre la mano → Expande</span>
+                            <span>✊ Cierra la mano → Contrae</span>
                         </div>
                     )}
                 </div>
