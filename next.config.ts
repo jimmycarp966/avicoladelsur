@@ -17,7 +17,19 @@ const nextConfig: NextConfig = {
   // Optimizaciones de rendimiento
   experimental: {
     // Optimizar imports de paquetes grandes (reduce bundle size)
-    optimizePackageImports: ['lucide-react'],
+    optimizePackageImports: [
+      'lucide-react',
+      '@radix-ui/react-icons',
+      '@radix-ui/react-select',
+      '@radix-ui/react-dialog',
+      '@radix-ui/react-dropdown-menu',
+      '@radix-ui/react-popover',
+      '@radix-ui/react-tooltip',
+      'date-fns',
+      '@tanstack/react-table',
+      'sonner',
+      'recharts',
+    ],
   },
 
   // Headers de caché para assets estáticos

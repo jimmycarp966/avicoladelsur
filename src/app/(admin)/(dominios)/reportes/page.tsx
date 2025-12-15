@@ -19,8 +19,7 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 
-export const dynamic = 'force-dynamic'
-export const revalidate = 3600 // Revalida cada hora
+export const revalidate = 60 // Revalida cada minuto (dashboard ejecutivo)
 
 export default async function ReportesPage() {
   const supabase = await createClient()
