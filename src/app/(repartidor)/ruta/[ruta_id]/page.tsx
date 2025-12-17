@@ -98,12 +98,13 @@ async function RutaHojaPage({ params }: { params: Promise<{ ruta_id: string }> }
   }
 
   // Para cada detalle, obtener el cliente (desde pedido o desde entregas) y convertir coordenadas
-  const detallesConCliente = await Promise.all(
+  // Usamos flat() para aplanar la lista expandida
+  const detallesConClienteMatrix = await Promise.all(
     (detallesRutaRaw || []).map(async (detalle: any) => {
       let clienteData = null
       let coordenadasCliente = null
 
-      // Si el pedido tiene cliente_id, obtener cliente directamente
+      // Si el pedido tiene cliente_id, es simple
       if (detalle.pedido?.cliente_id) {
         const { data: cliente, error: clienteError } = await supabase
           .from('clientes')
@@ -124,51 +125,84 @@ async function RutaHojaPage({ params }: { params: Promise<{ ruta_id: string }> }
             }
           }
         }
+
+        return [{
+          ...detalle,
+          pedido: {
+            ...detalle.pedido,
+            cliente: clienteData ? {
+              ...clienteData,
+              coordenadas: coordenadasCliente,
+            } : null,
+          }
+        }]
       } else {
-        // Si el pedido no tiene cliente_id, buscar en entregas (pedido agrupado)
+        // Si el pedido no tiene cliente_id, buscar TODAS las entregas (pedido agrupado)
         const { data: entregas, error: entregasError } = await supabase
           .from('entregas')
-          .select('cliente_id, coordenadas')
+          .select('id, cliente_id, coordenadas, estado_entrega, estado_pago, monto_cobrado, orden_entrega')
           .eq('pedido_id', detalle.pedido_id)
-          .limit(1)
-          .single()
+          .order('orden_entrega', { ascending: true })
 
-        if (!entregasError && entregas?.cliente_id) {
-          // Obtener cliente con ST_AsGeoJSON en consulta directa (no anidada)
-          const { data: cliente, error: clienteError } = await supabase
-            .from('clientes')
-            .select('id, nombre, telefono, direccion, zona_entrega, ST_AsGeoJSON(coordenadas)::jsonb as coordenadas')
-            .eq('id', entregas.cliente_id)
-            .single()
+        if (!entregasError && entregas && entregas.length > 0) {
+          // Mapear cada entrega individual a un objeto detalle
+          return await Promise.all(entregas.map(async (entregaInd: any) => {
+            // Necesitamos datos del cliente
+            let clienteDataInd = null
+            let coordenadasInd = null
 
-          if (!clienteError && cliente) {
-            clienteData = cliente
-            // Convertir coordenadas desde entregas o desde cliente
-            const coords = (entregas as any).coordenadas || (cliente as any).coordenadas
-            if (coords) {
-              if (coords && typeof coords === 'object' && 'type' in coords && coords.type === 'Point' && Array.isArray(coords.coordinates)) {
-                const [lng, lat] = coords.coordinates
-                coordenadasCliente = { lat, lng }
-              } else if (coords && typeof coords === 'object' && 'lat' in coords && 'lng' in coords) {
-                coordenadasCliente = coords
+            if (entregaInd.cliente_id) {
+              const { data: cliente, error: clienteError } = await supabase
+                .from('clientes')
+                .select('id, nombre, telefono, direccion, zona_entrega, ST_AsGeoJSON(coordenadas)::jsonb as coordenadas')
+                .eq('id', entregaInd.cliente_id)
+                .single()
+
+              if (!clienteError && cliente) {
+                clienteDataInd = cliente
+                const coords = (entregas as any).coordenadas || (cliente as any).coordenadas
+                // Prioridad a coords de entregaInd si existen (override local), si no del cliente
+                // Pero aqui coords viene de entregaInd (select)
+                const coordsEfectivas = entregaInd.coordenadas || (cliente as any).coordenadas
+
+                if (coordsEfectivas) {
+                  if (typeof coordsEfectivas === 'object' && 'type' in coordsEfectivas && coordsEfectivas.type === 'Point' && Array.isArray(coordsEfectivas.coordinates)) {
+                    const [lng, lat] = coordsEfectivas.coordinates
+                    coordenadasInd = { lat, lng }
+                  } else if (typeof coordsEfectivas === 'object' && 'lat' in coordsEfectivas && 'lng' in coordsEfectivas) {
+                    coordenadasInd = coordsEfectivas
+                  }
+                }
               }
             }
-          }
-        }
-      }
 
-      return {
-        ...detalle,
-        pedido: {
-          ...detalle.pedido,
-          cliente: clienteData ? {
-            ...clienteData,
-            coordenadas: coordenadasCliente,
-          } : null,
-        },
+            return {
+              ...detalle,
+              id: entregaInd.id, // SOBRESCRIBIR ID con el de la entrega individual
+              virtual_id: `${detalle.id}-${entregaInd.id}`, // Por si acaso
+              detalle_ruta_id_padre: detalle.id,
+              estado_entrega: entregaInd.estado_entrega,
+              orden_entrega: entregaInd.orden_entrega || detalle.orden_entrega, // Usar orden especifico si hay
+              pago_registrado: entregaInd.estado_pago === 'pagado',
+              monto_cobrado_registrado: entregaInd.monto_cobrado,
+              pedido: {
+                ...detalle.pedido,
+                cliente: clienteDataInd ? {
+                  ...clienteDataInd,
+                  coordenadas: coordenadasInd
+                } : null
+              }
+            }
+          }))
+        }
+
+        // Fallback si no hay entregas (devolver detalle original vacio)
+        return [{ ...detalle }]
       }
     })
   )
+
+  const detallesConCliente = detallesConClienteMatrix.flat()
 
   const ruta = {
     ...rutaBasica,

@@ -31,12 +31,12 @@ interface AsignarVehiculoSelectProps {
   onSuccess?: () => void
 }
 
-export function AsignarVehiculoSelect({ 
-  pedidoId, 
-  numeroPedido, 
-  estado, 
+export function AsignarVehiculoSelect({
+  pedidoId,
+  numeroPedido,
+  estado,
   pesoTotal,
-  onSuccess 
+  onSuccess
 }: AsignarVehiculoSelectProps) {
   const router = useRouter()
   const { showToast } = useNotificationStore()
@@ -85,13 +85,13 @@ export function AsignarVehiculoSelect({
     try {
       setLoading(true)
       const result = await asignarPedidoARutaConVehiculo(pedidoId, vehiculoSeleccionado)
-      
+
       if (result.success) {
         showToast(
           'success',
           result.message || `Pedido ${numeroPedido} asignado a ruta exitosamente`
         )
-        
+
         if (onSuccess) {
           onSuccess()
         } else {
@@ -116,10 +116,11 @@ export function AsignarVehiculoSelect({
 
   return (
     <div className="space-y-3 p-3 rounded-lg border bg-muted/30">
-      <p className="text-sm font-medium">Asignar a Ruta con Vehículo</p>
-      
-      <Select 
-        value={vehiculoSeleccionado} 
+      <p className="text-sm font-medium">Pasar a Ruta</p>
+      <p className="text-xs text-muted-foreground">Selecciona el vehículo que realizará la entrega</p>
+
+      <Select
+        value={vehiculoSeleccionado}
         onValueChange={setVehiculoSeleccionado}
         disabled={loadingVehiculos || loading}
       >
@@ -134,9 +135,9 @@ export function AsignarVehiculoSelect({
                 <div className="flex items-center gap-2">
                   <Truck className="h-4 w-4" />
                   <span>
-                    {vehiculo.marca && vehiculo.modelo 
+                    {vehiculo.marca && vehiculo.modelo
                       ? `${vehiculo.marca} ${vehiculo.modelo}`
-                      : vehiculo.modelo 
+                      : vehiculo.modelo
                         ? vehiculo.modelo
                         : vehiculo.patente}
                   </span>
@@ -162,7 +163,7 @@ export function AsignarVehiculoSelect({
         <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 p-2 rounded">
           <AlertTriangle className="h-4 w-4" />
           <span>
-            El peso del pedido ({pesoTotal.toFixed(2)} kg) supera la capacidad del vehículo ({vehiculoInfo?.capacidad_kg} kg). 
+            El peso del pedido ({pesoTotal.toFixed(2)} kg) supera la capacidad del vehículo ({vehiculoInfo?.capacidad_kg} kg).
             Se asignará de todas formas.
           </span>
         </div>
@@ -182,7 +183,7 @@ export function AsignarVehiculoSelect({
         ) : (
           <>
             <Truck className="mr-2 h-4 w-4" />
-            Asignar a Ruta
+            Pasar a Ruta
           </>
         )}
       </Button>

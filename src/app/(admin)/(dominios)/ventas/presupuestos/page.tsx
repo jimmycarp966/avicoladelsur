@@ -1,19 +1,49 @@
-import { Suspense } from 'react'
-import { Plus, FileText, Clock, Package, CheckCircle, AlertTriangle } from 'lucide-react'
+'use client'
+
+import { Suspense, useEffect, useState } from 'react'
+import { Plus, FileText, Clock, Package, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { PresupuestosTableSkeleton } from './presupuestos-table-skeleton'
 import { PresupuestosTableWrapper } from './presupuestos-table-wrapper'
+import { obtenerEstadisticasPresupuestosAction } from '@/actions/presupuestos.actions'
 
-export const revalidate = 300 // Revalida cada 5 minutos
-
-export const metadata = {
-  title: 'Presupuestos - Avícola del Sur ERP',
-  description: 'Gestión de presupuestos del sistema',
+interface EstadisticasPresupuestos {
+  totalMes: number
+  pendientes: number
+  enAlmacen: number
+  facturadosHoy: number
+  anuladosMes: number
 }
 
 export default function PresupuestosPage() {
+  const [estadisticas, setEstadisticas] = useState<EstadisticasPresupuestos | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const cargarEstadisticas = async () => {
+      try {
+        const result = await obtenerEstadisticasPresupuestosAction()
+        if (result.success && result.data) {
+          setEstadisticas(result.data)
+        }
+      } catch (error) {
+        console.error('Error cargando estadísticas:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    cargarEstadisticas()
+  }, [])
+
+  const renderEstadistica = (valor: number | undefined, colorClass: string) => {
+    if (loading) {
+      return <Loader2 className={`h-8 w-8 animate-spin ${colorClass}`} />
+    }
+    return valor ?? 0
+  }
+
   return (
     <div className="space-y-6">
       {/* Header - Estilo limpio y profesional */}
@@ -45,7 +75,7 @@ export default function PresupuestosPage() {
           </CardHeader>
           <CardContent>
             <div className="text-4xl font-bold text-primary mb-2">
-              -
+              {renderEstadistica(estadisticas?.totalMes, 'text-primary')}
             </div>
             <p className="text-sm text-muted-foreground font-medium">
               Este mes
@@ -62,7 +92,7 @@ export default function PresupuestosPage() {
           </CardHeader>
           <CardContent>
             <div className="text-4xl font-bold text-warning mb-2">
-              -
+              {renderEstadistica(estadisticas?.pendientes, 'text-warning')}
             </div>
             <p className="text-sm text-muted-foreground font-medium">
               Requieren atención
@@ -79,7 +109,7 @@ export default function PresupuestosPage() {
           </CardHeader>
           <CardContent>
             <div className="text-4xl font-bold text-secondary mb-2">
-              -
+              {renderEstadistica(estadisticas?.enAlmacen, 'text-secondary')}
             </div>
             <p className="text-sm text-muted-foreground font-medium">
               Pesaje pendiente
@@ -96,7 +126,7 @@ export default function PresupuestosPage() {
           </CardHeader>
           <CardContent>
             <div className="text-4xl font-bold text-success mb-2">
-              -
+              {renderEstadistica(estadisticas?.facturadosHoy, 'text-success')}
             </div>
             <p className="text-sm text-muted-foreground font-medium">
               Convertidos a pedidos
@@ -113,7 +143,7 @@ export default function PresupuestosPage() {
           </CardHeader>
           <CardContent>
             <div className="text-4xl font-bold text-destructive mb-2">
-              -
+              {renderEstadistica(estadisticas?.anuladosMes, 'text-destructive')}
             </div>
             <p className="text-sm text-muted-foreground font-medium">
               Este mes

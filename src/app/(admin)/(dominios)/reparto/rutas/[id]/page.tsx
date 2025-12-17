@@ -72,13 +72,13 @@ export default async function RutaDetallePage({
   }
 
   // Para cada detalle, obtener el cliente (desde pedido o desde entregas)
-  const detallesConCliente = await Promise.all(
+  const detallesConClienteMatrix = await Promise.all(
     (detallesRutaRaw || []).map(async (detalle: any) => {
-      let clienteData = null
-      let coordenadasCliente = null
-
-      // Si el pedido tiene cliente_id, obtener cliente directamente
+      // Si el pedido tiene cliente_id, es un pedido simple (1 cliente)
       if (detalle.pedido?.cliente_id) {
+        let clienteData = null
+        let coordenadasCliente = null
+
         const { data: cliente, error: clienteError } = await supabase
           .from('clientes')
           .select('id, nombre, direccion, telefono, coordenadas')
@@ -98,13 +98,30 @@ export default async function RutaDetallePage({
             }
           }
         }
+
+        return [{
+          ...detalle,
+          pedido: {
+            ...detalle.pedido,
+            cliente: clienteData ? {
+              ...clienteData,
+              coordenadas: coordenadasCliente,
+            } : null,
+          },
+        }]
       } else {
-        // Si el pedido no tiene cliente_id, buscar en entregas
+        // Si el pedido no tiene cliente_id, es un PEDIDO AGRUPADO (múltiples entregas)
         const { data: entregas, error: entregasError } = await supabase
           .from('entregas')
           .select(`
+            id,
             cliente_id,
+            estado_entrega,
+            estado_pago,
+            monto_cobrado,
+            metodo_pago,
             coordenadas,
+            orden_entrega,
             cliente:clientes(
               id,
               nombre,
@@ -114,41 +131,60 @@ export default async function RutaDetallePage({
             )
           `)
           .eq('pedido_id', detalle.pedido_id)
-          .limit(1)
-          .single()
+          .order('orden_entrega', { ascending: true })
 
-        if (!entregasError && entregas) {
-          // Usar cliente desde entregas
-          // cliente viene como array en relaciones de Supabase
-          const clienteFromEntrega = Array.isArray(entregas.cliente) ? entregas.cliente[0] : entregas.cliente
-          if (clienteFromEntrega) {
-            clienteData = clienteFromEntrega
-            // Convertir coordenadas desde entregas o desde cliente
-            const coords = entregas.coordenadas || clienteFromEntrega.coordenadas
-            if (coords) {
-              if (coords && typeof coords === 'object' && 'type' in coords && coords.type === 'Point' && Array.isArray(coords.coordinates)) {
-                const [lng, lat] = coords.coordinates
-                coordenadasCliente = { lat, lng }
-              } else if (coords && typeof coords === 'object' && 'lat' in coords && 'lng' in coords) {
-                coordenadasCliente = coords
+        if (!entregasError && entregas && entregas.length > 0) {
+          // Generar una fila visual por cada entrega individual
+          return entregas.map((entrega: any) => {
+            let clienteData = null
+            let coordenadasCliente = null
+
+            // Procesar cliente de la entrega
+            const clienteFromEntrega = Array.isArray(entrega.cliente) ? entrega.cliente[0] : entrega.cliente
+            if (clienteFromEntrega) {
+              clienteData = clienteFromEntrega
+              // Convertir coordenadas desde entregas o desde cliente
+              const coords = entrega.coordenadas || clienteFromEntrega.coordenadas
+              if (coords) {
+                if (coords && typeof coords === 'object' && 'type' in coords && coords.type === 'Point' && Array.isArray(coords.coordinates)) {
+                  const [lng, lat] = coords.coordinates
+                  coordenadasCliente = { lat, lng }
+                } else if (coords && typeof coords === 'object' && 'lat' in coords && 'lng' in coords) {
+                  coordenadasCliente = coords
+                }
               }
             }
-          }
-        }
-      }
 
-      return {
-        ...detalle,
-        pedido: {
-          ...detalle.pedido,
-          cliente: clienteData ? {
-            ...clienteData,
-            coordenadas: coordenadasCliente,
-          } : null,
-        },
+            return {
+              ...detalle,
+              // Sobrescribir ID para evitar claves duplicadas en listas si se usa detalle.id
+              // Usamos un ID compuesto virtual
+              virtual_id: `${detalle.id}-${entrega.id}`,
+              // Datos específicos de esta entrega
+              estado_entrega: entrega.estado_entrega,
+              pago_registrado: entrega.estado_pago === 'pagado',
+              metodo_pago_registrado: entrega.metodo_pago,
+              monto_cobrado_registrado: entrega.monto_cobrado,
+              orden_entrega: entrega.orden_entrega, // Usar orden de la entrega específica
+              pedido: {
+                ...detalle.pedido,
+                cliente: clienteData ? {
+                  ...clienteData,
+                  coordenadas: coordenadasCliente,
+                } : null,
+              },
+            }
+          })
+        }
+
+        // Si no se encontraron entregas (caso extraño), devolver el detalle original vacío
+        return [{ ...detalle }]
       }
     })
   )
+
+  // Aplanar la matriz de resultados (array de arrays -> array simple)
+  const detallesConCliente = detallesConClienteMatrix.flat()
 
   // Obtener ruta básica con relaciones
   const { data: rutaBasica, error: rutaError } = await supabase
@@ -532,7 +568,7 @@ export default async function RutaDetallePage({
                           (a.orden_entrega || 0) - (b.orden_entrega || 0),
                       )
                       .map((entrega: any) => (
-                        <tr key={entrega.id} className="border-t">
+                        <tr key={entrega.virtual_id || entrega.id} className="border-t">
                           <td className="py-2 pr-4 font-semibold">
                             #{entrega.orden_entrega}
                           </td>
@@ -572,7 +608,11 @@ export default async function RutaDetallePage({
         </TabsContent>
 
         <TabsContent value="mapa">
-          <RutaMap rutaId={ruta.id} entregas={entregas} showGpsTracking={false} />
+          <RutaMap
+            rutaId={ruta.id}
+            entregas={entregas.map((e: any) => ({ ...e, id: e.virtual_id || e.id }))}
+            showGpsTracking={false}
+          />
         </TabsContent>
       </Tabs>
     </div>

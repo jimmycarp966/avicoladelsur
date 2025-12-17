@@ -318,8 +318,8 @@ export async function asignarPedidosARuta(
     // Validar que todos los pedidos cumplan las condiciones
     const pedidosInvalidos = pedidos.filter(p => {
       return p.fecha_entrega_estimada !== ruta.fecha_ruta ||
-             p.turno !== ruta.turno ||
-             p.zona_id !== ruta.zona_id
+        p.turno !== ruta.turno ||
+        p.zona_id !== ruta.zona_id
     })
 
     if (pedidosInvalidos.length > 0) {
@@ -463,7 +463,7 @@ export async function finalizarRutaAction(
 
     if (detallesError) throw detallesError
 
-    const entregasPendientes = detalles?.filter(d => 
+    const entregasPendientes = detalles?.filter(d =>
       d.estado_entrega !== 'entregado' && d.estado_entrega !== 'fallido'
     )
 
@@ -689,14 +689,36 @@ export async function actualizarEstadoEntrega(
       updateData.fecha_hora_entrega = getNowArgentina().toISOString()
     }
 
-    const { error } = await supabase
-      .from('detalles_ruta')
-      .update(updateData)
+    // Verificar si el ID corresponde a la tabla 'entregas' (para pedidos agrupados)
+    const { count } = await supabase
+      .from('entregas')
+      .select('*', { count: 'exact', head: true })
       .eq('id', detalleRutaId)
 
-    if (error) throw error
+    if (count && count > 0) {
+      // Es una entrega individual (pedido agrupado)
+      // Si es 'entregado', también marcamos estado_pago si no estaba definido?
+      // No, eso va por separado en registrar pago.
+
+      const { error } = await supabase
+        .from('entregas')
+        .update(updateData)
+        .eq('id', detalleRutaId)
+
+      if (error) throw error
+
+    } else {
+      // Asumimos que es detalles_ruta (comportamiento original)
+      const { error } = await supabase
+        .from('detalles_ruta')
+        .update(updateData)
+        .eq('id', detalleRutaId)
+
+      if (error) throw error
+    }
 
     revalidatePath('/(admin)/(dominios)/reparto/rutas')
+    revalidatePath('/(repartidor)/ruta')
 
     return {
       success: true,
@@ -957,7 +979,7 @@ export async function obtenerVehiculosAction(): Promise<ApiResponse<any[]>> {
       .from('vehiculos')
       .select('*')
       .eq('activo', true)
-      .order('capacidad_kg', { ascending: true, nullsLast: true })
+      .order('capacidad_kg', { ascending: true })
 
     if (error) throw error
 
@@ -1601,7 +1623,7 @@ export async function asignarPedidoARutaConVehiculo(
 
     // Obtener un repartidor (el asignado al vehículo o cualquier activo)
     let repartidorId: string | null = null
-    
+
     const { data: repartidorVehiculo } = await supabase
       .from('usuarios')
       .select('id')
@@ -1609,7 +1631,7 @@ export async function asignarPedidoARutaConVehiculo(
       .eq('rol', 'repartidor')
       .eq('activo', true)
       .single()
-    
+
     if (repartidorVehiculo) {
       repartidorId = repartidorVehiculo.id
     } else {
@@ -1620,7 +1642,7 @@ export async function asignarPedidoARutaConVehiculo(
         .eq('activo', true)
         .limit(1)
         .single()
-      
+
       if (repartidorAny) {
         repartidorId = repartidorAny.id
       }
@@ -1652,7 +1674,7 @@ export async function asignarPedidoARutaConVehiculo(
     } else {
       // Crear nueva ruta
       const { data: numeroRuta } = await supabase.rpc('obtener_siguiente_numero_ruta')
-      
+
       const { data: nuevaRuta, error: rutaError } = await supabase
         .from('rutas_reparto')
         .insert({
@@ -1911,6 +1933,52 @@ export async function asignarTransferenciaARutaDesdeAlmacen(
     return {
       success: false,
       error: error.message || 'Error al asignar transferencia a ruta',
+    }
+  }
+}
+
+// Obtener detalle de ruta asociada a un pedido
+export async function obtenerRutaPorPedidoIdAction(pedidoId: string): Promise<ApiResponse<any>> {
+  try {
+    const supabase = await createClient()
+
+    // Buscar en detalles_ruta
+    const { data: detalle, error } = await supabase
+      .from('detalles_ruta')
+      .select(`
+        id,
+        ruta:rutas_reparto (
+          id,
+          numero_ruta,
+          estado,
+          fecha_ruta,
+          vehiculo:vehiculos (patente, marca, modelo),
+          repartidor:usuarios!rutas_reparto_repartidor_id_fkey (nombre, apellido)
+        )
+      `)
+      .eq('pedido_id', pedidoId)
+      .single()
+
+    if (error && error.code !== 'PGRST116') {
+      throw error
+    }
+
+    if (!detalle || !detalle.ruta) {
+      return {
+        success: false,
+        error: 'El pedido no está asignado a ninguna ruta',
+      }
+    }
+
+    return {
+      success: true,
+      data: detalle.ruta,
+    }
+  } catch (error: any) {
+    console.error('Error al obtener ruta por pedido:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al obtener ruta por pedido',
     }
   }
 }

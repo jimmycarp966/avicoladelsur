@@ -861,7 +861,15 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
               }}
               onOpenChange={(open) => {
                 setClienteDropdownOpen(open)
-                if (!open) {
+                if (open) {
+                  // Cuando se abre, enfocar el input de búsqueda automáticamente
+                  setTimeout(() => {
+                    const searchInput = document.querySelector('#cliente_id ~ [role="listbox"] input, [data-radix-popper-content-wrapper] input[placeholder*="Buscar"]') as HTMLInputElement
+                    if (searchInput) {
+                      searchInput.focus()
+                    }
+                  }, 50)
+                } else {
                   // Limpiar la búsqueda cuando se cierra el dropdown
                   setClienteSearch('')
                 }

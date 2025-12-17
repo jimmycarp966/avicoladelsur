@@ -65,9 +65,11 @@ export default async function RepartidorDashboard() {
       .from('detalles_ruta')
       .select(`
         id,
+        pedido_id,
         orden_entrega,
         estado_entrega,
         pedido:pedidos(
+          id,
           numero_pedido,
           total,
           cliente:clientes(nombre, direccion)
@@ -77,15 +79,58 @@ export default async function RepartidorDashboard() {
       .order('orden_entrega', { ascending: true })
 
     if (detalles) {
-      totalEntregas = detalles.length
-      entregasCompletadas = detalles.filter(det => det.estado_entrega === 'entregado').length
+      // Expandir detalles para pedidos agrupados
+      const detallesExpandidos = await Promise.all(
+        detalles.map(async (det: any) => {
+          const pedido = Array.isArray(det.pedido) ? det.pedido[0] : det.pedido
+          const cliente = Array.isArray(pedido?.cliente) ? pedido?.cliente[0] : pedido?.cliente
+
+          // Si el pedido no tiene cliente directo (es agrupado), buscar entregas
+          if (!cliente && (det.pedido_id || pedido?.id)) {
+            const pedidoId = det.pedido_id || pedido?.id
+
+            const { data: entregas } = await supabase
+              .from('entregas')
+              .select(`
+                id,
+                estado_entrega,
+                cliente:clientes(nombre, direccion)
+              `)
+              .eq('pedido_id', pedidoId)
+              .order('orden_entrega', { ascending: true })
+
+            if (entregas && entregas.length > 0) {
+              return entregas.map((entrega: any) => {
+                const clienteEntrega = Array.isArray(entrega.cliente) ? entrega.cliente[0] : entrega.cliente
+                return {
+                  ...det,
+                  id: det.id,
+                  virtual_id: entrega.id, // ID único para keys si fuera necesario
+                  estado_entrega: entrega.estado_entrega, // Estado específico de la entrega
+                  pedido: {
+                    ...pedido,
+                    cliente: clienteEntrega
+                  }
+                }
+              })
+            }
+          }
+
+          return [det]
+        })
+      )
+
+      const flatDetalles = detallesExpandidos.flat()
+
+      totalEntregas = flatDetalles.length
+      entregasCompletadas = flatDetalles.filter(det => det.estado_entrega === 'entregado').length
       entregasPendientes = totalEntregas - entregasCompletadas
 
-      entregasHoy = detalles.map(det => {
+      entregasHoy = flatDetalles.map(det => {
         const pedido = Array.isArray(det.pedido) ? det.pedido[0] : det.pedido
         const cliente = Array.isArray(pedido?.cliente) ? pedido?.cliente[0] : pedido?.cliente
         return {
-          id: det.id,
+          id: det.virtual_id || det.id, // Usar ID virtual si existe
           cliente: cliente?.nombre || pedido?.numero_pedido || 'Cliente',
           direccion: cliente?.direccion || 'Sin dirección',
           estado: det.estado_entrega,

@@ -19,6 +19,9 @@ export default async function EntregaDetallePage({ params }: PageProps) {
     notFound()
   }
 
+  let entrega: any = null
+
+  // 1. Intentar buscar en detalles_ruta (pedidos normales)
   const { data: entregaRaw, error } = await supabase
     .from('detalles_ruta')
     .select(`
@@ -63,7 +66,102 @@ export default async function EntregaDetallePage({ params }: PageProps) {
     .eq('id', entrega_id)
     .single()
 
-  if (error || !entregaRaw || entregaRaw.ruta_id !== ruta_id || entregaRaw.ruta?.repartidor_id !== user.id) {
+  if (entregaRaw) {
+    entrega = entregaRaw
+
+    // Ajuste para cliente si viene vacio (caso agrupado cargado como detalle normal por error, o legacy)
+    const pedidoCliente = Array.isArray(entrega.pedido?.cliente)
+      ? entrega.pedido.cliente[0]
+      : entrega.pedido?.cliente
+
+    if (!pedidoCliente && entrega.pedido_id) {
+      // Logica existente para buscar cliente en entregas si es detalle agrupado
+      const { data: entregaData } = await supabase
+        .from('entregas')
+        .select(`
+            cliente_id,
+            total,
+            direccion,
+            instruccion_repartidor,
+            cliente:clientes(*)
+          `)
+        .eq('pedido_id', entrega.pedido_id)
+        .limit(1)
+        .single()
+
+      if (entregaData?.cliente) {
+        entrega.pedido.cliente = entregaData.cliente
+        if (entregaData.total) entrega.pedido.total = entregaData.total
+      }
+    }
+  } else {
+    // 2. Si no es un detalle_ruta, buscar en tabla entregas (entrega individual de agrupado)
+    const { data: entregaIndividual, error: errInd } = await supabase
+      .from('entregas')
+      .select(`
+            id,
+            pedido_id,
+            estado_entrega,
+            fecha_hora_entrega,
+            coordenadas_entrega,
+            estado_pago,
+            metodo_pago,
+            monto_cobrado,
+            orden_entrega,
+            cliente:clientes(
+              id, nombre, telefono, direccion, zona_entrega, coordenadas
+            )
+        `)
+      .eq('id', entrega_id)
+      .single()
+
+    if (entregaIndividual) {
+      // Validar relación con ruta a través del pedido
+      // Un pedido agrupado tiene UN detalle_ruta en esta ruta
+      const { data: detalleRutaPadre } = await supabase
+        .from('detalles_ruta')
+        .select(`
+                id, ruta_id,
+                pedido:pedidos(
+                    id, numero_pedido, total, pago_estado, metodos_pago, instrucciones_repartidor,
+                    detalle_pedido:detalles_pedido(
+                      id, cantidad, producto_id,
+                      producto:productos(id, nombre, codigo, unidad_medida)
+                    )
+                ),
+                ruta:rutas_reparto(
+                    id, numero_ruta, fecha_ruta, estado, repartidor_id,
+                    vehiculo:vehiculos(patente, marca, modelo)
+                )
+             `)
+        .eq('pedido_id', entregaIndividual.pedido_id)
+        .eq('ruta_id', ruta_id)
+        .single()
+
+      if (detalleRutaPadre) {
+        // Construir objeto híbrido compatible con la UI
+        // Usamos el ID de la entrega individual como ID principal para que las acciones funcionen sobre ella
+        entrega = {
+          ...detalleRutaPadre, // Heredar props del padre
+          id: entregaIndividual.id, // SOBRESCRIBIR ID con el de la entrega individual
+          detalle_ruta_id_padre: detalleRutaPadre.id, // Guardar ref al padre por si acaso
+          estado_entrega: entregaIndividual.estado_entrega, // Estado especifico
+          fecha_hora_entrega: entregaIndividual.fecha_hora_entrega,
+          // Cliente especifico de esta entrega
+          pedido: {
+            ...(detalleRutaPadre.pedido as any),
+            cliente: entregaIndividual.cliente,
+            // Si la entrega tiene un total especifico (no esta en modelo actual pero podria), usarlo.
+            // Por ahora heredamos total del pedido general, lo cual es incorrecto para cobros parciales.
+            // TODO: Si 'entregas' tuviera campo 'monto_a_cobrar', usarlo aqui.
+          }
+        }
+      }
+    }
+  }
+
+  // Validaciones finales de seguridad
+  if (!entrega || entrega.ruta?.id !== ruta_id || entrega.ruta?.repartidor_id !== user.id) {
     return (
       <div className="p-4">
         <Card>
@@ -77,50 +175,6 @@ export default async function EntregaDetallePage({ params }: PageProps) {
         </Card>
       </div>
     )
-  }
-
-  // Si el pedido no tiene cliente (pedido agrupado), buscar desde entregas
-  let entrega = entregaRaw as any
-  const pedidoCliente = Array.isArray(entrega.pedido?.cliente)
-    ? entrega.pedido.cliente[0]
-    : entrega.pedido?.cliente
-
-  if (!pedidoCliente && entrega.pedido_id) {
-    const { data: entregaData } = await supabase
-      .from('entregas')
-      .select(`
-        cliente_id,
-        total,
-        direccion,
-        instruccion_repartidor,
-        cliente:clientes(
-          id,
-          nombre,
-          telefono,
-          direccion,
-          zona_entrega,
-          coordenadas
-        )
-      `)
-      .eq('pedido_id', entrega.pedido_id)
-      .limit(1)
-      .single()
-
-    if (entregaData?.cliente) {
-      const clienteFromEntrega = Array.isArray(entregaData.cliente)
-        ? entregaData.cliente[0]
-        : entregaData.cliente
-
-      entrega = {
-        ...entrega,
-        pedido: {
-          ...entrega.pedido,
-          cliente: clienteFromEntrega,
-          total: entregaData.total || entrega.pedido?.total,
-          instrucciones_repartidor: entregaData.instruccion_repartidor || entrega.pedido?.instrucciones_repartidor,
-        }
-      }
-    }
   }
 
   return <EntregaDetalleContent entrega={entrega} />

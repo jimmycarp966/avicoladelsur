@@ -161,123 +161,157 @@ export async function GET(request: NextRequest) {
       }
 
       // Para cada detalle, obtener el cliente (desde pedido o desde entregas)
-      const detallesConCliente = await Promise.all(
-        (detallesRutaRaw || []).map(async (detalle: any) => {
-          let clienteData = null
+      const detallesConCliente = (await Promise.all(
+        (detallesRutaRaw || []).map(async (detalleRaw: any) => {
+          let entregasAProcesar = []
 
-          // Si el pedido tiene cliente_id, obtener cliente directamente con coordenadas
-          if (detalle.pedido?.cliente_id) {
-            const { data: cliente, error: clienteError } = await supabase
-              .from('clientes')
-              .select('id, nombre, telefono, direccion, ST_AsGeoJSON(coordenadas)::jsonb as coordenadas')
-              .eq('id', detalle.pedido.cliente_id)
-              .single()
-
-            if (!clienteError && cliente) {
-              clienteData = cliente
-            }
-          } else {
-            // Si el pedido no tiene cliente_id, buscar en entregas (pedido agrupado)
+          // Si el pedido tiene cliente_id, es simple
+          if (detalleRaw.pedido?.cliente_id) {
+            entregasAProcesar.push({
+              ...detalleRaw,
+              virtual_id: detalleRaw.id,
+              cliente_final_id: detalleRaw.pedido.cliente_id
+            })
+          } else if (detalleRaw.pedido_id) {
+            // Pedido agrupado: buscar todas las entregas
             const { data: entregas, error: entregasError } = await supabase
               .from('entregas')
-              .select('cliente_id')
-              .eq('pedido_id', detalle.pedido_id)
-              .limit(1)
-              .single()
+              .select(`
+                  id,
+                  cliente_id,
+                  estado_entrega,
+                  estado_pago,
+                  monto_cobrado,
+                  orden_entrega,
+                  cliente:clientes(id, nombre, direccion, telefono, coordenadas),
+                  coordenadas
+                `)
+              .eq('pedido_id', detalleRaw.pedido_id)
+              .order('orden_entrega', { ascending: true })
 
-            if (!entregasError && entregas?.cliente_id) {
-              // Obtener cliente con ST_AsGeoJSON en consulta directa (no anidada)
+            if (!entregasError && entregas && entregas.length > 0) {
+              entregas.forEach((entrega: any) => {
+                entregasAProcesar.push({
+                  ...detalleRaw,
+                  virtual_id: entrega.id,
+                  cliente_final_id: entrega.cliente_id,
+                  estado_entrega: entrega.estado_entrega,
+                  pago_registrado: entrega.estado_pago === 'pagado',
+                  monto_cobrado_registrado: entrega.monto_cobrado,
+                  cliente_data_preloaded: entrega.cliente,
+                  coordenadas_entrega: entrega.coordenadas
+                })
+              })
+            } else {
+              entregasAProcesar.push({
+                ...detalleRaw,
+                virtual_id: detalleRaw.id
+              })
+            }
+          }
+
+          // Procesar cada entrega y obtener datos finales de cliente
+          return await Promise.all(entregasAProcesar.map(async (detalle: any) => {
+            const pedido = detalle.pedido
+            let clienteData = detalle.cliente_data_preloaded || null
+            let clienteId = detalle.cliente_final_id
+
+            if (!clienteData && clienteId) {
               const { data: cliente, error: clienteError } = await supabase
                 .from('clientes')
                 .select('id, nombre, telefono, direccion, ST_AsGeoJSON(coordenadas)::jsonb as coordenadas')
-                .eq('id', entregas.cliente_id)
+                .eq('id', clienteId)
                 .single()
 
-              if (!clienteError && cliente) {
-                clienteData = cliente
+              if (!clienteError && cliente) clienteData = cliente
+            }
+
+            return {
+              ...detalle,
+              pedido: {
+                ...detalle.pedido,
+                cliente: clienteData
               }
             }
-          }
-
-          return {
-            ...detalle,
-            pedido: {
-              ...detalle.pedido,
-              cliente: clienteData,
-            },
-          }
+          }))
         })
-      )
+      )).flat()
 
       // Crear mapa de detalles_ruta por orden_entrega para acceso rápido
-      const detallesMap = new Map()
+      // Como un orden puede tener multiples entregas (pedido agrupado expandido), el valor es Array
+      const detallesMap = new Map<number, any[]>()
       detallesConCliente?.forEach((detalle: any) => {
-        detallesMap.set(detalle.orden_entrega, detalle)
+        const list = detallesMap.get(detalle.orden_entrega) || []
+        list.push(detalle)
+        detallesMap.set(detalle.orden_entrega, list)
       })
 
       // Enriquecer orden_visita
-      const ordenVisitaEnriquecido = (ruta.orden_visita || []).map((cliente: any) => {
-        const detalle = detallesMap.get(cliente.orden)
+      const ordenVisitaEnriquecido = (ruta.orden_visita || []).flatMap((cliente: any) => {
+        const detalles = detallesMap.get(cliente.orden) || []
 
-        if (!detalle || !detalle.pedido) {
-          return {
+        // Si no hay detalles asociados a este orden, devolvemos el original (o vacio)
+        if (detalles.length === 0) {
+          return [{
             ...cliente,
             productos: [],
             pago_registrado: false,
             monto_cobrado_registrado: 0,
             telefono: cliente.telefono || null,
             direccion: cliente.direccion || null,
-          }
+          }]
         }
 
-        const pedido = detalle.pedido
-        const clienteData = Array.isArray(pedido.cliente) ? pedido.cliente[0] : pedido.cliente
+        // Si hay detalles, expandimos
+        return detalles.map(detalle => {
+          const pedido = detalle.pedido
+          const clienteData = Array.isArray(pedido?.cliente) ? pedido.cliente[0] : pedido?.cliente
 
-        // Obtener productos
-        const detallesPedido = Array.isArray(pedido.detalle_pedido)
-          ? pedido.detalle_pedido
-          : (pedido.detalle_pedido ? [pedido.detalle_pedido] : [])
+          const detallesPedido = Array.isArray(pedido?.detalle_pedido)
+            ? pedido.detalle_pedido
+            : (pedido?.detalle_pedido ? [pedido.detalle_pedido] : [])
 
-        const productos = detallesPedido.map((dp: any) => {
-          const producto = Array.isArray(dp.producto) ? dp.producto[0] : dp.producto
+          const productos = detallesPedido.map((dp: any) => {
+            const producto = Array.isArray(dp.producto) ? dp.producto[0] : dp.producto
+            return {
+              nombre: producto?.nombre || 'Producto',
+              cantidad: dp.cantidad || 0,
+            }
+          })
+
+          // Coordenadas
+          let lat = cliente.lat
+          let lng = cliente.lng
+
+          if (detalle.coordenadas_entrega) {
+            // Prioridad coord entrega
+            const c = detalle.coordenadas_entrega
+            if (c.lat && c.lng) { lat = c.lat; lng = c.lng }
+            else if (c.coordinates) { lng = c.coordinates[0]; lat = c.coordinates[1] }
+          } else if (clienteData?.coordenadas) {
+            const c = clienteData.coordenadas
+            if (c.lat && c.lng) { lat = c.lat; lng = c.lng }
+            else if (c.coordinates) { lng = c.coordinates[0]; lat = c.coordinates[1] }
+            else if (typeof c.type === 'string' && Array.isArray(c.coordinates)) {
+              lng = c.coordinates[0]; lat = c.coordinates[1]
+            }
+          }
+
           return {
-            nombre: producto?.nombre || 'Producto',
-            cantidad: dp.cantidad || 0,
+            ...cliente,
+            id: detalle.virtual_id || detalle.id || cliente.id,
+            // Usar ID visual expandido
+            cliente_nombre: clienteData?.nombre || cliente.cliente_nombre,
+            telefono: clienteData?.telefono || cliente.telefono || null,
+            direccion: clienteData?.direccion || cliente.direccion || null,
+            lat: lat, // Coordenadas especificas
+            lng: lng,
+            estado_entrega: detalle.estado_entrega || cliente.estado || 'pendiente',
+            pago_registrado: detalle.pago_registrado || false,
+            monto_cobrado_registrado: detalle.monto_cobrado_registrado || 0,
+            productos: productos,
           }
         })
-
-        // Convertir coordenadas PostGIS a lat/lng si están disponibles
-        let lat = cliente.lat
-        let lng = cliente.lng
-
-        // Si no hay coordenadas en orden_visita, intentar obtenerlas del cliente
-        if ((!lat || !lng) && clienteData?.coordenadas) {
-          const coords = clienteData.coordenadas
-          if (coords && typeof coords === 'object' && 'type' in coords && coords.type === 'Point' && Array.isArray(coords.coordinates)) {
-            // PostGIS GeoJSON: [lng, lat]
-            const [lngCoord, latCoord] = coords.coordinates
-            lat = latCoord
-            lng = lngCoord
-          } else if (coords && typeof coords === 'object' && 'lat' in coords && 'lng' in coords) {
-            // Formato directo
-            lat = coords.lat
-            lng = coords.lng
-          }
-        }
-
-        return {
-          ...cliente,
-          id: detalle.id || cliente.id,
-          cliente_nombre: clienteData?.nombre || cliente.cliente_nombre,
-          telefono: clienteData?.telefono || cliente.telefono || null,
-          direccion: clienteData?.direccion || cliente.direccion || null,
-          lat: lat,
-          lng: lng,
-          estado_entrega: detalle.estado_entrega || cliente.estado || 'pendiente',
-          pago_registrado: detalle.pago_registrado || false,
-          monto_cobrado_registrado: detalle.monto_cobrado_registrado || 0,
-          productos: productos,
-        }
       })
 
       return {
@@ -294,7 +328,7 @@ export async function GET(request: NextRequest) {
         })() : null,
         zona_id: ruta.zona_id,
         polyline: ruta.polyline,
-        orden_visita: ordenVisitaEnriquecido,
+        orden_visita: ordenVisitaEnriquecido.map((item: any, index: number) => ({ ...item, orden: index + 1 })),
         distancia_total_km: ruta.distancia_total_km,
         duracion_total_min: ruta.duracion_total_min,
         created_at: ruta.created_at
@@ -396,81 +430,146 @@ export async function GET(request: NextRequest) {
 
           // Generar orden_visita desde detalles_ruta
           // Para cada detalle, obtener cliente por separado (evitando consultas anidadas con ST_AsGeoJSON)
-          const ordenVisita = await Promise.all(detallesRutaRaw.map(async (detalle: any) => {
-            const pedido = detalle.pedido
-            let clienteData: any = null
-            let clienteId: string | null = pedido?.cliente_id || null
-            let lat: number | null = null
-            let lng: number | null = null
+          // Generar orden_visita desde detalles_ruta
+          // Expandir pedidos agrupados si es necesario
+          const ordenVisita = (await Promise.all(detallesRutaRaw.map(async (detalleRaw: any) => {
+            // Si tiene cliente_id es simple, si no, buscar entregas
+            let entregasAProcesar = []
 
-            // Si el pedido no tiene cliente_id (pedido agrupado), buscar en entregas
-            if (!clienteId && detalle.pedido_id) {
-              console.log('[DEBUG] Buscando cliente en entregas para pedido_id:', detalle.pedido_id)
-              const { data: entregaData, error: entregaError } = await supabase
+            if (detalleRaw.pedido?.cliente_id) {
+              // Pedido simple: convertimos el detalle en un "item de entrega" único
+              entregasAProcesar.push({
+                ...detalleRaw,
+                virtual_id: detalleRaw.id,
+                cliente_final_id: detalleRaw.pedido.cliente_id
+              })
+            } else if (detalleRaw.pedido_id) {
+              // Pedido agrupado: buscar todas las entregas
+              const { data: entregas, error: entregasError } = await supabase
                 .from('entregas')
-                .select('cliente_id')
-                .eq('pedido_id', detalle.pedido_id)
-                .limit(1)
-                .single()
+                .select(`
+                  id,
+                  cliente_id,
+                  estado_entrega,
+                  estado_pago,
+                  monto_cobrado,
+                  orden_entrega,
+                  cliente:clientes(id, nombre, direccion, telefono, coordenadas),
+                  coordenadas
+                `)
+                .eq('pedido_id', detalleRaw.pedido_id)
+                .order('orden_entrega', { ascending: true })
 
-              console.log('[DEBUG] Resultado entrega:', { entregaData, entregaError })
-
-              if (entregaData?.cliente_id) {
-                clienteId = entregaData.cliente_id
-                console.log('[DEBUG] Cliente ID encontrado:', clienteId)
-              }
-            }
-
-            // Si tenemos cliente_id, obtener datos del cliente con coordenadas via RPC
-            if (clienteId) {
-              // Usamos RPC porque Supabase no soporta ST_AsGeoJSON en consultas directas
-              const { data: clienteRpc, error: clienteError } = await supabase
-                .rpc('fn_get_cliente_con_coordenadas', { p_cliente_id: clienteId })
-                .single()
-
-              console.log('[DEBUG] Consulta cliente RPC:', { clienteId, clienteRpc, clienteError })
-
-              if (!clienteError && clienteRpc) {
-                clienteData = clienteRpc as any
-                // Ya tenemos lat/lng directamente del RPC
-                lat = (clienteRpc as any).lat
-                lng = (clienteRpc as any).lng
-                console.log('[DEBUG] Cliente cargado:', clienteData?.nombre, 'lat:', lat, 'lng:', lng)
+              if (!entregasError && entregas && entregas.length > 0) {
+                entregas.forEach((entrega: any) => {
+                  entregasAProcesar.push({
+                    ...detalleRaw,
+                    virtual_id: entrega.id, // ID Único de la entrega
+                    cliente_final_id: entrega.cliente_id,
+                    estado_entrega: entrega.estado_entrega, // Sobrescribir estado
+                    pago_registrado: entrega.estado_pago === 'pagado',
+                    monto_cobrado_registrado: entrega.monto_cobrado,
+                    cliente_data_preloaded: entrega.cliente, // Pasamos cliente ya cargado
+                    coordenadas_entrega: entrega.coordenadas
+                  })
+                })
               } else {
-                console.error('[DEBUG] Error al cargar cliente:', clienteError)
+                // Fallback si no hay entregas (no debería pasar)
+                entregasAProcesar.push({
+                  ...detalleRaw,
+                  virtual_id: detalleRaw.id
+                })
               }
             }
 
-            // Obtener productos
-            const detallesPedido = Array.isArray(pedido?.detalle_pedido)
-              ? pedido.detalle_pedido
-              : (pedido?.detalle_pedido ? [pedido.detalle_pedido] : [])
+            // Procesar cada entrega individualmente
+            return await Promise.all(entregasAProcesar.map(async (detalle: any) => {
+              const pedido = detalle.pedido
+              let clienteData: any = detalle.cliente_data_preloaded || null
+              let clienteId: string | null = detalle.cliente_final_id
+              let lat: number | null = null
+              let lng: number | null = null
 
-            const productos = detallesPedido.map((dp: any) => {
-              const producto = Array.isArray(dp.producto) ? dp.producto[0] : dp.producto
+              // Si no vino pre-cargado pero tenemos ID, buscarlo
+              if (!clienteData && clienteId) {
+                const { data: clienteRpc, error: clienteError } = await supabase
+                  .rpc('fn_get_cliente_con_coordenadas', { p_cliente_id: clienteId })
+                  .single()
+
+                if (!clienteError && clienteRpc) {
+                  clienteData = clienteRpc as any
+                  lat = (clienteRpc as any).lat
+                  lng = (clienteRpc as any).lng
+                }
+              } else if (clienteData) {
+                // Si ya vino pre-cargado, extraer coords
+                // Intentar sacar lat/lng de coordenadas o del objeto cliente
+                if (detalle.coordenadas_entrega) {
+                  // Prioridad a coord de la entrega
+                  // Asumimos formato simple punto {lat, lng} o GeoJSON
+                  // Por simplicidad, si viene de 'entregas', suele ser Point
+                  // ... procesamiento coords
+                }
+
+                // Si no, intentar del cliente (que puede venir como array o objeto)
+                const clienteObj = Array.isArray(clienteData) ? clienteData[0] : clienteData
+                if (clienteObj) {
+                  // Procesar coordenadas del cliente pre-cargado
+                  // Aquí asumimos que el select incluyó coordenadas
+                  if (clienteObj.coordenadas) {
+                    const c = clienteObj.coordenadas
+                    if (c.lat && c.lng) { lat = c.lat; lng = c.lng }
+                    else if (c.coordinates && Array.isArray(c.coordinates)) {
+                      lng = c.coordinates[0]; lat = c.coordinates[1]
+                    }
+                  }
+                }
+                // Si no obtuvimos lat/lng aun y usamos fn_get_cliente antes, replicar logica si hiciera falta. 
+                // Pero en el bloque anterior (Agrupado) hicimos select ordenado.
+                // Para simplificar, si ya tengo clienteData del select inner join, uso eso.
+                if (lat === null && clienteData) {
+                  // Parsear coordenadas standard PostGIS object -> lat/lng
+                  const c = clienteData.coordenadas
+                  if (c) {
+                    if (typeof c === 'object') {
+                      if ('lat' in c) { lat = c.lat; lng = c.lng }
+                      else if ('coordinates' in c) { lng = c.coordinates[0]; lat = c.coordinates[1] }
+                    }
+                  }
+                }
+              }
+
+              // Obtener productos
+              const detallesPedido = Array.isArray(pedido?.detalle_pedido)
+                ? pedido.detalle_pedido
+                : (pedido?.detalle_pedido ? [pedido.detalle_pedido] : [])
+
+              const productos = detallesPedido.map((dp: any) => {
+                const producto = Array.isArray(dp.producto) ? dp.producto[0] : dp.producto
+                return {
+                  nombre: producto?.nombre || 'Producto',
+                  cantidad: dp.cantidad || 0,
+                }
+              })
+
               return {
-                nombre: producto?.nombre || 'Producto',
-                cantidad: dp.cantidad || 0,
+                id: detalle.virtual_id,
+                detalle_ruta_id: detalle.id, // ID original del detalle_ruta (padre)
+                pedido_id: pedido?.id,
+                cliente_id: clienteData?.id || clienteId,
+                cliente_nombre: clienteData?.nombre || 'Cliente',
+                telefono: clienteData?.telefono || null,
+                direccion: clienteData?.direccion || null,
+                lat: lat,
+                lng: lng,
+                orden: detalle.orden_entrega,
+                estado: detalle.estado_entrega || 'pendiente',
+                pago_registrado: detalle.pago_registrado || false,
+                monto_cobrado_registrado: detalle.monto_cobrado_registrado || 0,
+                productos: productos,
               }
-            })
-
-            return {
-              id: detalle.id,
-              detalle_ruta_id: detalle.id,
-              pedido_id: pedido?.id,
-              cliente_id: clienteData?.id,
-              cliente_nombre: clienteData?.nombre || 'Cliente',
-              telefono: clienteData?.telefono || null,
-              direccion: clienteData?.direccion || null,
-              lat: lat,
-              lng: lng,
-              orden: detalle.orden_entrega,
-              estado: detalle.estado_entrega || 'pendiente',
-              pago_registrado: detalle.pago_registrado || false,
-              monto_cobrado_registrado: detalle.monto_cobrado_registrado || 0,
-              productos: productos,
-            }
-          }))
+            }))
+          }))).flat()
 
           // Filtrar puntos sin coordenadas
           const ordenVisitaFiltrado = ordenVisita.filter((punto: any) => punto.lat !== null && punto.lng !== null)
@@ -494,7 +593,7 @@ export async function GET(request: NextRequest) {
             } : null,
             zona_id: ruta.zona_id,
             polyline: '', // No hay polyline si no está optimizada
-            orden_visita: ordenVisitaFiltrado,
+            orden_visita: ordenVisitaFiltrado.map((item: any, index: number) => ({ ...item, orden: index + 1 })),
             distancia_total_km: null,
             duracion_total_min: null,
             created_at: new Date().toISOString()
@@ -502,7 +601,7 @@ export async function GET(request: NextRequest) {
         }))
 
         // Agregar rutas generadas a las formateadas
-        rutasFormateadas.push(...rutasGeneradas.filter((r: any) => r !== null))
+        rutasFormateadas.push(...(rutasGeneradas.filter((r: any) => r !== null) as any))
         console.log(`✅ [DEBUG] Agregadas ${rutasGeneradas.filter((r: any) => r !== null).length} rutas generadas desde detalles_ruta`)
       }
     }

@@ -200,6 +200,17 @@ const ProductoItemRow = memo(function ProductoItemRow({
                 }
               }, 100)
             }}
+            onOpenChange={(open) => {
+              if (open) {
+                // Cuando se abre, enfocar el input de búsqueda automáticamente
+                setTimeout(() => {
+                  const searchInput = document.querySelector(`input[data-product-search="${index}"]`) as HTMLInputElement
+                  if (searchInput) {
+                    searchInput.focus()
+                  }
+                }, 50)
+              }
+            }}
           >
             <SelectTrigger
               id={`producto_${index}`}

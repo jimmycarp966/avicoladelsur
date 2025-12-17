@@ -1220,3 +1220,63 @@ export async function recalcularRecargosAction(presupuestoId: string) {
     return { success: false, error: 'Error interno del servidor' }
   }
 }
+
+// Acción para obtener estadísticas de presupuestos
+export async function obtenerEstadisticasPresupuestosAction() {
+  try {
+    const supabase = await createClient()
+
+    // Obtener fecha actual y inicio del mes
+    const now = getNowArgentina()
+    const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+    const hoy = now.toISOString().split('T')[0]
+
+    // Query para total del mes
+    const { count: totalMes } = await supabase
+      .from('presupuestos')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', inicioMes)
+
+    // Query para pendientes (estado pendiente o esperando_pesaje)
+    const { count: pendientes } = await supabase
+      .from('presupuestos')
+      .select('*', { count: 'exact', head: true })
+      .in('estado', ['pendiente', 'esperando_pesaje'])
+
+    // Query para en almacén (estado en_almacen)
+    const { count: enAlmacen } = await supabase
+      .from('presupuestos')
+      .select('*', { count: 'exact', head: true })
+      .eq('estado', 'en_almacen')
+
+    // Query para facturados hoy (estado facturado, fecha de hoy)
+    const { count: facturadosHoy } = await supabase
+      .from('presupuestos')
+      .select('*', { count: 'exact', head: true })
+      .eq('estado', 'facturado')
+      .gte('updated_at', `${hoy}T00:00:00`)
+      .lte('updated_at', `${hoy}T23:59:59`)
+
+    // Query para anulados este mes
+    const { count: anuladosMes } = await supabase
+      .from('presupuestos')
+      .select('*', { count: 'exact', head: true })
+      .eq('estado', 'anulado')
+      .gte('created_at', inicioMes)
+
+    return {
+      success: true,
+      data: {
+        totalMes: totalMes || 0,
+        pendientes: pendientes || 0,
+        enAlmacen: enAlmacen || 0,
+        facturadosHoy: facturadosHoy || 0,
+        anuladosMes: anuladosMes || 0
+      }
+    }
+
+  } catch (error) {
+    console.error('Error en obtenerEstadisticasPresupuestosAction:', error)
+    return { success: false, error: 'Error interno del servidor' }
+  }
+}

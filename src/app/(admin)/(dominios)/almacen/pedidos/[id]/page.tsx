@@ -10,8 +10,9 @@ import { obtenerPedidoPorIdAction } from '@/actions/ventas.actions'
 import { listarCajasAction } from '@/actions/tesoreria.actions'
 import { RegistrarPagoPedidoForm } from '@/components/forms/RegistrarPagoPedidoForm'
 import { EntregasPedido } from '@/components/pedidos/EntregasPedido'
-import { PasarARutaButton } from '@/components/pedidos/PasarARutaButton'
 import { AsignarVehiculoSelect } from '@/components/pedidos/AsignarVehiculoSelect'
+
+import { obtenerRutaPorPedidoIdAction } from '@/actions/reparto.actions'
 
 interface PedidoDetallePageProps {
   params: Promise<{ id: string }>
@@ -47,7 +48,13 @@ const estadoCierreConfig = (estado: string) => {
 export default async function PedidoDetallePage({ params }: PedidoDetallePageProps) {
   const { id } = await params
   const pedidoId = id
-  const [pedidoResult, cajas] = await Promise.all([obtenerPedidoPorIdAction(pedidoId), listarCajasAction()])
+
+  // Obtener pedido, cajas y ruta en paralelo
+  const [pedidoResult, cajas, rutaResult] = await Promise.all([
+    obtenerPedidoPorIdAction(pedidoId),
+    listarCajasAction(),
+    obtenerRutaPorPedidoIdAction(pedidoId)
+  ])
 
   if (!pedidoResult.success || !pedidoResult.data?.pedido) {
     notFound()
@@ -59,7 +66,17 @@ export default async function PedidoDetallePage({ params }: PedidoDetallePagePro
   const saldoPendiente = Math.max(Number(pedido.total) - totalPagado, 0)
   const cuenta = pedidoResult.data.cuenta
   const estado = estadoConfig(pedido.estado)
-  
+
+  // Datos de ruta si existen
+  const ruta = rutaResult.success ? rutaResult.data : null
+  const repartidorNombre = ruta?.repartidor
+    ? `${ruta.repartidor.nombre} ${ruta.repartidor.apellido || ''}`
+    : pedido.repartidor || 'Sin asignar'
+
+  const vehiculoInfo = ruta?.vehiculo
+    ? `${ruta.vehiculo.marca || ''} ${ruta.vehiculo.modelo || ''} (${ruta.vehiculo.patente})`.trim()
+    : pedido.vehiculo || 'Sin asignar'
+
   // Calcular peso total del pedido
   const pesoTotal = (pedido.detalles_pedido ?? []).reduce((sum: number, item: any) => {
     const peso = item.peso_final ?? item.cantidad ?? 0
@@ -92,11 +109,6 @@ export default async function PedidoDetallePage({ params }: PedidoDetallePagePro
               Editar
             </Link>
           </Button>
-          <PasarARutaButton
-            pedidoId={pedido.id}
-            numeroPedido={pedido.numero_pedido}
-            estado={pedido.estado}
-          />
           {pedido.estado === 'enviado' && (
             <Button variant="outline" asChild>
               <Link href="/reparto/monitor">
@@ -255,14 +267,14 @@ export default async function PedidoDetallePage({ params }: PedidoDetallePagePro
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Repartidor:</span>
-                <span>{pedido.repartidor || 'Sin asignar'}</span>
+                <span>{repartidorNombre}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Vehículo:</span>
-                <span>{pedido.vehiculo || 'Sin asignar'}</span>
+                <span>{vehiculoInfo}</span>
               </div>
             </div>
-            
+
             {/* Selector de vehículo si está en preparando */}
             {pedido.estado === 'preparando' && (
               <AsignarVehiculoSelect
