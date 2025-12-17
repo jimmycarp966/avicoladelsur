@@ -82,25 +82,22 @@ async function RutaMapaContent({ rutaId }: { rutaId: string }) {
       let clienteData = null
       let coordenadasCliente = null
 
-      // Si el pedido tiene cliente_id, obtener cliente directamente
+      // Si el pedido tiene cliente_id, obtener cliente usando RPC para coords correctas
       if (detalle.pedido?.cliente_id) {
-        const { data: cliente, error: clienteError } = await supabase
-          .from('clientes')
-          .select('id, nombre, direccion, coordenadas')
-          .eq('id', detalle.pedido.cliente_id)
+        const { data: clienteRpc, error: clienteError } = await supabase
+          .rpc('fn_get_cliente_con_coordenadas', { p_cliente_id: detalle.pedido.cliente_id })
           .single()
 
-        if (!clienteError && cliente) {
-          clienteData = cliente
-          // Convertir coordenadas PostGIS si existen
-          const coords = (cliente as any).coordenadas
-          if (coords) {
-            if (coords && typeof coords === 'object' && 'type' in coords && coords.type === 'Point' && Array.isArray(coords.coordinates)) {
-              const [lng, lat] = coords.coordinates
-              coordenadasCliente = { lat, lng }
-            } else if (coords && typeof coords === 'object' && 'lat' in coords && 'lng' in coords) {
-              coordenadasCliente = coords
-            }
+        if (!clienteError && clienteRpc) {
+          const clienteData2 = clienteRpc as any
+          clienteData = {
+            id: clienteData2.id,
+            nombre: clienteData2.nombre,
+            direccion: clienteData2.direccion,
+            telefono: clienteData2.telefono
+          }
+          if (clienteData2.lat !== null && clienteData2.lng !== null) {
+            coordenadasCliente = { lat: clienteData2.lat, lng: clienteData2.lng }
           }
         }
       } else {
@@ -113,24 +110,27 @@ async function RutaMapaContent({ rutaId }: { rutaId: string }) {
           .single()
 
         if (!entregasError && entregas?.cliente_id) {
-          // Obtener cliente con select simple
-          const { data: cliente, error: clienteError } = await supabase
-            .from('clientes')
-            .select('id, nombre, direccion, coordenadas')
-            .eq('id', entregas.cliente_id)
+          // Obtener cliente usando RPC para coords correctas
+          const { data: clienteRpc, error: clienteError } = await supabase
+            .rpc('fn_get_cliente_con_coordenadas', { p_cliente_id: entregas.cliente_id })
             .single()
 
-          if (!clienteError && cliente) {
-            clienteData = cliente
-            // Convertir coordenadas desde entregas o desde cliente
-            const coords = (entregas as any).coordenadas || (cliente as any).coordenadas
-            if (coords) {
-              if (coords && typeof coords === 'object' && 'type' in coords && coords.type === 'Point' && Array.isArray(coords.coordinates)) {
-                const [lng, lat] = coords.coordinates
-                coordenadasCliente = { lat, lng }
-              } else if (coords && typeof coords === 'object' && 'lat' in coords && 'lng' in coords) {
-                coordenadasCliente = coords
+          if (!clienteError && clienteRpc) {
+            const clienteData2 = clienteRpc as any
+            clienteData = {
+              id: clienteData2.id,
+              nombre: clienteData2.nombre,
+              direccion: clienteData2.direccion,
+              telefono: clienteData2.telefono
+            }
+            // Priorizar coordenadas de la entrega si existen
+            if (entregas.coordenadas) {
+              const coords = entregas.coordenadas as any
+              if (typeof coords === 'object' && 'lat' in coords && 'lng' in coords) {
+                coordenadasCliente = { lat: coords.lat, lng: coords.lng }
               }
+            } else if (clienteData2.lat !== null && clienteData2.lng !== null) {
+              coordenadasCliente = { lat: clienteData2.lat, lng: clienteData2.lng }
             }
           }
         }
