@@ -32,7 +32,7 @@ export default async function EntregaDetallePage({ params }: PageProps) {
         total,
         pago_estado,
         metodos_pago,
-        instrucciones_repartidor,
+        instruccion_repartidor,
         cliente_id,
         cliente:clientes(
           id,
@@ -123,7 +123,7 @@ export default async function EntregaDetallePage({ params }: PageProps) {
         .select(`
                 id, ruta_id,
                 pedido:pedidos(
-                    id, numero_pedido, total, pago_estado, metodos_pago, instrucciones_repartidor,
+                    id, numero_pedido, total, pago_estado, metodos_pago, instruccion_repartidor,
                     detalle_pedido:detalles_pedido(
                       id, cantidad, producto_id,
                       producto:productos(id, nombre, codigo, unidad_medida)
