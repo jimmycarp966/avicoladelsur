@@ -343,7 +343,7 @@ export async function obtenerVentasMensualesAction(): Promise<ApiResponse<Array<
     for (let i = 11; i >= 0; i--) {
       const fechaInicio = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1)
       const fechaFin = new Date(hoy.getFullYear(), hoy.getMonth() - i + 1, 0)
-      
+
       const mesNombre = fechaInicio.toLocaleDateString('es-AR', { month: 'short' })
       const mesCapitalizado = mesNombre.charAt(0).toUpperCase() + mesNombre.slice(1)
 
@@ -519,7 +519,7 @@ export async function obtenerMetricasEficienciaRutasAction(): Promise<ApiRespons
 }>> {
   try {
     const supabase = await createClient()
-    
+
     // Obtener métricas de la semana actual usando la función RPC
     const { data, error } = await supabase.rpc('fn_obtener_metricas_rutas_semana', {
       p_fecha: getTodayArgentina()
@@ -579,6 +579,9 @@ export async function obtenerMetricasEficienciaRutasAction(): Promise<ApiRespons
 /**
  * Obtiene métricas de rendimiento del repartidor
  */
+/**
+ * Obtiene métricas de rendimiento del repartidor
+ */
 export async function obtenerMetricasRepartidorAction(repartidorId: string): Promise<ApiResponse<{
   eficiencia: number
   puntuacionGeneral: number
@@ -591,7 +594,7 @@ export async function obtenerMetricasRepartidorAction(repartidorId: string): Pro
     const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1)
 
     // Obtener rutas del repartidor del mes actual
-    const { data: rutasMes } = await supabase
+    const { data: rutasMes, error: rutasError } = await supabase
       .from('rutas_reparto')
       .select(`
         id,
@@ -604,6 +607,8 @@ export async function obtenerMetricasRepartidorAction(repartidorId: string): Pro
       `)
       .eq('repartidor_id', repartidorId)
       .gte('fecha_ruta', inicioMes.toISOString())
+
+    if (rutasError) throw rutasError
 
     if (!rutasMes || rutasMes.length === 0) {
       return {
@@ -626,16 +631,25 @@ export async function obtenerMetricasRepartidorAction(repartidorId: string): Pro
     let distanciaRealTotal = 0
 
     rutasMes.forEach((ruta) => {
-      const detalles = Array.isArray(ruta.detalles_ruta) ? ruta.detalles_ruta : (ruta.detalles_ruta ? [ruta.detalles_ruta] : [])
+      const detallesRaw = (ruta as any).detalles_ruta
+      const detalles = Array.isArray(detallesRaw) ? detallesRaw : (detallesRaw ? [detallesRaw] : [])
+
       totalEntregas += detalles.length
       entregasCompletadas += detalles.filter((d: any) => d.estado_entrega === 'entregado').length
 
       detalles.forEach((detalle: any) => {
         if (detalle.estado_entrega === 'entregado' && detalle.created_at && detalle.updated_at) {
-          const tiempoEntrega = (new Date(detalle.updated_at).getTime() - new Date(detalle.created_at).getTime()) / (1000 * 60) // minutos
-          if (tiempoEntrega > 0 && tiempoEntrega < 480) { // Filtrar valores anómalos (menos de 8 horas)
-            tiempoTotalEntrega += tiempoEntrega
-            entregasConTiempo++
+          try {
+            const start = new Date(detalle.created_at).getTime()
+            const end = new Date(detalle.updated_at).getTime()
+            const tiempoEntrega = (end - start) / (1000 * 60) // minutos
+
+            if (tiempoEntrega > 0 && tiempoEntrega < 480) { // Filtrar valores anómalos (menos de 8 horas)
+              tiempoTotalEntrega += tiempoEntrega
+              entregasConTiempo++
+            }
+          } catch (e) {
+            // Ignorar errores en parsing de fechas
           }
         }
       })
@@ -652,8 +666,10 @@ export async function obtenerMetricasRepartidorAction(repartidorId: string): Pro
     const eficienciaScore = (eficiencia / 100) * 7 // Máximo 7 puntos
     const tiempoScore = tiempoPromedioEntrega > 0 && tiempoPromedioEntrega < 60
       ? ((60 - tiempoPromedioEntrega) / 60) * 3 // Máximo 3 puntos, mejor tiempo = más puntos
-      : 0
-    const puntuacionGeneral = Number((eficienciaScore + tiempoScore).toFixed(1))
+      : (tiempoPromedioEntrega >= 60 ? 0.5 : 0) // Mínimo consuelo si entregó algo
+
+    let puntuacionGeneral = Number((eficienciaScore + tiempoScore).toFixed(1))
+    if (isNaN(puntuacionGeneral)) puntuacionGeneral = 0
 
     // Calcular ahorro de combustible (comparar distancia real vs estimada)
     const combustibleAhorrado = distanciaEstimadaTotal > 0 && distanciaRealTotal > 0
@@ -670,11 +686,12 @@ export async function obtenerMetricasRepartidorAction(repartidorId: string): Pro
       },
     }
   } catch (error: any) {
-    devError('Error al obtener métricas del repartidor:', error)
+    console.error('❌ [ACTION ERROR] obtenerMetricasRepartidorAction:', error)
     return {
       success: false,
       error: error.message || 'Error al obtener métricas del repartidor',
     }
   }
 }
+
 

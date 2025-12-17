@@ -555,6 +555,14 @@ Para el flujo de registro de nuevos clientes, el bot implementa una máquina de 
 
 ---
 
-*Resumen actualizado el Diciembre 2025 - Sistema de recargos por método de pago + Corrección de lógica de precios mayoristas en sucursales + Configuración de productos mayoristas implementada + Modelo de control para sucursales + Mejoras de UX y manejo de admins*
+### **Estabilización del Dashboard del Repartidor (Diciembre 2025)**
+- ✅ **Manejo de Errores Críticos**: Implementación de `try/catch` global en el Server Component y UI de fallback con botón de recarga.
+- ✅ **Optimización de Carga**: Carga paralela de métricas y rutas (`Promise.all`) para reducir el tiempo de respuesta.
+- ✅ **Robustez en Datos**: Mejora en la expansión de pedidos agrupados con validaciones estrictas de nulidad para evitar errores de renderizado.
+- ✅ **Integración de Maps**: Ajuste en la carga del script de Google Maps (`afterInteractive`) para mayor estabilidad en Next.js 15.
+
+---
+
+*Resumen actualizado el Diciembre 2025 - Estabilización de Dashboard Repartidor + Sistema de recargos por método de pago + Corrección de lógica de precios mayoristas en sucursales + Configuración de productos mayoristas implementada + Modelo de control para sucursales + Mejoras de UX y manejo de admins*
 
 

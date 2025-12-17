@@ -783,7 +783,8 @@ export async function obtenerRutaActivaAction(
         numero_ruta,
         fecha_ruta,
         estado,
-        vehiculos (
+        distancia_estimada_km,
+        vehiculo:vehiculos (
           patente,
           marca,
           modelo
@@ -796,9 +797,14 @@ export async function obtenerRutaActivaAction(
       .in('estado', ['planificada', 'en_curso'])
       .order('fecha_ruta', { ascending: false })
       .limit(1)
-      .single()
+      .maybeSingle()
 
-    console.log('🔍 [ACTION DEBUG] obtenerRutaActivaAction:', { repartidorId, rutaId: ruta?.id, estado: ruta?.estado, error: rutaError?.message })
+    console.log('🔍 [ACTION DEBUG] obtenerRutaActivaAction:', {
+      repartidorId,
+      rutaId: ruta?.id,
+      estado: ruta?.estado,
+      error: rutaError?.message
+    })
 
     if (rutaError && rutaError.code !== 'PGRST116') throw rutaError
 
@@ -810,8 +816,14 @@ export async function obtenerRutaActivaAction(
       }
     }
 
-    const entregasPendientes = ruta.detalles_ruta.filter((d: any) => d.estado_entrega === 'pendiente').length
-    const entregasCompletadas = ruta.detalles_ruta.filter((d: any) => d.estado_entrega === 'entregado').length
+    const detalles = Array.isArray(ruta.detalles_ruta) ? ruta.detalles_ruta : []
+    const entregasPendientes = detalles.filter((d: any) => d.estado_entrega === 'pendiente').length
+    const entregasCompletadas = detalles.filter((d: any) => d.estado_entrega === 'entregado').length
+
+    // Manejar el hecho de que vehiculo podría ser un objeto o un array de un solo elemento
+    const vehiculoData = Array.isArray((ruta as any).vehiculo)
+      ? (ruta as any).vehiculo[0]
+      : (ruta as any).vehiculo
 
     return {
       success: true,
@@ -821,16 +833,17 @@ export async function obtenerRutaActivaAction(
         fecha_ruta: ruta.fecha_ruta,
         estado: ruta.estado,
         vehiculo: {
-          patente: (ruta as any).vehiculos?.patente,
-          marca: (ruta as any).vehiculos?.marca,
-          modelo: (ruta as any).vehiculos?.modelo,
+          patente: vehiculoData?.patente || 'N/A',
+          marca: vehiculoData?.marca || '',
+          modelo: vehiculoData?.modelo || '',
         },
         entregas_pendientes: entregasPendientes,
         entregas_completadas: entregasCompletadas,
+        distancia_estimada_km: Number(ruta.distancia_estimada_km || 0)
       },
     }
   } catch (error: any) {
-    devError('Error al obtener ruta activa:', error)
+    console.error('❌ [ACTION ERROR] obtenerRutaActivaAction:', error)
     return {
       success: false,
       error: error.message || 'Error al obtener ruta activa',
