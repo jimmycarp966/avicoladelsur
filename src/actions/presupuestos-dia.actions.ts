@@ -92,36 +92,7 @@ export async function obtenerPresupuestosDiaAction(fecha: string, zonaId?: strin
 
   const { data: presupuestos, error } = await query.order('fecha_entrega_estimada', { ascending: true })
 
-  // #region agent log
-  // Log para verificar datos obtenidos de la BD
-  if (presupuestos && presupuestos.length > 0) {
-    const primerPresupuesto = presupuestos[0]
-    const primerItem = primerPresupuesto?.items?.[0]
-    fetch('http://127.0.0.1:7242/ingest/1672462a-0bab-407c-8bd1-baf6ccc7131f', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        location: 'presupuestos-dia.actions.ts:94',
-        message: 'Datos obtenidos de BD después de query',
-        data: {
-          totalPresupuestos: presupuestos.length,
-          primerPresupuestoId: primerPresupuesto?.id,
-          primerItemId: primerItem?.id,
-          primerItemTieneProducto: !!primerItem?.producto,
-          primerItemProductoNombre: primerItem?.producto?.nombre,
-          primerItemProductoCodigo: primerItem?.producto?.codigo,
-          primerItemProductoEstructura: primerItem?.producto ? Object.keys(primerItem.producto) : null,
-          primerItemEstructura: primerItem ? Object.keys(primerItem) : null,
-          querySelect: presupuestoSelect,
-        },
-        timestamp: Date.now(),
-        sessionId: 'debug-session',
-        runId: 'run1',
-        hypothesisId: 'D',
-      }),
-    }).catch(() => { })
-  }
-  // #endregion
+
 
   if (error) {
     console.error('Error obteniendo presupuestos:', error)

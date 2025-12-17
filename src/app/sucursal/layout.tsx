@@ -51,8 +51,8 @@ export default function SucursalLayout({ children }: SucursalLayoutProps) {
       await supabase.auth.signOut()
       storeLogout()
       toast.success('Sesión cerrada exitosamente')
-      router.push('/login')
-      router.refresh()
+      // Usar window.location.href para forzar recarga completa y limpiar todo el estado
+      window.location.href = '/login'
     } catch (error) {
       console.error('Error al cerrar sesión:', error)
       toast.error('Error al cerrar sesión')

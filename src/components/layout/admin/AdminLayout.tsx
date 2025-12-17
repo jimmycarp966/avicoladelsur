@@ -29,8 +29,7 @@ export function AdminLayout({ children, user }: AdminLayoutProps) {
       await supabase.auth.signOut()
       storeLogout()
       showToast('success', 'Sesión cerrada exitosamente')
-      router.push('/login')
-      router.refresh()
+      window.location.href = '/login'
     } catch (error) {
       console.error('Error al cerrar sesión:', error)
       showToast('error', 'Error al cerrar sesión')

@@ -35,6 +35,7 @@ interface Caja {
 
 interface VentaDia {
   id: string
+  numero_pedido?: string
   total: number
   estado: string
   metodos_pago: any // JSONB con métodos de pago

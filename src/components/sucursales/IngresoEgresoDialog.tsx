@@ -22,9 +22,9 @@ export function IngresoEgresoDialog({ open, onOpenChange, cajaId, tipo }: Ingres
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
-  
+
   const [monto, setMonto] = useState('')
-  const [metodoPago, setMetodoPago] = useState<'efectivo' | 'transferencia' | 'tarjeta' | 'qr'>('efectivo')
+  const [metodoPago, setMetodoPago] = useState<'efectivo' | 'transferencia' | 'tarjeta_debito' | 'tarjeta_credito' | 'qr'>('efectivo')
   const [descripcion, setDescripcion] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -112,7 +112,8 @@ export function IngresoEgresoDialog({ open, onOpenChange, cajaId, tipo }: Ingres
               <SelectContent>
                 <SelectItem value="efectivo">Efectivo</SelectItem>
                 <SelectItem value="transferencia">Transferencia</SelectItem>
-                <SelectItem value="tarjeta">Tarjeta</SelectItem>
+                <SelectItem value="tarjeta_debito">Tarjeta Débito</SelectItem>
+                <SelectItem value="tarjeta_credito">Tarjeta Crédito</SelectItem>
                 <SelectItem value="qr">QR / Mercado Pago</SelectItem>
               </SelectContent>
             </Select>
@@ -149,8 +150,8 @@ export function IngresoEgresoDialog({ open, onOpenChange, cajaId, tipo }: Ingres
             >
               Cancelar
             </Button>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               disabled={isPending}
               className={tipo === 'ingreso' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}
             >

@@ -431,9 +431,7 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
       const esListaMayorista = listaSeleccionada?.tipo === 'mayorista'
       const ventaMayorHabilitada = producto.venta_mayor_habilitada || false
       const kgPorUnidadMayor = producto.kg_por_unidad_mayor
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/1672462a-0bab-407c-8bd1-baf6ccc7131f', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'run2', hypothesisId: 'H4', location: 'presupuesto-form.tsx:handleProductoChange:preCalculo', message: 'Cambio de producto con lista', data: { index, productoId, listaId, listaTipo: listaSeleccionada?.tipo, esListaMayorista, ventaMayorHabilitada, kgPorUnidadMayor, unidad: producto.unidad_medida }, timestamp: Date.now() }) }).catch(() => { })
-      // #endregion
+
 
       const precioResult = await obtenerPrecioProductoAction(listaId, productoId)
       if (precioResult.success && precioResult.data) {

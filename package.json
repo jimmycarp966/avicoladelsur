@@ -11,7 +11,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "verificar-bot": "node verificar-datos-bot.js"
+    "verificar-bot": "node verificar-datos-bot.js",
+    "test:sucursales": "npx tsx scripts/test-sucursales-robot.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

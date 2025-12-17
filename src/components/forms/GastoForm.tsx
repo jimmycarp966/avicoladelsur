@@ -152,7 +152,7 @@ export function GastoForm({ categorias, cajas }: GastoFormProps) {
               <label className="text-sm font-medium">Método de pago</label>
               <Select
                 value={form.watch('metodo_pago') || 'efectivo'}
-                onValueChange={(value) => form.setValue('metodo_pago', value as 'efectivo' | 'transferencia' | 'qr' | 'tarjeta')}
+                onValueChange={(value) => form.setValue('metodo_pago', value as 'efectivo' | 'transferencia' | 'qr' | 'tarjeta_debito' | 'tarjeta_credito')}
               >
                 <SelectTrigger disabled={isPending}>
                   <SelectValue placeholder="Selecciona método de pago" />
@@ -161,7 +161,8 @@ export function GastoForm({ categorias, cajas }: GastoFormProps) {
                   <SelectItem value="efectivo">Efectivo</SelectItem>
                   <SelectItem value="transferencia">Transferencia</SelectItem>
                   <SelectItem value="qr">QR</SelectItem>
-                  <SelectItem value="tarjeta">Tarjeta</SelectItem>
+                  <SelectItem value="tarjeta_debito">Tarjeta Débito</SelectItem>
+                  <SelectItem value="tarjeta_credito">Tarjeta Crédito</SelectItem>
                 </SelectContent>
               </Select>
               {form.formState.errors.metodo_pago && (

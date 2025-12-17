@@ -526,4 +526,29 @@ Para el flujo de registro de nuevos clientes, el bot implementa una máquina de 
 
 ---
 
-*Resumen actualizado el Enero 2025 - Configuración de productos mayoristas implementada + Modelo de control para sucursales + Mejoras de UX y manejo de admins*
+### **Corrección de Precios Mayoristas en Sucursales (Diciembre 2025)**
+- ✅ **Alineación con Sistema Central**: La lógica de precios mayoristas del POS de sucursales ahora coincide con el sistema de presupuestos central
+- ✅ **Multiplicación Automática**: Cuando se selecciona una lista mayorista para un producto con `venta_mayor_habilitada=true` y `unidad_medida='kg'`, el precio se multiplica automáticamente por `kg_por_unidad_mayor`
+- ✅ **Archivos Corregidos**:
+  - `POSSucursal.tsx`: Función `actualizarPrecioItem` con lógica mayorista
+  - `NuevaVentaForm.tsx`: Funciones `actualizarPrecioItem`, `aplicarListaGlobal`, `handleCodigoBarras`, `agregarProducto` con lógica mayorista
+- ✅ **Consistencia**: Cambiar la lista de precios en sucursales ahora produce los mismos cálculos que en presupuestos del sistema central
+
+---
+
+### **Sistema de Recargos por Método de Pago (Diciembre 2025)**
+- ✅ **Constantes Centralizadas**: `payment-surcharges.ts` con porcentajes configurables
+- ✅ **Recargos por Método**:
+  - Transferencia: 5%
+  - Tarjeta Débito: 15%
+  - Tarjeta Crédito: 20%
+  - Efectivo / Mercado Pago / QR / Cuenta Corriente: 0%
+- ✅ **Separación de Tarjetas**: `tarjeta` separado en `tarjeta_debito` y `tarjeta_credito`
+- ✅ **Cálculo Dinámico**: Los recargos se calculan y muestran en tiempo real en el POS
+- ✅ **Archivos Actualizados**: 12+ archivos (schemas, types, componentes, actions)
+
+---
+
+*Resumen actualizado el Diciembre 2025 - Sistema de recargos por método de pago + Corrección de lógica de precios mayoristas en sucursales + Configuración de productos mayoristas implementada + Modelo de control para sucursales + Mejoras de UX y manejo de admins*
+
+

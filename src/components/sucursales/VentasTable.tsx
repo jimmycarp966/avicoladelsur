@@ -80,21 +80,23 @@ export function VentasTable({ ventas }: VentasTableProps) {
     if (!metodosPago) {
       return <Badge variant="secondary">Sin método</Badge>
     }
-    
+
     // Si es un array, mostrar el primero
     if (Array.isArray(metodosPago) && metodosPago.length > 0) {
       const metodo = metodosPago[0].metodoPago || metodosPago[0].metodo_pago || metodosPago[0]
       const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
         efectivo: "default",
         transferencia: "secondary",
-        tarjeta: "outline",
+        tarjeta_debito: "outline",
+        tarjeta_credito: "outline",
         cuenta_corriente: "destructive",
       }
 
       const labels: Record<string, string> = {
         efectivo: "Efectivo",
-        transferencia: "Transferencia",
-        tarjeta: "Tarjeta",
+        transferencia: "Transf. (+5%)",
+        tarjeta_debito: "Débito (+15%)",
+        tarjeta_credito: "Crédito (+20%)",
         mercado_pago: "Mercado Pago",
         cuenta_corriente: "Cta. Cte.",
       }
@@ -106,7 +108,7 @@ export function VentasTable({ ventas }: VentasTableProps) {
         </Badge>
       )
     }
-    
+
     // Si es un objeto o string, intentar parsearlo
     const metodoStr = typeof metodosPago === 'string' ? metodosPago : JSON.stringify(metodosPago)
     return <Badge variant="secondary">{metodoStr}</Badge>
@@ -139,7 +141,11 @@ export function VentasTable({ ventas }: VentasTableProps) {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <h4 className="font-semibold">
-                        {venta.numero_pedido || venta.numeroPedido || `Pedido #${venta.id.slice(-8)}`}
+                        {venta.numero_pedido || venta.numeroPedido ? (
+                          (venta.numero_pedido || venta.numeroPedido)?.startsWith('VTA-SUC') || (venta.numero_pedido || venta.numeroPedido)?.length === 11
+                            ? `Ticket ${venta.numero_pedido || venta.numeroPedido}`
+                            : `Pedido #${venta.numero_pedido || venta.numeroPedido}`
+                        ) : `Ticket ${venta.id.slice(-8)}`}
                       </h4>
                       <Badge variant="default" className="text-xs">
                         Completado
@@ -216,9 +222,9 @@ export function VentasTable({ ventas }: VentasTableProps) {
                   </div>
                 </div>
               </div>
-          </CardContent>
-        </Card>
-      ))}
+            </CardContent>
+          </Card>
+        ))}
 
         {/* Resumen del día */}
         <Card className="bg-muted/50">

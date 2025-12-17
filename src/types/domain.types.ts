@@ -329,7 +329,7 @@ export interface CierreCaja extends BaseEntity {
 
 // Tesoro
 export interface Tesoro extends BaseEntity {
-  tipo: 'efectivo' | 'transferencia' | 'qr' | 'tarjeta'
+  tipo: 'efectivo' | 'transferencia' | 'qr' | 'tarjeta_debito' | 'tarjeta_credito'
   monto: number
   descripcion?: string
   origen_tipo?: string

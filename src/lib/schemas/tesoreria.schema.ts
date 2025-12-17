@@ -12,7 +12,7 @@ export const movimientoCajaSchema = z.object({
   tipo: z.enum(['ingreso', 'egreso']),
   monto: z.number().min(0.01, 'El monto debe ser mayor a 0'),
   descripcion: z.string().max(500, 'La descripción es demasiado larga').optional(),
-  metodo_pago: z.enum(['efectivo', 'transferencia', 'tarjeta']).default('efectivo'),
+  metodo_pago: z.enum(['efectivo', 'transferencia', 'tarjeta_debito', 'tarjeta_credito', 'qr']).default('efectivo'),
   origen_tipo: z.string().max(50).optional(),
   origen_id: z.string().uuid().optional(),
 })
@@ -29,14 +29,14 @@ export const registrarGastoSchema = z.object({
   comprobante_url: z.string().url('URL inválida').optional(),
   afecta_caja: z.boolean().default(false),
   caja_id: z.string().uuid().optional(),
-  metodo_pago: z.enum(['efectivo', 'transferencia', 'qr', 'tarjeta']).default('efectivo'),
+  metodo_pago: z.enum(['efectivo', 'transferencia', 'qr', 'tarjeta_debito', 'tarjeta_credito']).default('efectivo'),
 })
 
 export const registrarPagoPedidoSchema = z.object({
   pedido_id: z.string().uuid('ID de pedido inválido'),
   caja_id: z.string().uuid('ID de caja inválido'),
   monto: z.number().min(0.01, 'El monto debe ser mayor a 0'),
-  tipo_pago: z.enum(['efectivo', 'transferencia', 'tarjeta']).default('efectivo'),
+  tipo_pago: z.enum(['efectivo', 'transferencia', 'tarjeta_debito', 'tarjeta_credito']).default('efectivo'),
 })
 
 export const exportReportSchema = z.object({
@@ -70,7 +70,7 @@ export const cerrarCierreCajaSchema = z.object({
 
 // Schema para registrar retiro al tesoro
 export const registrarRetiroTesoroSchema = z.object({
-  tipo: z.enum(['efectivo', 'transferencia', 'qr', 'tarjeta']),
+  tipo: z.enum(['efectivo', 'transferencia', 'qr', 'tarjeta_debito', 'tarjeta_credito']),
   monto: z.number().positive('El monto debe ser mayor a 0'),
   descripcion: z.string().optional(),
 })

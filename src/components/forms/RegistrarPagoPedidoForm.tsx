@@ -97,7 +97,7 @@ export function RegistrarPagoPedidoForm({ pedidoId, cajas, saldoPendiente }: Reg
         <label className="text-sm font-medium">Método de pago</label>
         <Select
           value={form.watch('tipo_pago')}
-          onValueChange={(value) => form.setValue('tipo_pago', value as 'efectivo' | 'transferencia' | 'tarjeta')}
+          onValueChange={(value) => form.setValue('tipo_pago', value as 'efectivo' | 'transferencia' | 'tarjeta_debito' | 'tarjeta_credito')}
         >
           <SelectTrigger disabled={isPending}>
             <SelectValue placeholder="Método" />
@@ -105,7 +105,8 @@ export function RegistrarPagoPedidoForm({ pedidoId, cajas, saldoPendiente }: Reg
           <SelectContent>
             <SelectItem value="efectivo">Efectivo</SelectItem>
             <SelectItem value="transferencia">Transferencia</SelectItem>
-            <SelectItem value="tarjeta">Tarjeta</SelectItem>
+            <SelectItem value="tarjeta_debito">Tarjeta Débito</SelectItem>
+            <SelectItem value="tarjeta_credito">Tarjeta Crédito</SelectItem>
           </SelectContent>
         </Select>
       </div>

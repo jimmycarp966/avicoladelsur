@@ -32,7 +32,7 @@ export function useKeyboardShortcuts({ shortcuts, enabled = true }: UseKeyboardS
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
-      fetch('http://127.0.0.1:7242/ingest/1672462a-0bab-407c-8bd1-baf6ccc7131f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useKeyboardShortcuts.ts:33',message:'handleKeyDown ejecutado',data:{key:event.key,ctrlKey:event.ctrlKey,targetTag:event.target?.tagName,isEnabled:enabled},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'A'})}).catch(()=>{});
+
 
       if (!enabled) return
 
@@ -45,7 +45,7 @@ export function useKeyboardShortcuts({ shortcuts, enabled = true }: UseKeyboardS
       const target = event.target as HTMLElement
       const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
 
-      fetch('http://127.0.0.1:7242/ingest/1672462a-0bab-407c-8bd1-baf6ccc7131f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useKeyboardShortcuts.ts:45',message:'Verificación de typing',data:{isTyping,targetTag:target.tagName,targetId:target.id},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'A'})}).catch(()=>{});
+
 
       // Permitir siempre las teclas de función (F1-F12) y atajos con Ctrl
       const isFunctionKey = event.key.startsWith('F') && /^F\d+$/.test(event.key)
@@ -56,7 +56,7 @@ export function useKeyboardShortcuts({ shortcuts, enabled = true }: UseKeyboardS
       // Si está escribiendo, solo permitir teclas de función y atajos con modificadores
       // NO buscar shortcuts cuando está escribiendo sin modificadores
       if (isTyping && !isFunctionKey && !isCtrlShortcut && !isShiftShortcut && !isAltShortcut) {
-        fetch('http://127.0.0.1:7242/ingest/1672462a-0bab-407c-8bd1-baf6ccc7131f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useKeyboardShortcuts.ts:54',message:'Está escribiendo y no es atajo con modificador, ignorando shortcut',data:{key:event.key,isTyping},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
+
         // Cuando está escribiendo sin modificadores, simplemente retornar y dejar que el input maneje la tecla
         return
       }
@@ -70,8 +70,8 @@ export function useKeyboardShortcuts({ shortcuts, enabled = true }: UseKeyboardS
           const fnKey = `F${shortcut.fn}`
           const fnCode = `F${shortcut.fn}`
           // Verificar tanto event.key como event.code para compatibilidad
-          matches = 
-            event.key === fnKey || 
+          matches =
+            event.key === fnKey ||
             event.code === fnCode ||
             event.key === `F${shortcut.fn}` ||
             (event.key.startsWith('F') && parseInt(event.key.slice(1)) === shortcut.fn)
@@ -94,7 +94,7 @@ export function useKeyboardShortcuts({ shortcuts, enabled = true }: UseKeyboardS
         }
 
         if (matches) {
-          fetch('http://127.0.0.1:7242/ingest/1672462a-0bab-407c-8bd1-baf6ccc7131f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useKeyboardShortcuts.ts:114',message:'Shortcut encontrado y ejecutándose',data:{shortcutKey:shortcut.key,shortcutCtrl:shortcut.ctrl,eventKey:event.key,eventCtrl:event.ctrlKey,description:shortcut.description},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'A'})}).catch(()=>{});
+
 
           if (shortcut.preventDefault !== false) {
             event.preventDefault()

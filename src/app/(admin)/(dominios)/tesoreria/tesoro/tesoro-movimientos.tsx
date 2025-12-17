@@ -72,7 +72,8 @@ export function TesoroMovimientos({
                 <SelectItem value="efectivo">Efectivo</SelectItem>
                 <SelectItem value="transferencia">Transferencia</SelectItem>
                 <SelectItem value="qr">QR</SelectItem>
-                <SelectItem value="tarjeta">Tarjeta</SelectItem>
+                <SelectItem value="tarjeta_debito">Tarjeta Débito</SelectItem>
+                <SelectItem value="tarjeta_credito">Tarjeta Crédito</SelectItem>
               </SelectContent>
             </Select>
           </div>

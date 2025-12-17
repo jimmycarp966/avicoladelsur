@@ -50,35 +50,7 @@ async function PresupuestosDiaContent({
     estadisticas,
   } = await obtenerPresupuestosDiaAction(fecha, zonaId, turno)
 
-  // #region agent log
-  // Log para verificar estructura de datos recibidos
-  if (presupuestos && presupuestos.length > 0) {
-    const primerPresupuesto = presupuestos[0]
-    const primerItem = primerPresupuesto?.items?.[0]
-    fetch('http://127.0.0.1:7242/ingest/1672462a-0bab-407c-8bd1-baf6ccc7131f', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        location: 'presupuestos-dia/page.tsx:51',
-        message: 'Estructura datos presupuesto recibidos',
-        data: {
-          totalPresupuestos: presupuestos.length,
-          primerPresupuestoId: primerPresupuesto?.id,
-          primerItemId: primerItem?.id,
-          primerItemTieneProducto: !!primerItem?.producto,
-          primerItemProductoNombre: primerItem?.producto?.nombre,
-          primerItemProductoCodigo: primerItem?.producto?.codigo,
-          primerItemProductoEstructura: primerItem?.producto ? Object.keys(primerItem.producto) : null,
-          primerItemEstructura: primerItem ? Object.keys(primerItem) : null,
-        },
-        timestamp: Date.now(),
-        sessionId: 'debug-session',
-        runId: 'run1',
-        hypothesisId: 'A',
-      }),
-    }).catch(() => {})
-  }
-  // #endregion
+
 
   // Obtener transferencias del día
   const transferencias = await obtenerTransferenciasDiaAction(fecha, turno, zonaId)
@@ -522,27 +494,7 @@ async function PresupuestosDiaContent({
                                   <AccordionContent className="px-4 pb-4 pt-0">
                                     <div className="space-y-3 w-full overflow-visible">
                                       {presupuesto.items.map((item: any) => {
-                                        // #region agent log
-                                        // Log para verificar que el item se está renderizando dentro del AccordionContent
-                                        fetch('http://127.0.0.1:7242/ingest/1672462a-0bab-407c-8bd1-baf6ccc7131f', {
-                                          method: 'POST',
-                                          headers: { 'Content-Type': 'application/json' },
-                                          body: JSON.stringify({
-                                            location: 'presupuestos-dia/page.tsx:523',
-                                            message: 'Item renderizado dentro AccordionContent',
-                                            data: {
-                                              presupuestoId: presupuesto.id,
-                                              itemId: item.id,
-                                              nombreProducto: item.producto?.nombre || 'Producto',
-                                              totalItems: presupuesto.items.length,
-                                            },
-                                            timestamp: Date.now(),
-                                            sessionId: 'debug-session',
-                                            runId: 'run2',
-                                            hypothesisId: 'F',
-                                          }),
-                                        }).catch(() => {})
-                                        // #endregion
+
                                         // Calcular valores una sola vez fuera del JSX (EXACTAMENTE igual que en ver detalles)
                                         const esMayorista =
                                           item.producto?.venta_mayor_habilitada === true &&
@@ -553,46 +505,16 @@ async function PresupuestosDiaContent({
                                         const unidadMayorNombre = item.producto?.unidad_mayor_nombre
                                         const solicitadoKg = esMayorista && kgPorUnidadMayor ? (item.cantidad_solicitada || 0) * kgPorUnidadMayor : item.cantidad_solicitada
                                         const reservadoKg = esMayorista && kgPorUnidadMayor ? (item.cantidad_reservada || 0) * kgPorUnidadMayor : item.cantidad_reservada
-                                        
+
                                         const nombreProducto = item.producto?.nombre || 'Producto'
                                         const codigoProducto = item.producto?.codigo
-                                        
+
                                         // Calcular el texto que se mostrará (usando unidad_mayor_nombre del producto)
                                         const textoSolicitado = esMayorista && unidadMayorNombre && kgPorUnidadMayor
                                           ? `${item.cantidad_solicitada ?? 0} ${unidadMayorNombre}${(item.cantidad_solicitada ?? 0) !== 1 ? '(s)' : ''} ≈ ${solicitadoKg?.toFixed(1)} kg`
                                           : `${item.cantidad_solicitada ?? 0} ${esPesableItem ? 'kg' : 'u'}`
 
-                                        // #region agent log
-                                        // Log para verificar valores calculados y texto final
-                                        fetch('http://127.0.0.1:7242/ingest/1672462a-0bab-407c-8bd1-baf6ccc7131f', {
-                                          method: 'POST',
-                                          headers: { 'Content-Type': 'application/json' },
-                                          body: JSON.stringify({
-                                            location: 'presupuestos-dia/page.tsx:556',
-                                            message: 'Valores calculados para mostrar cajas',
-                                            data: {
-                                              presupuestoId: presupuesto.id,
-                                              itemId: item.id,
-                                              nombreProducto,
-                                              esMayorista,
-                                              cantidad_solicitada: item.cantidad_solicitada,
-                                              cantidad_reservada: item.cantidad_reservada,
-                                              kgPorUnidadMayor,
-                                              unidadMayorNombre,
-                                              solicitadoKg,
-                                              reservadoKg,
-                                              textoSolicitado,
-                                              venta_mayor_habilitada: item.producto?.venta_mayor_habilitada,
-                                              lista_precio_item: item.lista_precio?.tipo,
-                                              lista_precio_presupuesto: presupuesto.lista_precio?.tipo,
-                                            },
-                                            timestamp: Date.now(),
-                                            sessionId: 'debug-session',
-                                            runId: 'run4',
-                                            hypothesisId: 'H',
-                                          }),
-                                        }).catch(() => {})
-                                        // #endregion
+
 
                                         return (
                                           <div
@@ -831,7 +753,7 @@ async function PresupuestosDiaContent({
                                       const solicitadoLabel = esMayorista && unidadMayorNombre
                                         ? `${cantidadSolicitada} ${unidadMayorNombre}${cantidadSolicitada !== 1 ? '(s)' : ''} ≈ ${kgEquivalente.toFixed(1)} kg`
                                         : `${cantidadSolicitada} ${esPesable ? 'kg' : 'u'}`
-                                      
+
                                       const nombreProducto = item.producto?.nombre || 'Producto'
                                       const codigoProducto = item.producto?.codigo
 

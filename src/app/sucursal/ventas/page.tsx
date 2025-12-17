@@ -128,7 +128,7 @@ async function getVentasData(sidParam?: string) {
   // Ahora obtener pedidos con filtros
   const { data: pedidosData, error: pedidosError } = await supabase
     .from('pedidos')
-    .select('id, total, estado, metodos_pago, created_at, cliente_id, sucursal_id')
+    .select('id, numero_pedido, total, estado, metodos_pago, created_at, cliente_id, sucursal_id')
     .eq('sucursal_id', sucursalIdFinal)
     .in('estado', ['completado', 'entregado', 'facturado'])
     .gte('created_at', `${hoy}T00:00:00.000Z`)
@@ -178,6 +178,7 @@ async function getVentasData(sidParam?: string) {
       // Combinar pedidos con datos de clientes
       ventasDia = pedidosData.map(pedido => ({
         id: pedido.id,
+        numero_pedido: pedido.numero_pedido,
         total: pedido.total,
         estado: pedido.estado,
         metodos_pago: pedido.metodos_pago,
@@ -188,6 +189,7 @@ async function getVentasData(sidParam?: string) {
       // Si no hay cliente_id, usar estructura sin cliente
       ventasDia = pedidosData.map(pedido => ({
         id: pedido.id,
+        numero_pedido: pedido.numero_pedido,
         total: pedido.total,
         estado: pedido.estado,
         metodos_pago: pedido.metodos_pago,

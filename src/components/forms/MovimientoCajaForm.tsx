@@ -97,7 +97,7 @@ export function MovimientoCajaForm({ cajas }: MovimientoCajaFormProps) {
             <div className="space-y-2">
               <label className="text-sm font-medium">Método de pago</label>
               <Select
-                onValueChange={(value) => form.setValue('metodo_pago', value as 'efectivo' | 'transferencia' | 'tarjeta')}
+                onValueChange={(value) => form.setValue('metodo_pago', value as 'efectivo' | 'transferencia' | 'tarjeta_debito' | 'tarjeta_credito')}
                 value={form.watch('metodo_pago')}
               >
                 <SelectTrigger disabled={isPending}>
@@ -106,7 +106,8 @@ export function MovimientoCajaForm({ cajas }: MovimientoCajaFormProps) {
                 <SelectContent>
                   <SelectItem value="efectivo">Efectivo</SelectItem>
                   <SelectItem value="transferencia">Transferencia</SelectItem>
-                  <SelectItem value="tarjeta">Tarjeta</SelectItem>
+                  <SelectItem value="tarjeta_debito">Tarjeta Débito</SelectItem>
+                  <SelectItem value="tarjeta_credito">Tarjeta Crédito</SelectItem>
                 </SelectContent>
               </Select>
               {form.formState.errors.metodo_pago && (

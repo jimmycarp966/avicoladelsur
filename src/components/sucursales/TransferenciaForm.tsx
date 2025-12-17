@@ -88,16 +88,64 @@ export function TransferenciaForm() {
         }
     }, [sucursalOrigenId])
 
-    // Filtrar productos cuando cambie la búsqueda
+    // Filtrar productos cuando cambie la búsqueda con priorización mejorada
     useEffect(() => {
         if (busquedaProducto.trim() === '') {
             setStockOrigenFiltrado(stockOrigen)
         } else {
-            const filtrados = stockOrigen.filter(item =>
-                item.producto.nombre.toLowerCase().includes(busquedaProducto.toLowerCase()) ||
-                item.producto.codigo.toLowerCase().includes(busquedaProducto.toLowerCase())
-            )
-            setStockOrigenFiltrado(filtrados)
+            const term = busquedaProducto.toLowerCase().trim()
+
+            // Separar en grupos de prioridad
+            const nombreExacto: typeof stockOrigen = []
+            const nombrePalabraCompleta: typeof stockOrigen = []
+            const nombreEmpiezaCon: typeof stockOrigen = []
+            const codigoEmpiezaCon: typeof stockOrigen = []
+            const contiene: typeof stockOrigen = []
+
+            for (const item of stockOrigen) {
+                const nombreLower = item.producto.nombre.toLowerCase()
+                const codigoLower = item.producto.codigo.toLowerCase()
+
+                // Prioridad 1: Nombre exacto
+                if (nombreLower === term) {
+                    nombreExacto.push(item)
+                    continue
+                }
+
+                // Prioridad 2: Nombre empieza con término y es palabra completa
+                if (nombreLower.startsWith(term)) {
+                    const charDespues = nombreLower[term.length]
+                    if (charDespues === ' ' || charDespues === undefined) {
+                        nombrePalabraCompleta.push(item)
+                    } else {
+                        nombreEmpiezaCon.push(item)
+                    }
+                    continue
+                }
+
+                // Prioridad 3: Código empieza con el término
+                if (codigoLower.startsWith(term)) {
+                    codigoEmpiezaCon.push(item)
+                    continue
+                }
+
+                // Prioridad 4: Contiene el término
+                if (nombreLower.includes(term) || codigoLower.includes(term)) {
+                    contiene.push(item)
+                }
+            }
+
+            // Ordenar por longitud de nombre (más corto primero)
+            nombrePalabraCompleta.sort((a, b) => a.producto.nombre.length - b.producto.nombre.length)
+            nombreEmpiezaCon.sort((a, b) => a.producto.nombre.length - b.producto.nombre.length)
+
+            setStockOrigenFiltrado([
+                ...nombreExacto,
+                ...nombrePalabraCompleta,
+                ...nombreEmpiezaCon,
+                ...codigoEmpiezaCon,
+                ...contiene
+            ])
         }
     }, [stockOrigen, busquedaProducto])
 

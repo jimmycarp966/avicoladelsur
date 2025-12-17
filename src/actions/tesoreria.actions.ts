@@ -91,7 +91,7 @@ export async function obtenerMovimientosTiempoRealAction(
       .from('tesoreria_cajas')
       .select('id, nombre, saldo_actual, moneda')
       .order('created_at', { ascending: false })
-    
+
     const totalesPorMetodo: Record<string, { ingresos: number; egresos: number }> = {}
     const totalesPorCaja: Record<string, { ingresos: number; egresos: number }> = {}
     let totalIngresos = 0
@@ -158,12 +158,12 @@ export async function obtenerMovimientosTiempoRealAction(
         totales_por_caja: totalesPorCaja,
         caja_central: cajaCentral
           ? {
-              id: cajaCentral.id,
-              nombre: cajaCentral.nombre,
-              ingresos: cajaCentralIngresos,
-              egresos: cajaCentralEgresos,
-              totales_por_metodo: cajaCentralMetodos,
-            }
+            id: cajaCentral.id,
+            nombre: cajaCentral.nombre,
+            ingresos: cajaCentralIngresos,
+            egresos: cajaCentralEgresos,
+            totales_por_metodo: cajaCentralMetodos,
+          }
           : null,
       },
     }
@@ -198,7 +198,7 @@ export async function crearCierreCajaAction(formData: FormData) {
     // Parsear y validar datos
     const rawData = Object.fromEntries(formData)
     const saldoInicialManual = rawData.saldo_inicial ? parseFloat(rawData.saldo_inicial as string) : null
-    
+
     const data = crearCierreCajaSchema.parse({
       caja_id: rawData.caja_id,
       fecha: rawData.fecha,
@@ -370,10 +370,10 @@ export async function cerrarCierreCajaAction(formData: FormData) {
 export async function obtenerCierreAbiertoAction(cajaId: string) {
   try {
     const supabase = await createClient()
-    
+
     // Obtener fecha actual en Argentina
     const hoy = getTodayArgentina()
-    
+
     const { data: cierre, error } = await supabase
       .from('cierres_caja')
       .select('*')
@@ -381,9 +381,9 @@ export async function obtenerCierreAbiertoAction(cajaId: string) {
       .eq('fecha', hoy)
       .eq('estado', 'abierto')
       .maybeSingle()
-    
+
     if (error) throw error
-    
+
     return {
       success: true,
       data: cierre
@@ -617,6 +617,8 @@ export async function registrarMovimientoCajaAction(data: {
       p_tipo: data.tipo,
       p_monto: data.monto,
       p_descripcion: data.descripcion || null,
+      p_origen_tipo: null, // Movimiento manual sin referencia
+      p_origen_id: null,
       p_user_id: user.id,
       p_metodo_pago: data.metodo_pago || 'efectivo',
     })
@@ -807,11 +809,11 @@ export async function validarRutaAction(formData: FormData) {
     // Agrupar pagos por método de pago
     const pagosPorMetodo: Record<string, { total: number; detalles: any[] }> = {}
     const pagosCuentaCorriente: any[] = []
-    
+
     ruta.detalles_ruta?.forEach((detalle: any) => {
       if (detalle.pago_registrado && detalle.monto_cobrado_registrado > 0) {
         const metodo = detalle.metodo_pago_registrado || 'efectivo'
-        
+
         // Separar cuenta corriente de otros métodos
         if (metodo === 'cuenta_corriente') {
           pagosCuentaCorriente.push(detalle)
@@ -827,7 +829,7 @@ export async function validarRutaAction(formData: FormData) {
 
     // Crear movimientos de caja agrupados por método de pago (excluyendo cuenta_corriente)
     const movimientosCreados: string[] = []
-    
+
     for (const [metodo, datos] of Object.entries(pagosPorMetodo)) {
       const { data: movimiento, error: movError } = await supabase
         .from('tesoreria_movimientos')
@@ -878,7 +880,7 @@ export async function validarRutaAction(formData: FormData) {
 
         // Reducir saldo de cuenta corriente
         const monto = Number(detalle.monto_cobrado_registrado)
-        
+
         // Obtener saldo actual y límite
         const { data: cuentaActual } = await supabase
           .from('cuentas_corrientes')
@@ -972,11 +974,11 @@ export async function validarRutaAction(formData: FormData) {
     const totalMovimientosCaja = movimientosCreados.length
     const totalPagosCuentaCorriente = pagosCuentaCorriente.length
     let mensaje = 'Ruta validada exitosamente.'
-    
+
     if (totalMovimientosCaja > 0) {
       mensaje += ` Se crearon ${totalMovimientosCaja} movimiento(s) de caja agrupado(s) por método de pago.`
     }
-    
+
     if (totalPagosCuentaCorriente > 0) {
       mensaje += ` Se procesaron ${totalPagosCuentaCorriente} pago(s) en cuenta corriente (no afectan caja).`
     }

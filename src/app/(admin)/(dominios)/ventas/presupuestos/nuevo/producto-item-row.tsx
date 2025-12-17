@@ -74,8 +74,8 @@ const ProductoItemRow = memo(function ProductoItemRow({
   const productoSeleccionado = productos.find(p => p.id === watchedItem?.producto_id)
   const listaSeleccionada = todasListas?.find(l => l.id === listaId)
   const mostrarUnidadMayorista = productoSeleccionado?.venta_mayor_habilitada &&
-                                 productoSeleccionado.unidad_medida === 'kg' &&
-                                 listaSeleccionada?.tipo === 'mayorista'
+    productoSeleccionado.unidad_medida === 'kg' &&
+    listaSeleccionada?.tipo === 'mayorista'
 
   // Determinar el placeholder/unidad a mostrar
   const unidadDisplay = mostrarUnidadMayorista && productoSeleccionado?.unidad_mayor_nombre
@@ -90,54 +90,88 @@ const ProductoItemRow = memo(function ProductoItemRow({
       // Si no hay búsqueda, devolver solo los primeros MAX_RESULTS
       return productos.slice(0, MAX_RESULTS)
     }
-    
-    // Optimizar filtrado: buscar coincidencias exactas primero, luego parciales
-    const results: typeof productos = []
+
+    // Separar en grupos de prioridad:
+    // 1. Coincidencia EXACTA del nombre (máxima prioridad)
+    // 2. Nombre empieza con el término y es la palabra completa (ej: "Suprema x kg" al buscar "suprema")
+    // 3. Nombre empieza con el término pero continúa (ej: "Suprema rebozada")
+    // 4. Código coincide exactamente o empieza con el término
+    // 5. Contiene el término en cualquier parte
+    const nombreExacto: typeof productos = []
+    const nombrePalabraCompleta: typeof productos = []
+    const nombreEmpiezaCon: typeof productos = []
+    const codigoEmpiezaCon: typeof productos = []
+    const contiene: typeof productos = []
     const termLower = term.toLowerCase()
-    
+
     // Asegurar que el producto seleccionado siempre esté en la lista si existe
-    const productoSeleccionadoEnLista = watchedItem?.producto_id 
+    const productoSeleccionadoEnLista = watchedItem?.producto_id
       ? productos.find(p => p.id === watchedItem.producto_id)
       : null
-    
+
     for (const producto of productos) {
-      if (results.length >= MAX_RESULTS) break
-      
-      // Si es el producto seleccionado, agregarlo primero si no está ya incluido
-      if (producto.id === watchedItem?.producto_id && !results.find(p => p.id === producto.id)) {
-        results.unshift(producto)
+      // Si es el producto seleccionado, lo manejamos al final
+      if (producto.id === watchedItem?.producto_id) {
         continue
       }
-      
-      // Coincidencia exacta en código (prioridad alta)
-      if (producto.codigo.toLowerCase() === termLower) {
-        results.unshift(producto) // Al inicio
+
+      const nombreLower = producto.nombre.toLowerCase()
+      const codigoLower = producto.codigo.toLowerCase()
+
+      // Prioridad 1: Nombre exacto (ej: buscar "suprema" y el producto se llama "Suprema")
+      if (nombreLower === termLower) {
+        nombreExacto.push(producto)
         continue
       }
-      
-      // Coincidencia que empieza con el término (prioridad media)
-      if (
-        producto.codigo.toLowerCase().startsWith(termLower) ||
-        producto.nombre.toLowerCase().startsWith(termLower)
-      ) {
-        results.push(producto)
+
+      // Prioridad 2: Nombre empieza con término y después hay un espacio o fin
+      // (ej: "Suprema x kg" al buscar "suprema" - la palabra "suprema" está completa)
+      if (nombreLower.startsWith(termLower)) {
+        const charDespues = nombreLower[termLower.length]
+        // Si después del término hay espacio, es palabra completa
+        if (charDespues === ' ' || charDespues === undefined) {
+          nombrePalabraCompleta.push(producto)
+        } else {
+          // El término continúa (ej: "Suprema" en "Supremarebozada" - raro pero posible)
+          nombreEmpiezaCon.push(producto)
+        }
         continue
       }
-      
-      // Coincidencia parcial (prioridad baja)
-      if (
-        producto.codigo.toLowerCase().includes(termLower) ||
-        producto.nombre.toLowerCase().includes(termLower)
-      ) {
-        results.push(producto)
+
+      // Prioridad 3: Código coincide exactamente o empieza con el término
+      if (codigoLower === termLower) {
+        codigoEmpiezaCon.unshift(producto) // Coincidencia exacta primero
+        continue
+      }
+      if (codigoLower.startsWith(termLower)) {
+        codigoEmpiezaCon.push(producto)
+        continue
+      }
+
+      // Prioridad 4: Contiene el término en nombre o código
+      if (nombreLower.includes(termLower) || codigoLower.includes(termLower)) {
+        contiene.push(producto)
       }
     }
-    
-    // Si hay un producto seleccionado y no está en los resultados, agregarlo al inicio
+
+    // Ordenar cada grupo por longitud de nombre (más corto primero)
+    nombrePalabraCompleta.sort((a, b) => a.nombre.length - b.nombre.length)
+    nombreEmpiezaCon.sort((a, b) => a.nombre.length - b.nombre.length)
+
+    // Combinar resultados en orden de prioridad
+    const results = [
+      ...nombreExacto,
+      ...nombrePalabraCompleta,
+      ...nombreEmpiezaCon,
+      ...codigoEmpiezaCon,
+      ...contiene
+    ].slice(0, MAX_RESULTS)
+
+    // Si hay un producto seleccionado, agregarlo al inicio si no está ya incluido
     if (productoSeleccionadoEnLista && !results.find(p => p.id === productoSeleccionadoEnLista.id)) {
       results.unshift(productoSeleccionadoEnLista)
     }
-    
+
     return results
   }, [productos, debouncedSearch, watchedItem?.producto_id])
 
@@ -167,7 +201,7 @@ const ProductoItemRow = memo(function ProductoItemRow({
               }, 100)
             }}
           >
-            <SelectTrigger 
+            <SelectTrigger
               id={`producto_${index}`}
               data-product-index={index}
               className={`${errors?.producto_id ? 'border-red-500' : ''} w-full min-w-0`}
@@ -245,16 +279,16 @@ const ProductoItemRow = memo(function ProductoItemRow({
               <div className="max-h-[200px] overflow-y-auto">
                 {(() => {
                   // Asegurar que el producto seleccionado siempre esté en la lista si existe
-                  const productoSeleccionadoEnLista = watchedItem?.producto_id 
+                  const productoSeleccionadoEnLista = watchedItem?.producto_id
                     ? productos.find(p => p.id === watchedItem.producto_id)
                     : null
-                  
+
                   // Si hay un producto seleccionado y no está en los resultados filtrados, agregarlo
                   const listaFinal = [...filteredProductos]
                   if (productoSeleccionadoEnLista && !listaFinal.find(p => p.id === productoSeleccionadoEnLista.id)) {
                     listaFinal.unshift(productoSeleccionadoEnLista)
                   }
-                  
+
                   return listaFinal.length > 0 ? (
                     <>
                       {listaFinal.map((producto) => (
@@ -309,25 +343,25 @@ const ProductoItemRow = memo(function ProductoItemRow({
             <SelectTrigger id={`lista_precio_${index}`} className="w-full min-w-0">
               <SelectValue placeholder="Seleccionar lista" />
             </SelectTrigger>
-          <SelectContent>
-            {listaGlobalId && (
-              <SelectItem value={listaGlobalId}>
-                {todasListas.find(l => l.id === listaGlobalId)?.codigo || 'Global'}
-              </SelectItem>
-            )}
-            {todasListas
-              .filter((lista) => !listaGlobalId || lista.id !== listaGlobalId) // Filtrar la lista global para evitar duplicados
-              .map((lista) => {
-                const margenText = lista.margen_ganancia ? `(${lista.margen_ganancia}%)` : ''
-                const titleText = `${lista.codigo} - ${lista.nombre} ${margenText}`
-                
-                return (
-                  <SelectItem key={lista.id} value={lista.id} title={titleText}>
-                    {lista.codigo}
-                  </SelectItem>
-                )
-              })}
-          </SelectContent>
+            <SelectContent>
+              {listaGlobalId && (
+                <SelectItem value={listaGlobalId}>
+                  {todasListas.find(l => l.id === listaGlobalId)?.codigo || 'Global'}
+                </SelectItem>
+              )}
+              {todasListas
+                .filter((lista) => !listaGlobalId || lista.id !== listaGlobalId) // Filtrar la lista global para evitar duplicados
+                .map((lista) => {
+                  const margenText = lista.margen_ganancia ? `(${lista.margen_ganancia}%)` : ''
+                  const titleText = `${lista.codigo} - ${lista.nombre} ${margenText}`
+
+                  return (
+                    <SelectItem key={lista.id} value={lista.id} title={titleText}>
+                      {lista.codigo}
+                    </SelectItem>
+                  )
+                })}
+            </SelectContent>
           </Select>
         </div>
         {usaListaGlobal && listaGlobalId && (

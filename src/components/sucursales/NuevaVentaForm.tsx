@@ -57,6 +57,14 @@ import {
 } from '@/actions/ventas-sucursal.actions'
 import { generarTicketTermicoAction } from '@/actions/pos-sucursal.actions'
 import { obtenerTodasListasActivasAction } from '@/actions/listas-precios.actions'
+import {
+  MetodoPago,
+  METODO_PAGO_LABELS,
+  calcularRecargo,
+  calcularTotalConRecargos,
+  tieneRecargo,
+  obtenerPorcentajeRecargo,
+} from '@/lib/constants/payment-surcharges'
 
 // ===========================================
 // SCHEMAS Y TIPOS
@@ -74,7 +82,7 @@ const ventaSchema = z.object({
     listaPrecioId: z.string().uuid().optional(), // Lista de precio por producto
   })).min(1, 'Agrega al menos un producto'),
   pagos: z.array(z.object({
-    metodoPago: z.enum(['efectivo', 'transferencia', 'tarjeta', 'mercado_pago', 'cuenta_corriente']),
+    metodoPago: z.enum(['efectivo', 'transferencia', 'tarjeta_debito', 'tarjeta_credito', 'mercado_pago', 'cuenta_corriente']),
     monto: z.number().min(0.01, 'Monto debe ser mayor a 0'),
   })).min(1, 'Agrega al menos un método de pago'),
 }).refine((data) => {
@@ -305,7 +313,21 @@ export function NuevaVentaForm({
     try {
       const result = await obtenerPrecioProductoAction(listaPrecioId, item.productoId)
       if (result.success && result.data) {
-        form.setValue(`items.${index}.precioUnitario`, result.data.precio)
+        // LÓGICA MAYORISTA: Si es lista mayorista y el producto tiene venta mayor habilitada,
+        // multiplicar el precio por kg_por_unidad_mayor (igual que en presupuestos del sistema central)
+        const listaSeleccionada = todasListas.find((l) => l.id === listaPrecioId)
+        const esListaMayorista = listaSeleccionada?.tipo === 'mayorista'
+        const productoCompleto = productos.find((p) => p.id === item.productoId)
+        const ventaMayorHabilitada = productoCompleto?.ventaMayorHabilitada || false
+        const kgPorUnidadMayor = productoCompleto?.kgPorUnidadMayor
+        const unidadMedida = productoCompleto?.unidadMedida
+
+        let precioFinal = result.data.precio
+        if (esListaMayorista && ventaMayorHabilitada && unidadMedida === 'kg' && kgPorUnidadMayor) {
+          precioFinal = result.data.precio * kgPorUnidadMayor
+        }
+
+        form.setValue(`items.${index}.precioUnitario`, precioFinal)
         form.setValue(`items.${index}.listaPrecioId`, listaPrecioId)
       }
     } catch (error) {
@@ -313,7 +335,7 @@ export function NuevaVentaForm({
     } finally {
       setCargandoPrecios(null)
     }
-  }, [watchedItems, form])
+  }, [watchedItems, form, todasListas, productos])
 
   // Aplicar lista global a todos los items que no tengan lista individual
   // IMPORTANTE: La lista individual siempre tiene prioridad sobre la global
@@ -335,6 +357,10 @@ export function NuevaVentaForm({
       }))
     })
 
+    // Obtener información de la lista global para saber si es mayorista
+    const listaGlobal = todasListas.find((l) => l.id === listaGlobalId)
+    const esListaMayorista = listaGlobal?.tipo === 'mayorista'
+
     // Aplicar lista global SOLO a items que no tienen lista individual O que estaban usando la global anterior
     for (let i = 0; i < watchedItems.length; i++) {
       const item = watchedItems[i]
@@ -354,8 +380,20 @@ export function NuevaVentaForm({
           const result = await obtenerPrecioProductoAction(listaGlobalId, item.productoId)
           console.log(`📊 Resultado precio item ${i}:`, result)
           if (result.success && result.data) {
-            console.log(`✅ Actualizando item ${i}: precio ${item.precioUnitario} → ${result.data.precio}`)
-            form.setValue(`items.${i}.precioUnitario`, result.data.precio)
+            // LÓGICA MAYORISTA: Si es lista mayorista y el producto tiene venta mayor habilitada,
+            // multiplicar el precio por kg_por_unidad_mayor (igual que en presupuestos del sistema central)
+            const productoCompleto = productos.find((p) => p.id === item.productoId)
+            const ventaMayorHabilitada = productoCompleto?.ventaMayorHabilitada || false
+            const kgPorUnidadMayor = productoCompleto?.kgPorUnidadMayor
+            const unidadMedida = productoCompleto?.unidadMedida
+
+            let precioFinal = result.data.precio
+            if (esListaMayorista && ventaMayorHabilitada && unidadMedida === 'kg' && kgPorUnidadMayor) {
+              precioFinal = result.data.precio * kgPorUnidadMayor
+            }
+
+            console.log(`✅ Actualizando item ${i}: precio ${item.precioUnitario} → ${precioFinal}`)
+            form.setValue(`items.${i}.precioUnitario`, precioFinal)
             form.setValue(`items.${i}.listaPrecioId`, listaGlobalId)
           } else {
             console.error(`❌ Error obteniendo precio item ${i}:`, result.error)
@@ -367,7 +405,7 @@ export function NuevaVentaForm({
         }
       }
     }
-  }, [watchedItems, form, productos])
+  }, [watchedItems, form, productos, todasListas])
 
   // Obtener información del cliente cuando se selecciona
   useEffect(() => {
@@ -459,8 +497,19 @@ export function NuevaVentaForm({
           const result = await obtenerPrecioProductoAction(watchedListaGlobal, producto.id)
           console.log('📊 Resultado precio producto agregado:', result)
           if (result.success && result.data) {
+            // LÓGICA MAYORISTA: Si es lista mayorista y el producto tiene venta mayor habilitada,
+            // multiplicar el precio por kg_por_unidad_mayor
+            const listaGlobal = todasListas.find((l) => l.id === watchedListaGlobal)
+            const esListaMayorista = listaGlobal?.tipo === 'mayorista'
+            const ventaMayorHabilitada = producto.ventaMayorHabilitada || false
+            const kgPorUnidadMayor = producto.kgPorUnidadMayor
+            const unidadMedida = producto.unidadMedida
+
             precio = result.data.precio
-            console.log(`✅ Precio actualizado: ${producto.precioVenta} → ${result.data.precio}`)
+            if (esListaMayorista && ventaMayorHabilitada && unidadMedida === 'kg' && kgPorUnidadMayor) {
+              precio = result.data.precio * kgPorUnidadMayor
+            }
+            console.log(`✅ Precio actualizado: ${producto.precioVenta} → ${precio}`)
           }
         } catch (error) {
           console.error('❌ Error al obtener precio de lista global:', error)
@@ -481,7 +530,7 @@ export function NuevaVentaForm({
     if (barcodeInputRef.current) {
       barcodeInputRef.current.focus()
     }
-  }, [productos, watchedItems, form, appendItem, watchedListaGlobal])
+  }, [productos, watchedItems, form, appendItem, watchedListaGlobal, todasListas])
 
   // Agregar producto por búsqueda
   const agregarProducto = useCallback(async (productoId: string) => {
@@ -510,8 +559,19 @@ export function NuevaVentaForm({
         const result = await obtenerPrecioProductoAction(watchedListaGlobal, producto.id)
         console.log('📊 Resultado precio producto agregado (búsqueda):', result)
         if (result.success && result.data) {
+          // LÓGICA MAYORISTA: Si es lista mayorista y el producto tiene venta mayor habilitada,
+          // multiplicar el precio por kg_por_unidad_mayor
+          const listaGlobal = todasListas.find((l) => l.id === watchedListaGlobal)
+          const esListaMayorista = listaGlobal?.tipo === 'mayorista'
+          const ventaMayorHabilitada = producto.ventaMayorHabilitada || false
+          const kgPorUnidadMayor = producto.kgPorUnidadMayor
+          const unidadMedida = producto.unidadMedida
+
           precio = result.data.precio
-          console.log(`✅ Precio actualizado (búsqueda): ${producto.precioVenta} → ${result.data.precio}`)
+          if (esListaMayorista && ventaMayorHabilitada && unidadMedida === 'kg' && kgPorUnidadMayor) {
+            precio = result.data.precio * kgPorUnidadMayor
+          }
+          console.log(`✅ Precio actualizado (búsqueda): ${producto.precioVenta} → ${precio}`)
         }
       } catch (error) {
         console.error('❌ Error al obtener precio de lista global:', error)
@@ -526,7 +586,7 @@ export function NuevaVentaForm({
     })
 
     setBusquedaProducto('')
-  }, [productos, appendItem, watchedListaGlobal])
+  }, [productos, appendItem, watchedListaGlobal, todasListas])
 
   // Validar crédito antes de enviar
   const validarCredito = async (): Promise<boolean> => {
@@ -599,7 +659,7 @@ export function NuevaVentaForm({
       const result = await registrarVentaSucursalConControlAction({
         sucursalId,
         clienteId: data.clienteId || undefined,
-        listaPrecioId: undefined, // Ya no se usa lista global
+        listaPrecioId: data.listaPrecioGlobal, // Lista global obligatoria
         items: data.items.map(item => ({
           productoId: item.productoId,
           cantidad: item.cantidad,
@@ -619,7 +679,7 @@ export function NuevaVentaForm({
         toast.success(
           <div className="space-y-1">
             <p className="font-semibold">¡Venta registrada!</p>
-            <p className="text-sm">Pedido: {ventaRegistrada.numeroPedido}</p>
+            <p className="text-sm">Ticket: {ventaRegistrada.numeroPedido}</p>
             <p className="text-sm">Total: ${ventaRegistrada.total.toFixed(2)}</p>
             <Button
               variant="outline"
@@ -681,11 +741,63 @@ export function NuevaVentaForm({
     }
   }
 
-  // Productos filtrados
-  const productosFiltrados = productos.filter(p =>
-    p.nombre.toLowerCase().includes(busquedaProducto.toLowerCase()) ||
-    p.codigo.toLowerCase().includes(busquedaProducto.toLowerCase())
-  ).slice(0, 10) // Limitar a 10 resultados
+  // Productos filtrados con priorización: primero coincidencias exactas, luego por longitud
+  const productosFiltrados = (() => {
+    const term = busquedaProducto.toLowerCase().trim()
+    if (!term) return productos.slice(0, 10)
+
+    // Separar en grupos de prioridad
+    const nombreExacto: typeof productos = []
+    const nombrePalabraCompleta: typeof productos = []
+    const nombreEmpiezaCon: typeof productos = []
+    const codigoEmpiezaCon: typeof productos = []
+    const contiene: typeof productos = []
+
+    for (const p of productos) {
+      const nombreLower = p.nombre.toLowerCase()
+      const codigoLower = p.codigo.toLowerCase()
+
+      // Prioridad 1: Nombre exacto
+      if (nombreLower === term) {
+        nombreExacto.push(p)
+        continue
+      }
+
+      // Prioridad 2: Nombre empieza con término y es palabra completa
+      if (nombreLower.startsWith(term)) {
+        const charDespues = nombreLower[term.length]
+        if (charDespues === ' ' || charDespues === undefined) {
+          nombrePalabraCompleta.push(p)
+        } else {
+          nombreEmpiezaCon.push(p)
+        }
+        continue
+      }
+
+      // Prioridad 3: Código empieza con el término
+      if (codigoLower.startsWith(term)) {
+        codigoEmpiezaCon.push(p)
+        continue
+      }
+
+      // Prioridad 4: Contiene el término
+      if (nombreLower.includes(term) || codigoLower.includes(term)) {
+        contiene.push(p)
+      }
+    }
+
+    // Ordenar por longitud de nombre (más corto primero)
+    nombrePalabraCompleta.sort((a, b) => a.nombre.length - b.nombre.length)
+    nombreEmpiezaCon.sort((a, b) => a.nombre.length - b.nombre.length)
+
+    return [
+      ...nombreExacto,
+      ...nombrePalabraCompleta,
+      ...nombreEmpiezaCon,
+      ...codigoEmpiezaCon,
+      ...contiene
+    ].slice(0, 10)
+  })()
 
   // Evitar problemas de hidratación - solo renderizar después de montar
   if (!mounted) {
@@ -1166,8 +1278,9 @@ export function NuevaVentaForm({
                             </FormControl>
                             <SelectContent>
                               <SelectItem value="efectivo">Efectivo</SelectItem>
-                              <SelectItem value="transferencia">Transferencia</SelectItem>
-                              <SelectItem value="tarjeta">Tarjeta</SelectItem>
+                              <SelectItem value="transferencia">Transferencia (+5%)</SelectItem>
+                              <SelectItem value="tarjeta_debito">Tarjeta Débito (+15%)</SelectItem>
+                              <SelectItem value="tarjeta_credito">Tarjeta Crédito (+20%)</SelectItem>
                               <SelectItem value="mercado_pago">Mercado Pago</SelectItem>
                               <SelectItem value="cuenta_corriente">Cuenta Corriente</SelectItem>
                             </SelectContent>
@@ -1217,23 +1330,44 @@ export function NuevaVentaForm({
 
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Subtotal:</span>
+                    <span className="text-muted-foreground">Subtotal productos:</span>
                     <span className="font-medium">${subtotal.toFixed(2)}</span>
                   </div>
-                  {/* Los recargos se calculan en el backend según método de pago */}
-                  <div className="flex justify-between text-sm text-muted-foreground">
-                    <span>Recargos (se aplican automáticamente):</span>
-                    <span>Calculado al cobrar</span>
-                  </div>
-                  <Separator />
-                  <div className="flex justify-between font-bold text-lg">
-                    <span>Total a pagar:</span>
-                    <span>${subtotal.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Total pagado:</span>
-                    <span className="font-medium">${totalPagos.toFixed(2)}</span>
-                  </div>
+                  {/* Calcular recargos dinámicamente */}
+                  {(() => {
+                    const recargosCalculados = calcularTotalConRecargos(
+                      watchedPagos.map(p => ({
+                        metodoPago: p.metodoPago as MetodoPago,
+                        monto: p.monto
+                      }))
+                    )
+                    const hayRecargos = recargosCalculados.totalRecargos > 0
+                    return (
+                      <>
+                        {hayRecargos && (
+                          <div className="flex justify-between text-amber-600">
+                            <span>Recargos:</span>
+                            <span>+${recargosCalculados.totalRecargos.toFixed(2)}</span>
+                          </div>
+                        )}
+                        <Separator />
+                        <div className="flex justify-between font-bold text-lg">
+                          <span>Total a pagar:</span>
+                          <span>${recargosCalculados.total.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Total pagado (sin recargos):</span>
+                          <span className="font-medium">${totalPagos.toFixed(2)}</span>
+                        </div>
+                        {hayRecargos && (
+                          <div className="flex justify-between text-sm text-muted-foreground">
+                            <span>Total con recargos:</span>
+                            <span>${recargosCalculados.total.toFixed(2)}</span>
+                          </div>
+                        )}
+                      </>
+                    )
+                  })()}
                   {Math.abs(diferencia) > 0.01 && (
                     <div className={`flex justify-between font-bold ${diferencia > 0 ? 'text-amber-600' : 'text-green-600'
                       }`}>
@@ -1251,7 +1385,15 @@ export function NuevaVentaForm({
         <div className="flex items-center justify-end gap-4">
           <div className="text-2xl font-bold flex items-center gap-2">
             <DollarSign className="w-6 h-6" />
-            Total: ${subtotal.toFixed(2)}
+            Total: ${(() => {
+              const recargos = calcularTotalConRecargos(
+                watchedPagos.map(p => ({
+                  metodoPago: p.metodoPago as MetodoPago,
+                  monto: p.monto
+                }))
+              )
+              return recargos.total.toFixed(2)
+            })()}
           </div>
           <div className="flex gap-2">
             <Button

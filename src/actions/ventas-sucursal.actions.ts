@@ -16,7 +16,7 @@ export interface ItemVentaSucursal {
 }
 
 export interface PagoMetodo {
-  metodoPago: 'efectivo' | 'transferencia' | 'tarjeta' | 'mercado_pago' | 'cuenta_corriente'
+  metodoPago: 'efectivo' | 'transferencia' | 'tarjeta_debito' | 'tarjeta_credito' | 'mercado_pago' | 'cuenta_corriente'
   monto: number
 }
 
@@ -140,7 +140,7 @@ export async function registrarVentaSucursalConControlAction(
             monto: p.monto
           }))
         }
-      } 
+      }
       // Si es un solo pago (compatibilidad)
       else if ('metodoPago' in params.pago) {
         pagoJson = {
@@ -284,7 +284,7 @@ export async function obtenerConteoStockAction(
         .select('nombre')
         .eq('id', conteoData.realizado_por)
         .maybeSingle()
-      
+
       if (!usuarioError && usuarioData) {
         nombreUsuario = usuarioData.nombre || 'Desconocido'
       }
@@ -449,14 +449,14 @@ export async function listarConteosStockAction(
     const conteosConUsuarios = await Promise.all(
       (data || []).map(async (conteo) => {
         let nombreRealizadoPor = 'Desconocido'
-        
+
         if (conteo.realizado_por) {
           const { data: usuarioData, error: usuarioError } = await supabase
             .from('usuarios')
             .select('nombre')
             .eq('id', conteo.realizado_por)
             .maybeSingle()
-          
+
           if (!usuarioError && usuarioData) {
             nombreRealizadoPor = usuarioData.nombre || 'Desconocido'
           }

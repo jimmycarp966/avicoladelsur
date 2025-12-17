@@ -87,7 +87,7 @@ export interface CrearPedidoParams {
     modalidad: 'contado' | 'credito'
     monto?: number
     caja_id?: string
-    tipo_pago?: 'efectivo' | 'transferencia' | 'tarjeta'
+    tipo_pago?: 'efectivo' | 'transferencia' | 'tarjeta_debito' | 'tarjeta_credito'
   }
 }
 
@@ -96,7 +96,7 @@ export interface CrearPedidoBotParams extends CrearPedidoParams {
   pago?: {
     modalidad: 'contado' | 'credito'
     monto?: number
-    tipo_pago?: 'efectivo' | 'transferencia' | 'tarjeta'
+    tipo_pago?: 'efectivo' | 'transferencia' | 'tarjeta_debito' | 'tarjeta_credito'
   }
 }
 
@@ -189,7 +189,7 @@ export interface MovimientoCajaParams {
   tipo: 'ingreso' | 'egreso'
   monto: number
   descripcion?: string
-  metodo_pago?: 'efectivo' | 'transferencia' | 'tarjeta'
+  metodo_pago?: 'efectivo' | 'transferencia' | 'tarjeta_debito' | 'tarjeta_credito'
   origen_tipo?: string
   origen_id?: string
 }
@@ -203,14 +203,14 @@ export interface RegistrarGastoParams {
   comprobante_url?: string
   afecta_caja?: boolean
   caja_id?: string
-  metodo_pago?: 'efectivo' | 'transferencia' | 'qr' | 'tarjeta'
+  metodo_pago?: 'efectivo' | 'transferencia' | 'qr' | 'tarjeta_debito' | 'tarjeta_credito'
 }
 
 export interface RegistrarPagoPedidoParams {
   pedido_id: string
   caja_id: string
   monto: number
-  tipo_pago?: 'efectivo' | 'transferencia' | 'tarjeta'
+  tipo_pago?: 'efectivo' | 'transferencia' | 'tarjeta_debito' | 'tarjeta_credito'
 }
 
 export interface ExportReportParams {

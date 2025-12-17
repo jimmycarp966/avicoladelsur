@@ -36,7 +36,7 @@ export function DashboardRealtime({
       // Solo contar pedidos completados del día actual
       const hoy = new Date().toISOString().split('T')[0]
       const fechaPedido = new Date(pedido.created_at).toISOString().split('T')[0]
-      
+
       if (pedido.estado === 'completado' && fechaPedido === hoy) {
         setVentasDia((prev) => {
           const nuevas = [...prev, pedido]
@@ -49,7 +49,7 @@ export function DashboardRealtime({
       const pedido = payload.new as any
       const hoy = new Date().toISOString().split('T')[0]
       const fechaPedido = new Date(pedido.created_at).toISOString().split('T')[0]
-      
+
       if (pedido.estado === 'completado' && fechaPedido === hoy) {
         setVentasDia((prev) => {
           const index = prev.findIndex((v) => v.id === pedido.id)
@@ -86,7 +86,7 @@ export function DashboardRealtime({
         setAlertas((prev) => {
           const nuevas = [...prev, alerta]
           onAlertasUpdate?.(nuevas)
-          
+
           // Mostrar notificación push si es crítica
           if (alerta.prioridad === 'critico' && 'Notification' in window && Notification.permission === 'granted') {
             new Notification('⚠️ Alerta de Stock Crítica', {
@@ -94,7 +94,7 @@ export function DashboardRealtime({
               icon: '/images/logo-avicola.svg',
             })
           }
-          
+
           return nuevas
         })
       }
@@ -183,7 +183,7 @@ export function DashboardRealtime({
     const cargarDatosIniciales = async () => {
       try {
         const hoy = new Date().toISOString().split('T')[0]
-        
+
         // Cargar ventas del día
         const ventasRes = await fetch(`/api/tesoreria/movimientos-tiempo-real?sucursal_id=${sucursalId}&fecha=${hoy}`)
         if (ventasRes.ok) {
@@ -199,7 +199,7 @@ export function DashboardRealtime({
         if (alertasRes.ok) {
           const alertasData = await alertasRes.json()
           if (alertasData.success) {
-            const alertasPendientes = (alertasData.data || []).filter((a: any) => a.estado === 'pendiente')
+            const alertasPendientes = (alertasData.data?.alertas || []).filter((a: any) => a.estado === 'pendiente')
             setAlertas(alertasPendientes)
             onAlertasUpdate?.(alertasPendientes)
           }

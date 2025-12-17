@@ -44,7 +44,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   } catch (error: any) {
     setConfigError(error.message)
     setLoading(false)
-    
+
     // Si hay error de configuración, mostrar mensaje
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-white to-secondary/5 p-4">
@@ -178,7 +178,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const refreshUser = async () => {
     try {
       console.log(`[AUTH LOG ${new Date().toISOString()}] Refreshing user...`)
-      
+
       const { data: { user: authUser }, error } = await supabase.auth.getUser()
 
       if (error || !authUser) {
@@ -329,10 +329,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       console.log('Redirigiendo a:', redirectTo)
       showToast('success', `Bienvenido ${userData.nombre}`)
-      
+
       // Asegurar que el loading se desactive antes de redirigir
       setLoading(false)
-      
+
       // Usar setTimeout para dar tiempo a que se actualice el estado antes de redirigir
       setTimeout(() => {
         router.push(redirectTo)
@@ -361,11 +361,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setLoading(true)
       await supabase.auth.signOut()
       storeLogout()
-      
+
       console.log(`[AUTH LOG ${timestamp}] Logout completado exitosamente`)
       showToast('info', 'Sesión cerrada exitosamente')
-      router.push('/login')
-      router.refresh()
+      window.location.href = '/login'
     } catch (error: any) {
       console.error(`[AUTH LOG ${new Date().toISOString()}] Error en logout:`, {
         error: error?.message || String(error),
@@ -383,7 +382,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const getInitialSession = async () => {
       try {
         console.log(`[AUTH LOG ${new Date().toISOString()}] Obteniendo sesión inicial...`)
-        
+
         const { data: { session }, error } = await supabase.auth.getSession()
 
         if (error) {
@@ -404,7 +403,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             const expiresAt = new Date(session.expires_at * 1000)
             const now = new Date()
             const isExpired = expiresAt < now
-            
+
             console.log(`[AUTH LOG ${new Date().toISOString()}] Estado del token:`, {
               expiresAt: expiresAt.toISOString(),
               now: now.toISOString(),
@@ -525,7 +524,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const interval = setInterval(async () => {
       const timestamp = new Date().toISOString()
-      
+
       // Verificar primero que el usuario todavía existe en el estado local
       // Esto evita ejecutar verificaciones si ya se cerró la sesión
       const currentUser = user
@@ -535,10 +534,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       console.log(`[AUTH LOG ${timestamp}] Verificación periódica de usuario...`)
-      
+
       // Verificar también el estado de la sesión
       const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-      
+
       if (sessionError) {
         console.error(`[AUTH LOG ${timestamp}] Error al obtener sesión en verificación periódica:`, {
           error: sessionError.message,
@@ -571,7 +570,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const expiresAt = new Date(session.expires_at * 1000)
         const now = new Date()
         const minutesUntilExpiry = Math.round((expiresAt.getTime() - now.getTime()) / 1000 / 60)
-        
+
         console.log(`[AUTH LOG ${timestamp}] Estado del token en verificación periódica:`, {
           expiresAt: expiresAt.toISOString(),
           minutesUntilExpiry,

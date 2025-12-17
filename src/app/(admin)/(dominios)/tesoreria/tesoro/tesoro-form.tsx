@@ -23,15 +23,15 @@ export function TesoroForm({ categorias }: TesoroFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [action, setAction] = useState<'retiro' | 'deposito' | 'gasto'>('retiro')
-  const [tipo, setTipo] = useState<'efectivo' | 'transferencia' | 'qr' | 'tarjeta'>('efectivo')
+  const [tipo, setTipo] = useState<'efectivo' | 'transferencia' | 'qr' | 'tarjeta_debito' | 'tarjeta_credito'>('efectivo')
   const [monto, setMonto] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [numeroTransaccion, setNumeroTransaccion] = useState('')
-  
+
   // Estados para gasto
   const [categoriaId, setCategoriaId] = useState('')
   const [fechaGasto, setFechaGasto] = useState(getTodayArgentina())
-  const [metodoPagoGasto, setMetodoPagoGasto] = useState<'efectivo' | 'transferencia' | 'qr' | 'tarjeta'>('transferencia')
+  const [metodoPagoGasto, setMetodoPagoGasto] = useState<'efectivo' | 'transferencia' | 'qr' | 'tarjeta_debito' | 'tarjeta_credito'>('transferencia')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -167,7 +167,8 @@ export function TesoroForm({ categorias }: TesoroFormProps) {
                       <SelectItem value="efectivo">Efectivo</SelectItem>
                       <SelectItem value="transferencia">Transferencia</SelectItem>
                       <SelectItem value="qr">QR</SelectItem>
-                      <SelectItem value="tarjeta">Tarjeta</SelectItem>
+                      <SelectItem value="tarjeta_debito">Tarjeta Débito</SelectItem>
+                      <SelectItem value="tarjeta_credito">Tarjeta Crédito</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -306,7 +307,8 @@ export function TesoroForm({ categorias }: TesoroFormProps) {
                       <SelectItem value="transferencia">Transferencia</SelectItem>
                       <SelectItem value="efectivo">Efectivo</SelectItem>
                       <SelectItem value="qr">QR</SelectItem>
-                      <SelectItem value="tarjeta">Tarjeta</SelectItem>
+                      <SelectItem value="tarjeta_debito">Tarjeta Débito</SelectItem>
+                      <SelectItem value="tarjeta_credito">Tarjeta Crédito</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">

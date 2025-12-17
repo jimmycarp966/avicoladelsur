@@ -38,8 +38,7 @@ export function SucursalHeader({ sucursal }: SucursalHeaderProps) {
       await supabase.auth.signOut()
       storeLogout()
       showToast('success', 'Sesión cerrada exitosamente')
-      router.push('/login')
-      router.refresh()
+      window.location.href = '/login'
     } catch (error) {
       console.error('Error al cerrar sesión:', error)
       showToast('error', 'Error al cerrar sesión')
@@ -99,7 +98,7 @@ export function SucursalHeader({ sucursal }: SucursalHeaderProps) {
                 <span>Configuración</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
+              <DropdownMenuItem onSelect={handleLogout} className="text-destructive focus:text-destructive cursor-pointer">
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Cerrar Sesión</span>
               </DropdownMenuItem>

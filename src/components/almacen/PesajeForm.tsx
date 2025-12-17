@@ -61,11 +61,7 @@ export function PesajeForm({ presupuesto, itemsPesables, presupuestoId }: Pesaje
   const [isFinalizing, setIsFinalizing] = useState(false)
   const [isConverting, setIsConverting] = useState(false)
 
-  // #region agent log
-  useEffect(() => {
-    fetch('http://127.0.0.1:7242/ingest/1672462a-0bab-407c-8bd1-baf6ccc7131f', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId: 'debug-session', runId: 'run-debug-4', hypothesisId: 'H6', location: 'PesajeForm:mount', message: 'PesajeForm mounted', data: { presupuestoId, listaTipo: presupuesto.lista_precio?.tipo, totalItems: itemsPesables.length, items: itemsPesables.slice(0, 5).map(it => ({ id: it.id, cant: it.cantidad_solicitada, reservada: it.cantidad_reservada, pesable: it.pesable, producto: { codigo: it.producto?.codigo, venta_mayor: it.producto?.venta_mayor_habilitada, kg_por_unidad_mayor: it.producto?.kg_por_unidad_mayor } })) }, timestamp: Date.now() }) }).catch(() => { })
-  }, [presupuestoId, presupuesto.lista_precio?.tipo, itemsPesables])
-  // #endregion
+
 
   // Helper para determinar si es venta mayorista
   function esVentaMayorista(item: ItemPesable): boolean {

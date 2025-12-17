@@ -24,10 +24,10 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatCurrency } from '@/lib/utils'
-import { 
-  registrarCobroEntregaAction, 
-  marcarEntregaCompletadaAction, 
-  marcarEntregaFallidaAction 
+import {
+  registrarCobroEntregaAction,
+  marcarEntregaCompletadaAction,
+  marcarEntregaFallidaAction
 } from '@/actions/entregas.actions'
 
 interface Entrega {
@@ -74,8 +74,8 @@ export function EntregaClienteForm({ entrega, rutaId }: EntregaClienteFormProps)
   const cliente = entrega.cliente
 
   const [estadoPago, setEstadoPago] = useState<'pagado' | 'parcial' | 'fiado' | ''>(
-    entrega.estado_pago === 'pagado' ? 'pagado' : 
-    entrega.estado_pago === 'fiado' ? 'fiado' : ''
+    entrega.estado_pago === 'pagado' ? 'pagado' :
+      entrega.estado_pago === 'fiado' ? 'fiado' : ''
   )
   const [metodoPago, setMetodoPago] = useState(entrega.metodo_pago || 'efectivo')
   const [montoCobrado, setMontoCobrado] = useState(entrega.monto_cobrado || entrega.total || 0)
@@ -93,7 +93,7 @@ export function EntregaClienteForm({ entrega, rutaId }: EntregaClienteFormProps)
     }
 
     setPagoLoading(true)
-    
+
     const formData = new FormData()
     formData.append('entrega_id', entrega.id)
     formData.append('metodo_pago', metodoPago)
@@ -118,7 +118,7 @@ export function EntregaClienteForm({ entrega, rutaId }: EntregaClienteFormProps)
 
   const handleMarcarEntregado = async () => {
     setEstadoLoading(true)
-    
+
     const formData = new FormData()
     formData.append('entrega_id', entrega.id)
     if (notasEntrega) {
@@ -138,7 +138,7 @@ export function EntregaClienteForm({ entrega, rutaId }: EntregaClienteFormProps)
 
   const handleMarcarFallido = async () => {
     setEstadoLoading(true)
-    
+
     const formData = new FormData()
     formData.append('entrega_id', entrega.id)
     formData.append('notas', notasEntrega || 'Entrega fallida')
@@ -168,9 +168,9 @@ export function EntregaClienteForm({ entrega, rutaId }: EntregaClienteFormProps)
     fiado: { label: 'Fiado', color: 'bg-purple-100 text-purple-800' },
   }
 
-  const estadoEntrega = estadoEntregaConfig[entrega.estado_entrega as keyof typeof estadoEntregaConfig] || 
+  const estadoEntrega = estadoEntregaConfig[entrega.estado_entrega as keyof typeof estadoEntregaConfig] ||
     { label: entrega.estado_entrega, color: 'bg-gray-100' }
-  const estadoPagoActual = estadoPagoConfig[entrega.estado_pago as keyof typeof estadoPagoConfig] || 
+  const estadoPagoActual = estadoPagoConfig[entrega.estado_pago as keyof typeof estadoPagoConfig] ||
     { label: entrega.estado_pago, color: 'bg-gray-100' }
 
   const yaEntregado = entrega.estado_entrega === 'entregado'
@@ -308,7 +308,8 @@ export function EntregaClienteForm({ entrega, rutaId }: EntregaClienteFormProps)
                       <option value="efectivo">Efectivo</option>
                       <option value="transferencia">Transferencia</option>
                       <option value="qr">QR / Mercado Pago</option>
-                      <option value="tarjeta">Tarjeta</option>
+                      <option value="tarjeta_debito">Tarjeta Débito</option>
+                      <option value="tarjeta_credito">Tarjeta Crédito</option>
                     </select>
                   </div>
 

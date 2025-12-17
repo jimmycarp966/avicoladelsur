@@ -45,11 +45,11 @@ export function AbrirCajaDialog({ open, onOpenChange, cajaId, cajaNombre, saldoA
   const cargarSaldoActual = async () => {
     setIsLoadingSaldo(true)
     setError(null)
-    
+
     try {
       const response = await fetch(`/api/tesoreria/cajas/${cajaId}`)
       const result = await response.json()
-      
+
       if (result.success && result.data) {
         setSaldoActual(result.data.saldo_actual || 0)
       } else {
@@ -115,15 +115,15 @@ export function AbrirCajaDialog({ open, onOpenChange, cajaId, cajaNombre, saldoA
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
             <p className="text-sm text-blue-900">
-              <strong>Fecha:</strong> {new Date().toLocaleDateString('es-AR', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
+              <strong>Fecha:</strong> {new Date().toLocaleDateString('es-AR', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
               })}
             </p>
             <p className="text-sm text-blue-700 mt-1">
-              Se creará un nuevo cierre de caja para hoy. Si ya existe un cierre abierto, no se podrá crear otro.
+              Se creará un nuevo cierre de caja para hoy. Confirma el saldo físico que hay en caja.
             </p>
           </div>
 
@@ -146,7 +146,7 @@ export function AbrirCajaDialog({ open, onOpenChange, cajaId, cajaNombre, saldoA
                 Actualizar
               </Button>
             </div>
-            
+
             {isLoadingSaldo ? (
               <Card>
                 <CardContent className="pt-4">
@@ -178,9 +178,9 @@ export function AbrirCajaDialog({ open, onOpenChange, cajaId, cajaNombre, saldoA
             )}
           </div>
 
-          {/* Saldo inicial para el cierre */}
+          {/* Saldo físico al abrir */}
           <div className="space-y-2">
-            <Label htmlFor="saldo-inicial">Saldo Inicial del Cierre *</Label>
+            <Label htmlFor="saldo-inicial">Saldo Físico al Abrir *</Label>
             <Input
               id="saldo-inicial"
               type="number"
@@ -192,7 +192,7 @@ export function AbrirCajaDialog({ open, onOpenChange, cajaId, cajaNombre, saldoA
               required
             />
             <p className="text-xs text-muted-foreground">
-              Este será el saldo inicial del cierre de caja. Puedes ajustarlo si el saldo físico difiere del sistema.
+              Ingresa el monto real contado en la caja. Si difiere del sistema, esta será la base para el día.
             </p>
           </div>
 
