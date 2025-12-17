@@ -77,8 +77,8 @@ async function RutaHojaPage({ params }: { params: Promise<{ ruta_id: string }> }
         cliente_id,
         pago_estado,
         metodos_pago,
-        instrucciones_repartidor,
-        detalle_pedido (
+        instrucciones_repartidor:observaciones,
+        detalles_pedido (
           id,
           cantidad,
           producto:productos(
@@ -113,7 +113,7 @@ async function RutaHojaPage({ params }: { params: Promise<{ ruta_id: string }> }
           .single()
 
         if (!clienteError && cliente) {
-          clienteData = cliente
+          clienteData = cliente as any
           // Convertir coordenadas PostGIS si existen
           const coords = (cliente as any).coordenadas
           if (coords) {
@@ -131,38 +131,44 @@ async function RutaHojaPage({ params }: { params: Promise<{ ruta_id: string }> }
           pedido: {
             ...detalle.pedido,
             cliente: clienteData ? {
-              ...clienteData,
+              ...(clienteData as any),
               coordenadas: coordenadasCliente,
             } : null,
           }
         }]
       } else {
         // Si el pedido no tiene cliente_id, buscar TODAS las entregas (pedido agrupado)
+
         const { data: entregas, error: entregasError } = await supabase
           .from('entregas')
-          .select('id, cliente_id, coordenadas, estado_entrega, estado_pago, monto_cobrado, orden_entrega')
+          .select('id, cliente_id, coordenadas, direccion, estado_entrega, estado_pago, monto_cobrado, orden_entrega, total')
           .eq('pedido_id', detalle.pedido_id)
           .order('orden_entrega', { ascending: true })
 
         if (!entregasError && entregas && entregas.length > 0) {
+
           // Mapear cada entrega individual a un objeto detalle
           return await Promise.all(entregas.map(async (entregaInd: any) => {
+
             // Necesitamos datos del cliente
             let clienteDataInd = null
             let coordenadasInd = null
 
             if (entregaInd.cliente_id) {
+              // Simplificamos la query para evitar error PGRST200 con ST_AsGeoJSON
               const { data: cliente, error: clienteError } = await supabase
                 .from('clientes')
-                .select('id, nombre, telefono, direccion, zona_entrega, ST_AsGeoJSON(coordenadas)::jsonb as coordenadas')
+                .select('id, nombre, telefono, direccion, zona_entrega, coordenadas')
                 .eq('id', entregaInd.cliente_id)
                 .single()
 
+              if (clienteError) {
+                console.error('Error obteniendo cliente para entrega:', entregaInd.id, clienteError)
+              }
+
               if (!clienteError && cliente) {
-                clienteDataInd = cliente
-                const coords = (entregas as any).coordenadas || (cliente as any).coordenadas
+                clienteDataInd = cliente as any
                 // Prioridad a coords de entregaInd si existen (override local), si no del cliente
-                // Pero aqui coords viene de entregaInd (select)
                 const coordsEfectivas = entregaInd.coordenadas || (cliente as any).coordenadas
 
                 if (coordsEfectivas) {
@@ -187,8 +193,10 @@ async function RutaHojaPage({ params }: { params: Promise<{ ruta_id: string }> }
               monto_cobrado_registrado: entregaInd.monto_cobrado,
               pedido: {
                 ...detalle.pedido,
+                total: entregaInd.total ?? detalle.pedido.total, // Usar total de entrega si existe
                 cliente: clienteDataInd ? {
-                  ...clienteDataInd,
+                  ...(clienteDataInd as any),
+                  direccion: entregaInd.direccion || (clienteDataInd as any).direccion, // Usar dirección de entrega si existe
                   coordenadas: coordenadasInd
                 } : null
               }
@@ -196,8 +204,14 @@ async function RutaHojaPage({ params }: { params: Promise<{ ruta_id: string }> }
           }))
         }
 
-        // Fallback si no hay entregas (devolver detalle original vacio)
-        return [{ ...detalle }]
+        // Fallback si no hay entregas (devolver detalle original vacio pero con aviso visual)
+        return [{
+          ...detalle,
+          pedido: {
+            ...detalle.pedido,
+            cliente: { nombre: '⚠️ Error carga entregas', direccion: 'Posible error de permisos RLS o datos' }
+          }
+        }]
       }
     })
   )

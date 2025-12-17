@@ -5,6 +5,7 @@
  */
 
 import { useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -18,6 +19,8 @@ interface DetalleRuta {
     orden_entrega: number
     estado_entrega: string
     pedido?: {
+        id: string
+        numero_pedido?: string
         cliente?: {
             id: string
             nombre: string
@@ -47,24 +50,27 @@ interface RutaMapaClientProps {
 }
 
 export default function RutaMapaClient({ ruta, puedeTrackear }: RutaMapaClientProps) {
+    const router = useRouter()
     const [isNavigating, setIsNavigating] = useState(false)
     const [deliveredStops, setDeliveredStops] = useState<Set<string>>(new Set())
 
     // Transform detalles_ruta to navigation stops format
     const stops = (ruta.detalles_ruta || [])
         .filter(d => d.pedido?.cliente?.coordenadas)
-        .map(d => ({
-            id: d.id,
-            orden: d.orden_entrega,
-            cliente_nombre: d.pedido?.cliente?.nombre || 'Cliente',
-            direccion: d.pedido?.cliente?.direccion,
-            telefono: d.pedido?.cliente?.telefono,
-            lat: d.pedido?.cliente?.coordenadas?.lat || 0,
-            lng: d.pedido?.cliente?.coordenadas?.lng || 0,
-            estado: deliveredStops.has(d.id)
-                ? 'entregado' as const
-                : (d.estado_entrega === 'entregado' ? 'entregado' as const : 'pendiente' as const)
-        }))
+        .map(d => {
+            const isDelivered = deliveredStops.has(d.id) || d.estado_entrega === 'entregado'
+            console.log(`[RutaMapClient] Stop ${d.id} (${d.pedido?.cliente?.nombre}): ${isDelivered ? 'Entregado' : 'Pendiente'}`)
+            return {
+                id: d.id,
+                orden: d.orden_entrega,
+                cliente_nombre: d.pedido?.cliente?.nombre || 'Cliente',
+                direccion: d.pedido?.cliente?.direccion,
+                telefono: d.pedido?.cliente?.telefono,
+                lat: d.pedido?.cliente?.coordenadas?.lat || 0,
+                lng: d.pedido?.cliente?.coordenadas?.lng || 0,
+                estado: isDelivered ? 'entregado' as const : 'pendiente' as const
+            }
+        })
         .sort((a, b) => a.orden - b.orden)
 
     const handleDeliveryComplete = useCallback(async (stopId: string) => {
@@ -78,10 +84,13 @@ export default function RutaMapaClient({ ruta, puedeTrackear }: RutaMapaClientPr
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ estado: 'entregado' })
             })
+
+            // Refresh server data to update map markers
+            router.refresh()
         } catch (err) {
             console.error('Error updating delivery:', err)
         }
-    }, [])
+    }, [router])
 
     const handleCloseNavigation = useCallback(() => {
         setIsNavigating(false)

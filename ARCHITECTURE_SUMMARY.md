@@ -287,6 +287,12 @@ supabase/                         # Scripts SQL y migraciones
 
 ## 🔧 **Actualizaciones Recientes**
 
+### **Mejoras en Visualización de Reparto (Enero 2026)**
+- ✅ **Expansión de Pedidos Agrupados**: El Monitor GPS y la App de Repartidor ahora desglosan automáticamente los pedidos agrupados, mostrando cada entrega individualmente.
+- ✅ **Numeración Secuencial Estricta**: Corrección en la numeración de paradas (1, 2, 3...) para reflejar el orden optimizado de visita, incluso al expandir grupos.
+- ✅ **Robustez en Rutas Activas**: Corrección en `obtenerRutaActivaAction` para manejar rutas sin vehículo asignado sin causar errores en la UI.
+- ✅ **Sincronización Real-Time**: El tracking GPS y el estado de las entregas se actualizan correctamente al nivel de entrega individual.
+
 ### **Redirección Automática a Dashboard de Sucursal (Enero 2025)**
 - ✅ **Redirección Inteligente**: Usuarios con sucursal asignada en `rrhh_empleados` son redirigidos automáticamente a `/sucursal/dashboard` al iniciar sesión
 - ✅ **Verificación Automática**: El sistema verifica la sucursal asignada durante el proceso de login

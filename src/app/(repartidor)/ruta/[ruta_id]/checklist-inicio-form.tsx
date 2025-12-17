@@ -29,13 +29,19 @@ const checklistSchema = z.object({
 
 type ChecklistFormData = z.infer<typeof checklistSchema>
 
+import { useRouter } from 'next/navigation'
+
+// ... existing imports
+
 interface ChecklistInicioFormProps {
   rutaId: string
   vehiculoId: string
-  onComplete: () => void
+  onComplete?: () => void
+  redirectTo?: string
 }
 
-export function ChecklistInicioForm({ rutaId, vehiculoId, onComplete }: ChecklistInicioFormProps) {
+export function ChecklistInicioForm({ rutaId, vehiculoId, onComplete, redirectTo }: ChecklistInicioFormProps) {
+  const router = useRouter()
   const [loading, setLoading] = useState(false)
   const { register, handleSubmit, formState: { errors }, watch, setValue } = useForm<ChecklistFormData>({
     resolver: zodResolver(checklistSchema),
@@ -56,7 +62,7 @@ export function ChecklistInicioForm({ rutaId, vehiculoId, onComplete }: Checklis
       // Obtener usuario actual
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
-      
+
       if (!user) {
         toast.error('Usuario no autenticado')
         return
@@ -100,7 +106,13 @@ export function ChecklistInicioForm({ rutaId, vehiculoId, onComplete }: Checklis
       }
 
       toast.success('Checklist de inicio completado')
-      onComplete()
+
+      if (redirectTo) {
+        router.push(redirectTo)
+        router.refresh()
+      } else if (onComplete) {
+        onComplete()
+      }
     } catch (error: any) {
       console.error('Error:', error)
       toast.error('Error al completar checklist')

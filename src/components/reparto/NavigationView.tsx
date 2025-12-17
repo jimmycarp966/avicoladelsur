@@ -12,6 +12,7 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -27,7 +28,8 @@ import {
     ArrowLeft,
     RotateCcw,
     Loader2,
-    Phone
+    Phone,
+    FileText
 } from 'lucide-react'
 
 // Types
@@ -104,6 +106,7 @@ export default function NavigationView({
     onClose,
     onDeliveryComplete
 }: NavigationViewProps) {
+    const router = useRouter()
     // Refs
     const mapRef = useRef<HTMLDivElement>(null)
     const mapInstanceRef = useRef<any>(null)
@@ -128,36 +131,95 @@ export default function NavigationView({
     const pendingStops = stops.filter(s => s.estado !== 'entregado')
     const currentStop = pendingStops[currentStopIndex]
 
-    // Initialize map
+    // Initialize map with retry mechanism
     useEffect(() => {
-        if (!mapRef.current || !window.google || mapInstanceRef.current) return
+        let timeoutId: NodeJS.Timeout
+        let attempts = 0
+        const maxAttempts = 20 // 10 seconds
 
-        const homeBase = config.rutas.homeBase
+        const initMap = () => {
+            console.log('[NavigationView] initMap called', {
+                attempts,
+                hasMapRef: !!mapRef.current,
+                hasGoogle: !!window.google,
+                hasMaps: !!window.google?.maps
+            })
 
-        mapInstanceRef.current = new window.google.maps.Map(mapRef.current, {
-            center: { lat: homeBase.lat, lng: homeBase.lng },
-            zoom: 16,
-            disableDefaultUI: true,
-            zoomControl: true,
-            mapTypeControl: false,
-            fullscreenControl: false,
-            styles: [
-                { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-                { featureType: 'transit', stylers: [{ visibility: 'off' }] }
-            ]
-        })
-
-        directionsRendererRef.current = new window.google.maps.DirectionsRenderer({
-            map: mapInstanceRef.current,
-            suppressMarkers: false,
-            polylineOptions: {
-                strokeColor: '#3B82F6',
-                strokeWeight: 6,
-                strokeOpacity: 0.8
+            if (!mapRef.current) {
+                console.warn('[NavigationView] mapRef is null, retrying...')
+                if (attempts < maxAttempts) {
+                    attempts++
+                    timeoutId = setTimeout(initMap, 500)
+                    return
+                }
+                // If ref is still null after all retries (unlikely), stop loading
+                console.error('[NavigationView] mapRef never became available')
+                setError('Error interno: No se pudo inicializar el contenedor del mapa')
+                setLoading(false)
+                return
             }
-        })
 
-        setLoading(false)
+            if (!window.google || !window.google.maps) {
+                if (attempts < maxAttempts) {
+                    console.log(`[NavigationView] Maps API not ready, retrying... (${attempts + 1}/${maxAttempts})`)
+                    attempts++
+                    timeoutId = setTimeout(initMap, 500)
+                    return
+                }
+                console.error('[NavigationView] Maps API timeout')
+                setError('No se pudo cargar Google Maps. Verifique su conexión.')
+                setLoading(false)
+                return
+            }
+
+            if (mapInstanceRef.current) {
+                console.log('[NavigationView] Map already initialized')
+                setLoading(false)
+                return
+            }
+
+            try {
+                console.log('[NavigationView] initializing Google Maps instance...')
+                const homeBase = config.rutas.homeBase
+
+                mapInstanceRef.current = new window.google.maps.Map(mapRef.current, {
+                    center: { lat: homeBase.lat, lng: homeBase.lng },
+                    zoom: 16,
+                    disableDefaultUI: true,
+                    zoomControl: true,
+                    mapTypeControl: false,
+                    fullscreenControl: false,
+                    styles: [
+                        { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+                        { featureType: 'transit', stylers: [{ visibility: 'off' }] }
+                    ]
+                })
+
+                directionsRendererRef.current = new window.google.maps.DirectionsRenderer({
+                    map: mapInstanceRef.current,
+                    suppressMarkers: false,
+                    polylineOptions: {
+                        strokeColor: '#3B82F6',
+                        strokeWeight: 6,
+                        strokeOpacity: 0.8
+                    }
+                })
+
+                console.log('[NavigationView] Map initialized successfully')
+                setLoading(false)
+            } catch (err) {
+                console.error('[NavigationView] Error initializing map:', err)
+                setError('Error al inicializar el mapa de navegación')
+                setLoading(false)
+            }
+        }
+
+        // Start initialization
+        initMap()
+
+        return () => {
+            if (timeoutId) clearTimeout(timeoutId)
+        }
     }, [])
 
     // Start GPS tracking
@@ -239,25 +301,42 @@ export default function NavigationView({
 
     // Calculate route to current stop
     const calculateRoute = useCallback(async () => {
-        if (!currentPosition || !currentStop || !window.google) return
+        console.log('[NavigationView] calculateRoute called', {
+            hasPosition: !!currentPosition,
+            hasStop: !!currentStop,
+            hasGoogle: !!window.google,
+            pos: currentPosition,
+            stop: currentStop
+        })
+
+        if (!currentPosition || !currentStop || !window.google) {
+            console.log('[NavigationView] Missing dependencies for route calculation')
+            return
+        }
 
         const directionsService = new window.google.maps.DirectionsService()
 
         try {
+            console.log('[NavigationView] requesting route...')
             const result = await new Promise<any>((resolve, reject) => {
                 directionsService.route({
                     origin: currentPosition,
                     destination: { lat: currentStop.lat, lng: currentStop.lng },
                     travelMode: window.google.maps.TravelMode.DRIVING
                 }, (res: any, status: any) => {
+                    console.log('[NavigationView] Directions status:', status)
                     if (status === 'OK') resolve(res)
                     else reject(new Error(status))
                 })
             })
 
+            console.log('[NavigationView] Route received')
+
             // Display route
             if (directionsRendererRef.current) {
                 directionsRendererRef.current.setDirections(result)
+            } else {
+                console.warn('[NavigationView] directionsRendererRef is null')
             }
 
             // Extract steps
@@ -274,6 +353,7 @@ export default function NavigationView({
                 maneuver: step.maneuver
             }))
 
+            console.log('[NavigationView] Steps set:', newSteps.length)
             setSteps(newSteps)
             setCurrentStepIndex(0)
 
@@ -283,8 +363,8 @@ export default function NavigationView({
             }
 
         } catch (err: any) {
-            console.error('Route calculation error:', err)
-            setError('No se pudo calcular la ruta')
+            console.error('[NavigationView] Route calculation error:', err)
+            setError('No se pudo calcular la ruta: ' + err.message)
         }
     }, [currentPosition, currentStop, voiceEnabled])
 
@@ -375,17 +455,6 @@ export default function NavigationView({
         }
     }
 
-    if (loading) {
-        return (
-            <div className="fixed inset-0 z-50 bg-background flex items-center justify-center">
-                <div className="text-center">
-                    <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
-                    <p className="text-lg font-medium">Iniciando navegación...</p>
-                </div>
-            </div>
-        )
-    }
-
     if (error) {
         return (
             <div className="fixed inset-0 z-50 bg-background flex items-center justify-center p-4">
@@ -416,6 +485,15 @@ export default function NavigationView({
 
     return (
         <div className="fixed inset-0 z-50 bg-background flex flex-col">
+            {loading && (
+                <div className="absolute inset-0 z-[60] bg-background flex items-center justify-center">
+                    <div className="text-center">
+                        <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
+                        <p className="text-lg font-medium">Iniciando navegación...</p>
+                    </div>
+                </div>
+            )}
+
             {/* Header with current instruction */}
             <div className="bg-primary text-primary-foreground p-4 shadow-lg">
                 <div className="flex items-center justify-between mb-2">
@@ -501,21 +579,31 @@ export default function NavigationView({
                                 <p className="text-muted-foreground">{currentStop.cliente_nombre}</p>
                             </div>
 
-                            <div className="flex gap-3">
+                            <div className="flex flex-col gap-3">
                                 <Button
-                                    variant="outline"
-                                    className="flex-1"
-                                    onClick={() => setShowArrivalPanel(false)}
+                                    className="w-full py-6 text-lg"
+                                    onClick={() => router.push(`/ruta/${rutaId}/entrega/${currentStop.id}`)}
                                 >
-                                    Cancelar
+                                    <FileText className="h-5 w-5 mr-2" />
+                                    Gestionar Cobro / Detalles
                                 </Button>
-                                <Button
-                                    className="flex-1 bg-green-600 hover:bg-green-700"
-                                    onClick={handleDeliveryComplete}
-                                >
-                                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                                    Entrega Completada
-                                </Button>
+
+                                <div className="flex gap-3">
+                                    <Button
+                                        variant="outline"
+                                        className="flex-1"
+                                        onClick={() => setShowArrivalPanel(false)}
+                                    >
+                                        Cancelar
+                                    </Button>
+                                    <Button
+                                        className="flex-1 bg-green-600 hover:bg-green-700"
+                                        onClick={handleDeliveryComplete}
+                                    >
+                                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                                        Entrega Rápida
+                                    </Button>
+                                </div>
                             </div>
                         </CardContent>
                     </Card>

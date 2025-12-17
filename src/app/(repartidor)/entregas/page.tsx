@@ -74,7 +74,7 @@ async function RepartoContent({ searchParams }: { searchParams: { fecha?: string
             zona_id,
             cliente_id,
             pago_estado,
-            instrucciones_repartidor
+            instruccion_repartidor
           ),
           ruta: rutas_reparto(
             id,
@@ -150,7 +150,7 @@ async function RepartoContent({ searchParams }: { searchParams: { fecha?: string
     cliente: detalle.pedido?.cliente,
     total: detalle.pedido?.total,
     pago_estado: detalle.pedido?.pago_estado,
-    instrucciones: detalle.pedido?.instrucciones_repartidor,
+    instrucciones: detalle.pedido?.instruccion_repartidor,
     orden_entrega: detalle.orden_entrega,
     ruta_id: detalle.ruta_id,
     ruta: detalle.ruta,
@@ -429,14 +429,26 @@ async function RepartoContent({ searchParams }: { searchParams: { fecha?: string
   )
 }
 
-export default function RepartoPage({
+// ... imports
+
+// Update RepartoContent signature to accept promised params? 
+// Actually, in Next.js 15, the page props are promises.
+// RepartoContent is async, so it can just take the props.
+// BUT RepartoPage is the page component.
+
+// Correct approach for Next.js 15:
+// Page component receives params as Promise.
+
+export default async function RepartoPage({
   searchParams,
 }: {
-  searchParams: { fecha?: string; turno?: string }
+  searchParams: Promise<{ fecha?: string; turno?: string }>
 }) {
+  const resolvedParams = await searchParams
+
   return (
     <Suspense fallback={<RepartoSkeleton />}>
-      <RepartoContent searchParams={searchParams} />
+      <RepartoContent searchParams={resolvedParams} />
     </Suspense>
   )
 }

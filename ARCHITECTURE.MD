@@ -270,6 +270,8 @@ Para optimizar la logística y la facturación, el sistema implementa un modelo 
   - Marcadores de clientes con estado (pendiente/entregado)
   - Panel lateral con progreso y estadísticas
   - Animaciones suaves de movimiento de vehículos
+  - **Expansión de Grupos**: Visualización desglosada de entregas individuales
+- **Numeración de Paradas**: Lógica de re-indexado secuencial (1, 2, 3...) post-expansión
 - **PWA Móvil Completa**: Dashboard, entregas, cobros, firma digital, QR verificación
 - **Gestión de Vehículos**: Flota con mantenimientos y seguros
 - **Control de Repartidores**: Usuarios con roles específicos y vehículo asignado

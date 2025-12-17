@@ -214,10 +214,7 @@ export default async function CheckinPage() {
           <ChecklistInicioForm
             rutaId={ruta.id}
             vehiculoId={ruta.vehiculo_id}
-            onComplete={() => {
-              // Redirigir a la hoja de ruta después de completar
-              window.location.href = `/ruta/${ruta.id}`
-            }}
+            redirectTo={`/ruta/${ruta.id}`}
           />
         </CardContent>
       </Card>

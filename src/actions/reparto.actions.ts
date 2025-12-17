@@ -798,6 +798,8 @@ export async function obtenerRutaActivaAction(
       .limit(1)
       .single()
 
+    console.log('🔍 [ACTION DEBUG] obtenerRutaActivaAction:', { repartidorId, rutaId: ruta?.id, estado: ruta?.estado, error: rutaError?.message })
+
     if (rutaError && rutaError.code !== 'PGRST116') throw rutaError
 
     if (!ruta) {
@@ -819,9 +821,9 @@ export async function obtenerRutaActivaAction(
         fecha_ruta: ruta.fecha_ruta,
         estado: ruta.estado,
         vehiculo: {
-          patente: (ruta as any).vehiculos.patente,
-          marca: (ruta as any).vehiculos.marca,
-          modelo: (ruta as any).vehiculos.modelo,
+          patente: (ruta as any).vehiculos?.patente,
+          marca: (ruta as any).vehiculos?.marca,
+          modelo: (ruta as any).vehiculos?.modelo,
         },
         entregas_pendientes: entregasPendientes,
         entregas_completadas: entregasCompletadas,

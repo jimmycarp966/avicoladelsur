@@ -269,6 +269,8 @@ scripts/                         # Scripts de automatización
   - 📍 **Marcadores de estado**: Clientes pendientes, entregados y con problemas
   - 📊 **Panel lateral**: Estadísticas en tiempo real y progreso por ruta
   - 🚚 **Info detallada**: Vehículos con animación y datos completos
+  - 📦 **Desglose de Grupos**: Visualización individual de entregas dentro de pedidos agrupados
+- **Numeración Secuencial**: Orden de visita estricto (1, 2, 3...) recalculado dinámicamente
 - **Historial completo**: Rutas_planificadas con orden visita y tiempos
 - **Trazabilidad total**: Desde ubicación hasta entrega confirmada
 

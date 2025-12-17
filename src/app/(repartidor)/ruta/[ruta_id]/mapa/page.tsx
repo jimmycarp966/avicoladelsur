@@ -86,7 +86,7 @@ async function RutaMapaContent({ rutaId }: { rutaId: string }) {
       if (detalle.pedido?.cliente_id) {
         const { data: cliente, error: clienteError } = await supabase
           .from('clientes')
-          .select('id, nombre, direccion, ST_AsGeoJSON(coordenadas)::jsonb as coordenadas')
+          .select('id, nombre, direccion, coordenadas')
           .eq('id', detalle.pedido.cliente_id)
           .single()
 
@@ -113,10 +113,10 @@ async function RutaMapaContent({ rutaId }: { rutaId: string }) {
           .single()
 
         if (!entregasError && entregas?.cliente_id) {
-          // Obtener cliente con ST_AsGeoJSON en consulta directa (no anidada)
+          // Obtener cliente con select simple
           const { data: cliente, error: clienteError } = await supabase
             .from('clientes')
-            .select('id, nombre, direccion, ST_AsGeoJSON(coordenadas)::jsonb as coordenadas')
+            .select('id, nombre, direccion, coordenadas')
             .eq('id', entregas.cliente_id)
             .single()
 
