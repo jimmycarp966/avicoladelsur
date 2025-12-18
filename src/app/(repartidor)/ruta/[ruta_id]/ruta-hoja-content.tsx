@@ -16,6 +16,7 @@ import {
   X,
   Plus
 } from 'lucide-react'
+import { getEntregasSinEstadoPago, estaPagado } from '@/lib/utils/estado-pago'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -70,26 +71,8 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
     pagosPorMetodo[metodo] = (pagosPorMetodo[metodo] || 0) + Number(detalle.monto_cobrado_registrado)
   })
 
-  // Verificar que todas las entregas completadas tengan estado de pago definido
-  // Una entrega tiene estado definido si:
-  // - Tiene pago_registrado = true (ya pagó, pago parcial, o rechazo)
-  // - O tiene metodo_pago_registrado pero monto = 0 (pendiente)
-  // - O tiene notas_pago indicando que pagará después
-  // - O fue rechazada (estado_entrega = 'rechazado')
-  const entregasSinEstadoPago = entregas.filter((e: any) => {
-    // Verificar entregas completadas (entregado o rechazado)
-    if (e.estado_entrega !== 'entregado' && e.estado_entrega !== 'rechazado') return false
-    // Las rechazadas siempre tienen pago_registrado = true
-    if (e.estado_entrega === 'rechazado') return false
-    // Si tiene pago registrado con monto > 0, está definido
-    if (e.pago_registrado && e.monto_cobrado_registrado > 0) return false
-    // Si tiene método de pago registrado (aunque monto sea 0), está definido
-    if (e.metodo_pago_registrado) return false
-    // Si tiene notas de pago, está definido
-    if (e.notas_pago && e.notas_pago.trim() !== '') return false
-    // Si no tiene nada, no está definido
-    return true
-  })
+  // Usar función helper centralizada para verificar estado de pago
+  const entregasSinEstadoPago = getEntregasSinEstadoPago(entregas)
 
   // Permitir iniciar rutas en estado 'planificada' o 'en_curso' (rutas iniciadas desde almacén)
   // El botón aparecerá si tiene checklist_inicio_id completado

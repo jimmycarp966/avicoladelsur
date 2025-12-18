@@ -145,6 +145,8 @@ supabase/                         # Scripts SQL y migraciones
 - **Obtención de Clientes Mejorada**: Sistema obtiene clientes desde `entregas` cuando pedido no tiene `cliente_id` (modelo agrupado)
 - **Conversión PostGIS**: Función mejorada para convertir coordenadas PostGIS (GeoJSON Point) a formato `{lat, lng}` para mapas
 - **Flujo de Iniciar Ruta**: Pedidos "Enviados" desde almacén crean rutas con estado `'en_curso'` automáticamente, visibles inmediatamente para repartidor
+- **Optimización N+1**: RPC `fn_get_detalles_ruta_completos` reduce ~20 queries a 1 en la hoja de ruta
+- **Estado de Pago Centralizado**: Función helper `estado-pago.ts` para consistencia en verificación de pagos
 
 ### 💵 **Tesorería**: Control Financiero
 - **Cajas**: Por sucursal con saldos iniciales/actuales

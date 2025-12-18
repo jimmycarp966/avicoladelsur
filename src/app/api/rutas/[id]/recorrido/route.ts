@@ -112,25 +112,48 @@ export async function GET(
             estado_entrega,
             pago_registrado,
             monto_cobrado,
-            coordenadas,
-            cliente:clientes(
-                id, nombre, telefono, direccion, ST_AsGeoJSON(coordenadas)::jsonb as coordenadas
-            )
+            coordenadas
         `)
         .in('pedido_id', pedidoIds)
         .order('orden_entrega')
 
+      // Para cada entrega, obtener cliente con coordenadas usando RPC
       if (todasEntregas) {
-        todasEntregas.forEach((e: any) => {
-          if (!entregasPorPedido[e.pedido_id]) entregasPorPedido[e.pedido_id] = []
-          entregasPorPedido[e.pedido_id].push(e)
-        })
+        for (const entrega of todasEntregas) {
+          if (!entregasPorPedido[entrega.pedido_id]) entregasPorPedido[entrega.pedido_id] = []
+
+          // Obtener cliente con coordenadas usando RPC
+          let clienteData = null
+          if (entrega.cliente_id) {
+            const { data: clienteRpc } = await supabase
+              .rpc('fn_get_cliente_con_coordenadas', { p_cliente_id: entrega.cliente_id })
+              .single()
+
+            if (clienteRpc) {
+              const c = clienteRpc as any
+              clienteData = {
+                id: c.id,
+                nombre: c.nombre,
+                telefono: c.telefono,
+                direccion: c.direccion,
+                coordenadas: (c.lat !== null && c.lng !== null)
+                  ? { lat: c.lat, lng: c.lng }
+                  : null
+              }
+            }
+          }
+
+          entregasPorPedido[entrega.pedido_id].push({
+            ...entrega,
+            cliente: clienteData
+          })
+        }
       }
     }
 
     // Si tiene pedidos pero no optimización, generar orden_visita desde detalles_ruta
     if (!tieneOptimizacion) {
-      // Obtener detalles_ruta con coordenadas de clientes
+      // Obtener detalles_ruta (sin coordenadas, se obtienen después con RPC)
       const { data: detallesRutaRaw, error: detallesError } = await supabase
         .from('detalles_ruta')
         .select(`
@@ -144,13 +167,6 @@ export async function GET(
             id,
             numero_pedido,
             cliente_id,
-            cliente:clientes(
-              id,
-              nombre,
-              telefono,
-              direccion,
-              ST_AsGeoJSON(coordenadas)::jsonb as coordenadas
-            ),
             detalle_pedido:detalles_pedido(
               id,
               cantidad,
@@ -169,41 +185,44 @@ export async function GET(
         console.error('Error obteniendo detalles_ruta:', detallesError)
       }
 
-      // Generar orden_visita desde detalles_ruta
-      const ordenVisitaGenerado = (detallesRutaRaw || []).flatMap((detalle: any) => {
-        const pedido = detalle.pedido
-        const clienteData = Array.isArray(pedido?.cliente) ? pedido.cliente[0] : pedido?.cliente
+      // Generar orden_visita desde detalles_ruta (con async para obtener coords por RPC)
+      const ordenVisitaGenerado: any[] = []
 
-        // Si no tiene cliente directo, verificar si es pedido agrupado con entregas
-        if (!clienteData && pedido?.id && entregasPorPedido[pedido.id] && entregasPorPedido[pedido.id].length > 0) {
+      for (const detalle of (detallesRutaRaw || [])) {
+        const pedido = detalle.pedido
+
+        // Si es pedido agrupado (cliente_id null), usar entregas
+        if (!pedido?.cliente_id && pedido?.id && entregasPorPedido[pedido.id]?.length > 0) {
           const subEntregas = entregasPorPedido[pedido.id]
 
-          return subEntregas.map((entregaInd: any) => {
-            const clienteInd = Array.isArray(entregaInd.cliente) ? entregaInd.cliente[0] : entregaInd.cliente
+          for (const entregaInd of subEntregas) {
+            const clienteInd = entregaInd.cliente // Ya viene enriquecido con coords desde arriba
 
-            // Coordenadas
+            // Coordenadas (prioridad: entrega > cliente)
             let lat: number | null = null
             let lng: number | null = null
 
-            // Logica coordenadas (prioridad entrega > cliente)
-            const coordsRaw = entregaInd.coordenadas || clienteInd?.coordenadas
-            if (coordsRaw) {
-              if (typeof coordsRaw === 'object' && 'type' in coordsRaw && coordsRaw.type === 'Point' && Array.isArray(coordsRaw.coordinates)) {
-                const [lngC, latC] = coordsRaw.coordinates; lat = latC; lng = lngC;
-              } else if (typeof coordsRaw === 'object' && 'lat' in coordsRaw && 'lng' in coordsRaw) {
-                lat = coordsRaw.lat; lng = coordsRaw.lng;
+            // Primero intentar de la entrega
+            if (entregaInd.coordenadas) {
+              const coords = entregaInd.coordenadas
+              if (typeof coords === 'object' && 'lat' in coords && 'lng' in coords) {
+                lat = coords.lat; lng = coords.lng
               }
             }
+            // Si no, del cliente
+            if (lat === null && clienteInd?.coordenadas) {
+              lat = clienteInd.coordenadas.lat
+              lng = clienteInd.coordenadas.lng
+            }
 
-            // Productos (todos los del pedido por ahora, ya que no se divide per se en modelo actual)
             const detallesPedido = Array.isArray(pedido?.detalle_pedido) ? pedido.detalle_pedido : (pedido?.detalle_pedido ? [pedido.detalle_pedido] : [])
             const productos = detallesPedido.map((dp: any) => {
               const producto = Array.isArray(dp.producto) ? dp.producto[0] : dp.producto
               return { nombre: producto?.nombre || 'Producto', cantidad: dp.cantidad || 0 }
             })
 
-            return {
-              id: entregaInd.id, // ID de la entrega individual
+            ordenVisitaGenerado.push({
+              id: entregaInd.id,
               detalle_ruta_id: detalle.id,
               virtual_id: `${detalle.id}-${entregaInd.id}`,
               pedido_id: pedido?.id,
@@ -217,57 +236,57 @@ export async function GET(
               pago_registrado: entregaInd.estado_pago === 'pagado',
               monto_cobrado_registrado: entregaInd.monto_cobrado,
               productos
+            })
+          }
+        } else if (pedido?.cliente_id) {
+          // Pedido simple - obtener cliente con RPC
+          const { data: clienteRpc } = await supabase
+            .rpc('fn_get_cliente_con_coordenadas', { p_cliente_id: pedido.cliente_id })
+            .single()
+
+          let lat: number | null = null
+          let lng: number | null = null
+          let clienteData: any = null
+
+          if (clienteRpc) {
+            clienteData = {
+              id: clienteRpc.id,
+              nombre: clienteRpc.nombre,
+              telefono: clienteRpc.telefono,
+              direccion: clienteRpc.direccion
             }
+            if (clienteRpc.lat !== null && clienteRpc.lng !== null) {
+              lat = clienteRpc.lat
+              lng = clienteRpc.lng
+            }
+          }
+
+          const detallesPedido = Array.isArray(pedido?.detalle_pedido) ? pedido.detalle_pedido : (pedido?.detalle_pedido ? [pedido.detalle_pedido] : [])
+          const productos = detallesPedido.map((dp: any) => {
+            const producto = Array.isArray(dp.producto) ? dp.producto[0] : dp.producto
+            return { nombre: producto?.nombre || 'Producto', cantidad: dp.cantidad || 0 }
+          })
+
+          ordenVisitaGenerado.push({
+            id: detalle.id,
+            detalle_ruta_id: detalle.id,
+            pedido_id: pedido?.id,
+            cliente_id: clienteData?.id,
+            cliente_nombre: clienteData?.nombre || 'Cliente',
+            telefono: clienteData?.telefono || null,
+            direccion: clienteData?.direccion || null,
+            lat, lng,
+            orden: detalle.orden_entrega,
+            estado: detalle.estado_entrega || 'pendiente',
+            pago_registrado: detalle.pago_registrado || false,
+            monto_cobrado_registrado: detalle.monto_cobrado_registrado || 0,
+            productos
           })
         }
+      }
 
-        // ... Lógica normal para pedidos simples ...
-        // Convertir coordenadas PostGIS a lat/lng
-        let lat: number | null = null
-        let lng: number | null = null
-
-        if (clienteData?.coordenadas) {
-          const coords = clienteData.coordenadas
-          if (coords && typeof coords === 'object' && 'type' in coords && coords.type === 'Point' && Array.isArray(coords.coordinates)) {
-            const [lngCoord, latCoord] = coords.coordinates
-            lat = latCoord
-            lng = lngCoord
-          } else if (coords && typeof coords === 'object' && 'lat' in coords && 'lng' in coords) {
-            lat = coords.lat
-            lng = coords.lng
-          }
-        }
-
-        // Obtener productos
-        const detallesPedido = Array.isArray(pedido?.detalle_pedido)
-          ? pedido.detalle_pedido
-          : (pedido?.detalle_pedido ? [pedido.detalle_pedido] : [])
-
-        const productos = detallesPedido.map((dp: any) => {
-          const producto = Array.isArray(dp.producto) ? dp.producto[0] : dp.producto
-          return {
-            nombre: producto?.nombre || 'Producto',
-            cantidad: dp.cantidad || 0,
-          }
-        })
-
-        return [{
-          id: detalle.id,
-          detalle_ruta_id: detalle.id,
-          pedido_id: pedido?.id,
-          cliente_id: clienteData?.id,
-          cliente_nombre: clienteData?.nombre || 'Cliente',
-          telefono: clienteData?.telefono || null,
-          direccion: clienteData?.direccion || null,
-          lat: lat,
-          lng: lng,
-          orden: detalle.orden_entrega,
-          estado: detalle.estado_entrega || 'pendiente',
-          pago_registrado: detalle.pago_registrado || false,
-          monto_cobrado_registrado: detalle.monto_cobrado_registrado || 0,
-          productos: productos,
-        }]
-      }).filter((punto: any) => punto.lat !== null && punto.lng !== null) // Solo incluir puntos con coordenadas válidas
+      // Filtrar solo los que tienen coordenadas válidas
+      const ordenVisitaFiltrado = ordenVisitaGenerado.filter((punto: any) => punto.lat !== null && punto.lng !== null)
 
       const repartidorData = Array.isArray(rutaReparto.repartidor)
         ? rutaReparto.repartidor[0]
