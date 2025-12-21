@@ -26,10 +26,14 @@ export function RepartidorHeader({ user }: RepartidorHeaderProps) {
   const [isOnline, setIsOnline] = useState(true)
 
   const handleLogout = async () => {
+    console.log('[RepartidorHeader] Iniciando logout...')
     try {
       await logout()
+      console.log('[RepartidorHeader] Logout completado')
     } catch (error) {
-      console.error('Error al cerrar sesión:', error)
+      console.error('[RepartidorHeader] Error al cerrar sesión:', error)
+      // Forzar redirección incluso con error
+      window.location.href = '/login'
     }
   }
 
@@ -114,7 +118,13 @@ export function RepartidorHeader({ user }: RepartidorHeaderProps) {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.preventDefault()
+                  handleLogout()
+                }}
+                className="text-destructive focus:text-destructive cursor-pointer"
+              >
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Cerrar Sesión</span>
               </DropdownMenuItem>

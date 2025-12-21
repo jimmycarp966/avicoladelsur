@@ -104,7 +104,13 @@ export function AdminHeader({ user, onMenuClick, onLogout }: AdminHeaderProps) {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={handleLogout} className="text-destructive focus:text-destructive cursor-pointer">
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.preventDefault()
+                  handleLogout()
+                }}
+                className="text-destructive focus:text-destructive cursor-pointer"
+              >
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Cerrar Sesión</span>
               </DropdownMenuItem>

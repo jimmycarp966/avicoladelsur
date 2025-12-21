@@ -79,7 +79,6 @@ const navigation = [
     icon: Truck,
     roles: ['admin', 'vendedor', 'almacenista'],
     children: [
-      { name: 'Planificación semanal', href: '/reparto/planificacion' },
       { name: 'Rutas', href: '/reparto/rutas' },
       { name: 'Monitor GPS', href: '/reparto/monitor' },
       { name: 'Vehículos', href: '/reparto/vehiculos' },

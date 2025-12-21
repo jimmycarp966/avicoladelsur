@@ -225,27 +225,46 @@ export default function NavigationView({
     // Start GPS tracking
     useEffect(() => {
         if (!navigator.geolocation) {
-            setError('Tu dispositivo no soporta GPS')
+            console.warn('[NavigationView] GPS no soportado, usando fallback')
+            // Usar ubicación por defecto inmediatamente
+            setCurrentPosition({
+                lat: config.rutas.homeBase.lat,
+                lng: config.rutas.homeBase.lng
+            })
             return
         }
+
+        // Timeout para usar fallback si GPS tarda mucho
+        const timeoutId = setTimeout(() => {
+            if (!currentPosition) {
+                console.warn('[NavigationView] GPS timeout, usando fallback')
+                setCurrentPosition({
+                    lat: config.rutas.homeBase.lat,
+                    lng: config.rutas.homeBase.lng
+                })
+            }
+        }, 5000)
 
         // Get initial position
         navigator.geolocation.getCurrentPosition(
             (pos) => {
+                clearTimeout(timeoutId)
+                console.log('[NavigationView] GPS position:', pos.coords.latitude, pos.coords.longitude)
                 setCurrentPosition({
                     lat: pos.coords.latitude,
                     lng: pos.coords.longitude
                 })
             },
             (err) => {
-                console.error('GPS Error:', err)
+                clearTimeout(timeoutId)
+                console.error('[NavigationView] GPS Error:', err)
                 // Use home base as fallback
                 setCurrentPosition({
                     lat: config.rutas.homeBase.lat,
                     lng: config.rutas.homeBase.lng
                 })
             },
-            { enableHighAccuracy: true }
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
         )
 
         // Watch position continuously
@@ -272,6 +291,7 @@ export default function NavigationView({
         )
 
         return () => {
+            clearTimeout(timeoutId)
             if (watchIdRef.current !== null) {
                 navigator.geolocation.clearWatch(watchIdRef.current)
             }
@@ -370,10 +390,15 @@ export default function NavigationView({
 
     // Calculate route when position or stop changes
     useEffect(() => {
+        console.log('[NavigationView] useEffect for calculateRoute', {
+            hasPosition: !!currentPosition,
+            hasStop: !!currentStop,
+            loading
+        })
         if (currentPosition && currentStop && !loading) {
             calculateRoute()
         }
-    }, [currentStop, loading])
+    }, [currentStop, loading, currentPosition, calculateRoute])
 
     // Recalculate periodically
     useEffect(() => {

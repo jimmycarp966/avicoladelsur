@@ -247,26 +247,18 @@ export async function GET(request: NextRequest) {
       })
 
       // Enriquecer orden_visita
-      const ordenVisitaEnriquecido = (ruta.orden_visita || []).flatMap((cliente: any) => {
-        const detalles = detallesMap.get(cliente.orden) || []
+      // Si el orden_visita ya tiene cliente_id y cliente_nombre (viene de optimización), usarlo directamente
+      const ordenVisitaEnriquecido = (ruta.orden_visita || []).map((cliente: any) => {
+        // Si ya tiene los datos principales, solo agregar productos y estado de pago
+        if (cliente.cliente_id && cliente.cliente_nombre && cliente.lat && cliente.lng) {
+          // Buscar detalle para obtener productos y estado de pago
+          const detallesFlat = Array.from(detallesMap.values()).flat()
+          const detalleMatch = detallesFlat.find((d: any) =>
+            d.cliente_final_id === cliente.cliente_id ||
+            d.pedido?.cliente?.id === cliente.cliente_id
+          )
 
-        // Si no hay detalles asociados a este orden, devolvemos el original (o vacio)
-        if (detalles.length === 0) {
-          return [{
-            ...cliente,
-            productos: [],
-            pago_registrado: false,
-            monto_cobrado_registrado: 0,
-            telefono: cliente.telefono || null,
-            direccion: cliente.direccion || null,
-          }]
-        }
-
-        // Si hay detalles, expandimos
-        return detalles.map(detalle => {
-          const pedido = detalle.pedido
-          const clienteData = Array.isArray(pedido?.cliente) ? pedido.cliente[0] : pedido?.cliente
-
+          const pedido = detalleMatch?.pedido
           const detallesPedido = Array.isArray(pedido?.detalle_pedido)
             ? pedido.detalle_pedido
             : (pedido?.detalle_pedido ? [pedido.detalle_pedido] : [])
@@ -279,39 +271,86 @@ export async function GET(request: NextRequest) {
             }
           })
 
-          // Coordenadas
-          let lat = cliente.lat
-          let lng = cliente.lng
-
-          if (detalle.coordenadas_entrega) {
-            // Prioridad coord entrega
-            const c = detalle.coordenadas_entrega
-            if (c.lat && c.lng) { lat = c.lat; lng = c.lng }
-            else if (c.coordinates) { lng = c.coordinates[0]; lat = c.coordinates[1] }
-          } else if (clienteData?.coordenadas) {
-            const c = clienteData.coordenadas
-            if (c.lat && c.lng) { lat = c.lat; lng = c.lng }
-            else if (c.coordinates) { lng = c.coordinates[0]; lat = c.coordinates[1] }
-            else if (typeof c.type === 'string' && Array.isArray(c.coordinates)) {
-              lng = c.coordinates[0]; lat = c.coordinates[1]
-            }
-          }
-
           return {
             ...cliente,
-            id: detalle.virtual_id || detalle.id || cliente.id,
-            // Usar ID visual expandido
-            cliente_nombre: clienteData?.nombre || cliente.cliente_nombre,
-            telefono: clienteData?.telefono || cliente.telefono || null,
-            direccion: clienteData?.direccion || cliente.direccion || null,
-            lat: lat, // Coordenadas especificas
-            lng: lng,
-            estado_entrega: detalle.estado_entrega || cliente.estado || 'pendiente',
-            pago_registrado: detalle.pago_registrado || false,
-            monto_cobrado_registrado: detalle.monto_cobrado_registrado || 0,
+            estado_entrega: detalleMatch?.estado_entrega || cliente.estado || 'pendiente',
+            pago_registrado: detalleMatch?.pago_registrado || false,
+            monto_cobrado_registrado: detalleMatch?.monto_cobrado_registrado || 0,
             productos: productos,
           }
+        }
+
+        // Fallback: lógica anterior de enriquecimiento completo
+        const detalles = detallesMap.get(cliente.orden) || []
+
+        // Si no hay detalles asociados a este orden, devolvemos el original
+        if (detalles.length === 0) {
+          return {
+            ...cliente,
+            productos: [],
+            pago_registrado: false,
+            monto_cobrado_registrado: 0,
+            telefono: cliente.telefono || null,
+            direccion: cliente.direccion || null,
+          }
+        }
+
+        // Si hay detalles, usar el primero (evitar expansión/duplicados)
+        const detalle = detalles[0]
+        const pedido = detalle.pedido
+        const clienteData = Array.isArray(pedido?.cliente) ? pedido.cliente[0] : pedido?.cliente
+
+        const detallesPedido = Array.isArray(pedido?.detalle_pedido)
+          ? pedido.detalle_pedido
+          : (pedido?.detalle_pedido ? [pedido.detalle_pedido] : [])
+
+        const productos = detallesPedido.map((dp: any) => {
+          const producto = Array.isArray(dp.producto) ? dp.producto[0] : dp.producto
+          return {
+            nombre: producto?.nombre || 'Producto',
+            cantidad: dp.cantidad || 0,
+          }
         })
+
+        // Coordenadas
+        let lat = cliente.lat
+        let lng = cliente.lng
+
+        if (detalle.coordenadas_entrega) {
+          const c = detalle.coordenadas_entrega
+          if (c.lat && c.lng) { lat = c.lat; lng = c.lng }
+          else if (c.coordinates) { lng = c.coordinates[0]; lat = c.coordinates[1] }
+        } else if (clienteData?.coordenadas) {
+          const c = clienteData.coordenadas
+          if (c.lat && c.lng) { lat = c.lat; lng = c.lng }
+          else if (c.coordinates) { lng = c.coordinates[0]; lat = c.coordinates[1] }
+          else if (typeof c.type === 'string' && Array.isArray(c.coordinates)) {
+            lng = c.coordinates[0]; lat = c.coordinates[1]
+          }
+        }
+
+        return {
+          ...cliente,
+          id: detalle.virtual_id || detalle.id || cliente.id,
+          cliente_nombre: clienteData?.nombre || cliente.cliente_nombre,
+          telefono: clienteData?.telefono || cliente.telefono || null,
+          direccion: clienteData?.direccion || cliente.direccion || null,
+          lat: lat,
+          lng: lng,
+          estado_entrega: detalle.estado_entrega || cliente.estado || 'pendiente',
+          pago_registrado: detalle.pago_registrado || false,
+          monto_cobrado_registrado: detalle.monto_cobrado_registrado || 0,
+          productos: productos,
+        }
+      })
+
+      // Deduplicar por cliente_id para evitar clientes repetidos
+      const clientesVistos = new Set<string>()
+      const ordenVisitaSinDuplicados = ordenVisitaEnriquecido.filter((item: any) => {
+        if (!item.cliente_id) return true // Mantener items sin cliente_id
+        if (clientesVistos.has(item.cliente_id)) return false // Filtrar duplicado
+        clientesVistos.add(item.cliente_id)
+        return true
       })
 
       return {
@@ -328,7 +367,7 @@ export async function GET(request: NextRequest) {
         })() : null,
         zona_id: ruta.zona_id,
         polyline: ruta.polyline,
-        orden_visita: ordenVisitaEnriquecido.map((item: any, index: number) => ({ ...item, orden: index + 1 })),
+        orden_visita: ordenVisitaSinDuplicados.map((item: any, index: number) => ({ ...item, orden: index + 1 })),
         distancia_total_km: ruta.distancia_total_km,
         duracion_total_min: ruta.duracion_total_min,
         created_at: ruta.created_at
@@ -574,7 +613,16 @@ export async function GET(request: NextRequest) {
           // Filtrar puntos sin coordenadas
           const ordenVisitaFiltrado = ordenVisita.filter((punto: any) => punto.lat !== null && punto.lng !== null)
 
-          if (ordenVisitaFiltrado.length === 0) {
+          // Deduplicar por cliente_id
+          const clientesVistos = new Set<string>()
+          const ordenVisitaSinDuplicados = ordenVisitaFiltrado.filter((item: any) => {
+            if (!item.cliente_id) return true
+            if (clientesVistos.has(item.cliente_id)) return false
+            clientesVistos.add(item.cliente_id)
+            return true
+          })
+
+          if (ordenVisitaSinDuplicados.length === 0) {
             return null
           }
 
@@ -593,7 +641,7 @@ export async function GET(request: NextRequest) {
             } : null,
             zona_id: ruta.zona_id,
             polyline: '', // No hay polyline si no está optimizada
-            orden_visita: ordenVisitaFiltrado.map((item: any, index: number) => ({ ...item, orden: index + 1 })),
+            orden_visita: ordenVisitaSinDuplicados.map((item: any, index: number) => ({ ...item, orden: index + 1 })),
             distancia_total_km: null,
             duracion_total_min: null,
             created_at: new Date().toISOString()

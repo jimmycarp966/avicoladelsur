@@ -26,8 +26,17 @@ export function ValidarRutaForm({ ruta, cajas }: ValidarRutaFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [montoFisico, setMontoFisico] = useState('')
-  const [cajaId, setCajaId] = useState(cajas[0]?.id || '')
   const [observaciones, setObservaciones] = useState('')
+
+  // Filtrar solo cajas de Casa Central (sin sucursal_id o sucursal_id null) para repartos
+  const cajasCasaCentral = cajas.filter(c => !c.sucursal_id)
+
+  // Pre-seleccionar la Caja Central (buscar por nombre o usar la primera sin sucursal)
+  const cajaCentralDefault = cajasCasaCentral.find(c =>
+    c.nombre.toLowerCase().includes('central')
+  ) || cajasCasaCentral[0] || cajas[0]
+
+  const [cajaId, setCajaId] = useState(cajaCentralDefault?.id || '')
 
   const totalRegistrado = ruta.recaudacion_total_registrada || 0
   const diferencia = montoFisico ? Number(montoFisico) - totalRegistrado : 0
@@ -71,19 +80,28 @@ export function ValidarRutaForm({ ruta, cajas }: ValidarRutaFormProps) {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="caja_id">Caja para acreditar *</Label>
+          <Label htmlFor="caja_id">Caja para acreditar (Casa Central) *</Label>
           <Select value={cajaId} onValueChange={setCajaId} required>
             <SelectTrigger>
               <SelectValue placeholder="Selecciona una caja" />
             </SelectTrigger>
             <SelectContent>
-              {cajas.map((caja) => (
-                <SelectItem key={caja.id} value={caja.id}>
-                  {caja.nombre} - Saldo: ${Number(caja.saldo_actual).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+              {cajasCasaCentral.length > 0 ? (
+                cajasCasaCentral.map((caja) => (
+                  <SelectItem key={caja.id} value={caja.id}>
+                    {caja.nombre} - Saldo: ${Number(caja.saldo_actual).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                  </SelectItem>
+                ))
+              ) : (
+                <SelectItem value="" disabled>
+                  No hay cajas de Casa Central
                 </SelectItem>
-              ))}
+              )}
             </SelectContent>
           </Select>
+          <p className="text-xs text-muted-foreground">
+            Los cobros de reparto siempre van a Caja Central
+          </p>
         </div>
 
         <div className="space-y-2">
@@ -104,8 +122,8 @@ export function ValidarRutaForm({ ruta, cajas }: ValidarRutaFormProps) {
               {diferencia === 0
                 ? '✓ Coincide con el monto registrado'
                 : diferencia > 0
-                ? `+$${diferencia.toLocaleString('es-AR', { minimumFractionDigits: 2 })} de diferencia (sobrante)`
-                : `-$${Math.abs(diferencia).toLocaleString('es-AR', { minimumFractionDigits: 2 })} de diferencia (faltante)`}
+                  ? `+$${diferencia.toLocaleString('es-AR', { minimumFractionDigits: 2 })} de diferencia (sobrante)`
+                  : `-$${Math.abs(diferencia).toLocaleString('es-AR', { minimumFractionDigits: 2 })} de diferencia (faltante)`}
             </p>
           )}
         </div>

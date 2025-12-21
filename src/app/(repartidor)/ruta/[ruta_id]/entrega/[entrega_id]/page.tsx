@@ -66,6 +66,12 @@ export default async function EntregaDetallePage({ params }: PageProps) {
     .eq('id', entrega_id)
     .single()
 
+  console.log('[EntregaDetallePage] Búsqueda en detalles_ruta:', {
+    entrega_id,
+    found: !!entregaRaw,
+    error: error?.message || null
+  })
+
   if (entregaRaw) {
     entrega = entregaRaw
 
@@ -103,7 +109,7 @@ export default async function EntregaDetallePage({ params }: PageProps) {
             pedido_id,
             estado_entrega,
             fecha_hora_entrega,
-            coordenadas_entrega,
+            coordenadas,
             estado_pago,
             metodo_pago,
             monto_cobrado,
@@ -115,10 +121,17 @@ export default async function EntregaDetallePage({ params }: PageProps) {
       .eq('id', entrega_id)
       .single()
 
+    console.log('[EntregaDetallePage] Búsqueda en entregas:', {
+      entrega_id,
+      found: !!entregaIndividual,
+      pedido_id: entregaIndividual?.pedido_id,
+      error: errInd?.message || null
+    })
+
     if (entregaIndividual) {
       // Validar relación con ruta a través del pedido
       // Un pedido agrupado tiene UN detalle_ruta en esta ruta
-      const { data: detalleRutaPadre } = await supabase
+      const { data: detalleRutaPadre, error: errPadre } = await supabase
         .from('detalles_ruta')
         .select(`
                 id, ruta_id,
@@ -138,7 +151,19 @@ export default async function EntregaDetallePage({ params }: PageProps) {
         .eq('ruta_id', ruta_id)
         .single()
 
+      console.log('[EntregaDetallePage] Búsqueda detalleRutaPadre:', {
+        pedido_id: entregaIndividual.pedido_id,
+        ruta_id,
+        found: !!detalleRutaPadre,
+        error: errPadre?.message || null
+      })
+
       if (detalleRutaPadre) {
+        console.log('[EntregaDetallePage] detalleRutaPadre.pedido:', {
+          total: (detalleRutaPadre.pedido as any)?.total,
+          hasDetallePedido: !!(detalleRutaPadre.pedido as any)?.detalle_pedido,
+          detalleCount: (detalleRutaPadre.pedido as any)?.detalle_pedido?.length
+        })
         // Construir objeto híbrido compatible con la UI
         // Usamos el ID de la entrega individual como ID principal para que las acciones funcionen sobre ella
         entrega = {
@@ -160,8 +185,25 @@ export default async function EntregaDetallePage({ params }: PageProps) {
     }
   }
 
+  // DEBUG: Mostrar qué se encontró
+  console.log('[EntregaDetallePage] DEBUG:', {
+    entrega_id,
+    ruta_id,
+    user_id: user.id,
+    entregaEncontrada: !!entrega,
+    entregaRutaId: entrega?.ruta?.id,
+    entregaRepartidorId: entrega?.ruta?.repartidor_id,
+    rutaIdMatch: entrega?.ruta?.id === ruta_id,
+    repartidorIdMatch: entrega?.ruta?.repartidor_id === user.id
+  })
+
   // Validaciones finales de seguridad
   if (!entrega || entrega.ruta?.id !== ruta_id || entrega.ruta?.repartidor_id !== user.id) {
+    console.error('[EntregaDetallePage] Validación fallida:', {
+      entregaNull: !entrega,
+      rutaIdNoMatch: entrega?.ruta?.id !== ruta_id,
+      repartidorIdNoMatch: entrega?.ruta?.repartidor_id !== user.id
+    })
     return (
       <div className="p-4">
         <Card>

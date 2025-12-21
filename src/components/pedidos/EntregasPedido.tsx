@@ -4,22 +4,19 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { 
-  Truck, 
-  User, 
-  MapPin, 
-  DollarSign, 
-  CheckCircle, 
-  XCircle, 
+import {
+  Truck,
+  User,
+  MapPin,
+  CheckCircle,
+  XCircle,
   Clock,
   ChevronDown,
   ChevronUp,
   Package
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
-import { obtenerEntregasPedidoAction, obtenerResumenEntregasAction, marcarEntregaEnCaminoAction, registrarCobroEntregaAction } from '@/actions/entregas.actions'
-import { useNotificationStore } from '@/store/notificationStore'
+import { obtenerEntregasPedidoAction, obtenerResumenEntregasAction } from '@/actions/entregas.actions'
 import {
   Collapsible,
   CollapsibleContent,
@@ -63,28 +60,28 @@ interface Resumen {
 
 const estadoEntregaConfig = (estado: string) => {
   const configs: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-    pendiente: { 
-      label: 'Pendiente', 
+    pendiente: {
+      label: 'Pendiente',
       color: 'bg-yellow-100 text-yellow-800 border-yellow-300',
       icon: <Clock className="h-3 w-3" />
     },
-    en_camino: { 
-      label: 'En camino', 
+    en_camino: {
+      label: 'En camino',
       color: 'bg-blue-100 text-blue-800 border-blue-300',
       icon: <Truck className="h-3 w-3" />
     },
-    entregado: { 
-      label: 'Entregado', 
+    entregado: {
+      label: 'Entregado',
       color: 'bg-green-100 text-green-800 border-green-300',
       icon: <CheckCircle className="h-3 w-3" />
     },
-    fallido: { 
-      label: 'Fallido', 
+    fallido: {
+      label: 'Fallido',
       color: 'bg-red-100 text-red-800 border-red-300',
       icon: <XCircle className="h-3 w-3" />
     },
-    parcial: { 
-      label: 'Parcial', 
+    parcial: {
+      label: 'Parcial',
       color: 'bg-orange-100 text-orange-800 border-orange-300',
       icon: <Package className="h-3 w-3" />
     },
@@ -107,8 +104,6 @@ export function EntregasPedido({ pedidoId }: EntregasPedidoProps) {
   const [resumen, setResumen] = useState<Resumen | null>(null)
   const [loading, setLoading] = useState(true)
   const [expandedEntregas, setExpandedEntregas] = useState<Set<string>>(new Set())
-  const [procesando, setProcesando] = useState<string | null>(null)
-  const { showToast } = useNotificationStore()
 
   useEffect(() => {
     const cargarDatos = async () => {
@@ -145,62 +140,6 @@ export function EntregasPedido({ pedidoId }: EntregasPedidoProps) {
       }
       return newSet
     })
-  }
-
-  const handleEnCamino = async (entregaId: string) => {
-    setProcesando(entregaId)
-    try {
-      const result = await marcarEntregaEnCaminoAction(entregaId)
-      if (result.success) {
-        showToast('success', result.message || 'Entrega marcada como en camino')
-        // Actualizar estado local
-        setEntregas(prev => prev.map(e => 
-          e.entrega_id === entregaId 
-            ? { ...e, estado_entrega: 'en_camino' } 
-            : e
-        ))
-      } else {
-        showToast('error', result.message || 'Error al marcar entrega')
-      }
-    } catch (error) {
-      showToast('error', 'Error al procesar la solicitud')
-    } finally {
-      setProcesando(null)
-    }
-  }
-
-  const handleRegistrarCobro = async (entrega: Entrega) => {
-    // Por ahora mostrar un prompt simple - en el futuro se puede hacer un modal
-    const monto = prompt(`Monto a cobrar (Total: $${entrega.total}):`, entrega.total.toString())
-    if (!monto) return
-
-    const metodo = prompt('Método de pago (efectivo, transferencia, etc.):', 'efectivo')
-    if (!metodo) return
-
-    setProcesando(entrega.entrega_id)
-    try {
-      const formData = new FormData()
-      formData.append('entrega_id', entrega.entrega_id)
-      formData.append('monto_cobrado', monto)
-      formData.append('metodo_pago', metodo)
-
-      const result = await registrarCobroEntregaAction(formData)
-      if (result.success) {
-        showToast('success', result.message || 'Cobro registrado')
-        // Actualizar estado local
-        setEntregas(prev => prev.map(e => 
-          e.entrega_id === entrega.entrega_id 
-            ? { ...e, estado_pago: 'pagado', monto_cobrado: parseFloat(monto), metodo_pago: metodo } 
-            : e
-        ))
-      } else {
-        showToast('error', result.message || 'Error al registrar cobro')
-      }
-    } catch (error) {
-      showToast('error', 'Error al procesar la solicitud')
-    } finally {
-      setProcesando(null)
-    }
   }
 
   if (loading) {
@@ -378,30 +317,8 @@ export function EntregasPedido({ pedidoId }: EntregasPedidoProps) {
                             </>
                           )}
                         </div>
-                        <div className="flex gap-2">
-                          {entrega.estado_entrega === 'pendiente' && (
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              onClick={() => handleEnCamino(entrega.entrega_id)}
-                              disabled={procesando === entrega.entrega_id}
-                            >
-                              <Truck className="h-3 w-3 mr-1" />
-                              {procesando === entrega.entrega_id ? 'Procesando...' : 'En camino'}
-                            </Button>
-                          )}
-                          {entrega.estado_pago === 'pendiente' && (
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              onClick={() => handleRegistrarCobro(entrega)}
-                              disabled={procesando === entrega.entrega_id}
-                            >
-                              <DollarSign className="h-3 w-3 mr-1" />
-                              {procesando === entrega.entrega_id ? 'Procesando...' : 'Registrar cobro'}
-                            </Button>
-                          )}
-                        </div>
+                        {/* Nota: Las acciones de "En camino" y "Registrar cobro" se realizan 
+                            desde la app del repartidor en /ruta/[ruta_id]/entrega/[entrega_id] */}
                       </div>
                     </div>
                   </CollapsibleContent>

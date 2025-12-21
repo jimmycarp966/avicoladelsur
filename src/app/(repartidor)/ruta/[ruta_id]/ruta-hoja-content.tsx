@@ -14,7 +14,9 @@ import {
   Navigation,
   Package,
   X,
-  Plus
+  Plus,
+  Map,
+  List
 } from 'lucide-react'
 import { getEntregasSinEstadoPago, estaPagado } from '@/lib/utils/estado-pago'
 import Link from 'next/link'
@@ -29,6 +31,7 @@ import { ChecklistInicioForm } from './checklist-inicio-form'
 import { ChecklistFinForm } from './checklist-fin-form'
 import { EntregaCard } from './entrega-card'
 import GpsTracker from '@/components/reparto/GpsTracker'
+import { RutaMapaContent } from './ruta-mapa-content'
 
 interface RutaHojaContentProps {
   ruta: any
@@ -36,10 +39,31 @@ interface RutaHojaContentProps {
 
 export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
   const router = useRouter()
+  const [vistaActual, setVistaActual] = useState<'mapa' | 'lista'>('mapa')
   const [showChecklistInicio, setShowChecklistInicio] = useState(false)
   const [showChecklistFin, setShowChecklistFin] = useState(false)
   const [loading, setLoading] = useState(false)
 
+  // Si la vista es mapa, renderizar el nuevo componente
+  if (vistaActual === 'mapa') {
+    return (
+      <div className="relative">
+        <RutaMapaContent ruta={ruta} />
+        {/* Botón flotante para cambiar a vista lista */}
+        <Button
+          variant="secondary"
+          size="sm"
+          className="fixed bottom-20 right-4 z-30 shadow-lg"
+          onClick={() => setVistaActual('lista')}
+        >
+          <List className="mr-2 h-4 w-4" />
+          Ver Lista
+        </Button>
+      </div>
+    )
+  }
+
+  // Vista lista existente (original)
   const entregas = ruta.detalles_ruta || []
   const entregasOrdenadas = [...entregas].sort((a, b) => a.orden_entrega - b.orden_entrega)
   const entregasCompletadas = entregas.filter((e: any) =>
@@ -444,11 +468,13 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
             Entregas ({entregasOrdenadas.length})
           </h2>
           {entregasOrdenadas.length > 0 && (
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/ruta/${ruta.id}/mapa`}>
-                <Navigation className="mr-2 h-4 w-4" />
-                Ver mapa
-              </Link>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setVistaActual('mapa')}
+            >
+              <Map className="mr-2 h-4 w-4" />
+              Ver mapa
             </Button>
           )}
         </div>

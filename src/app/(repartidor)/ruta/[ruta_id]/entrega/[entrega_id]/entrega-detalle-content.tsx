@@ -47,10 +47,11 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
     entrega.pago_registrado ? 'pagado' : ''
   )
   const [metodoPago, setMetodoPago] = useState(entrega.metodo_pago_registrado || 'efectivo')
-  const [montoCobrado, setMontoCobrado] = useState(
-    entrega.monto_cobrado_registrado || pedido?.total || 0
+  const [montoCobrado, setMontoCobrado] = useState<string>(
+    String(entrega.monto_cobrado_registrado || pedido?.total || '')
   )
   const [numeroTransaccion, setNumeroTransaccion] = useState(entrega.numero_transaccion_registrado || '')
+  const [comprobanteFile, setComprobanteFile] = useState<File | null>(null)
   const [comprobanteUrl, setComprobanteUrl] = useState(entrega.comprobante_url_registrado || '')
   const [notasEntrega, setNotasEntrega] = useState(entrega.notas_pago || entrega.notas_entrega || '')
   const [metodoPagoFuturo, setMetodoPagoFuturo] = useState('efectivo')
@@ -87,7 +88,7 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
     if (estadoPago === 'pagado') {
       // Si ya pagó, incluir método y monto
       bodyData.metodo_pago = metodoPago
-      bodyData.monto_cobrado = Number(montoCobrado) || 0
+      bodyData.monto_cobrado = montoCobrado ? Number(montoCobrado) : 0
       bodyData.numero_transaccion = numeroTransaccion || undefined
       bodyData.comprobante_url = comprobanteUrl || undefined
     } else if (estadoPago === 'pendiente') {
@@ -241,18 +242,33 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
             </div>
           )}
 
-          <div>
-            <p className="text-sm text-muted-foreground mb-1">Productos</p>
-            <div className="space-y-1 text-sm">
-              {productos.map((detalle: any) => (
-                <div key={detalle.id} className="flex items-center justify-between">
-                  <span>{detalle.producto?.nombre || detalle.producto?.codigo}</span>
-                  <span className="text-muted-foreground">
-                    {detalle.cantidad} {detalle.producto?.unidad_medida || 'un'}
-                  </span>
-                </div>
-              ))}
+          {productos.length > 0 ? (
+            <div>
+              <p className="text-sm text-muted-foreground mb-2">Productos a entregar</p>
+              <div className="space-y-2 text-sm bg-gray-50 p-3 rounded-lg border">
+                {productos.map((detalle: any, index: number) => (
+                  <div key={detalle.id || index} className="flex items-center justify-between py-1 border-b last:border-b-0">
+                    <span className="font-medium">{detalle.producto?.nombre || detalle.producto?.codigo || 'Producto'}</span>
+                    <Badge variant="secondary">
+                      {detalle.cantidad} {detalle.producto?.unidad_medida || 'un'}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
             </div>
+          ) : (
+            <div className="text-sm text-muted-foreground italic">
+              (Productos no disponibles para esta entrega)
+            </div>
+          )}
+
+          <Separator />
+
+          <div className="flex items-center justify-between bg-primary/5 p-4 rounded-lg">
+            <p className="text-lg font-semibold">Total a cobrar</p>
+            <p className="text-2xl font-bold text-primary">
+              ${(pedido?.total || 0).toLocaleString('es-AR')}
+            </p>
           </div>
 
           {cliente?.coordenadas && (
@@ -300,7 +316,6 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
                   <option value="pagado">Ya pagó (total)</option>
                   <option value="pago_parcial">Pagó parcialmente</option>
                   <option value="pendiente">Pendiente de pago</option>
-                  <option value="pagara_despues">Pagará después</option>
                   <option value="rechazado">Rechazó el pedido</option>
                 </select>
               </div>
@@ -329,7 +344,8 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
                       type="number"
                       step="0.01"
                       value={montoCobrado}
-                      onChange={(e) => setMontoCobrado(parseFloat(e.target.value) || 0)}
+                      onChange={(e) => setMontoCobrado(e.target.value)}
+                      placeholder="0.00"
                       required
                     />
                   </div>
@@ -346,12 +362,27 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
                   )}
 
                   <div className="space-y-1">
-                    <Label>Comprobante (URL)</Label>
+                    <Label>Comprobante (foto)</Label>
                     <Input
-                      value={comprobanteUrl}
-                      onChange={(e) => setComprobanteUrl(e.target.value)}
-                      placeholder="https://..."
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          setComprobanteFile(file)
+                          // Crear URL temporal para preview
+                          setComprobanteUrl(URL.createObjectURL(file))
+                        }
+                      }}
                     />
+                    {comprobanteUrl && (
+                      <img
+                        src={comprobanteUrl}
+                        alt="Comprobante"
+                        className="mt-2 max-h-32 rounded border"
+                      />
+                    )}
                   </div>
                 </>
               )}

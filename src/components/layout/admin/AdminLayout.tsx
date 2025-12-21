@@ -24,15 +24,21 @@ export function AdminLayout({ children, user }: AdminLayoutProps) {
 
   // Función logout local que no depende del AuthProvider
   const handleLogout = async () => {
+    console.log('[AdminLayout] Iniciando logout...')
     try {
       const supabase = createClient()
+      console.log('[AdminLayout] SignOut de Supabase...')
       await supabase.auth.signOut()
+      console.log('[AdminLayout] Store logout...')
       storeLogout()
       showToast('success', 'Sesión cerrada exitosamente')
-      window.location.href = '/login'
     } catch (error) {
-      console.error('Error al cerrar sesión:', error)
+      console.error('[AdminLayout] Error al cerrar sesión:', error)
       showToast('error', 'Error al cerrar sesión')
+    } finally {
+      // Siempre redirigir al login, incluso si hay error
+      console.log('[AdminLayout] Redirigiendo a /login...')
+      window.location.href = '/login'
     }
   }
 

@@ -897,7 +897,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
                   <p class="text-xs text-gray-500">${(cliente.estado || 'pendiente').toUpperCase()}</p>
                 </div>
               </div>
-              <p class="text-xs mb-1">📍 ${cliente.direccion}</p>
+              <p class="text-xs mb-1">📍 ${cliente.direccion || 'Sin dirección registrada'}</p>
               ${cliente.hora_estimada ? `<p class="text-xs">⏰ Est: ${cliente.hora_estimada}</p>` : ''}
             </div>
           `
@@ -1237,9 +1237,15 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
         }
       }
       r.ordenVisita.forEach(c => {
-        if (c.lat && c.lng) {
+        // Validar que las coordenadas estén en un rango razonable para Argentina
+        // Argentina: lat entre -55 y -21, lng entre -73 y -53
+        if (c.lat && c.lng &&
+          c.lat >= -60 && c.lat <= -15 &&
+          c.lng >= -80 && c.lng <= -50) {
           bounds.extend({ lat: c.lat, lng: c.lng })
           hasPoints = true
+        } else if (c.lat && c.lng) {
+          console.warn(`⚠️ [DEBUG] Coordenada inválida filtrada: lat=${c.lat}, lng=${c.lng} para cliente ${c.cliente_nombre}`)
         }
       })
     })
@@ -1247,8 +1253,14 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
     // 2. Procesar ubicaciones GPS (si no hay rutas o para incluir todos los puntos)
     const ubicacionesLimitadas = getUbicacionesLimitadas(ubicaciones)
     ubicacionesLimitadas.forEach(ubicacion => {
-      bounds.extend({ lat: ubicacion.lat, lng: ubicacion.lng })
-      hasPoints = true
+      // Validar coordenadas GPS también
+      if (ubicacion.lat >= -60 && ubicacion.lat <= -15 &&
+        ubicacion.lng >= -80 && ubicacion.lng <= -50) {
+        bounds.extend({ lat: ubicacion.lat, lng: ubicacion.lng })
+        hasPoints = true
+      } else {
+        console.warn(`⚠️ [DEBUG] Coordenada GPS inválida filtrada: lat=${ubicacion.lat}, lng=${ubicacion.lng}`)
+      }
     })
 
     if (hasPoints) {
@@ -1503,13 +1515,13 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
             {!panelCollapsed && (
               <ScrollArea className="flex-1 px-3">
                 <div className="space-y-2 pb-4">
-                  {clientesRutaSeleccionada.map((cliente) => {
+                  {clientesRutaSeleccionada.map((cliente, index) => {
                     const numeroColor = getNumeroColor(cliente, rutas.get(selectedRutaId)?.color || '#000000')
                     const isEntregadoYCobrado = cliente.estado === 'entregado' && cliente.pago_registrado
 
                     return (
                       <button
-                        key={cliente.id}
+                        key={`${cliente.id}-${cliente.orden}-${index}`}
                         onClick={() => handleClienteClick(cliente, selectedRutaId)}
                         className={`w-full p-3 rounded-lg border-2 transition-all hover:shadow-md ${isEntregadoYCobrado
                           ? 'border-black bg-black/5'
@@ -1641,17 +1653,20 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
                       Información del Cliente
                     </h4>
                     <div className="space-y-1 text-sm">
-                      {selectedCliente.cliente.direccion && (
+                      {selectedCliente.cliente.direccion ? (
                         <div className="flex items-start gap-2">
                           <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                           <span className="text-muted-foreground">{selectedCliente.cliente.direccion}</span>
                         </div>
-                      )}
-                      {selectedCliente.cliente.telefono && (
+                      ) : null}
+                      {selectedCliente.cliente.telefono ? (
                         <div className="flex items-center gap-2">
                           <Phone className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                           <span className="text-muted-foreground">{selectedCliente.cliente.telefono}</span>
                         </div>
+                      ) : null}
+                      {!selectedCliente.cliente.direccion && !selectedCliente.cliente.telefono && (
+                        <p className="text-muted-foreground italic">Sin información de contacto registrada</p>
                       )}
                     </div>
                   </div>
@@ -1688,9 +1703,9 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
                           Cobrado
                         </Badge>
                       )}
-                      {selectedCliente.cliente.monto_cobrado_registrado && selectedCliente.cliente.monto_cobrado_registrado > 0 && (
+                      {selectedCliente.cliente.monto_cobrado_registrado && Number(selectedCliente.cliente.monto_cobrado_registrado) > 0 && (
                         <Badge variant="outline">
-                          ${selectedCliente.cliente.monto_cobrado_registrado.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                          ${Number(selectedCliente.cliente.monto_cobrado_registrado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                         </Badge>
                       )}
                     </div>
@@ -1699,25 +1714,34 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
                   <Separator />
 
                   {/* Productos */}
-                  {selectedCliente.cliente.productos && selectedCliente.cliente.productos.length > 0 && (
-                    <div className="space-y-2">
-                      <h4 className="font-semibold text-sm flex items-center gap-2">
-                        <Package className="h-4 w-4" />
-                        Productos
-                      </h4>
-                      <div className="space-y-1">
-                        {selectedCliente.cliente.productos.map((producto, index) => (
-                          <div
-                            key={index}
-                            className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm"
-                          >
-                            <span className="font-medium">{producto.nombre}</span>
-                            <span className="text-muted-foreground">x {producto.cantidad}</span>
-                          </div>
-                        ))}
+                  {selectedCliente.cliente.productos && selectedCliente.cliente.productos.length > 0 && (() => {
+                    // Agrupar productos por nombre y sumar cantidades
+                    const productosAgrupados = selectedCliente.cliente.productos.reduce((acc: Record<string, number>, producto: any) => {
+                      const nombre = producto.nombre || 'Producto'
+                      acc[nombre] = (acc[nombre] || 0) + (producto.cantidad || 0)
+                      return acc
+                    }, {})
+
+                    return (
+                      <div className="space-y-2">
+                        <h4 className="font-semibold text-sm flex items-center gap-2">
+                          <Package className="h-4 w-4" />
+                          Productos
+                        </h4>
+                        <div className="space-y-1">
+                          {Object.entries(productosAgrupados).map(([nombre, cantidad], index) => (
+                            <div
+                              key={index}
+                              className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm"
+                            >
+                              <span className="font-medium">{nombre}</span>
+                              <span className="text-muted-foreground">x {cantidad}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )
+                  })()}
 
                   {(!selectedCliente.cliente.productos || selectedCliente.cliente.productos.length === 0) && (
                     <div className="text-sm text-muted-foreground text-center py-4">

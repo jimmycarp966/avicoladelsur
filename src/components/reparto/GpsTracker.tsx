@@ -17,9 +17,10 @@ interface GpsTrackerProps {
   repartidorId: string
   vehiculoId: string
   rutaId?: string
+  compact?: boolean
 }
 
-export default function GpsTracker({ repartidorId, vehiculoId, rutaId }: GpsTrackerProps) {
+export default function GpsTracker({ repartidorId, vehiculoId, rutaId, compact = false }: GpsTrackerProps) {
   const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isTracking, setIsTracking] = useState(false)
@@ -143,6 +144,41 @@ export default function GpsTracker({ repartidorId, vehiculoId, rutaId }: GpsTrac
       stopTracking()
     }
   }, [])
+
+  // Modo compacto para vista mapa
+  if (compact) {
+    return (
+      <div className="bg-white rounded-full shadow-lg p-2 flex items-center gap-2">
+        {!isTracking ? (
+          <Button
+            size="sm"
+            onClick={startTracking}
+            className="rounded-full h-10 w-10 p-0"
+            title="Iniciar Tracking GPS"
+          >
+            <Navigation className="h-5 w-5" />
+          </Button>
+        ) : (
+          <>
+            <Badge variant="default" className="bg-green-500 animate-pulse">
+              <Navigation className="h-3 w-3 mr-1" />
+              GPS
+            </Badge>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={stopTracking}
+              className="rounded-full h-8 w-8 p-0"
+              title="Detener Tracking"
+            >
+              <span className="sr-only">Detener</span>
+              ✕
+            </Button>
+          </>
+        )}
+      </div>
+    )
+  }
 
   return (
     <Card>

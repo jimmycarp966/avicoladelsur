@@ -6,6 +6,7 @@
 
 - 🗓️ **Planificación Semanal**: Rutas fijas por zona/día/turno con vehículos asignados
 - 📱 **PWA Móvil**: App nativa-like para repartidores con GPS tracking en tiempo real
+- 🔊 **Navegación con Voz**: Instrucciones turn-by-turn con voz en español usando Web Speech API
 - 🤖 **Bot WhatsApp**: Toma automática de pedidos con validación de stock
 - 🗺️ **Optimización de Rutas**: Google Directions API + fallback local (Nearest Neighbor + 2-opt)
 - 📍 **GPS Tracking**: Seguimiento en tiempo real con alertas de desvío
@@ -255,10 +256,12 @@ scripts/                         # Scripts de automatización
 
 ### 🗺️ **Optimización de Rutas Híbrida**
 - **Google Directions API**: Optimización profesional con waypoints
+- **Polylines reales**: Rutas que siguen las calles (no líneas rectas)
+- **Orden optimizado**: Google optimiza el orden de visita por distancia/tiempo
 - **Fallback local**: Nearest Neighbor + 2-opt cuando Google falla
-- **Polylines**: Visualización de rutas optimizadas en mapas
 - **Re-optimización**: Automática al agregar nuevos pedidos
 - **Monitor admin**: Mapa Google Maps con tracking en tiempo real
+- **Sincronización**: Vista del repartidor muestra el mismo orden que el monitor
 
 ### 📍 **GPS Tracking y Alertas**
 - **Polling inteligente optimizado**: Adaptativo (10-60s según vehículos), pausa automática cuando pestaña oculta, actualización manual disponible
@@ -270,6 +273,8 @@ scripts/                         # Scripts de automatización
   - 📊 **Panel lateral**: Estadísticas en tiempo real y progreso por ruta
   - 🚚 **Info detallada**: Vehículos con animación y datos completos
   - 📦 **Desglose de Grupos**: Visualización individual de entregas dentro de pedidos agrupados
+  - ✨ **Sin duplicados**: Deduplicación inteligente de clientes
+  - 📱 **UI mejorada**: Manejo de direcciones vacías, agrupación de productos
 - **Numeración Secuencial**: Orden de visita estricto (1, 2, 3...) recalculado dinámicamente
 - **Historial completo**: Rutas_planificadas con orden visita y tiempos
 - **Trazabilidad total**: Desde ubicación hasta entrega confirmada

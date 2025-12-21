@@ -130,7 +130,21 @@ export async function generateRutaOptimizada({
     }
   }
 
-  if (waypoints.length === 0) {
+  // Deduplicar waypoints por clienteId para evitar clientes repetidos
+  const waypointsUnicos: Point[] = []
+  const clientesVistos = new Set<string>()
+
+  for (const wp of waypoints) {
+    if (wp.clienteId && !clientesVistos.has(wp.clienteId)) {
+      clientesVistos.add(wp.clienteId)
+      waypointsUnicos.push(wp)
+    } else if (!wp.clienteId) {
+      // Si no tiene clienteId, agregarlo de todas formas
+      waypointsUnicos.push(wp)
+    }
+  }
+
+  if (waypointsUnicos.length === 0) {
     throw new Error('No hay coordenadas válidas para optimizar la ruta')
   }
 
@@ -148,7 +162,7 @@ export async function generateRutaOptimizada({
       id: 'home-base-destination',
       nombreCliente: homeBase.nombre,
     }
-    : waypoints[waypoints.length - 1]
+    : waypointsUnicos[waypointsUnicos.length - 1]
 
   let ordenVisita: any[] = []
   let polyline = ''
@@ -157,28 +171,33 @@ export async function generateRutaOptimizada({
   let optimizadaPor: 'google' | 'local' = 'local'
 
   const puedeUsarGoogle = usarGoogle && isGoogleDirectionsAvailable()
+  console.log('[Optimizer] ¿Puede usar Google?', puedeUsarGoogle, '| usarGoogle:', usarGoogle, '| API disponible:', isGoogleDirectionsAvailable())
 
   if (puedeUsarGoogle) {
+    console.log('[Optimizer] Llamando a Google Directions con', waypointsUnicos.length, 'clientes...')
     const googleResult = await getGoogleDirections({
       origin: { lat: origin.lat, lng: origin.lng },
       destination: { lat: destination.lat, lng: destination.lng },
-      waypoints: waypoints.slice(1, -1),
-      optimize: waypoints.length > 2,
+      waypoints: waypointsUnicos, // Enviar TODOS los clientes como waypoints
+      optimize: waypointsUnicos.length > 1, // Optimizar si hay más de 1 cliente
     })
 
+    console.log('[Optimizer] Resultado Google:', googleResult.success ? 'OK' : 'FALLBACK', googleResult.error || '')
+
     if (googleResult.success && googleResult.orderedStops) {
-      ordenVisita = mapOrderedStops(googleResult.orderedStops, waypoints)
+      ordenVisita = mapOrderedStops(googleResult.orderedStops, waypointsUnicos)
       polyline = googleResult.polyline || ''
       distanciaTotal = (googleResult.distance || 0) / 1000
       duracionTotal = Math.round((googleResult.duration || 0) / 60)
       optimizadaPor = 'google'
+      console.log('[Optimizer] ✅ Usando Google Directions - polyline length:', polyline.length)
     } else {
-      console.warn('Google Directions no disponible, usando fallback local:', googleResult.error)
+      console.warn('[Optimizer] Google Directions falló, usando fallback local:', googleResult.error)
     }
   }
 
   if (optimizadaPor === 'local' || ordenVisita.length === 0) {
-    const localResult = optimizeRouteLocal(origin, waypoints, destination)
+    const localResult = optimizeRouteLocal(origin, waypointsUnicos, destination)
     ordenVisita = localResult.orderedPoints
       .filter((punto) => punto.detalleRutaId)
       .map((punto, index) => ({
@@ -235,6 +254,45 @@ export async function generateRutaOptimizada({
   if (updateRutaError) {
     console.warn('Error al actualizar tiempo estimado en ruta:', updateRutaError)
     // No lanzamos error porque la optimización ya se guardó en rutas_planificadas
+  }
+
+  // Sincronizar orden optimizado en la tabla entregas para que el repartidor vea el mismo orden
+  // Esto es importante para pedidos agrupados donde cada cliente tiene un registro en entregas
+  console.log('[Optimizer] Sincronizando orden en tabla entregas para', ordenVisita.length, 'puntos...')
+
+  // Obtener los pedido_ids de esta ruta para filtrar correctamente
+  const pedidoIds = [...new Set(ordenVisita.map(p => p.pedido_id).filter(Boolean))]
+  console.log('[Optimizer] Pedidos en la ruta:', pedidoIds)
+
+  for (const punto of ordenVisita) {
+    if (punto.cliente_id && punto.pedido_id) {
+      // Buscar la entrega por pedido_id + cliente_id
+      const { data: entrega, error: entregaFetchError } = await (supabase as any)
+        .from('entregas')
+        .select('id, pedido_id, cliente_id, orden_entrega')
+        .eq('cliente_id', punto.cliente_id)
+        .eq('pedido_id', punto.pedido_id)
+        .maybeSingle()
+
+      console.log('[Optimizer] Buscando entrega para cliente', punto.cliente_nombre, '(', punto.cliente_id, ') pedido', punto.pedido_id, '->', entrega ? 'encontrada' : 'no encontrada')
+
+      if (!entregaFetchError && entrega) {
+        const { error: entregaUpdateError } = await (supabase as any)
+          .from('entregas')
+          .update({ orden_entrega: punto.orden })
+          .eq('id', (entrega as any).id)
+
+        if (entregaUpdateError) {
+          console.warn(`[Optimizer] Error al actualizar orden_entrega para entrega ${(entrega as any).id}:`, entregaUpdateError)
+        } else {
+          console.log(`[Optimizer] ✅ Entrega ${(entrega as any).id} (${punto.cliente_nombre}) → orden ${punto.orden}`)
+        }
+      } else if (entregaFetchError) {
+        console.warn(`[Optimizer] Error buscando entrega:`, entregaFetchError)
+      }
+    } else {
+      console.log('[Optimizer] Punto sin cliente_id o pedido_id:', punto.cliente_nombre)
+    }
   }
 
   return {
@@ -691,11 +749,29 @@ function mapOrderedStops(
   orderedStops: Array<{ lat: number; lng: number; waypointIndex?: number }>,
   waypoints: Point[],
 ) {
+  console.log('[mapOrderedStops] Mapeando', orderedStops.length, 'paradas con', waypoints.length, 'waypoints originales')
+
   return orderedStops.map((stop, index) => {
-    const punto =
-      waypoints.find(
+    // Usar waypointIndex si está disponible (viene de la optimización de Google)
+    // waypointIndex indica el índice del waypoint ORIGINAL que corresponde a esta parada
+    let punto: Point | undefined
+
+    if (stop.waypointIndex !== undefined && waypoints[stop.waypointIndex]) {
+      punto = waypoints[stop.waypointIndex]
+      console.log(`[mapOrderedStops] Posición ${index + 1}: usando waypointIndex ${stop.waypointIndex} -> ${punto?.nombreCliente}`)
+    } else {
+      // Fallback: buscar por coordenadas cercanas
+      punto = waypoints.find(
         (wp) => Math.abs(wp.lat - stop.lat) < 0.001 && Math.abs(wp.lng - stop.lng) < 0.001,
-      ) || waypoints[index]
+      )
+      if (punto) {
+        console.log(`[mapOrderedStops] Posición ${index + 1}: encontrado por coords -> ${punto?.nombreCliente}`)
+      } else {
+        // Último fallback: usar índice secuencial
+        punto = waypoints[index]
+        console.warn(`[mapOrderedStops] Posición ${index + 1}: fallback a índice ${index} -> ${punto?.nombreCliente}`)
+      }
+    }
 
     return {
       detalle_ruta_id: punto?.detalleRutaId,

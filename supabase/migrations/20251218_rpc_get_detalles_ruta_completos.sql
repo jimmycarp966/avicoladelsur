@@ -103,14 +103,11 @@ BEGIN
           'zona_entrega', c.zona_entrega,
           'coordenadas', CASE 
             WHEN e.coordenadas IS NOT NULL THEN
-              -- Si la entrega tiene coordenadas propias
-              CASE 
-                WHEN e.coordenadas::text LIKE '%lat%' THEN e.coordenadas
-                ELSE jsonb_build_object(
-                  'lat', (e.coordenadas->>'lat')::double precision,
-                  'lng', (e.coordenadas->>'lng')::double precision
-                )
-              END
+              -- e.coordenadas es de tipo geometry (PostGIS), usar ST_Y/ST_X
+              jsonb_build_object(
+                'lat', ST_Y(e.coordenadas::geometry),
+                'lng', ST_X(e.coordenadas::geometry)
+              )
             WHEN c.coordenadas IS NOT NULL THEN 
               jsonb_build_object(
                 'lat', ST_Y(c.coordenadas::geometry),

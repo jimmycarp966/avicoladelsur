@@ -263,6 +263,9 @@ Para optimizar la logística y la facturación, el sistema implementa un modelo 
 - **Asignación Automática**: Pedidos se asignan a rutas planificadas según zona/turno/día
 - **Validación de Capacidad**: Peso final del pedido ≤ capacidad del vehículo planificada
 - **Optimización de Rutas**: Google Directions API + fallback local (Nearest Neighbor + 2-opt)
+  - Polylines siguen calles reales (no líneas rectas)
+  - Orden de visita optimizado por distancia/tiempo
+  - Sincronización automática del orden a tabla `entregas`
 - **GPS Tracking**: PWA con ubicación cada 5s durante reparto activo
 - **Alertas Automáticas**: Desvío (>200m) y cliente saltado (<100m sin entrega)
 - **Monitor Admin**: Mapa Google Maps en tiempo real con:
@@ -271,11 +274,23 @@ Para optimizar la logística y la facturación, el sistema implementa un modelo 
   - Panel lateral con progreso y estadísticas
   - Animaciones suaves de movimiento de vehículos
   - **Expansión de Grupos**: Visualización desglosada de entregas individuales
+  - **Sin Duplicados**: Deduplicación inteligente de clientes en orden_visita
+  - **UI Mejorada**: Manejo de direcciones/teléfonos vacíos, agrupación de productos
 - **Numeración de Paradas**: Lógica de re-indexado secuencial (1, 2, 3...) post-expansión
 - **PWA Móvil Completa**: Dashboard, entregas, cobros, firma digital, QR verificación
+- **Navegación Integrada con Voz**: 
+  - Componente `NavigationView` con instrucciones turn-by-turn
+  - Voz en español usando Web Speech API (`speechSynthesis`)
+  - Detección automática de llegada (50m del destino)
+  - Recálculo de ruta cada 30 segundos
+  - GPS fallback a ubicación por defecto si no responde en 5 segundos
+  - Botón "Iniciar Navegación" reemplaza navegación externa en Google Maps
 - **Gestión de Vehículos**: Flota con mantenimientos y seguros
 - **Control de Repartidores**: Usuarios con roles específicos y vehículo asignado
 - **Checklists Vehiculares**: Inspecciones diarias guardadas en Supabase Storage
+- **Sincronización Monitor-Repartidor**: Vista del repartidor muestra el mismo orden optimizado que el monitor admin
+- **Estados de Pago Simplificados**: "Pagará después" removido, solo queda "Pendiente de pago"
+- **Upload de Comprobante**: Input de archivo para subir fotos desde el teléfono (cambiado de URL)
 
 ### 6️⃣ Dominio: Tesorería y Finanzas ✅ COMPLETO
 

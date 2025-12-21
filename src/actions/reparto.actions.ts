@@ -1754,6 +1754,18 @@ export async function asignarPedidoARutaConVehiculo(
       .update({ estado: 'enviado', updated_at: new Date().toISOString() })
       .eq('id', pedidoId)
 
+    // Optimizar la ruta automáticamente
+    try {
+      await generateRutaOptimizada({
+        supabase,
+        rutaId: rutaId as string,
+        usarGoogle: true,
+      })
+    } catch (optError) {
+      console.error(`Error optimizando ruta ${rutaId}:`, optError)
+      // No fallar si la optimización falla
+    }
+
     revalidatePath('/(admin)/(dominios)/reparto/rutas')
     revalidatePath('/(admin)/(dominios)/almacen/pedidos')
     revalidatePath(`/(admin)/(dominios)/almacen/pedidos/${pedidoId}`)

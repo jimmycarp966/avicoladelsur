@@ -49,30 +49,28 @@ supabase/                         # Scripts SQL y migraciones
 ## 🔄 Flujo Principal del Sistema (Pasos)
 
 ### **Flujo Automático Completo**:
-1. **Planificación semanal** → Admin configura rutas por zona/día/turno/vehículo
-2. **Cliente contacta** → Bot WhatsApp recibe pedido o vendedor crea presupuesto
-3. **Validación stock** → Consulta lotes disponibles (FIFO automático)
-4. **Creación pedido** → fn_convertir_presupuesto_a_pedido() (atómica)
-5. **Turno automático** → Si no definido, asigna mañana (<06:00) o tarde (≥06:00)
-6. **Asignación automática** → fn_asignar_pedido_a_ruta() busca ruta planificada por zona/turno/día
-7. **Validación capacidad** → Verifica peso final ≤ capacidad vehículo planificada
-8. **Descuento stock** → Actualiza lotes con FIFO y reservas consumidas
-9. **Generación referencia** → PAY-YYYYMMDD-XXXXXX para pagos diferidos
+1. **Cliente contacta** → Bot WhatsApp recibe pedido o vendedor crea presupuesto
+2. **Validación stock** → Consulta lotes disponibles (FIFO automático)
+3. **Creación pedido** → fn_convertir_presupuesto_a_pedido() (atómica)
+4. **Turno automático** → Si no definido, asigna mañana (<05:00) o tarde (05:00-15:00) o mañana día siguiente (≥15:00)
+5. **Descuento stock** → Actualiza lotes con FIFO y reservas consumidas
+6. **Generación referencia** → PAY-YYYYMMDD-XXXXXX para pagos diferidos
+7. **Preparación almacén** → Almacenista pesa productos balanza, actualiza pesos finales
+8. **Asignación a ruta** → Botón "Pasar a Ruta" → fn_asignar_pedido_a_ruta() crea/asigna ruta automáticamente
+9. **Vehículo/Repartidor auto** → Asigna primer vehículo activo con capacidad y repartidor disponible
 10. **Optimización ruta** → Google Directions o fallback local genera orden visita + polyline
-11. **Notificación admin** → Dashboard recibe alerta de nuevo pedido asignado
-12. **Preparación almacén** → Almacenista pesa productos balanza, actualiza pesos finales
-13. **Reparto asignación** → PWA repartidor recibe hoja ruta con GPS tracking
-14. **Entrega** → Firma digital + QR verificación + registro cobro
-15. **Cobro automático** → Actualización cuentas corrientes + caja en tiempo real
-16. **Conciliación** → Reportes CSV/PDF de movimientos y rutas
+11. **Reparto** → PWA repartidor recibe hoja ruta con GPS tracking
+12. **Entrega** → Firma digital + QR verificación + registro cobro
+13. **Cobro automático** → Actualización cuentas corrientes + caja en tiempo real
+14. **Conciliación** → Reportes CSV/PDF de movimientos y rutas
 
 ## 🔑 12 Puntos Clave del Diseño y Comportamiento
 
 1. **Single Source of Truth**: Todo gira alrededor de Supabase como BD central
 2. **Server-Side First**: Server Actions manejan toda lógica crítica, validaciones y operaciones atómicas
-3. **Planificación Semanal**: Rutas se definen por semana (zona/día/turno/vehículo) y pedidos se asignan automáticamente
+3. **Rutas Automáticas**: NO requiere planificación semanal previa - rutas se crean automáticamente al asignar pedidos
 4. **Turnos Automáticos**: Pedidos sin turno definido lo heredan según hora de confirmación (<05:00 mañana mismo día, 05:00-15:00 tarde mismo día, ≥15:00 mañana día siguiente)
-5. **Asignación Automática**: fn_asignar_pedido_a_ruta() busca rutas planificadas y valida capacidad por peso final
+5. **Asignación Automática**: fn_asignar_pedido_a_ruta() crea rutas y asigna vehículo/repartidor automáticamente
 6. **FIFO Automático**: Sistema de lotes con descuento automático del más antiguo primero
 7. **RLS Estricto**: Cada tabla tiene Row Level Security por roles (admin, vendedor, encargado_sucursal, repartidor, almacenista, tesorero)
 8. **Validación Preventiva**: Clientes bloqueados por deuda no pueden crear pedidos
@@ -121,10 +119,10 @@ supabase/                         # Scripts SQL y migraciones
 - **Diagnóstico Avanzado**: Páginas de debugging para troubleshooting
 
 ### 🚛 **Reparto (TMS)**: Logística y Entregas
-- **Planificación Semanal**: Rutas fijas por zona/día/turno/vehículo con capacidad definida
+- **Sin Planificación Previa**: Las rutas se crean automáticamente al asignar pedidos, no requiere configuración previa
 - **Vehículos Base**: Fiorino (600kg), Hilux (1500kg), F-4000 (4000kg) precargados
-- **Asignación Automática**: Pedidos se asignan a rutas planificadas según zona/turno/día
-- **Optimización de Rutas**: Google Directions API con fallback local (Nearest Neighbor + 2-opt)
+- **Asignación Automática**: fn_asignar_pedido_a_ruta() crea rutas con vehículo y repartidor automáticos
+- **Optimización Automática**: Al asignar cada pedido, la ruta se optimiza automáticamente usando Google Directions API (optimize:true) con fallback local (Nearest Neighbor + 2-opt)
 - **GPS Tracking**: PWA móvil envía ubicación cada 5s durante reparto activo
 - **Alertas Automáticas**: Desvío (>200m) y cliente saltado (<100m sin entrega)
 - **PWA Móvil**: Hoja ruta digital con GPS, entregas y registro de pagos
@@ -145,8 +143,14 @@ supabase/                         # Scripts SQL y migraciones
 - **Obtención de Clientes Mejorada**: Sistema obtiene clientes desde `entregas` cuando pedido no tiene `cliente_id` (modelo agrupado)
 - **Conversión PostGIS**: Función mejorada para convertir coordenadas PostGIS (GeoJSON Point) a formato `{lat, lng}` para mapas
 - **Flujo de Iniciar Ruta**: Pedidos "Enviados" desde almacén crean rutas con estado `'en_curso'` automáticamente, visibles inmediatamente para repartidor
+- **Polylines Siguiendo Calles**: Polyline real obtenida de `rutas_planificadas` y decodificada con Google Maps geometry.encoding
 - **Optimización N+1**: RPC `fn_get_detalles_ruta_completos` reduce ~20 queries a 1 en la hoja de ruta
 - **Estado de Pago Centralizado**: Función helper `estado-pago.ts` para consistencia en verificación de pagos
+- **Sincronización Orden Optimizado**: Al optimizar ruta, el orden se sincroniza a tabla `entregas` para que el repartidor vea el mismo orden que el monitor admin
+- **Deduplicación de Clientes**: Endpoint `rutas-planificadas` ahora evita duplicar clientes cuando el `orden_visita` ya tiene datos completos
+- **Navegación Integrada con Voz**: Componente `NavigationView` con instrucciones paso a paso y voz en español usando Web Speech API
+- **Actualización Dinámica de Polyline**: La polyline se actualiza en tiempo real cuando se completan entregas
+- **Detección de Llegada Automática**: El sistema detecta automáticamente cuando el repartidor llega a destino (50m) y muestra panel de confirmación
 
 ### 💵 **Tesorería**: Control Financiero
 - **Cajas**: Por sucursal con saldos iniciales/actuales
@@ -201,13 +205,11 @@ supabase/                         # Scripts SQL y migraciones
 - **Módulos**: Ventas, gastos, movimientos caja, cuentas corrientes, rutas y entregas
 - **Server-side**: Generación con pdfkit, descarga directa
 
-### 🗓️ **Planificación Semanal**: Gestión de Rutas
-- **Nueva tabla**: `plan_rutas_semanal` con zona/día/turno/vehículo/repartidor/capacidad
-- **Vehículos fijos**: 3 modelos precargados (Fiorino 600kg, Hilux 1500kg, F-4000 4000kg)
-- **UI de planificación**: `/reparto/planificacion` para crear/editar/eliminar planes semanales
-- **Asignación automática**: Pedidos se asignan a rutas planificadas según zona/turno/día
-- **Validación capacidad**: Peso final del pedido ≤ capacidad del vehículo planificada
-- **RPC integrada**: `fn_asignar_pedido_a_ruta()` busca planes y valida restricciones
+### 🗓️ ~~**Planificación Semanal**~~ (DEPRECADO - Diciembre 2025)
+> ⚠️ **NOTA**: Esta funcionalidad ya no es requerida. El sistema ahora crea rutas automáticamente al asignar pedidos, sin necesidad de configuración previa.
+- **Tabla legacy**: `plan_rutas_semanal` (se mantiene por compatibilidad pero ya no se consulta)
+- **UI eliminada**: `/reparto/planificacion` ya no está en el menú
+- **Nueva lógica**: `fn_asignar_pedido_a_ruta()` asigna vehículo y repartidor automáticamente
 
 ### 💵 **Sistema de Listas de Precios**: Gestión de Precios por Cliente
 - **Tablas nuevas**: `listas_precios`, `precios_productos`, `clientes_listas_precios`
@@ -288,6 +290,16 @@ supabase/                         # Scripts SQL y migraciones
 ---
 
 ## 🔧 **Actualizaciones Recientes**
+
+### **Eliminación de Dependencia del Plan Semanal (Diciembre 2025)**
+- ✅ **Sistema Simplificado**: Ya NO se requiere configurar planes semanales para crear rutas
+- ✅ **Rutas Automáticas**: `fn_asignar_pedido_a_ruta()` crea rutas automáticamente al asignar pedidos
+- ✅ **Vehículo Auto**: Se asigna el primer vehículo activo con capacidad suficiente
+- ✅ **Repartidor Auto**: Se asigna el repartidor asignado al vehículo, o el primer repartidor activo
+- ✅ **Reutilización Inteligente**: Si ya existe ruta para la misma fecha/zona/turno con capacidad, se reutiliza
+- ✅ **UI Simplificada**: Eliminado menú "Planificación semanal" del sidebar
+- ✅ **Migración**: `20251219_eliminar_dependencia_plan_semanal.sql`
+- ✅ **Flujo Simplificado**: Presupuesto → Pedido → Botón "Pasar a Ruta" → Repartidor ve la ruta inmediatamente
 
 ### **Mejoras en Visualización de Reparto (Enero 2026)**
 - ✅ **Expansión de Pedidos Agrupados**: El Monitor GPS y la App de Repartidor ahora desglosan automáticamente los pedidos agrupados, mostrando cada entrega individualmente.
@@ -565,6 +577,37 @@ Para el flujo de registro de nuevos clientes, el bot implementa una máquina de 
 
 ---
 
-*Resumen actualizado el Diciembre 2025 - Estabilización de Dashboard Repartidor + Sistema de recargos por método de pago + Corrección de lógica de precios mayoristas en sucursales + Configuración de productos mayoristas implementada + Modelo de control para sucursales + Mejoras de UX y manejo de admins*
+### **Correcciones de Optimización de Rutas (Diciembre 2025)**
+- ✅ **Polylines Correctos**: Corregido el envío de waypoints a Google Directions API para que incluya TODOS los clientes, generando rutas que siguen las calles reales (no líneas rectas)
+- ✅ **Orden Optimizado Correcto**: Corregida la función `mapOrderedStops` para usar `waypointIndex` de Google, mapeando correctamente cada parada optimizada con su cliente original
+- ✅ **Sin Duplicados en Monitor**: Corregido endpoint `rutas-planificadas` para no duplicar clientes cuando el `orden_visita` ya tiene datos completos (viene de optimización)
+- ✅ **Sincronización Vista Repartidor**: Nuevo código sincroniza `entregas.orden_entrega` con el orden optimizado para que el repartidor vea el mismo orden que el monitor admin
+- ✅ **UI Mejorada Monitor GPS**: 
+  - Dirección "undefined" ahora muestra "Sin dirección registrada"
+  - Información del cliente vacía muestra mensaje informativo
+  - Productos duplicados ahora se agrupan por nombre y suman cantidades
+  - No muestra monto $0 en el modal de cliente
+- ✅ **Logs de Diagnóstico**: Agregados logs completos en `ruta-optimizer.ts` y `google-directions.ts` para monitoreo de optimización
 
+---
 
+### **Navegación Integrada con Voz para Repartidores (Diciembre 2025)**
+- ✅ **NavigationView Component**: Vista fullscreen de navegación turn-by-turn integrada en la app del repartidor
+- ✅ **Voz en Español**: Instrucciones de navegación habladas usando Web Speech API (`speechSynthesis`) con voz en español argentino
+- ✅ **Polyline Real**: La ruta se muestra siguiendo las calles, obtenida de `rutas_planificadas` y decodificada con `google.maps.geometry.encoding.decodePath()`
+- ✅ **Detección de Llegada**: Automática a 50 metros del destino con panel de confirmación
+- ✅ **Recálculo de Ruta**: Cada 30 segundos durante la navegación activa
+- ✅ **GPS Fallback**: Si el GPS no responde en 5 segundos, usa ubicación por defecto (homeBase)
+- ✅ **Botón "Iniciar Navegación"**: Reemplaza el botón "Navegar" que abría Google Maps externo
+- ✅ **Gestión de Cobro Integrada**: Desde NavigationView se puede ir directamente a la página de gestión de cobro
+- ✅ **Estados de Pago Simplificados**: Removida opción "Pagará después", solo queda "Pendiente de pago"
+- ✅ **Upload de Comprobante**: Campo de comprobante cambiado de URL a input de archivo para subir fotos desde el teléfono
+- ✅ **Monto Cobrado Editable**: Arreglado input de monto para permitir borrar contenido (ya no fuerza a 0)
+- ✅ **UI de Entrega Mejorada**: 
+  - Productos a entregar con fondo destacado
+  - Total a cobrar con formato prominente
+  - Información del pedido más clara
+
+---
+
+*Resumen actualizado el 19/12/2025 - Navegación integrada con voz + Correcciones de Optimización de Rutas + Estabilización de Dashboard Repartidor + Sistema de recargos por método de pago + Corrección de lógica de precios mayoristas en sucursales + Configuración de productos mayoristas implementada + Modelo de control para sucursales + Mejoras de UX y manejo de admins*

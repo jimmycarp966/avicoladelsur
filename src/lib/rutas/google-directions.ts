@@ -29,19 +29,19 @@ const GOOGLE_DIRECTIONS_API_URL = 'https://maps.googleapis.com/maps/api/directio
  */
 function buildDirectionsUrl(request: GoogleDirectionsRequest): string {
   const params = new URLSearchParams()
-  
+
   // Origin
   params.append('origin', `${request.origin.lat},${request.origin.lng}`)
-  
+
   // Destination
   params.append('destination', `${request.destination.lat},${request.destination.lng}`)
-  
+
   // Waypoints (máximo 25 para requests estándar)
   if (request.waypoints.length > 0) {
     const waypointsStr = request.waypoints
       .map(wp => `${wp.lat},${wp.lng}`)
       .join('|')
-    
+
     if (request.optimize && request.waypoints.length > 2) {
       // optimize:true solo funciona con 2+ waypoints
       params.append('waypoints', `optimize:true|${waypointsStr}`)
@@ -49,17 +49,17 @@ function buildDirectionsUrl(request: GoogleDirectionsRequest): string {
       params.append('waypoints', waypointsStr)
     }
   }
-  
+
   // API Key
   if (GOOGLE_MAPS_API_KEY) {
     params.append('key', GOOGLE_MAPS_API_KEY)
   }
-  
+
   // Configuración adicional
   params.append('language', 'es')
   params.append('region', 'ar')
   params.append('units', 'metric')
-  
+
   return `${GOOGLE_DIRECTIONS_API_URL}?${params.toString()}`
 }
 
@@ -73,59 +73,72 @@ function parseGoogleResponse(data: any): GoogleDirectionsResponse {
       error: `Google Directions API error: ${data.status} - ${data.error_message || 'Unknown error'}`
     }
   }
-  
+
   if (!data.routes || data.routes.length === 0) {
     return {
       success: false,
       error: 'No routes found'
     }
   }
-  
+
   const route = data.routes[0]
-  const leg = route.legs[0]
-  
+
   // Extraer polyline
   const polyline = route.overview_polyline?.points || ''
-  
-  // Calcular distancia total (en metros)
+
+  // Calcular distancia total (en metros) - sumando todos los legs
   const distance = route.legs.reduce((sum: number, leg: any) => sum + leg.distance.value, 0)
-  
+
   // Calcular duración total (en segundos)
   const duration = route.legs.reduce((sum: number, leg: any) => sum + leg.duration.value, 0)
-  
+
+  console.log('[Google Directions] Parseando respuesta:', {
+    status: data.status,
+    legsCount: route.legs?.length,
+    waypointOrder: route.waypoint_order,
+    polylineLength: polyline.length,
+    distanceM: distance,
+    durationS: duration
+  })
+
   // Extraer orden optimizado de waypoints
+  // Google devuelve waypoint_order que es el índice original de cada waypoint en el orden optimizado
   const orderedStops: Array<{ lat: number; lng: number; waypointIndex?: number }> = []
-  
+
+  // Cuando hay waypoints, Google devuelve N+1 legs (origen a waypoint1, waypoint1 a waypoint2, ..., waypointN a destino)
+  // waypoint_order indica el nuevo orden de los waypoints intermedios
   if (route.waypoint_order && route.waypoint_order.length > 0) {
-    // Si hay optimización, usar el orden optimizado
-    route.waypoint_order.forEach((waypointIndex: number, order: number) => {
-      // Los waypoints están en el orden original, pero waypoint_order indica el orden optimizado
-      // Necesitamos extraer las coordenadas de los waypoints en el orden optimizado
-      if (leg.steps && leg.steps.length > 0) {
-        // Aproximación: usar el inicio de cada leg para los waypoints
-        const step = leg.steps[Math.floor((order / route.waypoint_order.length) * leg.steps.length)]
-        if (step && step.start_location) {
-          orderedStops.push({
-            lat: step.start_location.lat,
-            lng: step.start_location.lng,
-            waypointIndex
-          })
-        }
-      }
-    })
-  } else {
-    // Sin optimización, usar el orden original
-    route.legs.forEach((leg: any, index: number) => {
-      if (leg.start_location) {
+    console.log('[Google Directions] Usando orden optimizado:', route.waypoint_order)
+
+    // El orden optimizado: waypoint_order[i] indica qué waypoint original va en la posición i
+    route.waypoint_order.forEach((originalIndex: number, optimizedPosition: number) => {
+      // Los legs tienen: origen -> wp[order[0]] -> wp[order[1]] -> ... -> destino
+      // Entonces leg[i].end_location es la ubicación del waypoint en posición i
+      if (route.legs[optimizedPosition] && route.legs[optimizedPosition].end_location) {
         orderedStops.push({
-          lat: leg.start_location.lat,
-          lng: leg.start_location.lng,
-          waypointIndex: index
+          lat: route.legs[optimizedPosition].end_location.lat,
+          lng: route.legs[optimizedPosition].end_location.lng,
+          waypointIndex: originalIndex
         })
       }
     })
+  } else {
+    console.log('[Google Directions] Sin optimización de orden, usando orden original')
+    // Sin optimización, cada leg excepto el último corresponde a un waypoint
+    for (let i = 0; i < route.legs.length - 1; i++) {
+      const leg = route.legs[i]
+      if (leg.end_location) {
+        orderedStops.push({
+          lat: leg.end_location.lat,
+          lng: leg.end_location.lng,
+          waypointIndex: i
+        })
+      }
+    }
   }
-  
+
+  console.log('[Google Directions] Orden final de paradas:', orderedStops.length, 'puntos')
+
   return {
     success: true,
     orderedStops,
@@ -148,7 +161,7 @@ export async function getGoogleDirections(
       error: 'GOOGLE_MAPS_API_KEY no está configurada. Usa fallback local.'
     }
   }
-  
+
   // Validar límites de waypoints
   if (request.waypoints.length > 25) {
     return {
@@ -156,26 +169,32 @@ export async function getGoogleDirections(
       error: 'Máximo 25 waypoints permitidos por request de Google Directions. Divide la ruta en sub-rutas.'
     }
   }
-  
+
   try {
     const url = buildDirectionsUrl(request)
-    
+    console.log('[Google Directions] Consultando API...')
+    console.log('[Google Directions] Origin:', request.origin)
+    console.log('[Google Directions] Destination:', request.destination)
+    console.log('[Google Directions] Waypoints:', request.waypoints.length)
+
     const response = await fetch(url, {
       method: 'GET',
       headers: {
         'Accept': 'application/json'
       }
     })
-    
+
     if (!response.ok) {
+      console.error('[Google Directions] HTTP Error:', response.status, response.statusText)
       return {
         success: false,
         error: `HTTP error: ${response.status} ${response.statusText}`
       }
     }
-    
+
     const data = await response.json()
-    
+    console.log('[Google Directions] Respuesta status:', data.status)
+
     // Manejar rate limits
     if (data.status === 'OVER_QUERY_LIMIT') {
       console.warn('Google Directions API: Rate limit exceeded')
@@ -184,7 +203,11 @@ export async function getGoogleDirections(
         error: 'Rate limit exceeded. Usa fallback local.'
       }
     }
-    
+
+    if (data.status !== 'OK') {
+      console.error('[Google Directions] Error status:', data.status, data.error_message)
+    }
+
     return parseGoogleResponse(data)
   } catch (error: any) {
     console.error('Error al consultar Google Directions API:', error)

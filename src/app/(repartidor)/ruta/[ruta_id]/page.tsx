@@ -68,6 +68,15 @@ async function RutaHojaPage({ params }: { params: Promise<{ ruta_id: string }> }
     console.error('Error obteniendo detalles de ruta:', detallesError)
   }
 
+  // Obtener polyline desde rutas_planificadas
+  const { data: rutaPlanificada } = await supabase
+    .from('rutas_planificadas')
+    .select('polyline, orden_visita, distancia_total_km, duracion_total_min')
+    .eq('ruta_reparto_id', ruta_id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
   // Convertir el resultado JSONB a array de detalles
   // La RPC ya viene con clientes expandidos y coordenadas convertidas
   const detallesConCliente = Array.isArray(detallesCompletos)
@@ -77,6 +86,10 @@ async function RutaHojaPage({ params }: { params: Promise<{ ruta_id: string }> }
   const ruta = {
     ...rutaBasica,
     detalles_ruta: detallesConCliente,
+    // Agregar datos de la ruta planificada (polyline, etc.)
+    polyline: rutaPlanificada?.polyline || null,
+    distancia_total_km: rutaPlanificada?.distancia_total_km || null,
+    duracion_total_min: rutaPlanificada?.duracion_total_min || null,
   }
 
   return <RutaHojaContent ruta={ruta} />

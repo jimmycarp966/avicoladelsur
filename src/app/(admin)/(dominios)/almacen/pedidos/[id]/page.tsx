@@ -4,14 +4,11 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { ArrowLeft, Edit, Truck, FileText, Printer, User, MapPin, CheckCircle, Wallet, Users, Clock, Scale, Navigation } from 'lucide-react'
+import { ArrowLeft, Edit, Truck, FileText, Printer, User, MapPin, CheckCircle, Users, Clock, Scale, Navigation } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { obtenerPedidoPorIdAction } from '@/actions/ventas.actions'
-import { listarCajasAction } from '@/actions/tesoreria.actions'
-import { RegistrarPagoPedidoForm } from '@/components/forms/RegistrarPagoPedidoForm'
 import { EntregasPedido } from '@/components/pedidos/EntregasPedido'
 import { AsignarVehiculoSelect } from '@/components/pedidos/AsignarVehiculoSelect'
-
 import { obtenerRutaPorPedidoIdAction } from '@/actions/reparto.actions'
 
 interface PedidoDetallePageProps {
@@ -49,10 +46,9 @@ export default async function PedidoDetallePage({ params }: PedidoDetallePagePro
   const { id } = await params
   const pedidoId = id
 
-  // Obtener pedido, cajas y ruta en paralelo
-  const [pedidoResult, cajas, rutaResult] = await Promise.all([
+  // Obtener pedido y ruta en paralelo
+  const [pedidoResult, rutaResult] = await Promise.all([
     obtenerPedidoPorIdAction(pedidoId),
-    listarCajasAction(),
     obtenerRutaPorPedidoIdAction(pedidoId)
   ])
 
@@ -61,10 +57,6 @@ export default async function PedidoDetallePage({ params }: PedidoDetallePagePro
   }
 
   const pedido = pedidoResult.data.pedido
-  const pagos = pedidoResult.data.pagos ?? []
-  const totalPagado = pagos.filter((p: any) => p.tipo === 'ingreso').reduce((sum: number, p: any) => sum + Number(p.monto), 0)
-  const saldoPendiente = Math.max(Number(pedido.total) - totalPagado, 0)
-  const cuenta = pedidoResult.data.cuenta
   const estado = estadoConfig(pedido.estado)
 
   // Datos de ruta si existen
@@ -335,67 +327,7 @@ export default async function PedidoDetallePage({ params }: PedidoDetallePagePro
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Wallet className="h-5 w-5 text-primary" />
-            Tesorería
-          </CardTitle>
-          <CardDescription>Pagos registrados y saldo pendiente</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="rounded-lg border border-primary/10 bg-primary/5 p-4">
-              <p className="text-xs text-muted-foreground">Total pagado</p>
-              <p className="text-2xl font-bold text-primary">{formatCurrency(totalPagado)}</p>
-            </div>
-            <div className="rounded-lg border border-warning/10 bg-warning/5 p-4">
-              <p className="text-xs text-muted-foreground">Saldo pendiente</p>
-              <p className="text-2xl font-bold text-warning">{formatCurrency(saldoPendiente)}</p>
-            </div>
-            <div className="rounded-lg border border-secondary/10 bg-secondary/5 p-4">
-              <p className="text-xs text-muted-foreground">Crédito disponible</p>
-              <p className="text-2xl font-bold">
-                {formatCurrency(Math.max((cuenta?.limite_credito ?? 0) - (cuenta?.saldo ?? 0), 0))}
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <p className="text-sm font-semibold mb-2">Pagos registrados</p>
-              <div className="space-y-2 max-h-56 overflow-y-auto pr-2">
-                {pagos.length === 0 && <p className="text-xs text-muted-foreground">Sin pagos registrados.</p>}
-                {pagos.map((pago: any) => (
-                  <div key={pago.id} className="rounded-lg border border-muted/50 p-3 flex justify-between text-sm">
-                    <div>
-                      <p className="font-medium">{pago.metodo_pago}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(pago.created_at).toLocaleString('es-AR')}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold">{formatCurrency(pago.monto)}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {(pago.tesoreria_cajas as any)?.nombre || 'Caja'}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <p className="text-sm font-semibold mb-2">Registrar pago manual</p>
-              <RegistrarPagoPedidoForm
-                pedidoId={pedido.id}
-                cajas={cajas ?? []}
-                saldoPendiente={saldoPendiente}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Nota: La sección de Tesorería (pagos, saldos) se gestiona desde el módulo de Tesorería */}
 
       {pedido.observaciones && (
         <Card>

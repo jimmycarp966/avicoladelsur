@@ -33,15 +33,21 @@ export function SucursalHeader({ sucursal }: SucursalHeaderProps) {
   const { showToast } = useNotificationStore()
 
   const handleLogout = async () => {
+    console.log('[SucursalHeader] Iniciando logout...')
     try {
       const supabase = createClient()
+      console.log('[SucursalHeader] SignOut de Supabase...')
       await supabase.auth.signOut()
+      console.log('[SucursalHeader] Store logout...')
       storeLogout()
       showToast('success', 'Sesión cerrada exitosamente')
-      window.location.href = '/login'
     } catch (error) {
-      console.error('Error al cerrar sesión:', error)
+      console.error('[SucursalHeader] Error al cerrar sesión:', error)
       showToast('error', 'Error al cerrar sesión')
+    } finally {
+      // Siempre redirigir al login, incluso si hay error
+      console.log('[SucursalHeader] Redirigiendo a /login...')
+      window.location.href = '/login'
     }
   }
   return (
@@ -98,7 +104,13 @@ export function SucursalHeader({ sucursal }: SucursalHeaderProps) {
                 <span>Configuración</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={handleLogout} className="text-destructive focus:text-destructive cursor-pointer">
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.preventDefault()
+                  handleLogout()
+                }}
+                className="text-destructive focus:text-destructive cursor-pointer"
+              >
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Cerrar Sesión</span>
               </DropdownMenuItem>
