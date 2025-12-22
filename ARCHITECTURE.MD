@@ -3029,4 +3029,37 @@ Conciliación automática → Reportes CSV/PDF
   - Manejo de errores mejorado con logging detallado
   - Campo `codigo` agregado a consultas de clientes para búsqueda por código
 
+- ✅ **Mejoras en Validación de Rutas - Tesorería (21-22/12/2025)**
+  - Cálculo correcto de recaudación con separación de pagos que van a caja vs cuenta corriente
+  - Manejo de entregas individuales para pedidos agrupados
+  - Visualización mejorada en `/tesoreria/validar-rutas` con tarjetas resumen
+
+- ✅ **Sistema de Gestión de Cuenta Corriente de Clientes (21-22/12/2025)**
+  - Nueva página `/ventas/clientes/[id]/cuenta-corriente` con resumen de cuenta
+  - Formulario de registro de pagos con métodos: efectivo, transferencia, tarjeta, cheque
+  - Función RPC `fn_registrar_pago_cuenta_corriente` que crea ingreso en Caja Central automáticamente
+  - Historial de movimientos de cuenta corriente por cliente
+  - Botón "Desbloquear Cliente" para casos especiales
+  - Integración en detalle del cliente con badge "Bloqueado por deuda"
+
+- ✅ **Sistema de Facturas con Estado de Pago (21-22/12/2025)**
+  - Campos nuevos en tabla `facturas`: `estado_pago`, `monto_pagado`, `saldo_pendiente`, `fecha_vencimiento`
+  - Estados: `pendiente`, `parcial`, `pagada`, `anulada`
+  - Trigger automático `fn_actualizar_estado_pago_factura` que actualiza estado según pagos
+  - `FacturasTable.tsx` con columnas de saldo, estado de pago con badges visuales
+  - Filtro por cliente con prop `clienteId`
+  - Migración: `20251222_trigger_estado_pago_facturas.sql`
+
+- ✅ **Sistema de Moras y Moratorias (21-22/12/2025)**
+  - Nueva página `/tesoreria/moratorias` con estadísticas de deuda
+  - Tabla de clientes morosos ordenable por días vencidos
+  - Funciones RPC: `fn_obtener_clientes_morosos`, `fn_actualizar_moras_facturas`, `fn_obtener_facturas_vencidas_cliente`
+  - Configuración por cliente: `dias_gracia_mora`, `porcentaje_mora_mensual`, `mora_habilitada`
+  - Fórmula de mora: `saldo * (porcentaje_mensual / 100) * (días_vencidos / 30)`
+  - Badges de urgencia: ⚠️ (1-7d), ⏰ (8-30d), 🔴 (31-60d), 🚨 (+60d)
+  - Botones de contacto directo (WhatsApp, teléfono)
+  - Enlace "Moratorias" agregado en sidebar de Tesorería
+  - Migraciones: `20251222_sistema_moras.sql`, `20251222_fix_pago_cc_acreditar_caja.sql`
+
 *Documento creado siguiendo las REGLAS MAESTRAS v7.0 - Arquitectura completa del Sistema ERP para Avícola del Sur*
+*Última actualización: 22/12/2025*

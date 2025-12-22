@@ -35,7 +35,10 @@ export function EntregaCard({ entrega, rutaId, rutaEstado }: EntregaCardProps) {
     entrega.estado_entrega !== 'rechazado'
 
   // Calcular monto pendiente de cobro
-  const estaPagado = pedido?.pago_estado === 'pagado'
+  // Estados resueltos: pagado, cuenta_corriente, parcial
+  const estadoPago = entrega.estado_pago || (entrega.pago_registrado ? 'pagado' : null)
+  const estadosPagoResueltos = ['pagado', 'cuenta_corriente', 'parcial']
+  const estaPagado = estadosPagoResueltos.includes(estadoPago) || pedido?.pago_estado === 'pagado'
   const montoPendiente = !estaPagado ? (pedido?.total || 0) : 0
 
   return (
@@ -51,10 +54,24 @@ export function EntregaCard({ entrega, rutaId, rutaEstado }: EntregaCardProps) {
                 Entregado
               </Badge>
             )}
-            {estaPagado && (
-              <Badge variant="secondary" className="bg-blue-100">
+            {/* Badge de estado de pago con método */}
+            {estadoPago === 'pagado' && (
+              <Badge variant="secondary" className="bg-blue-100 text-blue-800">
                 <DollarSign className="mr-1 h-3 w-3" />
-                Pagado
+                {entrega.metodo_pago_registrado === 'transferencia' ? 'Transferencia' :
+                  entrega.metodo_pago_registrado === 'efectivo' ? 'Efectivo' :
+                    entrega.metodo_pago_registrado === 'qr' ? 'QR' :
+                      entrega.metodo_pago_registrado === 'tarjeta' ? 'Tarjeta' : 'Pagado'}
+              </Badge>
+            )}
+            {estadoPago === 'cuenta_corriente' && (
+              <Badge variant="secondary" className="bg-amber-100 text-amber-800">
+                📒 Cuenta corriente
+              </Badge>
+            )}
+            {estadoPago === 'parcial' && (
+              <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+                💰 Pago parcial
               </Badge>
             )}
           </div>

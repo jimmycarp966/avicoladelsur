@@ -7,11 +7,12 @@
  * Representa el estado de pago de una entrega
  */
 export type EstadoPagoType =
-    | 'pagado'         // Monto completo cobrado
-    | 'pendiente'      // Tiene método de pago pero monto = 0
-    | 'pagara_despues' // Sin monto ni método definido
-    | 'parcial'        // Monto parcial con saldo pendiente
-    | 'rechazado'      // Pedido no entregado
+    | 'pagado'           // Monto completo cobrado
+    | 'pendiente'        // Tiene método de pago pero monto = 0
+    | 'pagara_despues'   // Sin monto ni método definido
+    | 'parcial'          // Monto parcial con saldo pendiente
+    | 'cuenta_corriente' // Todo cargado a cuenta corriente del cliente
+    | 'rechazado'        // Pedido no entregado
 
 /**
  * Interfaz mínima para verificar estado de pago
@@ -67,9 +68,14 @@ export function tieneEstadoPagoDefinido(entrega: EntregaConEstadoPago): boolean 
 /**
  * Verifica si una entrega está completamente pagada
  */
+/**
+ * Verifica si una entrega tiene su pago resuelto (pagado, cuenta corriente, o parcial)
+ * Esto NO significa que se cobró dinero, sino que el estado fue definido
+ */
 export function estaPagado(entrega: EntregaConEstadoPago): boolean {
+    const estadosResueltos = ['pagado', 'cuenta_corriente', 'parcial']
     return (
-        entrega.estado_pago === 'pagado' ||
+        estadosResueltos.includes(entrega.estado_pago || '') ||
         (entrega.pago_registrado === true && (entrega.monto_cobrado_registrado ?? 0) > 0)
     )
 }
@@ -85,6 +91,14 @@ export function getEstadoPagoLabel(entrega: EntregaConEstadoPago): string {
     if (entrega.estado_pago === 'pagado' ||
         (entrega.pago_registrado && (entrega.monto_cobrado_registrado ?? 0) > 0)) {
         return 'Pagado'
+    }
+
+    if (entrega.estado_pago === 'cuenta_corriente') {
+        return 'Cuenta corriente'
+    }
+
+    if (entrega.estado_pago === 'parcial') {
+        return 'Pago parcial'
     }
 
     if (entrega.metodo_pago_registrado) {

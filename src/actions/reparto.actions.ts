@@ -456,18 +456,53 @@ export async function finalizarRutaAction(
     const supabase = await createClient()
 
     // Verificar que todas las entregas estén completas
+    // Para pedidos simples: verificar detalles_ruta.estado_entrega
+    // Para pedidos agrupados: verificar entregas.estado_entrega
     const { data: detalles, error: detallesError } = await supabase
       .from('detalles_ruta')
-      .select('estado_entrega')
+      .select(`
+        id,
+        estado_entrega,
+        pedido:pedidos(cliente_id)
+      `)
       .eq('ruta_id', rutaId)
 
     if (detallesError) throw detallesError
 
-    const entregasPendientes = detalles?.filter(d =>
-      d.estado_entrega !== 'entregado' && d.estado_entrega !== 'fallido'
-    )
+    // Verificar entregas pendientes en detalles_ruta (pedidos simples)
+    let entregasPendientes = detalles?.filter(d => {
+      // Si el pedido tiene cliente_id, es un pedido simple - verificar estado_entrega del detalle
+      if (d.pedido?.cliente_id) {
+        return d.estado_entrega !== 'entregado' && d.estado_entrega !== 'fallido' && d.estado_entrega !== 'rechazado'
+      }
+      // Si no tiene cliente_id, es un pedido agrupado - ignorar este detalle (se verifica abajo)
+      return false
+    }) || []
 
-    if (entregasPendientes && entregasPendientes.length > 0) {
+    // Para pedidos agrupados, verificar la tabla entregas
+    const pedidosAgrupados = detalles?.filter(d => !d.pedido?.cliente_id).map(d => d.id) || []
+
+    if (pedidosAgrupados.length > 0) {
+      // Obtener las entregas individuales de los pedidos agrupados en esta ruta
+      const { data: entregasIndividuales, error: entregasError } = await supabase
+        .from('entregas')
+        .select('id, estado_entrega, pedido_id')
+        .in('pedido_id', await supabase
+          .from('detalles_ruta')
+          .select('pedido_id')
+          .eq('ruta_id', rutaId)
+          .then(r => r.data?.map(d => d.pedido_id) || [])
+        )
+
+      if (!entregasError && entregasIndividuales) {
+        const entregasAgrupPendientes = entregasIndividuales.filter(e =>
+          e.estado_entrega !== 'entregado' && e.estado_entrega !== 'fallido' && e.estado_entrega !== 'rechazado'
+        )
+        entregasPendientes = [...entregasPendientes, ...entregasAgrupPendientes]
+      }
+    }
+
+    if (entregasPendientes.length > 0) {
       throw new Error('No se puede finalizar la ruta. Todas las entregas deben estar completas.')
     }
 

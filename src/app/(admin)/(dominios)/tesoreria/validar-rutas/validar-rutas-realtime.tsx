@@ -173,18 +173,33 @@ export function ValidarRutasRealtime({ rutasIniciales, cajas }: ValidarRutasReal
             ) : (
                 <div className="space-y-4">
                     {rutas.map((ruta: any) => {
-                        const entregasConPago = ruta.detalles_ruta?.filter(
-                            (d: any) => d.pago_registrado && d.monto_cobrado_registrado > 0
-                        ) || []
+                        // Para pedidos agrupados, usar entregas_individuales
+                        const tieneEntregasIndividuales = ruta.entregas_individuales && ruta.entregas_individuales.length > 0
 
-                        const totalRegistrado = ruta.recaudacion_total_registrada || 0
+                        // Calcular entregas con pago
+                        let entregasConPago: any[] = []
+                        let pagosPorMetodo: Record<string, number> = {}
 
-                        // Agrupar por método de pago
-                        const pagosPorMetodo: Record<string, number> = {}
-                        entregasConPago.forEach((detalle: any) => {
-                            const metodo = detalle.metodo_pago_registrado || 'efectivo'
-                            pagosPorMetodo[metodo] = (pagosPorMetodo[metodo] || 0) + Number(detalle.monto_cobrado_registrado)
-                        })
+                        if (tieneEntregasIndividuales) {
+                            // Usar datos calculados del servidor
+                            pagosPorMetodo = ruta.pagos_por_metodo || {}
+                            entregasConPago = ruta.entregas_individuales.filter(
+                                (e: any) => ['pagado', 'cuenta_corriente', 'parcial'].includes(e.estado_pago)
+                            )
+                        } else {
+                            // Pedidos simples - usar detalles_ruta
+                            entregasConPago = ruta.detalles_ruta?.filter(
+                                (d: any) => d.pago_registrado && d.monto_cobrado_registrado > 0
+                            ) || []
+
+                            entregasConPago.forEach((detalle: any) => {
+                                const metodo = detalle.metodo_pago_registrado || 'efectivo'
+                                pagosPorMetodo[metodo] = (pagosPorMetodo[metodo] || 0) + Number(detalle.monto_cobrado_registrado)
+                            })
+                        }
+
+                        // Usar recaudación calculada si está disponible
+                        const totalRegistrado = ruta.recaudacion_calculada || ruta.recaudacion_total_registrada || 0
 
                         // Separar totales
                         const totalCaja = Object.entries(pagosPorMetodo)
@@ -277,29 +292,65 @@ export function ValidarRutasRealtime({ rutasIniciales, cajas }: ValidarRutasReal
                                     <div>
                                         <h4 className="font-semibold mb-2">Entregas con pago registrado ({entregasConPago.length})</h4>
                                         <div className="space-y-2 max-h-60 overflow-y-auto">
-                                            {entregasConPago.map((detalle: any) => (
-                                                <div
-                                                    key={detalle.id}
-                                                    className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm"
-                                                >
-                                                    <div className="flex-1">
-                                                        <span className="font-medium">
-                                                            #{detalle.orden_entrega} - {detalle.pedido?.cliente?.nombre || 'Cliente'}
-                                                        </span>
-                                                        <span className="text-muted-foreground ml-2">
-                                                            ({detalle.pedido?.numero_pedido})
-                                                        </span>
+                                            {entregasConPago.map((item: any, index: number) => {
+                                                // Determinar si es entrega individual o detalle_ruta
+                                                const esEntregaIndividual = !!item.cliente_id
+                                                const clienteNombre = esEntregaIndividual
+                                                    ? (item.cliente?.nombre || 'Cliente')
+                                                    : (item.pedido?.cliente?.nombre || 'Cliente')
+                                                const metodoPago = esEntregaIndividual
+                                                    ? item.metodo_pago
+                                                    : item.metodo_pago_registrado
+                                                const estadoPago = esEntregaIndividual
+                                                    ? item.estado_pago
+                                                    : 'pagado'
+                                                const montoCobrado = esEntregaIndividual
+                                                    ? (item.monto_cobrado || 0)
+                                                    : (item.monto_cobrado_registrado || 0)
+                                                const montoTotal = esEntregaIndividual
+                                                    ? (item.total || 0)
+                                                    : (item.pedido?.total || 0)
+                                                const numeroPedido = esEntregaIndividual
+                                                    ? `ENT-${index + 1}`
+                                                    : item.pedido?.numero_pedido
+
+                                                return (
+                                                    <div
+                                                        key={item.id}
+                                                        className="flex items-center justify-between p-2 bg-muted/50 rounded text-sm"
+                                                    >
+                                                        <div className="flex-1">
+                                                            <span className="font-medium">
+                                                                #{item.orden_entrega || index + 1} - {clienteNombre}
+                                                            </span>
+                                                            <span className="text-muted-foreground ml-2">
+                                                                ({numeroPedido})
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center gap-3">
+                                                            <Badge
+                                                                variant="outline"
+                                                                className={`text-xs capitalize ${estadoPago === 'cuenta_corriente' ? 'bg-amber-100 text-amber-800' :
+                                                                        estadoPago === 'parcial' ? 'bg-orange-100 text-orange-800' :
+                                                                            'bg-green-100 text-green-800'
+                                                                    }`}
+                                                            >
+                                                                {estadoPago === 'cuenta_corriente' ? '📒 Cuenta corriente' :
+                                                                    estadoPago === 'parcial' ? `💰 Parcial` :
+                                                                        metodoPago?.replace('_', ' ') || 'efectivo'}
+                                                            </Badge>
+                                                            <span className="font-semibold">
+                                                                {estadoPago === 'cuenta_corriente'
+                                                                    ? `$${Number(montoTotal).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
+                                                                    : estadoPago === 'parcial'
+                                                                        ? `$${Number(montoCobrado).toLocaleString('es-AR', { minimumFractionDigits: 2 })} / $${Number(montoTotal).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
+                                                                        : `$${Number(montoCobrado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
+                                                                }
+                                                            </span>
+                                                        </div>
                                                     </div>
-                                                    <div className="flex items-center gap-3">
-                                                        <Badge variant="outline" className="text-xs capitalize">
-                                                            {detalle.metodo_pago_registrado?.replace('_', ' ') || 'efectivo'}
-                                                        </Badge>
-                                                        <span className="font-semibold">
-                                                            ${Number(detalle.monto_cobrado_registrado).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            ))}
+                                                )
+                                            })}
                                         </div>
                                     </div>
 

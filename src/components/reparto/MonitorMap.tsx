@@ -443,6 +443,51 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
     }
   })
 
+  // Realtime: Suscribirse a actualizaciones de detalles_ruta (para pagos y entregas completadas)
+  useRealtime({
+    table: 'detalles_ruta',
+    event: 'UPDATE',
+    onUpdate: (payload) => {
+      const detalleRuta = payload.new as any
+
+      // Si la ruta cambió de estado o se registró pago, recargar datos
+      if (detalleRuta.ruta_id) {
+        // Buscar si tenemos esta ruta cargada
+        const rutaExistente = rutasRef.current.get(detalleRuta.ruta_id)
+
+        if (rutaExistente) {
+          // Recargar datos de la ruta específica
+          fetch(`/api/rutas/${detalleRuta.ruta_id}/recorrido`)
+            .then((res) => res.json())
+            .then((res) => {
+              if (res.success && res.data) {
+                const ordenVisita = res.data.ordenVisita || []
+                const total = ordenVisita.length
+                const completadas = ordenVisita.filter((c: any) => c.estado === 'entregado').length
+
+                let estadoRuta: 'en_curso' | 'completada' | 'retrasada' = 'en_curso'
+                if (total > 0 && completadas === total) {
+                  estadoRuta = 'completada'
+                }
+
+                setRutas((prev) => {
+                  const nuevas = new Map(prev)
+                  nuevas.set(detalleRuta.ruta_id, {
+                    ...rutaExistente,
+                    ordenVisita: ordenVisita,
+                    progreso: { completadas, total },
+                    estado: estadoRuta
+                  })
+                  return nuevas
+                })
+              }
+            })
+            .catch((err) => console.error('[MonitorMap] Error recargando ruta:', err))
+        }
+      }
+    }
+  })
+
   // Polling fallback: Solo si Realtime no está disponible o está pausado
   useEffect(() => {
     // Mantener polling como fallback pero con intervalo más largo (60s)

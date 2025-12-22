@@ -732,7 +732,7 @@ function EntregasListPanel({
 
                         return (
                             <button
-                                key={entrega.id}
+                                key={`${entrega.id}-${entrega.entrega_id || index}`}
                                 onClick={() => onSelectEntrega(entrega)}
                                 className={`w-full px-4 py-3 flex items-center gap-3 border-b hover:bg-gray-50 text-left ${isCompleted ? 'opacity-50 bg-gray-50' : ''
                                     }`}

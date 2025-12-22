@@ -101,6 +101,13 @@ supabase/                         # Scripts SQL y migraciones
 - **Stock FIFO**: Consulta y descuento automático del lote más antiguo
 - **Checklists**: Control calidad obligatorio antes de salida
 - **Picking**: Optimización de preparación de pedidos
+- **Producción/Desposte**: Sistema completo de transformación de productos con trazabilidad
+  - **Órdenes de Producción**: Registro de transformación (ej: cajas pollo entero → patamuslo, suprema, etc.)
+  - **Entradas**: Productos consumidos con descuento automático de stock FIFO
+  - **Salidas**: Productos generados con peso individual y generación automática de lotes
+  - **Merma**: Cálculo automático de porcentaje de merma por orden
+  - **Integración Balanza**: Preparado para balanza SDP BBC-4030 (indicador SDP 32)
+  - **Rutas**: `/almacen/produccion`, `/almacen/produccion/nueva`
 
 ### 💰 **Ventas (CRM)**: Gestión de Clientes y Pedidos
 - **Clientes**: Con zonas entrega, límites crédito, bloqueo automático, listas de precios asignadas
@@ -127,13 +134,19 @@ supabase/                         # Scripts SQL y migraciones
 - **Alertas Automáticas**: Desvío (>200m) y cliente saltado (<100m sin entrega)
 - **PWA Móvil**: Hoja ruta digital con GPS, entregas y registro de pagos
 - **Registro de Pagos**: Repartidores registran estado de pago durante la ruta:
-  - **Ya pagó**: Monto completo cobrado
+  - **Ya pagó**: Monto completo cobrado (efectivo, transferencia, QR, tarjeta)
+  - **Cuenta Corriente**: Todo el monto va a deuda del cliente (monto_cobrado = 0)
+  - **Pago Parcial**: Monto parcial cobrado + resto a cuenta corriente
   - **Pendiente**: Se define método de pago futuro
-  - **Pagará después**: Sin monto ni método definido
-  - **Pagó parcialmente**: Monto parcial con saldo pendiente
   - **Rechazó el pedido**: Pedido no entregado con motivo de rechazo
+- **Estados de Pago en BD**: Campo `estado_pago` en tabla `entregas` con valores: `pagado`, `cuenta_corriente`, `parcial`, `pendiente`, `rechazado`
 - **Pago Obligatorio**: El botón "Marcar como entregado" requiere primero registrar el estado de pago
 - **Validación de Cobros**: Sistema de validación donde tesorero verifica y acredita cobros antes de afectar caja
+- **Cálculos de Recaudación**: 
+  - **Recaudación Registrada**: Solo suma `monto_cobrado` efectivamente recibido (no incluye cuenta corriente)
+  - **Por Cobrar**: Solo entregas sin estado de pago definido
+  - **Desglose por Método**: Agrupa por efectivo, transferencia, QR, etc. (solo montos > 0)
+- **Badges de Estado en Cards**: Muestra método de pago usado (Transferencia, Efectivo, Cuenta corriente, Pago parcial)
 - **Firma Digital**: Verificación con QR y subida automática a Supabase Storage
 - **Generación de Datos Mock**: Sistema completo para crear datos de prueba (rutas, clientes, GPS) para testing del monitor GPS, optimizado para Vercel Free (10s timeout) con logs detallados
 - **Monitor GPS Avanzado**: Panel lateral con números clickeables de clientes, modal de vista previa con información completa (cliente y productos), números cambian de color según estado (negro: entregado y cobrado, gris: solo entregado)
@@ -145,19 +158,47 @@ supabase/                         # Scripts SQL y migraciones
 - **Flujo de Iniciar Ruta**: Pedidos "Enviados" desde almacén crean rutas con estado `'en_curso'` automáticamente, visibles inmediatamente para repartidor
 - **Polylines Siguiendo Calles**: Polyline real obtenida de `rutas_planificadas` y decodificada con Google Maps geometry.encoding
 - **Optimización N+1**: RPC `fn_get_detalles_ruta_completos` reduce ~20 queries a 1 en la hoja de ruta
+- **RPC de Pedidos Agrupados**: La función `fn_get_detalles_ruta_completos` ahora obtiene productos de `presupuesto_items` para entregas individuales y maneja correctamente estados `cuenta_corriente` y `parcial`
 - **Estado de Pago Centralizado**: Función helper `estado-pago.ts` para consistencia en verificación de pagos
 - **Sincronización Orden Optimizado**: Al optimizar ruta, el orden se sincroniza a tabla `entregas` para que el repartidor vea el mismo orden que el monitor admin
 - **Deduplicación de Clientes**: Endpoint `rutas-planificadas` ahora evita duplicar clientes cuando el `orden_visita` ya tiene datos completos
 - **Navegación Integrada con Voz**: Componente `NavigationView` con instrucciones paso a paso y voz en español usando Web Speech API
 - **Actualización Dinámica de Polyline**: La polyline se actualiza en tiempo real cuando se completan entregas
 - **Detección de Llegada Automática**: El sistema detecta automáticamente cuando el repartidor llega a destino (50m) y muestra panel de confirmación
+- **Finalización de Ruta**: Valida entregas individuales para pedidos agrupados antes de permitir finalizar
 
 ### 💵 **Tesorería**: Control Financiero
 - **Cajas**: Por sucursal con saldos iniciales/actuales
 - **Movimientos**: Ingresos/egresos ligados a pedidos/gastos
 - **Cuentas Corrientes**: Control saldos y límites por cliente
+  - **Gestión de Cuenta Corriente**: Página `/ventas/clientes/[id]/cuenta-corriente` para ver saldo, límite, crédito disponible
+  - **Registro de Pagos**: Formulario para abonar a cuenta corriente con método de pago
+  - **Movimientos de CC**: Historial de cargos (deudas) y abonos (pagos) por cliente
+  - **Bloqueo Automático**: Clientes que exceden límite son bloqueados automáticamente
+- **Facturas con Estado de Pago**:
+  - Estados: `pendiente`, `parcial`, `pagada`, `anulada`
+  - Campo `saldo_pendiente` calculado automáticamente
+  - Trigger `fn_calcular_saldo_factura` actualiza estado según pagos
+  - Vista en `/ventas/facturas` con filtros por estado
+  - Historial de facturas en detalle del cliente
 - **Validación de Cobros**: Repartidores registran pagos durante ruta, tesorero valida antes de acreditar en caja
-- **Página de Validación**: `/tesoreria/validar-rutas` para revisar y validar rutas completadas
+  - Página `/tesoreria/validar-rutas` muestra entregas con pago registrado
+  - Cálculo correcto de entregas individuales de pedidos agrupados
+  - Separación de pagos en efectivo/transferencia vs cuenta corriente
+- **Funciones RPC**:
+  - `fn_registrar_pago_cuenta_corriente`: Registra pago y actualiza saldo
+  - `fn_obtener_resumen_cuenta_cliente`: Resumen completo de cuenta corriente
+  - `fn_obtener_clientes_morosos`: Lista de clientes con deuda, ordenados por días vencidos
+  - `fn_actualizar_moras_facturas`: Calcula y actualiza moras en facturas vencidas
+  - `fn_obtener_facturas_vencidas_cliente`: Facturas pendientes de un cliente con moras
+- **Sistema de Moras**:
+  - Página `/tesoreria/moratorias` con estadísticas de deuda total, moras y clientes bloqueados
+  - Tabla de clientes morosos ordenable por días vencidos
+  - Cálculo de mora: `saldo * (porcentaje_mensual / 100) * (días_vencidos / 30)`
+  - Días de gracia configurables por cliente (default 7)
+  - Porcentaje de mora mensual configurable por cliente
+  - Botón para recalcular moras manualmente
+  - Badges de urgencia según días vencidos (verde/amarillo/naranja/rojo)
 - **Reportes**: CSV/PDF export con pdfkit
 
 ### 👥 **RRHH (Recursos Humanos)**: Gestión de Personal
@@ -610,4 +651,108 @@ Para el flujo de registro de nuevos clientes, el bot implementa una máquina de 
 
 ---
 
-*Resumen actualizado el 19/12/2025 - Navegación integrada con voz + Correcciones de Optimización de Rutas + Estabilización de Dashboard Repartidor + Sistema de recargos por método de pago + Corrección de lógica de precios mayoristas en sucursales + Configuración de productos mayoristas implementada + Modelo de control para sucursales + Mejoras de UX y manejo de admins*
+### **Mejoras en Validación de Rutas - Tesorería (Diciembre 2025)**
+- ✅ **Cálculo Correcto de Recaudación**: La función `obtenerRutasPendientesValidacionAction` ahora calcula correctamente:
+  - `recaudacion_total`: Total cobrado en la ruta (efectivo + transferencia + otros)
+  - `total_cuenta_corriente`: Pagos registrados como "cuenta_corriente" (no van a caja)
+  - Total para caja = `recaudacion_total - total_cuenta_corriente`
+- ✅ **Manejo de Entregas Individuales**: Para pedidos agrupados, se obtienen los datos de `entregas_individuales`:
+  - Monto cobrado por cada cliente individual
+  - Estado de pago de cada entrega
+  - Cliente y método de pago de cada entrega
+- ✅ **Visualización Mejorada en `/tesoreria/validar-rutas`**:
+  - Tarjetas resumen con Total para Caja vs Total Cuenta Corriente
+  - Desglose de pagos por método (efectivo, transferencia, etc.)
+  - Lista de entregas con pago registrado y montos individuales
+- ✅ **Separación de Pagos**: El sistema diferencia claramente los pagos que van a caja de los que se registran en cuenta corriente
+
+---
+
+### **Sistema de Gestión de Cuenta Corriente de Clientes (Diciembre 2025)**
+- ✅ **Nueva página `/ventas/clientes/[id]/cuenta-corriente`**:
+  - Resumen de cuenta: saldo actual, límite de crédito, crédito disponible
+  - Barra de progreso visual de uso del crédito
+  - Contador de facturas pendientes
+- ✅ **Formulario de Registro de Pagos** (`RegistrarPagoForm.tsx`):
+  - Selector de método de pago (efectivo, transferencia, tarjeta, cheque)
+  - Campo de número de transacción para transferencias
+  - Asociación opcional a factura específica
+  - Preview del saldo después del pago
+- ✅ **Función RPC `fn_registrar_pago_cuenta_corriente`**:
+  - Actualiza saldo de cuenta corriente del cliente
+  - Registra movimiento en `cuentas_movimientos`
+  - **CREA INGRESO EN CAJA CENTRAL** automáticamente
+  - Actualiza saldo de la caja
+  - Opcionalmente actualiza factura asociada
+  - Desbloquea cliente si corresponde
+- ✅ **Historial de Movimientos**: Visualización de cargos y abonos con fechas y descripciones
+- ✅ **Botón Desbloquear Cliente** (`DesbloquearClienteButton.tsx`):
+  - Visible solo cuando el cliente está bloqueado por deuda
+  - Confirmación antes de desbloquear
+  - Actualiza estado del cliente en base de datos
+- ✅ **Integración en Detalle del Cliente**:
+  - Botón "Cuenta Corriente" en header
+  - Badge "Bloqueado por deuda" cuando corresponde
+  - Historial de facturas reales con `FacturasTable`
+
+---
+
+### **Sistema de Facturas con Estado de Pago (Diciembre 2025)**
+- ✅ **Campos nuevos en tabla `facturas`**:
+  - `estado_pago`: 'pendiente', 'parcial', 'pagada', 'anulada'
+  - `monto_pagado`: Cantidad abonada a la factura
+  - `saldo_pendiente`: Calculado automáticamente
+  - `fecha_vencimiento`: Para cálculo de moras
+  - `dias_vencida`, `mora_calculada`: Para sistema de moras
+- ✅ **Trigger automático `fn_actualizar_estado_pago_factura`**:
+  - `monto_pagado >= total` → Estado: **Pagada**
+  - `monto_pagado > 0` pero menor → Estado: **Parcial**
+  - `monto_pagado = 0` → Estado: **Pendiente**
+  - Factura anulada → Estado: **Anulada**
+  - Actualiza `saldo_pendiente` automáticamente
+- ✅ **Actualización de `FacturasTable.tsx`**:
+  - Columna "Saldo" con colores (rojo=deuda, verde=pagada)
+  - Columna "Estado Pago" con badges visuales (✓ Pagada, ◐ Parcial, ○ Pendiente, ✕ Anulada)
+  - Enlace clickeable al detalle del cliente
+  - Acción "Registrar pago" para facturas pendientes
+- ✅ **Filtro por cliente**: Prop `clienteId` para filtrar facturas de un cliente específico
+
+---
+
+### **Sistema de Moras y Moratorias (Diciembre 2025)**
+- ✅ **Nueva página `/tesoreria/moratorias`**:
+  - Estadísticas: Clientes con deuda, Deuda total, Moras calculadas, Bloqueados
+  - Tabla de clientes morosos ordenable por días vencidos
+  - Badges de urgencia según días: ⚠️ (1-7d), ⏰ (8-30d), 🔴 (31-60d), 🚨 (+60d)
+  - Botones de contacto directo (teléfono, WhatsApp)
+  - Enlace a cuenta corriente del cliente
+- ✅ **Botón "Recalcular Moras"** (`ActualizarMorasButton.tsx`):
+  - Ejecuta función RPC `fn_actualizar_moras_facturas`
+  - Muestra cantidad de facturas actualizadas y total de mora
+- ✅ **Funciones RPC para Moras**:
+  - `fn_obtener_clientes_morosos`: Lista de clientes con deuda, ordenados por días vencidos
+  - `fn_actualizar_moras_facturas`: Calcula y actualiza moras en facturas vencidas
+  - `fn_obtener_facturas_vencidas_cliente`: Facturas pendientes de un cliente con moras
+- ✅ **Configuración por cliente**:
+  - `dias_gracia_mora`: Días antes de aplicar mora (default 7)
+  - `porcentaje_mora_mensual`: % mensual a aplicar (default 0 = sin mora)
+  - `mora_habilitada`: Flag para activar cálculo de moras
+- ✅ **Fórmula de mora**: `saldo * (porcentaje_mensual / 100) * (días_vencidos / 30)`
+- ✅ **Enlace en Sidebar**: "Moratorias" agregado en menú de Tesorería
+
+---
+
+### **Migraciones SQL de esta Sesión (21-22/12/2025)**
+```
+supabase/migrations/
+├── 20251222_mejoras_facturas_cuenta_corriente.sql  # Campos estado_pago, funciones CC
+├── 20251222_sistema_moras.sql                      # Funciones de cálculo de moras
+├── 20251222_fix_pago_cc_acreditar_caja.sql         # Pagos CC van a Caja Central
+├── 20251222_trigger_estado_pago_facturas.sql       # Trigger automático de estados
+├── 20251222_sistema_produccion_desposte.sql        # Sistema de producción/desposte + integración balanza
+```
+
+---
+
+*Resumen actualizado el 22/12/2025 - Sistema de Producción/Desposte + Integración Balanza SDP BBC-4030 + Sistema de Moras y Moratorias + Gestión de Cuenta Corriente + Facturas con Estado de Pago + Mejoras en Validación de Rutas + Navegación integrada con voz + Correcciones de Optimización de Rutas + Estabilización de Dashboard Repartidor + Sistema de recargos por método de pago + Corrección de lógica de precios mayoristas en sucursales + Configuración de productos mayoristas implementada + Modelo de control para sucursales + Mejoras de UX y manejo de admins*
+

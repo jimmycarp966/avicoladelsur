@@ -77,9 +77,13 @@ export interface Lote extends BaseEntity {
   fecha_ingreso: string
   fecha_vencimiento?: string
   proveedor?: string
-  costo_unitario?: number
   ubicacion_almacen?: string
   estado: string
+  // Campos de producción
+  orden_produccion_id?: string
+  es_produccion: boolean
+  // Relaciones
+  producto?: Producto
 }
 
 // Pedido
@@ -683,3 +687,86 @@ export interface ClienteListaPrecio extends BaseEntity {
   lista_precio?: ListaPrecio
   cliente?: Cliente
 }
+
+// ===========================================
+// PRODUCCIÓN / DESPOSTE
+// ===========================================
+
+// Estado de orden de producción
+export type EstadoOrdenProduccion = 'en_proceso' | 'completada' | 'cancelada'
+
+// Orden de Producción
+export interface OrdenProduccion extends BaseEntity {
+  numero_orden: string
+  fecha_produccion: string
+  estado: EstadoOrdenProduccion
+  operario_id?: string
+  observaciones?: string
+  // Métricas
+  peso_total_entrada: number
+  peso_total_salida: number
+  merma_kg: number
+  merma_porcentaje: number
+  // Relaciones
+  operario?: Usuario
+  entradas?: OrdenProduccionEntrada[]
+  salidas?: OrdenProduccionSalida[]
+}
+
+// Entrada de Producción (producto consumido)
+export interface OrdenProduccionEntrada extends BaseEntity {
+  orden_id: string
+  producto_id: string
+  lote_id?: string
+  cantidad: number
+  peso_kg?: number
+  // Relaciones
+  producto?: Producto
+  lote?: Lote
+}
+
+// Salida de Producción (producto generado)
+export interface OrdenProduccionSalida extends BaseEntity {
+  orden_id: string
+  producto_id: string
+  lote_generado_id?: string
+  cantidad: number
+  peso_kg: number
+  plu?: string
+  fecha_vencimiento?: string
+  pesaje_id?: string
+  // Relaciones
+  producto?: Producto
+  lote_generado?: Lote
+}
+
+// Configuración de Balanza
+export interface BalanzaConfig extends BaseEntity {
+  nombre: string
+  modelo?: string
+  indicador?: string
+  puerto?: string
+  baudrate: number
+  data_bits: number
+  parity: 'none' | 'even' | 'odd'
+  stop_bits: number
+  activa: boolean
+  ultima_sincronizacion?: string
+}
+
+// Pesaje (registro individual)
+export interface Pesaje extends BaseEntity {
+  balanza_id?: string
+  producto_id?: string
+  orden_produccion_id?: string
+  peso_bruto: number
+  tara: number
+  peso_neto: number
+  unidad: string
+  operario_id?: string
+  // Relaciones
+  balanza?: BalanzaConfig
+  producto?: Producto
+  operario?: Usuario
+}
+

@@ -288,6 +288,19 @@ scripts/                         # Scripts de automatización
 
 ### 💰 **Tesorería Completa**
 - **Cuentas corrientes**: Control automático de saldos por cliente
+  - Página `/ventas/clientes/[id]/cuenta-corriente` con resumen de cuenta
+  - Formulario para registrar pagos (efectivo, transferencia, tarjeta, cheque)
+  - Pagos se acreditan automáticamente en Caja Central
+  - Botón "Desbloquear Cliente" para casos especiales
+- **Facturas con Estado de Pago**:
+  - Estados: `pendiente`, `parcial`, `pagada`, `anulada`
+  - Trigger automático actualiza estado según pagos recibidos
+  - Tabla visual con badges y colores por estado
+- **Sistema de Moras** (`/tesoreria/moratorias`):
+  - Clientes morosos ordenados por días vencidos
+  - Cálculo automático de mora: `saldo * (% mensual / 100) * (días / 30)`
+  - Configuración por cliente: días de gracia, % mora mensual
+  - Badges de urgencia y botones de contacto (WhatsApp, teléfono)
 - **Cajas múltiples**: Por sucursal con cierres automáticos
 - **Movimientos atómicos**: RPC `fn_crear_movimiento_caja()`
 - **Referencias pago**: PAY-YYYYMMDD-XXXXXX para seguimiento

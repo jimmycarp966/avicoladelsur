@@ -1,12 +1,15 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { Suspense } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { ArrowLeft, Edit, User, Phone, Mail, MapPin, MessageCircle, ShoppingCart, DollarSign, FileText } from 'lucide-react'
+import { ArrowLeft, Edit, User, Phone, Mail, MapPin, MessageCircle, ShoppingCart, DollarSign, FileText, CreditCard, AlertTriangle } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { obtenerClientePorIdAction } from '@/actions/ventas.actions'
+import { FacturasTable } from '@/components/tables/FacturasTable'
+import { FacturasTableSkeleton } from '@/components/tables/FacturasTableSkeleton'
 
 interface ClienteDetallePageProps {
   params: Promise<{
@@ -71,6 +74,12 @@ export default async function ClienteDetallePage({ params }: ClienteDetallePageP
               </a>
             </Button>
           )}
+          <Button variant="default" asChild>
+            <Link href={`/ventas/clientes/${cliente.id}/cuenta-corriente`}>
+              <CreditCard className="mr-2 h-4 w-4" />
+              Cuenta Corriente
+            </Link>
+          </Button>
           <Button variant="outline" asChild>
             <Link href={`/ventas/clientes/${cliente.id}/editar`}>
               <Edit className="mr-2 h-4 w-4" />
@@ -88,6 +97,12 @@ export default async function ClienteDetallePage({ params }: ClienteDetallePageP
         <Badge variant="outline" className="capitalize">{cliente.tipo_cliente || 'N/A'}</Badge>
         {cliente.zona_entrega && (
           <Badge variant="outline">{cliente.zona_entrega}</Badge>
+        )}
+        {cliente.bloqueado_por_deuda && (
+          <Badge variant="destructive" className="flex items-center gap-1">
+            <AlertTriangle className="h-3 w-3" />
+            Bloqueado por deuda
+          </Badge>
         )}
       </div>
 
@@ -149,7 +164,7 @@ export default async function ClienteDetallePage({ params }: ClienteDetallePageP
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Dirección</label>
                 <p className="text-sm">{cliente.direccion}</p>
-            </div>
+              </div>
             )}
             {cliente.zona_entrega && (
               <div>
@@ -192,9 +207,16 @@ export default async function ClienteDetallePage({ params }: ClienteDetallePageP
                 <Separator />
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Saldo Actual</label>
-                  <p className={`text-lg font-semibold ${cliente.cuenta_corriente.saldo < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                  <p className={`text-lg font-semibold ${(cliente.cuenta_corriente.saldo || 0) > 0 ? 'text-red-600' : 'text-green-600'}`}>
                     {formatCurrency(cliente.cuenta_corriente.saldo || 0)}
                   </p>
+                  {(cliente.cuenta_corriente.saldo || 0) > 0 && (
+                    <Button variant="link" size="sm" className="p-0 h-auto" asChild>
+                      <Link href={`/ventas/clientes/${cliente.id}/cuenta-corriente`}>
+                        Ver cuenta corriente →
+                      </Link>
+                    </Button>
+                  )}
                 </div>
               </>
             )}
@@ -262,35 +284,32 @@ export default async function ClienteDetallePage({ params }: ClienteDetallePageP
         </Card>
       </div>
 
-      {/* Historial de facturas (placeholder, se conectará a BD más adelante) */}
+      {/* Historial de facturas */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Facturas del Cliente
-          </CardTitle>
-          <CardDescription>
-            Aquí se listarán las facturas reales de este cliente cuando se conecte a la base de datos.
-          </CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Facturas del Cliente
+            </CardTitle>
+            <CardDescription>
+              Historial completo de facturas emitidas
+            </CardDescription>
+          </div>
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/ventas/clientes/${cliente.id}/cuenta-corriente`}>
+              <CreditCard className="mr-2 h-4 w-4" />
+              Gestionar pagos
+            </Link>
+          </Button>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground mb-2">
-            Esta sección usará la tabla <code>facturas</code> filtrada por <code>cliente_id</code> para mostrar el historial completo.
-          </p>
-          <div className="flex items-center justify-between p-3 border rounded-lg">
-            <div>
-              <p className="font-medium">Factura FAC-20251202-0001</p>
-              <p className="text-sm text-muted-foreground">
-                {formatDate('2025-12-02T10:00:00Z')}
-              </p>
-            </div>
-            <div className="text-right">
-              <Badge variant="default">emitida</Badge>
-              <p className="text-sm font-medium mt-1">{formatCurrency(12345)}</p>
-            </div>
-          </div>
+          <Suspense fallback={<FacturasTableSkeleton />}>
+            <FacturasTable clienteId={cliente.id} />
+          </Suspense>
         </CardContent>
       </Card>
     </div>
   )
 }
+

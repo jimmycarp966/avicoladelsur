@@ -107,6 +107,7 @@ export default async function EntregaDetallePage({ params }: PageProps) {
       .select(`
             id,
             pedido_id,
+            presupuesto_id,
             estado_entrega,
             fecha_hora_entrega,
             coordenadas,
@@ -125,8 +126,49 @@ export default async function EntregaDetallePage({ params }: PageProps) {
       entrega_id,
       found: !!entregaIndividual,
       pedido_id: entregaIndividual?.pedido_id,
+      presupuesto_id: entregaIndividual?.presupuesto_id,
       error: errInd?.message || null
     })
+
+    // Obtener datos del presupuesto por separado si existe
+    let presupuestoData: any = null
+    let productosPresupuesto: any[] = []
+
+    if (entregaIndividual?.presupuesto_id) {
+      // Consulta 1: Obtener presupuesto básico
+      const { data: pres, error: presError } = await supabase
+        .from('presupuestos')
+        .select('id, numero_presupuesto, total_final')
+        .eq('id', entregaIndividual.presupuesto_id)
+        .single()
+
+      console.log('[EntregaDetallePage] Presupuesto query:', {
+        presupuesto_id: entregaIndividual.presupuesto_id,
+        found: !!pres,
+        total_final: pres?.total_final,
+        error: presError?.message
+      })
+
+      if (pres) {
+        presupuestoData = pres
+
+        // Consulta 2: Obtener items del presupuesto
+        const { data: items, error: itemsError } = await supabase
+          .from('presupuesto_items')
+          .select(`
+            id, cantidad_solicitada, peso_final, producto_id, precio_unit_final,
+            producto:productos(id, nombre, codigo, unidad_medida)
+          `)
+          .eq('presupuesto_id', entregaIndividual.presupuesto_id)
+
+        console.log('[EntregaDetallePage] Presupuesto items:', {
+          count: items?.length,
+          error: itemsError?.message
+        })
+
+        productosPresupuesto = items || []
+      }
+    }
 
     if (entregaIndividual) {
       // Validar relación con ruta a través del pedido
@@ -134,7 +176,7 @@ export default async function EntregaDetallePage({ params }: PageProps) {
       const { data: detalleRutaPadre, error: errPadre } = await supabase
         .from('detalles_ruta')
         .select(`
-                id, ruta_id,
+                id, ruta_id, orden_entrega, pago_registrado, monto_cobrado_registrado, metodo_pago_registrado,
                 pedido:pedidos(
                     id, numero_pedido, total, pago_estado, metodos_pago, instruccion_repartidor,
                     detalle_pedido:detalles_pedido(
@@ -164,22 +206,67 @@ export default async function EntregaDetallePage({ params }: PageProps) {
           hasDetallePedido: !!(detalleRutaPadre.pedido as any)?.detalle_pedido,
           detalleCount: (detalleRutaPadre.pedido as any)?.detalle_pedido?.length
         })
+        console.log('[EntregaDetallePage] detalleRutaPadre.ruta:', {
+          rutaId: (detalleRutaPadre.ruta as any)?.id,
+          repartidorId: (detalleRutaPadre.ruta as any)?.repartidor_id,
+          hasRuta: !!detalleRutaPadre.ruta
+        })
+
+        // Consultar factura si existe para esta entrega
+        let facturaData = null
+        const { data: factura } = await supabase
+          .from('facturas')
+          .select('id, numero_factura, total, estado, fecha_emision')
+          .eq('entrega_id', entregaIndividual.id)
+          .single()
+
+        if (factura) {
+          facturaData = factura
+          console.log('[EntregaDetallePage] Factura encontrada:', factura.numero_factura)
+        }
+
         // Construir objeto híbrido compatible con la UI
         // Usamos el ID de la entrega individual como ID principal para que las acciones funcionen sobre ella
+
+        // Usar productos del PRESUPUESTO original (obtenido en consulta separada)
+        const totalDelPresupuesto = presupuestoData?.total_final || 0
+
+        // Convertir presupuesto_items al formato detalle_pedido que espera la UI
+        const detallePedidoConvertido = productosPresupuesto.map((dp: any) => ({
+          id: dp.id,
+          // Usar peso_final si está disponible (productos pesables), sino cantidad_solicitada
+          cantidad: dp.peso_final || dp.cantidad_solicitada,
+          producto_id: dp.producto_id,
+          producto: dp.producto
+        }))
+
         entrega = {
-          ...detalleRutaPadre, // Heredar props del padre
+          ...detalleRutaPadre, // Heredar props del padre (incluye orden_entrega del detalle_ruta)
           id: entregaIndividual.id, // SOBRESCRIBIR ID con el de la entrega individual
           detalle_ruta_id_padre: detalleRutaPadre.id, // Guardar ref al padre por si acaso
           estado_entrega: entregaIndividual.estado_entrega, // Estado especifico
           fecha_hora_entrega: entregaIndividual.fecha_hora_entrega,
+          // Usar orden_entrega de la entrega individual si existe, sino del padre
+          orden_entrega: entregaIndividual.orden_entrega || (detalleRutaPadre as any).orden_entrega,
+          // Estado de pago: para entregas individuales (pedidos agrupados), 
+          // cada entrega tiene su propio estado de pago en la tabla entregas
+          // Considerar pagado si: pagó total, pagó parcial + cuenta corriente, o todo a cuenta corriente
+          pago_registrado: ['pagado', 'cuenta_corriente', 'parcial'].includes(entregaIndividual.estado_pago),
+          monto_cobrado_registrado: entregaIndividual.monto_cobrado || 0,
+          metodo_pago_registrado: entregaIndividual.metodo_pago,
           // Cliente especifico de esta entrega
           pedido: {
             ...(detalleRutaPadre.pedido as any),
+            // IMPORTANTE: Usar el pedido_id de la entrega individual
+            id: entregaIndividual.pedido_id,
             cliente: entregaIndividual.cliente,
-            // Si la entrega tiene un total especifico (no esta en modelo actual pero podria), usarlo.
-            // Por ahora heredamos total del pedido general, lo cual es incorrecto para cobros parciales.
-            // TODO: Si 'entregas' tuviera campo 'monto_a_cobrar', usarlo aqui.
-          }
+            // Usar productos del PRESUPUESTO original
+            detalle_pedido: detallePedidoConvertido,
+            // Usar total del PRESUPUESTO original
+            total: totalDelPresupuesto,
+          },
+          // Factura asociada a esta entrega
+          factura: facturaData
         }
       }
     }
@@ -202,7 +289,12 @@ export default async function EntregaDetallePage({ params }: PageProps) {
     console.error('[EntregaDetallePage] Validación fallida:', {
       entregaNull: !entrega,
       rutaIdNoMatch: entrega?.ruta?.id !== ruta_id,
-      repartidorIdNoMatch: entrega?.ruta?.repartidor_id !== user.id
+      repartidorIdNoMatch: entrega?.ruta?.repartidor_id !== user.id,
+      entregaRutaId: entrega?.ruta?.id,
+      expectedRutaId: ruta_id,
+      entregaRepartidorId: entrega?.ruta?.repartidor_id,
+      expectedUserId: user.id,
+      entregaRuta: entrega?.ruta
     })
     return (
       <div className="p-4">

@@ -11,6 +11,13 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
   CheckCircle,
   DollarSign,
   MapPin,
@@ -21,9 +28,12 @@ import {
   RefreshCw,
   ArrowLeft,
   RotateCcw,
+  PartyPopper,
+  Home,
 } from 'lucide-react'
 import Link from 'next/link'
-import { actualizarEstadoEntrega } from '@/actions/reparto.actions'
+import { actualizarEstadoEntrega, finalizarRutaAction } from '@/actions/reparto.actions'
+import { createClient } from '@/lib/supabase/client'
 
 interface EntregaDetalleContentProps {
   entrega: any
@@ -43,7 +53,7 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
   const cliente = pedido?.cliente
   const productos = pedido?.detalle_pedido || []
 
-  const [estadoPago, setEstadoPago] = useState<'pagado' | 'pendiente' | 'pagara_despues' | 'pago_parcial' | 'rechazado' | ''>(
+  const [estadoPago, setEstadoPago] = useState<'pagado' | 'pendiente' | 'pagara_despues' | 'pago_parcial' | 'rechazado' | 'cuenta_corriente' | ''>(
     entrega.pago_registrado ? 'pagado' : ''
   )
   const [metodoPago, setMetodoPago] = useState(entrega.metodo_pago_registrado || 'efectivo')
@@ -55,7 +65,7 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
   const [comprobanteUrl, setComprobanteUrl] = useState(entrega.comprobante_url_registrado || '')
   const [notasEntrega, setNotasEntrega] = useState(entrega.notas_pago || entrega.notas_entrega || '')
   const [metodoPagoFuturo, setMetodoPagoFuturo] = useState('efectivo')
-  const [montoParcial, setMontoParcial] = useState(0)
+  const [montoParcial, setMontoParcial] = useState('')
   const [motivoRechazo, setMotivoRechazo] = useState('')
   const [pagoLoading, setPagoLoading] = useState(false)
 
@@ -67,10 +77,25 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
 
   const [estadoLoading, setEstadoLoading] = useState(false)
 
+  // Estado para modal de ruta completada
+  const [showRutaCompletadaModal, setShowRutaCompletadaModal] = useState(false)
+  const [resumenRuta, setResumenRuta] = useState<{
+    totalEntregas: number
+    totalRecaudado: number
+  } | null>(null)
+
   const handleRegistrarPago = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
-    if (!pedido?.id) return
+    console.log('[handleRegistrarPago] entrega:', entrega)
+    console.log('[handleRegistrarPago] pedido:', pedido)
+    console.log('[handleRegistrarPago] pedido?.id:', pedido?.id)
+    console.log('[handleRegistrarPago] entrega.id:', entrega.id)
+
+    if (!pedido?.id) {
+      toast.error('Error: No se encontró el ID del pedido')
+      return
+    }
 
     if (!estadoPago) {
       toast.error('Selecciona el estado del pago')
@@ -82,6 +107,7 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
     // Preparar datos según el estado de pago
     const bodyData: any = {
       pedido_id: pedido.id,
+      entrega_id: entrega.id, // Para entregas individuales (pedidos agrupados)
       notas_entrega: notasEntrega || undefined,
     }
 
@@ -91,6 +117,12 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
       bodyData.monto_cobrado = montoCobrado ? Number(montoCobrado) : 0
       bodyData.numero_transaccion = numeroTransaccion || undefined
       bodyData.comprobante_url = comprobanteUrl || undefined
+    } else if (estadoPago === 'cuenta_corriente') {
+      // Todo a cuenta corriente - no se cobra nada
+      bodyData.metodo_pago = 'cuenta_corriente'
+      bodyData.monto_cobrado = 0
+      bodyData.monto_cuenta_corriente = pedido?.total || 0
+      bodyData.es_cuenta_corriente = true
     } else if (estadoPago === 'pendiente') {
       // Si está pendiente, solo registrar método futuro
       bodyData.metodo_pago = metodoPagoFuturo
@@ -99,9 +131,10 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
       // Si pagará después, no registrar monto
       bodyData.monto_cobrado = 0
     } else if (estadoPago === 'pago_parcial') {
-      // Pago parcial: registrar método y monto parcial
+      // Pago parcial: registrar método y monto parcial, resto a cuenta corriente
       bodyData.metodo_pago = metodoPago
       bodyData.monto_cobrado = Number(montoParcial) || 0
+      bodyData.monto_cuenta_corriente = (pedido?.total || 0) - (Number(montoParcial) || 0)
       bodyData.es_pago_parcial = true
     } else if (estadoPago === 'rechazado') {
       // Pedido rechazado: registrar motivo
@@ -172,12 +205,72 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
   const handleMarcarEntregado = async () => {
     setEstadoLoading(true)
     const result = await actualizarEstadoEntrega(entrega.id, 'entregado')
-    setEstadoLoading(false)
 
     if (result.success) {
-      toast.success('Entrega marcada como completada')
-      router.refresh()
+      // Verificar si era la última entrega pendiente
+      const supabase = createClient()
+
+      // Obtener todas las entregas de la ruta (tanto de detalles_ruta como entregas individuales)
+      const { data: detallesRuta } = await supabase
+        .from('detalles_ruta')
+        .select('id, estado_entrega, pedido_id')
+        .eq('ruta_id', entrega.ruta_id)
+
+      // Para pedidos agrupados, verificar entregas individuales
+      let todasCompletadas = true
+      let totalEntregas = 0
+      let totalRecaudado = 0
+
+      if (detallesRuta) {
+        for (const detalle of detallesRuta) {
+          // Verificar si tiene entregas individuales (pedido agrupado)
+          const { data: entregasIndividuales } = await supabase
+            .from('entregas')
+            .select('id, estado_entrega, monto_cobrado')
+            .eq('pedido_id', detalle.pedido_id)
+
+          if (entregasIndividuales && entregasIndividuales.length > 0) {
+            // Es pedido agrupado - verificar cada entrega individual
+            for (const ei of entregasIndividuales) {
+              totalEntregas++
+              totalRecaudado += ei.monto_cobrado || 0
+              if (ei.estado_entrega !== 'entregado' && ei.estado_entrega !== 'rechazado') {
+                todasCompletadas = false
+              }
+            }
+          } else {
+            // Es pedido individual
+            totalEntregas++
+            if (detalle.estado_entrega !== 'entregado' && detalle.estado_entrega !== 'rechazado') {
+              todasCompletadas = false
+            }
+          }
+        }
+      }
+
+      setEstadoLoading(false)
+
+      if (todasCompletadas && totalEntregas > 0) {
+        // ¡Última entrega! Mostrar modal de ruta completada
+        setResumenRuta({
+          totalEntregas,
+          totalRecaudado
+        })
+        setShowRutaCompletadaModal(true)
+
+        // Intentar finalizar la ruta automáticamente
+        try {
+          await finalizarRutaAction(entrega.ruta_id)
+        } catch (err) {
+          console.log('No se pudo finalizar la ruta automáticamente:', err)
+        }
+      } else {
+        // Hay más entregas - ir al siguiente cliente
+        toast.success('Entrega completada - Siguiente cliente')
+        router.push(`/ruta/${entrega.ruta_id}`)
+      }
     } else {
+      setEstadoLoading(false)
       toast.error(result.error || 'No se pudo actualizar el estado')
     }
   }
@@ -313,10 +406,11 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
                   required
                 >
                   <option value="">Selecciona un estado</option>
-                  <option value="pagado">Ya pagó (total)</option>
-                  <option value="pago_parcial">Pagó parcialmente</option>
-                  <option value="pendiente">Pendiente de pago</option>
-                  <option value="rechazado">Rechazó el pedido</option>
+                  <option value="pagado">💵 Pagó total (efectivo/transferencia/QR/tarjeta)</option>
+                  <option value="cuenta_corriente">📒 Todo a cuenta corriente</option>
+                  <option value="pago_parcial">💰 Pago parcial + resto a cuenta corriente</option>
+                  <option value="pendiente">⏳ Pendiente (pagará después)</option>
+                  <option value="rechazado">❌ Rechazó el pedido</option>
                 </select>
               </div>
 
@@ -334,7 +428,6 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
                       <option value="transferencia">Transferencia</option>
                       <option value="qr">QR</option>
                       <option value="tarjeta">Tarjeta</option>
-                      <option value="cuenta_corriente">Cuenta corriente</option>
                     </select>
                   </div>
 
@@ -387,6 +480,20 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
                 </>
               )}
 
+              {/* Cuenta corriente - Todo el monto va a deuda del cliente */}
+              {estadoPago === 'cuenta_corriente' && (
+                <div className="bg-amber-50 border border-amber-200 rounded-md p-3">
+                  <p className="font-medium text-amber-800">📒 Cargar a cuenta corriente</p>
+                  <p className="text-sm text-amber-700 mt-1">
+                    El monto de <strong>${pedido?.total?.toLocaleString('es-AR')}</strong> se cargará
+                    como deuda a la cuenta corriente del cliente.
+                  </p>
+                  <p className="text-xs text-amber-600 mt-2">
+                    El repartidor no recibe dinero. La factura quedará como pendiente de pago.
+                  </p>
+                </div>
+              )}
+
               {estadoPago === 'pendiente' && (
                 <div className="space-y-1">
                   <Label>Método de pago previsto</Label>
@@ -399,7 +506,6 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
                     <option value="transferencia">Transferencia</option>
                     <option value="qr">QR</option>
                     <option value="tarjeta">Tarjeta</option>
-                    <option value="cuenta_corriente">Cuenta corriente</option>
                   </select>
                 </div>
               )}
@@ -407,7 +513,7 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
               {estadoPago === 'pago_parcial' && (
                 <>
                   <div className="space-y-1">
-                    <Label>Método de pago *</Label>
+                    <Label>Método de pago del monto cobrado *</Label>
                     <select
                       className="w-full rounded-md border px-3 py-2 text-sm"
                       value={metodoPago}
@@ -418,23 +524,37 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
                       <option value="transferencia">Transferencia</option>
                       <option value="qr">QR</option>
                       <option value="tarjeta">Tarjeta</option>
-                      <option value="cuenta_corriente">Cuenta corriente</option>
                     </select>
                   </div>
 
                   <div className="space-y-1">
-                    <Label>Monto cobrado (parcial) *</Label>
+                    <Label>Monto cobrado ahora *</Label>
                     <Input
                       type="number"
                       step="0.01"
                       value={montoParcial}
-                      onChange={(e) => setMontoParcial(parseFloat(e.target.value) || 0)}
+                      onChange={(e) => setMontoParcial(e.target.value)}
                       placeholder={`Total del pedido: $${pedido?.total || 0}`}
                       required
                     />
-                    <p className="text-xs text-muted-foreground">
-                      Restante: ${((pedido?.total || 0) - montoParcial).toFixed(2)}
-                    </p>
+                  </div>
+
+                  {/* Resumen de pago parcial */}
+                  <div className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm">
+                    <div className="space-y-1">
+                      <div className="flex justify-between">
+                        <span>Total del pedido:</span>
+                        <span className="font-medium">${pedido?.total?.toLocaleString('es-AR')}</span>
+                      </div>
+                      <div className="flex justify-between text-green-700">
+                        <span>💵 Pagó ahora:</span>
+                        <span className="font-medium">${(parseFloat(montoParcial) || 0).toLocaleString('es-AR')}</span>
+                      </div>
+                      <div className="flex justify-between text-amber-700 border-t pt-1">
+                        <span>📒 A cuenta corriente:</span>
+                        <span className="font-bold">${((pedido?.total || 0) - (parseFloat(montoParcial) || 0)).toLocaleString('es-AR')}</span>
+                      </div>
+                    </div>
                   </div>
                 </>
               )}
@@ -482,6 +602,34 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
                   <p className="text-xs mt-1">
                     {entrega.pago_validado ? '✓ Validado por tesorería' : '⏳ Pendiente de validación'}
                   </p>
+                </div>
+              )}
+
+              {/* Factura asociada */}
+              {entrega.factura && (
+                <div className="bg-green-50 border border-green-200 rounded-md p-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-semibold text-green-800 flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        Factura {entrega.factura.numero_factura}
+                      </p>
+                      <p className="text-xs text-green-600">
+                        Total: ${entrega.factura.total} | Estado: {entrega.factura.estado}
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-green-700 border-green-300 hover:bg-green-100"
+                      onClick={() => {
+                        // Abrir factura en nueva pestaña (o implementar vista previa)
+                        window.open(`/factura/${entrega.factura.id}`, '_blank')
+                      }}
+                    >
+                      Ver Factura
+                    </Button>
+                  </div>
                 </div>
               )}
 
@@ -634,6 +782,67 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* Modal de Ruta Completada */}
+      <Dialog open={showRutaCompletadaModal} onOpenChange={setShowRutaCompletadaModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3 text-2xl">
+              <PartyPopper className="h-8 w-8 text-green-500" />
+              ¡Ruta Completada!
+            </DialogTitle>
+            <DialogDescription>
+              Has completado todas las entregas de esta ruta
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-6 space-y-4">
+            {/* Resumen */}
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="grid grid-cols-2 gap-4 text-center">
+                <div>
+                  <p className="text-3xl font-bold text-green-700">
+                    {resumenRuta?.totalEntregas || 0}
+                  </p>
+                  <p className="text-sm text-green-600">Entregas realizadas</p>
+                </div>
+                <div>
+                  <p className="text-3xl font-bold text-green-700">
+                    ${resumenRuta?.totalRecaudado?.toLocaleString('es-AR') || 0}
+                  </p>
+                  <p className="text-sm text-green-600">Total recaudado</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Mensaje */}
+            <p className="text-center text-muted-foreground">
+              La ruta ha sido marcada como completada. Puedes volver al inicio o revisar el resumen.
+            </p>
+
+            {/* Botones */}
+            <div className="flex flex-col gap-2">
+              <Button
+                className="w-full bg-green-600 hover:bg-green-700"
+                onClick={() => router.push('/home')}
+              >
+                <Home className="mr-2 h-4 w-4" />
+                Ir al Inicio
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  setShowRutaCompletadaModal(false)
+                  router.push(`/ruta/${entrega.ruta_id}`)
+                }}
+              >
+                Ver resumen de la ruta
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

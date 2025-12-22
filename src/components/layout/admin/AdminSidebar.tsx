@@ -53,6 +53,7 @@ const navigation = [
     children: [
       { name: 'Productos', href: '/almacen/productos' },
       { name: 'Lotes', href: '/almacen/lotes' },
+      { name: 'Producción', href: '/almacen/produccion' },
       { name: 'Presupuestos del Día', href: '/almacen/presupuestos-dia' },
       { name: 'Pedidos', href: '/almacen/pedidos' },
       { name: 'Transferencias', href: '/sucursales/transferencias' },
@@ -93,6 +94,7 @@ const navigation = [
       { name: 'Cajas', href: '/tesoreria/cajas' },
       { name: 'Movimientos', href: '/tesoreria/movimientos' },
       { name: 'Validar rutas', href: '/tesoreria/validar-rutas' },
+      { name: 'Moratorias', href: '/tesoreria/moratorias' },
       { name: 'Cierres de Caja', href: '/tesoreria/cierre-caja' },
       { name: 'Tesoro', href: '/tesoreria/tesoro' },
       { name: 'Gastos', href: '/tesoreria/gastos' },

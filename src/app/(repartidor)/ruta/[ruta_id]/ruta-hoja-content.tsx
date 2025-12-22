@@ -72,8 +72,15 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
   const entregasPendientes = entregas.filter((e: any) =>
     e.estado_entrega === 'pendiente' || e.estado_entrega === 'en_camino' || !e.estado_entrega
   ).length
+
+  // Total por cobrar: solo sumar entregas que NO tienen estado de pago resuelto
+  // Estados resueltos: pagado, cuenta_corriente, parcial (ya definieron el pago)
+  const estadosPagoResueltos = ['pagado', 'cuenta_corriente', 'parcial']
   const totalCobrar = entregas
-    .filter((e: any) => e.pedido?.pago_estado !== 'pagado')
+    .filter((e: any) => {
+      const estadoPago = e.estado_pago || (e.pago_registrado ? 'pagado' : null)
+      return !estadosPagoResueltos.includes(estadoPago) && e.pedido?.pago_estado !== 'pagado'
+    })
     .reduce((sum: number, e: any) => sum + (e.pedido?.total || 0), 0)
 
   // Debug: Log si no hay entregas
@@ -87,12 +94,27 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
   }
 
   // Calcular recaudación registrada
-  const entregasConPago = entregas.filter((e: any) => e.pago_registrado && e.monto_cobrado_registrado > 0)
-  const recaudacionRegistrada = ruta.recaudacion_total_registrada || 0
+  // Incluir todos los estados de pago válidos (pagado, parcial, cuenta_corriente)
+  const entregasConPago = entregas.filter((e: any) => {
+    const estadoPago = e.estado_pago || (e.pago_registrado ? 'pagado' : null)
+    return ['pagado', 'parcial', 'cuenta_corriente'].includes(estadoPago)
+  })
+
+  // Solo sumar monto_cobrado_registrado (dinero efectivamente recibido, no cuenta corriente)
+  const recaudacionCalculada = entregasConPago.reduce((sum: number, e: any) => {
+    // Solo sumar si hay monto cobrado (no cuenta corriente pura)
+    return sum + (Number(e.monto_cobrado_registrado) || 0)
+  }, 0)
+  const recaudacionRegistrada = recaudacionCalculada || ruta.recaudacion_total_registrada || 0
+
   const pagosPorMetodo: Record<string, number> = {}
   entregasConPago.forEach((detalle: any) => {
     const metodo = detalle.metodo_pago_registrado || 'efectivo'
-    pagosPorMetodo[metodo] = (pagosPorMetodo[metodo] || 0) + Number(detalle.monto_cobrado_registrado)
+    const monto = Number(detalle.monto_cobrado_registrado) || 0
+    // Solo agregar al desglose si hay monto (no cuenta corriente pura)
+    if (monto > 0) {
+      pagosPorMetodo[metodo] = (pagosPorMetodo[metodo] || 0) + monto
+    }
   })
 
   // Usar función helper centralizada para verificar estado de pago
@@ -382,8 +404,8 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
                   Debes registrar el estado de pago para {entregasSinEstadoPago.length} entrega(s) antes de finalizar la ruta:
                 </p>
                 <ul className="list-disc list-inside text-sm text-yellow-800 space-y-1">
-                  {entregasSinEstadoPago.map((entrega: any) => (
-                    <li key={entrega.id}>
+                  {entregasSinEstadoPago.map((entrega: any, index: number) => (
+                    <li key={`${entrega.id}-${entrega.entrega_id || index}`}>
                       Orden #{entrega.orden_entrega} - {entrega.pedido?.cliente?.nombre || 'Cliente'}
                       <Button
                         variant="link"
@@ -425,7 +447,10 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
                     vehiculoId={ruta.vehiculo_id}
                     onComplete={() => {
                       setShowChecklistFin(false)
-                      handleFinalizarRuta()
+                      // Refrescar la página para obtener los datos actualizados del servidor
+                      // incluyendo el nuevo checklist_fin_id
+                      toast.success('Checklist completado. Finalizando ruta...')
+                      router.refresh()
                     }}
                   />
                 ) : (
@@ -490,9 +515,9 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
             </CardContent>
           </Card>
         ) : (
-          entregasOrdenadas.map((entrega: any) => (
+          entregasOrdenadas.map((entrega: any, index: number) => (
             <EntregaCard
-              key={entrega.id}
+              key={`${entrega.id}-${entrega.entrega_id || index}`}
               entrega={entrega}
               rutaId={ruta.id}
               rutaEstado={ruta.estado}

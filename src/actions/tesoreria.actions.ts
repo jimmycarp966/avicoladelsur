@@ -788,7 +788,7 @@ export async function validarRutaAction(formData: FormData) {
           numero_transaccion_registrado,
           comprobante_url_registrado,
           pago_validado,
-          pedido:pedidos(id, numero_pedido, total)
+          pedido:pedidos(id, numero_pedido, total, cliente_id)
         )
       `)
       .eq('id', ruta_id)
@@ -806,23 +806,85 @@ export async function validarRutaAction(formData: FormData) {
       return { success: false, error: 'Esta ruta ya fue validada' }
     }
 
+    // Para pedidos agrupados, obtener entregas individuales con sus pagos
+    const pedidosAgrupados = ruta.detalles_ruta?.filter((d: any) => !d.pedido?.cliente_id).map((d: any) => d.pedido_id) || []
+    let entregasIndividuales: any[] = []
+
+    if (pedidosAgrupados.length > 0) {
+      const { data: entregas } = await supabase
+        .from('entregas')
+        .select(`
+          id,
+          pedido_id,
+          cliente_id,
+          estado_pago,
+          monto_cobrado,
+          metodo_pago,
+          total,
+          cliente:clientes(id, nombre)
+        `)
+        .in('pedido_id', pedidosAgrupados)
+
+      entregasIndividuales = entregas || []
+    }
+
     // Agrupar pagos por método de pago
     const pagosPorMetodo: Record<string, { total: number; detalles: any[] }> = {}
     const pagosCuentaCorriente: any[] = []
 
+    // Procesar pagos de detalles_ruta (pedidos simples con cliente_id)
     ruta.detalles_ruta?.forEach((detalle: any) => {
-      if (detalle.pago_registrado && detalle.monto_cobrado_registrado > 0) {
+      // Solo procesar pedidos simples (con cliente_id)
+      if (detalle.pedido?.cliente_id && detalle.pago_registrado && detalle.monto_cobrado_registrado > 0) {
         const metodo = detalle.metodo_pago_registrado || 'efectivo'
 
         // Separar cuenta corriente de otros métodos
         if (metodo === 'cuenta_corriente') {
-          pagosCuentaCorriente.push(detalle)
+          pagosCuentaCorriente.push({ ...detalle, cliente_id: detalle.pedido.cliente_id })
         } else {
           if (!pagosPorMetodo[metodo]) {
             pagosPorMetodo[metodo] = { total: 0, detalles: [] }
           }
           pagosPorMetodo[metodo].total += Number(detalle.monto_cobrado_registrado)
-          pagosPorMetodo[metodo].detalles.push(detalle)
+          pagosPorMetodo[metodo].detalles.push({ ...detalle, cliente_id: detalle.pedido.cliente_id })
+        }
+      }
+    })
+
+    // Procesar pagos de entregas individuales (pedidos agrupados)
+    entregasIndividuales.forEach((entrega: any) => {
+      const estadoPagoResuelto = ['pagado', 'cuenta_corriente', 'parcial'].includes(entrega.estado_pago)
+
+      if (estadoPagoResuelto) {
+        const metodo = entrega.metodo_pago || 'efectivo'
+        const montoCobrado = Number(entrega.monto_cobrado) || 0
+
+        // Separar cuenta corriente de otros métodos
+        if (metodo === 'cuenta_corriente' || entrega.estado_pago === 'cuenta_corriente') {
+          // Para cuenta corriente, el monto a registrar es el total (no el monto_cobrado que es 0)
+          pagosCuentaCorriente.push({
+            ...entrega,
+            monto_cobrado_registrado: entrega.total,
+            es_entrega_individual: true
+          })
+        } else if (montoCobrado > 0) {
+          if (!pagosPorMetodo[metodo]) {
+            pagosPorMetodo[metodo] = { total: 0, detalles: [] }
+          }
+          pagosPorMetodo[metodo].total += montoCobrado
+          pagosPorMetodo[metodo].detalles.push({ ...entrega, es_entrega_individual: true })
+
+          // Si es pago parcial, también agregar el resto a cuenta corriente
+          if (entrega.estado_pago === 'parcial') {
+            const restoCuentaCorriente = Number(entrega.total) - montoCobrado
+            if (restoCuentaCorriente > 0) {
+              pagosCuentaCorriente.push({
+                ...entrega,
+                monto_cobrado_registrado: restoCuentaCorriente,
+                es_entrega_individual: true
+              })
+            }
+          }
         }
       }
     })
@@ -856,76 +918,94 @@ export async function validarRutaAction(formData: FormData) {
       })
     }
 
-    // Procesar pagos en cuenta corriente (reducir saldo de cuenta, NO crear movimiento de caja)
+    // Procesar pagos en cuenta corriente (aumentar saldo de cuenta, NO crear movimiento de caja)
     for (const detalle of pagosCuentaCorriente) {
-      // Obtener pedido para acceder al cliente_id
-      const { data: pedido } = await supabase
-        .from('pedidos')
-        .select('cliente_id, numero_pedido')
-        .eq('id', detalle.pedido_id)
-        .single()
+      // Para entregas individuales ya tenemos cliente_id, para detalles_ruta lo obtenemos del pedido
+      let clienteId = detalle.cliente_id
+      let numeroPedido = detalle.numero_pedido || ''
 
-      if (pedido) {
-        // Asegurar que existe cuenta corriente (RPC retorna UUID directamente)
-        const { data: cuentaIdResult, error: cuentaError } = await supabase.rpc('fn_asegurar_cuenta_corriente', {
-          p_cliente_id: pedido.cliente_id,
-        })
-
-        if (cuentaError || !cuentaIdResult) {
-          devError('Error al asegurar cuenta corriente:', cuentaError)
-          continue
-        }
-
-        const cuentaId = cuentaIdResult as string
-
-        // Reducir saldo de cuenta corriente
-        const monto = Number(detalle.monto_cobrado_registrado)
-
-        // Obtener saldo actual y límite
-        const { data: cuentaActual } = await supabase
-          .from('cuentas_corrientes')
-          .select('saldo, limite_credito')
-          .eq('id', cuentaId)
+      if (!clienteId && detalle.pedido_id) {
+        const { data: pedido } = await supabase
+          .from('pedidos')
+          .select('cliente_id, numero_pedido')
+          .eq('id', detalle.pedido_id)
           .single()
 
-        if (cuentaActual) {
-          const nuevoSaldo = Math.max((cuentaActual.saldo || 0) - monto, 0)
-          const { error: updateCuentaError } = await supabase
-            .from('cuentas_corrientes')
-            .update({
-              saldo: nuevoSaldo,
-              updated_at: getNowArgentina().toISOString(),
-            })
-            .eq('id', cuentaId)
-
-          if (updateCuentaError) throw updateCuentaError
-
-          // Crear movimiento en cuenta corriente
-          const { error: movCuentaError } = await supabase
-            .from('cuentas_movimientos')
-            .insert({
-              cuenta_corriente_id: cuentaId,
-              tipo: 'pago',
-              monto: monto,
-              descripcion: `Pago validado ruta ${ruta.numero_ruta} - Pedido ${pedido.numero_pedido}`,
-              origen_tipo: 'pedido',
-              origen_id: detalle.pedido_id,
-            })
-
-          if (movCuentaError) throw movCuentaError
-
-          // Verificar si cliente debe ser desbloqueado
-          const debeBloquear = nuevoSaldo > (cuentaActual.limite_credito || 0)
-          const { error: updateClienteError } = await supabase
-            .from('clientes')
-            .update({
-              bloqueado_por_deuda: debeBloquear,
-              updated_at: getNowArgentina().toISOString(),
-            })
-            .eq('id', pedido.cliente_id)
-
-          if (updateClienteError) throw updateClienteError
+        if (pedido) {
+          clienteId = pedido.cliente_id
+          numeroPedido = pedido.numero_pedido
         }
+      }
+
+      if (!clienteId) {
+        devError('No se encontró cliente_id para detalle:', detalle)
+        continue
+      }
+
+      // Asegurar que existe cuenta corriente (RPC retorna UUID directamente)
+      const { data: cuentaIdResult, error: cuentaError } = await supabase.rpc('fn_asegurar_cuenta_corriente', {
+        p_cliente_id: clienteId,
+      })
+
+      if (cuentaError || !cuentaIdResult) {
+        devError('Error al asegurar cuenta corriente:', cuentaError)
+        continue
+      }
+
+      const cuentaId = cuentaIdResult as string
+
+      // Monto a agregar a cuenta corriente (es deuda, no pago)
+      const monto = Number(detalle.monto_cobrado_registrado)
+
+      // Obtener saldo actual y límite
+      const { data: cuentaActual } = await supabase
+        .from('cuentas_corrientes')
+        .select('saldo, limite_credito')
+        .eq('id', cuentaId)
+        .single()
+
+      if (cuentaActual) {
+        // AUMENTAR saldo porque es deuda (no pago)
+        const nuevoSaldo = (cuentaActual.saldo || 0) + monto
+        const { error: updateCuentaError } = await supabase
+          .from('cuentas_corrientes')
+          .update({
+            saldo: nuevoSaldo,
+            updated_at: getNowArgentina().toISOString(),
+          })
+          .eq('id', cuentaId)
+
+        if (updateCuentaError) throw updateCuentaError
+
+        // Crear movimiento en cuenta corriente (tipo cargo porque es deuda)
+        const descripcion = detalle.es_entrega_individual
+          ? `Cargo a cuenta corriente ruta ${ruta.numero_ruta} - ${detalle.cliente?.nombre || 'Cliente'}`
+          : `Cargo a cuenta corriente ruta ${ruta.numero_ruta} - Pedido ${numeroPedido}`
+
+        const { error: movCuentaError } = await supabase
+          .from('cuentas_movimientos')
+          .insert({
+            cuenta_corriente_id: cuentaId,
+            tipo: 'cargo', // Es cargo, no pago
+            monto: monto,
+            descripcion,
+            origen_tipo: detalle.es_entrega_individual ? 'entrega' : 'pedido',
+            origen_id: detalle.es_entrega_individual ? detalle.id : detalle.pedido_id,
+          })
+
+        if (movCuentaError) throw movCuentaError
+
+        // Verificar si cliente debe ser bloqueado por exceder límite
+        const debeBloquear = nuevoSaldo > (cuentaActual.limite_credito || 0)
+        const { error: updateClienteError } = await supabase
+          .from('clientes')
+          .update({
+            bloqueado_por_deuda: debeBloquear,
+            updated_at: getNowArgentina().toISOString(),
+          })
+          .eq('id', clienteId)
+
+        if (updateClienteError) throw updateClienteError
       }
     }
 
@@ -1012,7 +1092,8 @@ export async function obtenerRutasPendientesValidacionAction() {
           pago_registrado,
           metodo_pago_registrado,
           monto_cobrado_registrado,
-          pedido:pedidos(id, numero_pedido, total, cliente:clientes(nombre))
+          pedido_id,
+          pedido:pedidos(id, numero_pedido, total, cliente_id, cliente:clientes(nombre))
         )
       `)
       .eq('estado', 'completada')
@@ -1022,9 +1103,84 @@ export async function obtenerRutasPendientesValidacionAction() {
 
     if (error) throw error
 
+    // Para cada ruta, obtener entregas individuales de pedidos agrupados
+    const rutasConEntregas = await Promise.all((rutas || []).map(async (ruta: any) => {
+      // Identificar pedidos agrupados (sin cliente_id)
+      const pedidosAgrupados = ruta.detalles_ruta?.filter((d: any) => !d.pedido?.cliente_id).map((d: any) => d.pedido_id) || []
+
+      if (pedidosAgrupados.length > 0) {
+        const { data: entregas } = await supabase
+          .from('entregas')
+          .select(`
+            id,
+            pedido_id,
+            cliente_id,
+            estado_pago,
+            monto_cobrado,
+            metodo_pago,
+            total,
+            orden_entrega,
+            cliente:clientes(id, nombre)
+          `)
+          .in('pedido_id', pedidosAgrupados)
+
+        // Calcular recaudación real desde entregas
+        let recaudacionReal = 0
+        let totalCuentaCorriente = 0
+        const pagosPorMetodo: Record<string, number> = {}
+
+        // Procesar entregas individuales
+        entregas?.forEach((e: any) => {
+          const monto = Number(e.monto_cobrado) || 0
+          const total = Number(e.total) || 0
+
+          if (e.estado_pago === 'cuenta_corriente') {
+            // Todo el monto va a cuenta corriente
+            totalCuentaCorriente += total
+            pagosPorMetodo['cuenta_corriente'] = (pagosPorMetodo['cuenta_corriente'] || 0) + total
+          } else if (e.estado_pago === 'parcial') {
+            // Parte va a caja, parte a cuenta corriente
+            if (monto > 0) {
+              recaudacionReal += monto
+              const metodo = e.metodo_pago || 'efectivo'
+              pagosPorMetodo[metodo] = (pagosPorMetodo[metodo] || 0) + monto
+            }
+            const restoCuentaCorriente = total - monto
+            if (restoCuentaCorriente > 0) {
+              totalCuentaCorriente += restoCuentaCorriente
+              pagosPorMetodo['cuenta_corriente'] = (pagosPorMetodo['cuenta_corriente'] || 0) + restoCuentaCorriente
+            }
+          } else if (e.estado_pago === 'pagado' && monto > 0) {
+            recaudacionReal += monto
+            const metodo = e.metodo_pago || 'efectivo'
+            pagosPorMetodo[metodo] = (pagosPorMetodo[metodo] || 0) + monto
+          }
+        })
+
+        // También procesar detalles_ruta para pedidos simples
+        ruta.detalles_ruta?.forEach((d: any) => {
+          if (d.pedido?.cliente_id && d.pago_registrado && d.monto_cobrado_registrado > 0) {
+            recaudacionReal += Number(d.monto_cobrado_registrado)
+            const metodo = d.metodo_pago_registrado || 'efectivo'
+            pagosPorMetodo[metodo] = (pagosPorMetodo[metodo] || 0) + Number(d.monto_cobrado_registrado)
+          }
+        })
+
+        return {
+          ...ruta,
+          entregas_individuales: entregas || [],
+          recaudacion_calculada: recaudacionReal,
+          total_cuenta_corriente: totalCuentaCorriente,
+          pagos_por_metodo: pagosPorMetodo
+        }
+      }
+
+      return ruta
+    }))
+
     return {
       success: true,
-      data: rutas || [],
+      data: rutasConEntregas,
     }
   } catch (error: any) {
     devError('Error en obtenerRutasPendientesValidacion:', error)

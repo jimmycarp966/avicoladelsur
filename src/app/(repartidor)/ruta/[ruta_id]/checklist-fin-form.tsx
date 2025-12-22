@@ -50,30 +50,38 @@ export function ChecklistFinForm({ rutaId, vehiculoId, onComplete }: ChecklistFi
   })
 
   const onSubmit = async (data: ChecklistFormData) => {
+    console.log('[ChecklistFin] Iniciando submit...', { vehiculoId, rutaId, data })
     setLoading(true)
 
     try {
       // Obtener usuario actual
       const supabase = createClient()
+      console.log('[ChecklistFin] Obteniendo usuario...')
       const { data: { user } } = await supabase.auth.getUser()
-      
+
       if (!user) {
         toast.error('Usuario no autenticado')
+        setLoading(false)
         return
       }
+      console.log('[ChecklistFin] Usuario obtenido:', user.id)
 
       // Registrar checklist
+      console.log('[ChecklistFin] Llamando a registrarChecklistVehiculoAction...')
       const result = await registrarChecklistVehiculoAction({
         vehiculo_id: vehiculoId,
         ...data,
       })
+      console.log('[ChecklistFin] Resultado de action:', result)
 
       if (!result.success) {
         toast.error(result.error || 'Error al registrar checklist')
+        setLoading(false)
         return
       }
 
       // Obtener el ID del checklist recién creado
+      console.log('[ChecklistFin] Obteniendo checklist creado...')
       const { data: checklistData, error: checklistError } = await supabase
         .from('checklists_vehiculos')
         .select('id')
@@ -83,19 +91,28 @@ export function ChecklistFinForm({ rutaId, vehiculoId, onComplete }: ChecklistFi
         .limit(1)
         .single()
 
+      console.log('[ChecklistFin] Resultado de obtener checklist:', { checklistData, checklistError })
+
       if (checklistError || !checklistData) {
+        console.error('[ChecklistFin] Error al obtener checklist:', checklistError)
         toast.error('Error al obtener checklist creado')
+        setLoading(false)
         return
       }
 
       // Vincular checklist a la ruta
+      console.log('[ChecklistFin] Vinculando checklist a ruta...')
       const { error: updateError } = await supabase
         .from('rutas_reparto')
         .update({ checklist_fin_id: checklistData.id })
         .eq('id', rutaId)
 
+      console.log('[ChecklistFin] Resultado de vincular:', { updateError })
+
       if (updateError) {
+        console.error('[ChecklistFin] Error al vincular:', updateError)
         toast.error('Error al vincular checklist a la ruta')
+        setLoading(false)
         return
       }
 

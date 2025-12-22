@@ -5,7 +5,7 @@ import { ColumnDef } from '@tanstack/react-table'
 import { DataTable, SortableHeader } from '@/components/ui/data-table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Eye, FileText, MoreHorizontal } from 'lucide-react'
+import { Eye, FileText, MoreHorizontal, DollarSign } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import Link from 'next/link'
 
 interface Factura {
   id: string
@@ -23,62 +24,106 @@ interface Factura {
   cliente_id: string
   pedido_id: string
   fecha_emision: string
+  fecha_vencimiento?: string | null
   subtotal: number
   descuento: number
   total: number
+  monto_pagado: number
+  saldo_pendiente: number
   estado: string
+  estado_pago: 'pendiente' | 'parcial' | 'pagada' | 'anulada'
 }
 
 interface FacturasTableProps {
   onView?: (factura: Factura) => void
   onPrint?: (factura: Factura) => void
+  clienteId?: string // Para filtrar por cliente
 }
 
-export function FacturasTable({ onView, onPrint }: FacturasTableProps = {}) {
+export function FacturasTable({ onView, onPrint, clienteId }: FacturasTableProps = {}) {
   const [facturas, setFacturas] = useState<Factura[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const loadFacturas = async () => {
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from('facturas')
-        .select(
-          `
-          id,
-          numero_factura,
-          cliente_id,
-          pedido_id,
-          fecha_emision,
-          subtotal,
-          descuento,
-          total,
-          estado,
-          cliente:clientes(razon_social, nombre)
-        `
-        )
-        .order('fecha_emision', { ascending: false })
-        .limit(200)
+      try {
+        const supabase = createClient()
 
-      if (!error && data) {
-        const mapped: Factura[] = data.map((f: any) => ({
-          id: f.id,
-          numero_factura: f.numero_factura,
-          cliente_id: f.cliente_id,
-          pedido_id: f.pedido_id,
-          fecha_emision: f.fecha_emision,
-          subtotal: f.subtotal,
-          descuento: f.descuento,
-          total: f.total,
-          estado: f.estado,
-          cliente_nombre:
-            f.cliente?.razon_social || f.cliente?.nombre || 'Cliente',
-        }))
-        setFacturas(mapped)
+        // Query básico primero - sin campos opcionales que pueden no existir
+        let query = supabase
+          .from('facturas')
+          .select(
+            `
+            id,
+            numero_factura,
+            cliente_id,
+            pedido_id,
+            fecha_emision,
+            subtotal,
+            descuento,
+            total,
+            estado,
+            cliente:clientes(nombre)
+          `
+          )
+          .order('fecha_emision', { ascending: false })
+          .limit(200)
+
+        if (clienteId) {
+          query = query.eq('cliente_id', clienteId)
+        }
+
+        const { data, error } = await query
+
+        if (error) {
+          console.error('Error cargando facturas:', error.message, error.code, error.details)
+          setLoading(false)
+          return
+        }
+
+        if (data) {
+          const mapped: Factura[] = data.map((f: any) => ({
+            id: f.id,
+            numero_factura: f.numero_factura,
+            cliente_id: f.cliente_id,
+            pedido_id: f.pedido_id,
+            fecha_emision: f.fecha_emision,
+            fecha_vencimiento: f.fecha_vencimiento || null,
+            subtotal: f.subtotal,
+            descuento: f.descuento,
+            total: f.total,
+            monto_pagado: f.monto_pagado || 0,
+            saldo_pendiente: f.saldo_pendiente ?? f.total,
+            estado: f.estado,
+            estado_pago: f.estado_pago || 'pendiente',
+            cliente_nombre: f.cliente?.nombre || 'Cliente',
+          }))
+          setFacturas(mapped)
+        }
+      } catch (err) {
+        console.error('Error inesperado cargando facturas:', err)
+      } finally {
+        setLoading(false)
       }
     }
 
     loadFacturas()
-  }, [])
+  }, [clienteId])
+
+  const getEstadoPagoBadge = (estado: string) => {
+    switch (estado) {
+      case 'pagada':
+        return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">✓ Pagada</Badge>
+      case 'parcial':
+        return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">◐ Parcial</Badge>
+      case 'pendiente':
+        return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">○ Pendiente</Badge>
+      case 'anulada':
+        return <Badge variant="destructive">✕ Anulada</Badge>
+      default:
+        return <Badge variant="secondary">{estado}</Badge>
+    }
+  }
 
   const columns: ColumnDef<Factura>[] = [
     {
@@ -106,7 +151,15 @@ export function FacturasTable({ onView, onPrint }: FacturasTableProps = {}) {
       header: 'Cliente',
       cell: ({ row }) => {
         const nombre = (row.getValue('cliente_nombre') as string) || 'Cliente'
-        return <span>{nombre}</span>
+        const clienteId = row.original.cliente_id
+        return (
+          <Link
+            href={`/ventas/clientes/${clienteId}`}
+            className="hover:underline text-primary"
+          >
+            {nombre}
+          </Link>
+        )
       },
     },
     {
@@ -124,12 +177,32 @@ export function FacturasTable({ onView, onPrint }: FacturasTableProps = {}) {
       },
     },
     {
-      accessorKey: 'estado',
-      header: 'Estado',
+      accessorKey: 'saldo_pendiente',
+      header: ({ column }) => (
+        <SortableHeader column={column}>Saldo</SortableHeader>
+      ),
       cell: ({ row }) => {
-        const estado = row.getValue('estado') as string
-        const variant = estado === 'anulada' ? 'destructive' : 'default'
-        return <Badge variant={variant}>{estado}</Badge>
+        const saldo = row.original.saldo_pendiente
+        const estadoPago = row.original.estado_pago
+        if (estadoPago === 'pagada') {
+          return <span className="text-green-600">$0</span>
+        }
+        return (
+          <span className={saldo > 0 ? 'text-red-600 font-medium' : 'text-green-600'}>
+            {formatCurrency(saldo)}
+          </span>
+        )
+      },
+    },
+    {
+      accessorKey: 'estado_pago',
+      header: 'Estado Pago',
+      cell: ({ row }) => {
+        const estado = row.original.estado_pago
+        return getEstadoPagoBadge(estado)
+      },
+      filterFn: (row, id, value) => {
+        return value.includes(row.getValue(id))
       },
     },
     {
@@ -159,12 +232,24 @@ export function FacturasTable({ onView, onPrint }: FacturasTableProps = {}) {
                   Imprimir
                 </DropdownMenuItem>
               )}
+              {factura.estado_pago !== 'pagada' && (
+                <DropdownMenuItem asChild>
+                  <Link href={`/ventas/clientes/${factura.cliente_id}/cuenta-corriente`}>
+                    <DollarSign className="mr-2 h-4 w-4" />
+                    Registrar pago
+                  </Link>
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         )
       },
     },
   ]
+
+  if (loading) {
+    return <div className="text-center py-8 text-muted-foreground">Cargando facturas...</div>
+  }
 
   return (
     <DataTable
@@ -179,5 +264,3 @@ export function FacturasTable({ onView, onPrint }: FacturasTableProps = {}) {
     />
   )
 }
-
-
