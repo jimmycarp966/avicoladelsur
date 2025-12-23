@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -24,7 +24,8 @@ import {
     Plus,
     Trash2,
     Factory,
-    AlertCircle
+    AlertCircle,
+    Camera
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -35,7 +36,9 @@ import {
     cancelarOrdenProduccionAction,
     obtenerLotesDisponiblesAction
 } from '@/actions/produccion.actions'
-import { obtenerProductosAction } from '@/actions/almacen.actions'
+import { obtenerProductosAction, buscarProductoPorCodigoBarrasAction } from '@/actions/almacen.actions'
+import { ScanButton } from '@/components/barcode/BarcodeScanner'
+import { parseBarcodeEAN13 } from '@/lib/barcode-parser'
 import type { Producto } from '@/types/domain.types'
 
 // Tipos locales para el formulario
@@ -115,6 +118,68 @@ export default function NuevaOrdenProduccionPage() {
         }
         cargarLotes()
     }, [productoEntradaId])
+
+    // Manejar escaneo de código de barras para entradas
+    const handleScanEntrada = useCallback(async (code: string) => {
+        const parsed = parseBarcodeEAN13(code)
+        console.log('[Producción] Código escaneado:', code, parsed)
+
+        if (!parsed.plu) {
+            toast.error('Código no válido')
+            return
+        }
+
+        // Buscar producto por PLU
+        const result = await buscarProductoPorCodigoBarrasAction(parsed.plu)
+
+        if (!result.success || !result.data) {
+            toast.error(result.error || 'Producto no encontrado')
+            return
+        }
+
+        const producto = result.data.producto
+        setProductoEntradaId(producto.id)
+
+        // Si el código tiene peso embebido, pre-llenar
+        if (parsed.isWeightCode && parsed.weight) {
+            setPesoEntrada(parsed.weight.toFixed(3))
+            setCantidadEntrada('1')
+            toast.success(`${producto.nombre} - ${parsed.weight.toFixed(3)} kg`)
+        } else {
+            toast.success(`Producto: ${producto.nombre}`)
+        }
+    }, [])
+
+    // Manejar escaneo de código de barras para salidas
+    const handleScanSalida = useCallback(async (code: string) => {
+        const parsed = parseBarcodeEAN13(code)
+        console.log('[Producción] Código escaneado (salida):', code, parsed)
+
+        if (!parsed.plu) {
+            toast.error('Código no válido')
+            return
+        }
+
+        // Buscar producto por PLU
+        const result = await buscarProductoPorCodigoBarrasAction(parsed.plu)
+
+        if (!result.success || !result.data) {
+            toast.error(result.error || 'Producto no encontrado')
+            return
+        }
+
+        const producto = result.data.producto
+        setProductoSalidaId(producto.id)
+        setPluSalida(parsed.plu)
+
+        // Si el código tiene peso embebido, pre-llenar
+        if (parsed.isWeightCode && parsed.weight) {
+            setPesoSalida(parsed.weight.toFixed(3))
+            toast.success(`${producto.nombre} - ${parsed.weight.toFixed(3)} kg`)
+        } else {
+            toast.success(`Producto: ${producto.nombre}`)
+        }
+    }, [])
 
     // Calcular totales
     const pesoTotalEntrada = entradas.reduce((sum, e) => sum + (e.peso_kg || 0), 0)
@@ -418,7 +483,16 @@ export default function NuevaOrdenProduccionPage() {
                         {/* Formulario para agregar entrada */}
                         <div className="grid grid-cols-2 gap-4 p-4 border rounded-lg bg-muted/30">
                             <div>
-                                <Label>Producto</Label>
+                                <div className="flex items-center justify-between mb-1">
+                                    <Label>Producto</Label>
+                                    <ScanButton
+                                        onScan={handleScanEntrada}
+                                        size="sm"
+                                        variant="ghost"
+                                        title="Escanear Producto"
+                                        description="Escanea el código de barras de la etiqueta"
+                                    />
+                                </div>
                                 <Select value={productoEntradaId} onValueChange={setProductoEntradaId}>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Seleccionar producto..." />
@@ -567,7 +641,16 @@ export default function NuevaOrdenProduccionPage() {
                         {/* Formulario para agregar salida */}
                         <div className="grid grid-cols-3 gap-4 p-4 border rounded-lg bg-muted/30">
                             <div>
-                                <Label>Producto</Label>
+                                <div className="flex items-center justify-between mb-1">
+                                    <Label>Producto</Label>
+                                    <ScanButton
+                                        onScan={handleScanSalida}
+                                        size="sm"
+                                        variant="ghost"
+                                        title="Escanear Producto"
+                                        description="Escanea el código de barras de la etiqueta"
+                                    />
+                                </div>
                                 <Select value={productoSalidaId} onValueChange={setProductoSalidaId}>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Seleccionar producto..." />

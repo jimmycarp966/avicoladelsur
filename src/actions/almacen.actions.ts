@@ -1003,3 +1003,96 @@ export async function actualizarCategoriaProductosAction(
     }
   }
 }
+
+// Buscar producto por código de barras o PLU
+// Soporta códigos EAN-13 con peso embebido de balanza SDP
+export async function buscarProductoPorCodigoBarrasAction(
+  codigo: string
+): Promise<ApiResponse<{
+  producto: any
+  stockDisponible: number
+}>> {
+  try {
+    const supabase = await createClient()
+
+    // Limpiar código
+    const codigoLimpio = codigo.trim()
+
+    // Generar variantes del código para búsqueda
+    const variantes: string[] = [codigoLimpio]
+
+    // Agregar versión sin ceros a la izquierda
+    const sinCeros = codigoLimpio.replace(/^0+/, '')
+    if (sinCeros && sinCeros !== codigoLimpio) {
+      variantes.push(sinCeros)
+    }
+
+    // Agregar versión con ceros a la izquierda (4 dígitos)
+    if (codigoLimpio.length < 4) {
+      variantes.push(codigoLimpio.padStart(4, '0'))
+    }
+
+    // Buscar por codigo_barras primero
+    let producto = null
+
+    const { data: porBarras } = await supabase
+      .from('productos')
+      .select('*')
+      .eq('codigo_barras', codigoLimpio)
+      .eq('activo', true)
+      .single()
+
+    if (porBarras) {
+      producto = porBarras
+    } else {
+      // Buscar por código (PLU) - probar variantes
+      for (const variante of variantes) {
+        const { data } = await supabase
+          .from('productos')
+          .select('*')
+          .eq('codigo', variante)
+          .eq('activo', true)
+          .single()
+
+        if (data) {
+          producto = data
+          break
+        }
+      }
+    }
+
+    if (!producto) {
+      return {
+        success: false,
+        error: `Producto no encontrado para código: ${codigoLimpio}`,
+      }
+    }
+
+    // Obtener stock disponible
+    const { data: lotes } = await supabase
+      .from('lotes')
+      .select('cantidad_disponible')
+      .eq('producto_id', producto.id)
+      .eq('estado', 'disponible')
+      .gt('cantidad_disponible', 0)
+
+    const stockDisponible = lotes?.reduce(
+      (sum, lote) => sum + (lote.cantidad_disponible || 0),
+      0
+    ) || 0
+
+    return {
+      success: true,
+      data: {
+        producto,
+        stockDisponible,
+      },
+    }
+  } catch (error: any) {
+    devError('Error al buscar producto por código de barras:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al buscar producto',
+    }
+  }
+}

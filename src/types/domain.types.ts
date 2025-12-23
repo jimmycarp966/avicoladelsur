@@ -21,6 +21,7 @@ export interface Usuario extends BaseEntity {
 // Producto
 export interface Producto extends BaseEntity {
   codigo: string
+  codigo_barras?: string
   nombre: string
   descripcion?: string
   categoria?: string
