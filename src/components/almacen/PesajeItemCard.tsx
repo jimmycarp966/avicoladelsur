@@ -1,12 +1,15 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Scale, CheckCircle } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { ScanButton } from '@/components/barcode/BarcodeScanner'
+import { parseBarcodeEAN13 } from '@/lib/barcode-parser'
+import { toast } from 'sonner'
 
 interface ItemPesable {
   id: string
@@ -63,9 +66,16 @@ export function PesajeItemCard({
 
   // Sincronizar con el valor guardado cuando se actualiza
   useEffect(() => {
+    let isMounted = true
     if (item.peso_final) {
-      setPesoInput(item.peso_final.toString())
+      // Usar microtask para evitar cascading renders
+      queueMicrotask(() => {
+        if (isMounted) {
+          setPesoInput(item.peso_final!.toString())
+        }
+      })
     }
+    return () => { isMounted = false }
   }, [item.peso_final])
 
 
@@ -83,6 +93,21 @@ export function PesajeItemCard({
       }
     }
   }, [item.id])
+
+  // Manejar escaneo de código de barras
+  const handleScan = useCallback((code: string) => {
+    const parsed = parseBarcodeEAN13(code)
+    console.log('[PesajeItemCard] Código escaneado:', code, parsed)
+
+    if (parsed.isWeightCode && parsed.weight) {
+      setPesoInput(parsed.weight.toFixed(3))
+      toast.success(`Peso escaneado: ${parsed.weight.toFixed(3)} kg`)
+    } else if (parsed.plu) {
+      toast.info(`Código PLU: ${parsed.plu} (sin peso embebido)`)
+    } else {
+      toast.error('Código no válido')
+    }
+  }, [])
 
   return (
     <Card className={estaPesado ? "border-green-200 bg-green-50/50" : ""}>
@@ -169,6 +194,13 @@ export function PesajeItemCard({
             </div>
 
             <div className="flex gap-2">
+              <ScanButton
+                onScan={handleScan}
+                size="sm"
+                variant="outline"
+                title="Escanear Etiqueta"
+                description="Escanea la etiqueta de la balanza para obtener el peso"
+              />
               <Button
                 type="button"
                 variant="outline"

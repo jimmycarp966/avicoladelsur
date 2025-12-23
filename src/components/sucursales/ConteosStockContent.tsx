@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -36,6 +36,7 @@ import {
   User,
   Package,
   TrendingDown,
+  Camera,
 } from 'lucide-react'
 import {
   iniciarConteoStockAction,
@@ -45,6 +46,9 @@ import {
   type ConteoStock,
   type ConteoStockItem,
 } from '@/actions/ventas-sucursal.actions'
+import { ScanButton } from '@/components/barcode/BarcodeScanner'
+import { parseBarcodeEAN13 } from '@/lib/barcode-parser'
+import { buscarProductoPorCodigoBarrasAction } from '@/actions/almacen.actions'
 
 // ===========================================
 // TIPOS
@@ -174,12 +178,12 @@ export function ConteosStockContent({ data }: { data: ConteosData }) {
             items: conteoActivo.items.map((item) =>
               item.productoId === itemId
                 ? {
-                    ...item,
-                    cantidadContada,
-                    diferencia: cantidadContada - item.cantidadTeorica,
-                    valorDiferencia:
-                      (cantidadContada - item.cantidadTeorica) * item.costoUnitario,
-                  }
+                  ...item,
+                  cantidadContada,
+                  diferencia: cantidadContada - item.cantidadTeorica,
+                  valorDiferencia:
+                    (cantidadContada - item.cantidadTeorica) * item.costoUnitario,
+                }
                 : item
             ),
           })
@@ -254,6 +258,49 @@ export function ConteosStockContent({ data }: { data: ConteosData }) {
         return <Badge variant="outline">{estado}</Badge>
     }
   }
+
+  // Manejar escaneo de código de barras en conteo
+  const handleScanConteo = useCallback(async (code: string) => {
+    if (!conteoActivo) return
+
+    const parsed = parseBarcodeEAN13(code)
+    console.log('[ConteosStock] Código escaneado:', code, parsed)
+
+    if (!parsed.plu) {
+      toast.error('Código no válido')
+      return
+    }
+
+    // Buscar producto por PLU
+    const result = await buscarProductoPorCodigoBarrasAction(parsed.plu)
+
+    if (!result.success || !result.data) {
+      toast.error(result.error || 'Producto no encontrado')
+      return
+    }
+
+    // Buscar el item en el conteo activo
+    const itemConteo = conteoActivo.items.find(
+      item => item.productoId === result.data!.producto.id
+    )
+
+    if (!itemConteo) {
+      toast.error('Este producto no está en el conteo actual')
+      return
+    }
+
+    // Si el código tiene peso embebido, actualizar cantidad contada
+    if (parsed.isWeightCode && parsed.weight) {
+      await handleActualizarCantidad(itemConteo.productoId, parsed.weight)
+      toast.success(`${result.data.producto.nombre}: ${parsed.weight.toFixed(3)} kg registrado`)
+    } else {
+      // Mostrar mensaje para ingresar cantidad manualmente
+      toast.info(`Producto: ${result.data.producto.nombre}. Ingresa la cantidad manualmente.`)
+      // Hacer scroll al item
+      const rowElement = document.getElementById(`conteo-item-${itemConteo.productoId}`)
+      rowElement?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [conteoActivo, handleActualizarCantidad])
 
   return (
     <div className="space-y-6">
@@ -463,7 +510,20 @@ export function ConteosStockContent({ data }: { data: ConteosData }) {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Producto</TableHead>
+                    <TableHead>
+                      <div className="flex items-center gap-2">
+                        Producto
+                        {conteoActivo.estado === 'en_proceso' && (
+                          <ScanButton
+                            onScan={handleScanConteo}
+                            size="sm"
+                            variant="ghost"
+                            title="Escanear Producto"
+                            description="Escanea el código de barras para registrar cantidad"
+                          />
+                        )}
+                      </div>
+                    </TableHead>
                     <TableHead className="text-right">Stock Teórico</TableHead>
                     <TableHead className="text-right w-32">Cantidad Contada</TableHead>
                     <TableHead className="text-right">Diferencia</TableHead>
@@ -472,7 +532,7 @@ export function ConteosStockContent({ data }: { data: ConteosData }) {
                 </TableHeader>
                 <TableBody>
                   {conteoActivo.items.map((item) => (
-                    <TableRow key={item.productoId}>
+                    <TableRow key={item.productoId} id={`conteo-item-${item.productoId}`}>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Package className="w-4 h-4 text-muted-foreground" />
@@ -511,8 +571,8 @@ export function ConteosStockContent({ data }: { data: ConteosData }) {
                               item.diferencia < 0
                                 ? 'text-red-600 font-medium'
                                 : item.diferencia > 0
-                                ? 'text-green-600 font-medium'
-                                : 'text-muted-foreground'
+                                  ? 'text-green-600 font-medium'
+                                  : 'text-muted-foreground'
                             }
                           >
                             {item.diferencia > 0 ? '+' : ''}
@@ -529,8 +589,8 @@ export function ConteosStockContent({ data }: { data: ConteosData }) {
                               item.valorDiferencia < 0
                                 ? 'text-red-600 font-medium'
                                 : item.valorDiferencia > 0
-                                ? 'text-green-600 font-medium'
-                                : 'text-muted-foreground'
+                                  ? 'text-green-600 font-medium'
+                                  : 'text-muted-foreground'
                             }
                           >
                             {item.valorDiferencia > 0 ? '+' : ''}$
