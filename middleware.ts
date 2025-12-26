@@ -218,13 +218,13 @@ export async function middleware(request: NextRequest) {
   if (isSellerRoute && !['admin', 'vendedor', 'encargado_sucursal'].includes(userRole)) {
     return NextResponse.redirect(new URL('/unauthorized', request.url))
   }
-  
+
   // Rutas de sucursal (solo para encargado_sucursal y admin)
   const sucursalRoutes = [
     '/sucursal',
   ]
   const isSucursalRoute = sucursalRoutes.some(route => pathname.startsWith(route))
-  
+
   if (isSucursalRoute && !['admin', 'encargado_sucursal'].includes(userRole)) {
     return NextResponse.redirect(new URL('/unauthorized', request.url))
   }
@@ -247,12 +247,12 @@ export async function middleware(request: NextRequest) {
     // Admin, tesorero y encargado_sucursal pueden acceder a tesorería (con restricciones RLS)
     return NextResponse.redirect(new URL('/unauthorized', request.url))
   }
-  
+
   // Redirección automática para encargado_sucursal
   if (userRole === 'encargado_sucursal' && pathname === '/dashboard') {
     return NextResponse.redirect(new URL('/sucursal/dashboard', request.url))
   }
-  
+
   // Redirección automática para encargado_sucursal desde raíz
   if (userRole === 'encargado_sucursal' && pathname === '/') {
     return NextResponse.redirect(new URL('/sucursal/dashboard', request.url))
@@ -273,8 +273,10 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     * - manifest.json (PWA manifest)
      * - public folder
+     * - static assets
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|manifest.json|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|json)$).*)',
   ],
 }
