@@ -26,7 +26,7 @@ export function BarcodeScanner({
     const [selectedDevice, setSelectedDevice] = useState<string | null>(null)
     const readerRef = useRef<BrowserMultiFormatReader | null>(null)
 
-    // Inicializar lector
+    // Inicializar lector y solicitar permisos de cámara
     useEffect(() => {
         const hints = new Map()
         hints.set(DecodeHintType.POSSIBLE_FORMATS, [
@@ -42,23 +42,57 @@ export function BarcodeScanner({
 
         readerRef.current = new BrowserMultiFormatReader(hints)
 
-        // Obtener lista de cámaras disponibles
-        navigator.mediaDevices.enumerateDevices()
-            .then(deviceList => {
+        // Función para obtener cámaras después de tener permisos
+        const getCameras = async () => {
+            try {
+                // IMPORTANTE: En iOS y algunos Android, necesitamos solicitar permisos
+                // con getUserMedia ANTES de poder enumerar dispositivos
+                console.log('[BarcodeScanner] Solicitando permisos de cámara...')
+
+                // Solicitar permiso de cámara primero (esto dispara el popup de permisos)
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'environment' // Preferir cámara trasera
+                    }
+                })
+
+                // Detener el stream temporal (solo lo usamos para obtener permisos)
+                stream.getTracks().forEach(track => track.stop())
+
+                console.log('[BarcodeScanner] Permisos de cámara otorgados')
+
+                // Ahora sí podemos enumerar los dispositivos correctamente
+                const deviceList = await navigator.mediaDevices.enumerateDevices()
                 const videoDevices = deviceList.filter(d => d.kind === 'videoinput')
+
+                console.log('[BarcodeScanner] Cámaras encontradas:', videoDevices.length)
                 setDevices(videoDevices)
+
                 // Preferir cámara trasera si está disponible
                 const backCamera = videoDevices.find(d =>
                     d.label.toLowerCase().includes('back') ||
                     d.label.toLowerCase().includes('trasera') ||
-                    d.label.toLowerCase().includes('rear')
+                    d.label.toLowerCase().includes('rear') ||
+                    d.label.toLowerCase().includes('environment')
                 )
                 setSelectedDevice(backCamera?.deviceId || videoDevices[0]?.deviceId || null)
-            })
-            .catch(err => {
-                console.error('Error enumerating devices:', err)
-                setError('No se pudo acceder a las cámaras')
-            })
+
+            } catch (err: any) {
+                console.error('[BarcodeScanner] Error al obtener cámaras:', err)
+
+                if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                    setError('Permisos de cámara denegados. Por favor, habilita el acceso a la cámara en la configuración de tu navegador.')
+                } else if (err.name === 'NotFoundError') {
+                    setError('No se encontró ninguna cámara en este dispositivo.')
+                } else if (err.name === 'NotReadableError') {
+                    setError('La cámara está siendo usada por otra aplicación.')
+                } else {
+                    setError('No se pudo acceder a la cámara: ' + err.message)
+                }
+            }
+        }
+
+        getCameras()
 
         return () => {
             readerRef.current?.reset()
