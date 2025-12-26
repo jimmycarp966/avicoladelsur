@@ -122,21 +122,20 @@ export function useLocationTracker(options: UseLocationTrackerOptions = {}): Use
         setIsLoading(false)
         setError(null)
 
-        // Log para debugging
-        if (process.env.NODE_ENV === 'development') {
-            console.log('[useLocationTracker] Ubicación actualizada:', {
-                lat: newLocation.lat.toFixed(6),
-                lng: newLocation.lng.toFixed(6),
-                accuracy: newLocation.accuracy?.toFixed(0) + 'm'
-            })
-        }
+        // Debug siempre visible
+        console.log('%c[useLocationTracker] ✅ Ubicación actualizada:', 'color: green; font-weight: bold', {
+            lat: newLocation.lat.toFixed(6),
+            lng: newLocation.lng.toFixed(6),
+            accuracy: newLocation.accuracy?.toFixed(0) + 'm',
+            timestamp: new Date(newLocation.timestamp).toLocaleTimeString()
+        })
     }, [])
 
     // Manejar error de geolocalización
     const handlePositionError = useCallback((err: GeolocationPositionError) => {
         setIsLoading(false)
         let errorMessage = 'Error de geolocalización'
-        
+
         switch (err.code) {
             case err.PERMISSION_DENIED:
                 errorMessage = 'Permisos de ubicación denegados. Habilítalos en la configuración.'
@@ -148,7 +147,7 @@ export function useLocationTracker(options: UseLocationTrackerOptions = {}): Use
                 errorMessage = 'Tiempo de espera agotado. Reintentando...'
                 break
         }
-        
+
         setError(errorMessage)
         console.error('[useLocationTracker] Error:', errorMessage)
     }, [])
@@ -175,11 +174,22 @@ export function useLocationTracker(options: UseLocationTrackerOptions = {}): Use
 
         setIsTracking(true)
         setIsLoading(true)
+        console.log('%c[useLocationTracker] 📡 Iniciando tracking GPS...', 'color: blue; font-weight: bold')
 
         // Obtener posición inicial
         navigator.geolocation.getCurrentPosition(
-            handlePositionUpdate,
-            handlePositionError,
+            (pos) => {
+                console.log('%c[useLocationTracker] 📍 getCurrentPosition exitoso:', 'color: green', {
+                    lat: pos.coords.latitude,
+                    lng: pos.coords.longitude,
+                    accuracy: pos.coords.accuracy
+                })
+                handlePositionUpdate(pos)
+            },
+            (err) => {
+                console.error('%c[useLocationTracker] ❌ getCurrentPosition error:', 'color: red', err.message)
+                handlePositionError(err)
+            },
             {
                 enableHighAccuracy: highAccuracy,
                 timeout: 15000,

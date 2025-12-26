@@ -323,6 +323,11 @@ export default function NavigationView({
             return
         }
 
+        console.log('%c[NavigationView] 🗺️ Calculando ruta...', 'color: purple; font-weight: bold', {
+            origen: currentPosition,
+            destino: { lat: currentStop.lat, lng: currentStop.lng, nombre: currentStop.cliente_nombre }
+        })
+
         const directionsService = new window.google.maps.DirectionsService()
 
         try {
