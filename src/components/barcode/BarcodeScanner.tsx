@@ -26,6 +26,14 @@ export function BarcodeScanner({
     const [selectedDevice, setSelectedDevice] = useState<string | null>(null)
     const readerRef = useRef<BrowserMultiFormatReader | null>(null)
 
+    // Debug logs para mostrar en pantalla (móvil)
+    const [debugLogs, setDebugLogs] = useState<string[]>([])
+    const addDebugLog = (msg: string) => {
+        const timestamp = new Date().toLocaleTimeString()
+        setDebugLogs(prev => [...prev.slice(-4), `${timestamp}: ${msg}`])
+        console.log('[BarcodeScanner]', msg)
+    }
+
     // Inicializar lector y solicitar permisos de cámara
     useEffect(() => {
         const hints = new Map()
@@ -47,7 +55,7 @@ export function BarcodeScanner({
             try {
                 // IMPORTANTE: En iOS y algunos Android, necesitamos solicitar permisos
                 // con getUserMedia ANTES de poder enumerar dispositivos
-                console.log('[BarcodeScanner] Solicitando permisos de cámara...')
+                addDebugLog('Solicitando permisos cámara...')
 
                 // Solicitar permiso de cámara primero (esto dispara el popup de permisos)
                 const stream = await navigator.mediaDevices.getUserMedia({
@@ -59,13 +67,11 @@ export function BarcodeScanner({
                 // Detener el stream temporal (solo lo usamos para obtener permisos)
                 stream.getTracks().forEach(track => track.stop())
 
-                console.log('[BarcodeScanner] Permisos de cámara otorgados')
-
                 // Ahora sí podemos enumerar los dispositivos correctamente
                 const deviceList = await navigator.mediaDevices.enumerateDevices()
                 const videoDevices = deviceList.filter(d => d.kind === 'videoinput')
 
-                console.log('[BarcodeScanner] Cámaras encontradas:', videoDevices.length)
+                addDebugLog(`Permisos OK - ${videoDevices.length} cámaras`)
                 setDevices(videoDevices)
 
                 // Preferir cámara trasera si está disponible
@@ -78,7 +84,7 @@ export function BarcodeScanner({
                 setSelectedDevice(backCamera?.deviceId || videoDevices[0]?.deviceId || null)
 
             } catch (err: any) {
-                console.error('[BarcodeScanner] Error al obtener cámaras:', err)
+                addDebugLog(`❌ Error: ${err.name} - ${err.message}`)
 
                 if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
                     setError('Permisos de cámara denegados. Por favor, habilita el acceso a la cámara en la configuración de tu navegador.')
@@ -117,14 +123,13 @@ export function BarcodeScanner({
 
                         if (result) {
                             const code = result.getText()
-                            console.log('[BarcodeScanner] ✅ Código detectado:', code, 'Formato:', result.getBarcodeFormat())
+                            addDebugLog(`✅ Código: ${code}`)
                             onScan(code)
                             readerRef.current?.reset()
                             setIsScanning(false)
                         }
                         if (err && !(err.name === 'NotFoundException')) {
-                            // Ignorar NotFoundException (es normal cuando no hay código visible)
-                            console.error('[BarcodeScanner] ❌ Error en escaneo:', err.name, err.message)
+                            addDebugLog(`❌ ${err.name}: ${err.message}`)
                         }
                     }
                 )
@@ -133,8 +138,8 @@ export function BarcodeScanner({
                     setIsScanning(true)
                     setError(null)
                 }
-            } catch (err) {
-                console.error('[BarcodeScanner] Error al iniciar cámara:', err)
+            } catch (err: any) {
+                addDebugLog(`❌ No se pudo iniciar cámara: ${err.message}`)
                 if (isMounted) {
                     setError('No se pudo iniciar la cámara. Verifica los permisos.')
                     setIsScanning(false)
@@ -224,6 +229,16 @@ export function BarcodeScanner({
                                     </Button>
                                 )}
                             </div>
+                        </div>
+                    )}
+
+                    {/* Panel de Debug (visible en móvil) */}
+                    {debugLogs.length > 0 && (
+                        <div className="bg-black/80 rounded-lg p-2 text-xs font-mono text-green-400 max-h-24 overflow-y-auto">
+                            <div className="text-white/50 mb-1">Debug:</div>
+                            {debugLogs.map((log, i) => (
+                                <div key={i} className="truncate">{log}</div>
+                            ))}
                         </div>
                     )}
 
