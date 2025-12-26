@@ -56,6 +56,8 @@ interface NavigationViewProps {
     stops: DeliveryStop[]
     onClose: () => void
     onDeliveryComplete: (stopId: string) => void
+    /** Ubicación inicial pre-obtenida (del hook useLocationTracker) */
+    initialPosition?: { lat: number; lng: number } | null
 }
 
 // Voice synthesis helper
@@ -104,7 +106,8 @@ export default function NavigationView({
     rutaId,
     stops,
     onClose,
-    onDeliveryComplete
+    onDeliveryComplete,
+    initialPosition
 }: NavigationViewProps) {
     const router = useRouter()
     // Refs
@@ -119,7 +122,8 @@ export default function NavigationView({
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [voiceEnabled, setVoiceEnabled] = useState(true)
-    const [currentPosition, setCurrentPosition] = useState<{ lat: number, lng: number } | null>(null)
+    // Usar ubicación pre-obtenida si está disponible
+    const [currentPosition, setCurrentPosition] = useState<{ lat: number, lng: number } | null>(initialPosition || null)
     const [currentStopIndex, setCurrentStopIndex] = useState(0)
     const [steps, setSteps] = useState<NavigationStep[]>([])
     const [currentStepIndex, setCurrentStepIndex] = useState(0)
@@ -222,52 +226,38 @@ export default function NavigationView({
         }
     }, [])
 
-    // Start GPS tracking
+    // Start GPS tracking - usa initialPosition si está disponible, sin fallback a homeBase
     useEffect(() => {
         if (!navigator.geolocation) {
-            console.warn('[NavigationView] GPS no soportado, usando fallback')
-            // Usar ubicación por defecto inmediatamente
-            setCurrentPosition({
-                lat: config.rutas.homeBase.lat,
-                lng: config.rutas.homeBase.lng
-            })
+            console.warn('[NavigationView] GPS no soportado')
+            // Si tenemos initialPosition, usarla; sino mostrar error
+            if (!currentPosition && !initialPosition) {
+                setError('GPS no disponible y no hay ubicación inicial')
+            }
             return
         }
 
-        // Timeout para usar fallback si GPS tarda mucho
-        const timeoutId = setTimeout(() => {
-            if (!currentPosition) {
-                console.warn('[NavigationView] GPS timeout, usando fallback')
-                setCurrentPosition({
-                    lat: config.rutas.homeBase.lat,
-                    lng: config.rutas.homeBase.lng
-                })
-            }
-        }, 5000)
+        // Si ya tenemos posición inicial, no necesitamos getCurrentPosition
+        // pero sí queremos watchPosition para actualizaciones
+        if (!currentPosition && !initialPosition) {
+            // Solicitar posición solo si no tenemos ninguna
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    console.log('[NavigationView] GPS position:', pos.coords.latitude, pos.coords.longitude)
+                    setCurrentPosition({
+                        lat: pos.coords.latitude,
+                        lng: pos.coords.longitude
+                    })
+                },
+                (err) => {
+                    console.error('[NavigationView] GPS Error:', err)
+                    setError('No se pudo obtener tu ubicación. Verifica los permisos de GPS.')
+                },
+                { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
+            )
+        }
 
-        // Get initial position
-        navigator.geolocation.getCurrentPosition(
-            (pos) => {
-                clearTimeout(timeoutId)
-                console.log('[NavigationView] GPS position:', pos.coords.latitude, pos.coords.longitude)
-                setCurrentPosition({
-                    lat: pos.coords.latitude,
-                    lng: pos.coords.longitude
-                })
-            },
-            (err) => {
-                clearTimeout(timeoutId)
-                console.error('[NavigationView] GPS Error:', err)
-                // Use home base as fallback
-                setCurrentPosition({
-                    lat: config.rutas.homeBase.lat,
-                    lng: config.rutas.homeBase.lng
-                })
-            },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
-        )
-
-        // Watch position continuously
+        // Watch position continuously para actualizaciones en tiempo real
         watchIdRef.current = navigator.geolocation.watchPosition(
             (pos) => {
                 const newPos = {
@@ -285,18 +275,17 @@ export default function NavigationView({
             (err) => console.error('GPS Watch Error:', err),
             {
                 enableHighAccuracy: true,
-                maximumAge: 5000,
-                timeout: 10000
+                maximumAge: 3000,
+                timeout: 15000
             }
         )
 
         return () => {
-            clearTimeout(timeoutId)
             if (watchIdRef.current !== null) {
                 navigator.geolocation.clearWatch(watchIdRef.current)
             }
         }
-    }, [])
+    }, [initialPosition])
 
     // Create position marker
     useEffect(() => {

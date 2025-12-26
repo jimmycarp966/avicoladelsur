@@ -29,6 +29,7 @@ import { iniciarRutaAction } from '@/actions/reparto.actions'
 import GpsTracker from '@/components/reparto/GpsTracker'
 import NavigationView from '@/components/reparto/NavigationView'
 import { ChecklistInicioForm } from './checklist-inicio-form'
+import { useLocationTracker } from '@/hooks/useLocationTracker'
 
 interface RutaMapaContentProps {
     ruta: any
@@ -72,7 +73,22 @@ export function RutaMapaContent({ ruta }: RutaMapaContentProps) {
     const [showEntregaPanel, setShowEntregaPanel] = useState(false)
     const [showNavigation, setShowNavigation] = useState(false)
     const [loading, setLoading] = useState(false)
-    const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null)
+
+    // Tracking GPS continuo desde que se abre la página
+    const {
+        location: userLocation,
+        accuracy: gpsAccuracy,
+        error: gpsError,
+        isLoading: isGpsLoading,
+        isReady: isGpsReady,
+        isTracking: isGpsTracking
+    } = useLocationTracker({
+        autoStart: true,
+        repartidorId: ruta.repartidor_id,
+        vehiculoId: ruta.vehiculo_id,
+        rutaId: ruta.id,
+        sendInterval: 5000
+    })
 
     // Estado local de entregas para actualización dinámica
     const [entregasLocales, setEntregasLocales] = useState<any[]>(ruta.detalles_ruta || [])
@@ -284,44 +300,29 @@ export function RutaMapaContent({ ruta }: RutaMapaContentProps) {
         }
     }, [entregasOrdenadas, proximaEntrega, mapLoaded, ruta.polyline])
 
-    // Obtener y actualizar ubicación del usuario
+    // Actualizar marcador de usuario en el mapa cuando cambia la ubicación
     useEffect(() => {
-        if (!navigator.geolocation) return
+        if (!mapInstanceRef.current || !window.google?.maps || !userLocation) return
 
-        const updateUserLocation = (position: GeolocationPosition) => {
-            const coords = {
-                lat: position.coords.latitude,
-                lng: position.coords.longitude
-            }
-            setUserLocation(coords)
-
-            if (mapInstanceRef.current && window.google?.maps) {
-                if (userMarkerRef.current) {
-                    userMarkerRef.current.setPosition(coords)
-                } else {
-                    userMarkerRef.current = new window.google.maps.Marker({
-                        position: coords,
-                        map: mapInstanceRef.current,
-                        icon: {
-                            path: window.google.maps.SymbolPath.CIRCLE,
-                            scale: 8,
-                            fillColor: '#22c55e',
-                            fillOpacity: 1,
-                            strokeColor: '#ffffff',
-                            strokeWeight: 3,
-                        },
-                        title: 'Tu ubicación',
-                        zIndex: 200,
-                    })
-                }
-            }
+        if (userMarkerRef.current) {
+            userMarkerRef.current.setPosition(userLocation)
+        } else {
+            userMarkerRef.current = new window.google.maps.Marker({
+                position: userLocation,
+                map: mapInstanceRef.current,
+                icon: {
+                    path: window.google.maps.SymbolPath.CIRCLE,
+                    scale: 8,
+                    fillColor: '#22c55e',
+                    fillOpacity: 1,
+                    strokeColor: '#ffffff',
+                    strokeWeight: 3,
+                },
+                title: 'Tu ubicación',
+                zIndex: 200,
+            })
         }
-
-        navigator.geolocation.getCurrentPosition(updateUserLocation)
-        const watchId = navigator.geolocation.watchPosition(updateUserLocation)
-
-        return () => navigator.geolocation.clearWatch(watchId)
-    }, [mapLoaded])
+    }, [userLocation, mapLoaded])
 
     const handleIniciarRuta = async () => {
         if (!ruta.checklist_inicio_id) {
@@ -430,6 +431,25 @@ export function RutaMapaContent({ ruta }: RutaMapaContentProps) {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
+                    {/* Indicador de GPS */}
+                    {isGpsLoading && (
+                        <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-300">
+                            <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                            GPS...
+                        </Badge>
+                    )}
+                    {gpsError && !isGpsLoading && (
+                        <Badge variant="destructive" className="text-xs">
+                            <AlertCircle className="h-3 w-3 mr-1" />
+                            GPS
+                        </Badge>
+                    )}
+                    {isGpsReady && (
+                        <Badge variant="secondary" className="bg-green-50 text-green-700 border-green-300">
+                            <Navigation className="h-3 w-3 mr-1" />
+                            GPS
+                        </Badge>
+                    )}
                     <Badge variant={ruta.estado === 'en_curso' ? 'default' : 'secondary'}>
                         {ruta.estado === 'en_curso' ? 'En Curso' : 'Planificada'}
                     </Badge>
@@ -506,10 +526,20 @@ export function RutaMapaContent({ ruta }: RutaMapaContentProps) {
                             <Button
                                 variant="default"
                                 className="bg-blue-600 hover:bg-blue-700"
-                                onClick={() => setShowNavigation(true)}
-                                disabled={ruta.estado !== 'en_curso'}
+                                onClick={() => {
+                                    if (!userLocation) {
+                                        toast.error('Esperando ubicación GPS... Por favor, espera un momento.')
+                                        return
+                                    }
+                                    setShowNavigation(true)
+                                }}
+                                disabled={ruta.estado !== 'en_curso' || isGpsLoading}
                             >
-                                <Volume2 className="mr-2 h-4 w-4" />
+                                {isGpsLoading ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                    <Volume2 className="mr-2 h-4 w-4" />
+                                )}
                                 Iniciar Navegación
                             </Button>
                             <Button
@@ -694,6 +724,7 @@ export function RutaMapaContent({ ruta }: RutaMapaContentProps) {
                     stops={deliveryStops}
                     onClose={handleCloseNavigation}
                     onDeliveryComplete={handleDeliveryComplete}
+                    initialPosition={userLocation}
                 />
             )}
         </div>
