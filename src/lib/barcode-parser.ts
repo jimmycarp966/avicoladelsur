@@ -25,13 +25,13 @@ export interface BarcodeResult {
  */
 function calculateEAN13CheckDigit(code: string): number {
   if (code.length !== 12) return -1
-  
+
   let sum = 0
   for (let i = 0; i < 12; i++) {
     const digit = parseInt(code[i], 10)
     sum += i % 2 === 0 ? digit : digit * 3
   }
-  
+
   return (10 - (sum % 10)) % 10
 }
 
@@ -40,20 +40,33 @@ function calculateEAN13CheckDigit(code: string): number {
  */
 export function validateEAN13(code: string): boolean {
   if (!/^\d{13}$/.test(code)) return false
-  
+
   const checkDigit = parseInt(code[12], 10)
   const calculatedCheck = calculateEAN13CheckDigit(code.substring(0, 12))
-  
+
   return checkDigit === calculatedCheck
 }
 
 /**
  * Parsea un código de barras EAN-13 con peso embebido
- * Soporta códigos con prefijo 20 (estándar de peso variable)
+ * 
+ * Formato de balanza SDP BBC-4030 (Avícola del Sur):
+ * 2 0 P P P P F W W W W W C
+ * │ │ └─────┘ │ └───────┘ │
+ * │ │    │    │     │     └── Dígito verificador
+ * │ │    │    │     └── Peso (5 dígitos en gramos, ej: 11650 = 11.650 kg)
+ * │ │    │    └── Flag (0=normal, 1=unidad mayor, etc.)
+ * │ │    └── PLU/Código producto (4 dígitos con ceros a la izquierda)
+ * │ └── Indicador tipo
+ * └── Prefijo nacional peso variable
+ * 
+ * Ejemplos:
+ * - 2001480116503 → PLU: 148, Peso: 11.650 kg
+ * - 2001481010704 → PLU: 148, Peso: 10.170 kg (flag 1 = unidad mayor)
  */
 export function parseBarcodeEAN13(code: string): BarcodeResult {
   const rawCode = code.trim()
-  
+
   // Validar formato básico
   if (!/^\d{13}$/.test(rawCode)) {
     return {
@@ -65,11 +78,11 @@ export function parseBarcodeEAN13(code: string): BarcodeResult {
       error: 'Código debe tener 13 dígitos'
     }
   }
-  
+
   // Verificar prefijo de peso variable (20, 21, 22, etc.)
   const prefix = rawCode.substring(0, 2)
   const isWeightCode = prefix === '20' || prefix === '21' || prefix === '22'
-  
+
   if (!isWeightCode) {
     // Es un código EAN-13 estándar (sin peso embebido)
     return {
@@ -80,20 +93,28 @@ export function parseBarcodeEAN13(code: string): BarcodeResult {
       rawCode
     }
   }
-  
-  // Extraer PLU y peso del código
-  // Formato: 20 PPPPP WWWWW C
-  const pluRaw = rawCode.substring(2, 7)  // 5 dígitos de PLU
-  const weightRaw = rawCode.substring(7, 12)  // 5 dígitos de peso
-  
-  // Limpiar PLU (remover ceros a la izquierda pero mantener al menos 1 dígito)
+
+  // Formato SDP: 20 + PLU(4) + FLAG(1) + PESO(5) + CHECK(1)
+  const pluRaw = rawCode.substring(2, 6)   // 4 dígitos de PLU (posición 2-5)
+  const flag = rawCode.substring(6, 7)      // 1 dígito flag (posición 6)
+  const weightRaw = rawCode.substring(7, 12)  // 5 dígitos de peso (posición 7-11)
+
+  // Limpiar PLU: remover ceros a la izquierda
   const plu = pluRaw.replace(/^0+/, '') || '0'
-  
-  // Convertir peso: los 5 dígitos representan gramos (ej: 10170 = 10.170 kg)
-  // O pueden representar el peso con 3 decimales (ej: 10170 = 10.170 kg)
+
+  // Convertir peso: los 5 dígitos representan gramos (ej: 11650 = 11.650 kg)
   const weightGrams = parseInt(weightRaw, 10)
   const weight = weightGrams / 1000  // Convertir a kg
-  
+
+  console.log('[barcode-parser] Código parseado:', {
+    rawCode,
+    pluRaw,
+    plu,
+    flag,
+    weightRaw,
+    weight: weight.toFixed(3) + ' kg'
+  })
+
   return {
     isValid: true,
     isWeightCode: true,
@@ -109,12 +130,12 @@ export function parseBarcodeEAN13(code: string): BarcodeResult {
  */
 export function parseGenericBarcode(code: string): BarcodeResult {
   const rawCode = code.trim()
-  
+
   // Si es EAN-13, usar el parser específico
   if (/^\d{13}$/.test(rawCode)) {
     return parseBarcodeEAN13(rawCode)
   }
-  
+
   // Para otros formatos, simplemente retornar el código como PLU
   return {
     isValid: true,
@@ -139,17 +160,17 @@ export function formatWeight(weight: number | null): string {
  */
 export function getPLUVariants(plu: string): string[] {
   const variants: string[] = [plu]
-  
+
   // Agregar con ceros a la izquierda (4 dígitos)
   if (plu.length < 4) {
     variants.push(plu.padStart(4, '0'))
   }
-  
+
   // Agregar sin ceros a la izquierda
   const withoutLeadingZeros = plu.replace(/^0+/, '')
   if (withoutLeadingZeros !== plu && withoutLeadingZeros.length > 0) {
     variants.push(withoutLeadingZeros)
   }
-  
+
   return [...new Set(variants)] // Eliminar duplicados
 }
