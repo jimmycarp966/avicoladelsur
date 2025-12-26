@@ -96,16 +96,26 @@ export function PesajeItemCard({
 
   // Manejar escaneo de código de barras
   const handleScan = useCallback((code: string) => {
+    console.log('[PesajeItemCard] 📷 Código recibido del escáner:', code)
     const parsed = parseBarcodeEAN13(code)
-    console.log('[PesajeItemCard] Código escaneado:', code, parsed)
+    console.log('[PesajeItemCard] 🔍 Resultado del parser:', {
+      isValid: parsed.isValid,
+      isWeightCode: parsed.isWeightCode,
+      plu: parsed.plu,
+      weight: parsed.weight,
+      error: parsed.error
+    })
 
     if (parsed.isWeightCode && parsed.weight) {
+      console.log('[PesajeItemCard] ✅ Peso detectado:', parsed.weight.toFixed(3), 'kg')
       setPesoInput(parsed.weight.toFixed(3))
       toast.success(`Peso escaneado: ${parsed.weight.toFixed(3)} kg`)
     } else if (parsed.plu) {
+      console.log('[PesajeItemCard] ⚠️ Código sin peso:', parsed.plu)
       toast.info(`Código PLU: ${parsed.plu} (sin peso embebido)`)
     } else {
-      toast.error('Código no válido')
+      console.log('[PesajeItemCard] ❌ Código no válido:', parsed.error)
+      toast.error('Código no válido: ' + (parsed.error || 'formato desconocido'))
     }
   }, [])
 

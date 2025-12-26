@@ -117,14 +117,14 @@ export function BarcodeScanner({
 
                         if (result) {
                             const code = result.getText()
-                            console.log('[BarcodeScanner] Código detectado:', code)
+                            console.log('[BarcodeScanner] ✅ Código detectado:', code, 'Formato:', result.getBarcodeFormat())
                             onScan(code)
                             readerRef.current?.reset()
                             setIsScanning(false)
                         }
                         if (err && !(err.name === 'NotFoundException')) {
                             // Ignorar NotFoundException (es normal cuando no hay código visible)
-                            console.error('[BarcodeScanner] Error:', err)
+                            console.error('[BarcodeScanner] ❌ Error en escaneo:', err.name, err.message)
                         }
                     }
                 )
