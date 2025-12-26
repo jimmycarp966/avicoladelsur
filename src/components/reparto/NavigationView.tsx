@@ -91,6 +91,19 @@ const formatDistance = (meters: number): string => {
     return `${(meters / 1000).toFixed(1)}km`
 }
 
+// Distance calculation helper (Haversine formula)
+const getDistanceMeters = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+    const R = 6371000 // Earth radius in meters
+    const dLat = (lat2 - lat1) * Math.PI / 180
+    const dLng = (lng2 - lng1) * Math.PI / 180
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLng / 2) * Math.sin(dLng / 2)
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    return R * c
+}
+
 // Maneuver icons
 const getManeuverIcon = (maneuver?: string) => {
     if (!maneuver) return <ArrowRight className="h-8 w-8" />
@@ -117,6 +130,7 @@ export default function NavigationView({
     const positionMarkerRef = useRef<any>(null)
     const watchIdRef = useRef<number | null>(null)
     const lastSpokenStepRef = useRef<number>(-1)
+    const lastRouteCalcPositionRef = useRef<{ lat: number; lng: number } | null>(null)
 
     // State
     const [loading, setLoading] = useState(true)
@@ -382,14 +396,26 @@ export default function NavigationView({
         }
     }, [currentPosition, currentStop, voiceEnabled])
 
-    // Calculate route when position or stop changes
+    // Calculate route only when there's significant position change (>50m) or on initial load
     useEffect(() => {
-        console.log('[NavigationView] useEffect for calculateRoute', {
-            hasPosition: !!currentPosition,
-            hasStop: !!currentStop,
-            loading
-        })
-        if (currentPosition && currentStop && !loading) {
+        if (!currentPosition || !currentStop || loading) return
+
+        // Check if we need to recalculate (first time or moved >50m)
+        const shouldRecalculate = () => {
+            if (!lastRouteCalcPositionRef.current) return true
+
+            const distance = getDistanceMeters(
+                lastRouteCalcPositionRef.current.lat,
+                lastRouteCalcPositionRef.current.lng,
+                currentPosition.lat,
+                currentPosition.lng
+            )
+            return distance > 50 // Only recalculate if moved more than 50 meters
+        }
+
+        if (shouldRecalculate()) {
+            console.log('[NavigationView] Recalculando ruta (cambio >50m o inicial)')
+            lastRouteCalcPositionRef.current = currentPosition
             calculateRoute()
         }
     }, [currentStop, loading, currentPosition, calculateRoute])
@@ -435,18 +461,7 @@ export default function NavigationView({
         }
     }, [currentStepIndex, steps, voiceEnabled])
 
-    // Distance calculation helper
-    const getDistanceMeters = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
-        const R = 6371000 // Earth radius in meters
-        const dLat = (lat2 - lat1) * Math.PI / 180
-        const dLng = (lng2 - lng1) * Math.PI / 180
-        const a =
-            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-            Math.sin(dLng / 2) * Math.sin(dLng / 2)
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-        return R * c
-    }
+
 
     // Handle delivery complete
     const handleDeliveryComplete = () => {
