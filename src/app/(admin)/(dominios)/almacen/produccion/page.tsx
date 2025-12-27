@@ -60,47 +60,49 @@ async function OrdenesProduccionList() {
             {ordenes.map((orden) => (
                 <Card key={orden.id} className="hover:shadow-md transition-shadow">
                     <CardContent className="py-4">
-                        <div className="flex items-center justify-between">
+                        {/* Stack vertical en móvil */}
+                        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                             <div className="flex items-center gap-4">
-                                <div className="p-3 bg-primary/10 rounded-lg">
+                                <div className="p-3 bg-primary/10 rounded-lg shrink-0">
                                     <Factory className="h-6 w-6 text-primary" />
                                 </div>
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <h3 className="font-semibold text-lg">{orden.numero_orden}</h3>
+                                <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <h3 className="font-semibold text-lg truncate">{orden.numero_orden}</h3>
                                         {getEstadoBadge(orden.estado)}
                                     </div>
-                                    <p className="text-sm text-muted-foreground">
+                                    <p className="text-sm text-muted-foreground truncate">
                                         {formatDate(orden.fecha_produccion)}
                                         {orden.operario && ` • ${orden.operario.nombre} ${orden.operario.apellido || ''}`}
                                     </p>
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-6">
+                            {/* Stats y botón - wrap en móvil */}
+                            <div className="flex flex-wrap items-center gap-4 md:gap-6">
                                 <div className="text-center">
                                     <div className="flex items-center gap-1 text-muted-foreground">
                                         <Package className="h-4 w-4" />
-                                        <span className="text-sm">Entrada</span>
+                                        <span className="text-xs md:text-sm">Entrada</span>
                                     </div>
-                                    <p className="font-semibold">{orden.peso_total_entrada?.toFixed(2) || '0'} kg</p>
+                                    <p className="font-semibold text-sm md:text-base">{orden.peso_total_entrada?.toFixed(2) || '0'} kg</p>
                                 </div>
 
                                 <div className="text-center">
                                     <div className="flex items-center gap-1 text-muted-foreground">
                                         <Scale className="h-4 w-4" />
-                                        <span className="text-sm">Salida</span>
+                                        <span className="text-xs md:text-sm">Salida</span>
                                     </div>
-                                    <p className="font-semibold">{orden.peso_total_salida?.toFixed(2) || '0'} kg</p>
+                                    <p className="font-semibold text-sm md:text-base">{orden.peso_total_salida?.toFixed(2) || '0'} kg</p>
                                 </div>
 
                                 {orden.estado === 'completada' && (
                                     <div className="text-center">
                                         <div className="flex items-center gap-1 text-muted-foreground">
                                             <TrendingDown className="h-4 w-4" />
-                                            <span className="text-sm">Merma</span>
+                                            <span className="text-xs md:text-sm">Merma</span>
                                         </div>
-                                        <p className="font-semibold text-orange-600">
+                                        <p className="font-semibold text-orange-600 text-sm md:text-base">
                                             {orden.merma_porcentaje?.toFixed(1) || '0'}%
                                         </p>
                                     </div>
@@ -123,22 +125,23 @@ async function OrdenesProduccionList() {
 export default function ProduccionPage() {
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            {/* Header - Stack vertical en móvil */}
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Producción / Desposte</h1>
-                    <p className="text-muted-foreground">
+                    <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Producción / Desposte</h1>
+                    <p className="text-muted-foreground text-sm md:text-base">
                         Gestión de transformación de productos y trazabilidad
                     </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                     <Link href="/almacen/produccion/configuracion">
-                        <Button variant="outline">
+                        <Button variant="outline" size="sm" className="md:size-default">
                             <Scale className="mr-2 h-4 w-4" />
-                            Configurar Balanza
+                            <span className="hidden sm:inline">Configurar</span> Balanza
                         </Button>
                     </Link>
                     <Link href="/almacen/produccion/nueva">
-                        <Button>
+                        <Button size="sm" className="md:size-default">
                             <Plus className="mr-2 h-4 w-4" />
                             Nueva Orden
                         </Button>
@@ -146,8 +149,8 @@ export default function ProduccionPage() {
                 </div>
             </div>
 
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Stats Cards - 2 columnas en móvil */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <Card>
                     <CardHeader className="pb-2">
                         <CardDescription>En Proceso</CardDescription>

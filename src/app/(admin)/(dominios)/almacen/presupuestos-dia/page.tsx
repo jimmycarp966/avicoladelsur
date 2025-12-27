@@ -82,18 +82,18 @@ async function PresupuestosDiaContent({
       {/* Componente Realtime que actualiza la página automáticamente */}
       <PresupuestosDiaRealtime fecha={fecha} zonaId={zonaId} turno={turno} />
 
-      {/* Header */}
-      <div className="relative overflow-hidden rounded-lg bg-gradient-to-br from-primary/5 via-white to-secondary/5 p-6 shadow-sm border border-primary/10">
+      {/* Header - Stack vertical en móvil */}
+      <div className="relative overflow-hidden rounded-lg bg-gradient-to-br from-primary/5 via-white to-secondary/5 p-4 md:p-6 shadow-sm border border-primary/10">
         <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-10"></div>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Almacén del Día</h1>
-            <p className="text-muted-foreground mt-1">
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Almacén del Día</h1>
+            <p className="text-muted-foreground text-sm md:text-base mt-1">
               Presupuestos y transferencias pendientes de preparación
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline" className="text-xs md:text-sm">
               <Calendar className="mr-1 h-3 w-3" />
               {new Date().toLocaleDateString('es-AR')}
             </Badge>
@@ -104,8 +104,8 @@ async function PresupuestosDiaContent({
         </div>
       </div>
 
-      {/* Estadísticas rápidas */}
-      <div className="grid gap-4 md:grid-cols-5">
+      {/* Estadísticas rápidas - 2 cols móvil, 3 tablet, 6 desktop */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
         <Card className="border-t-[3px] border-t-primary bg-primary/5">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Presupuestos</CardTitle>
@@ -419,47 +419,44 @@ async function PresupuestosDiaContent({
 
                     return (
                       <Card key={presupuesto.id} className="hover:shadow-md transition-shadow">
-                        <CardContent className="p-6">
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-3 mb-2">
+                        <CardContent className="p-4 md:p-6">
+                          {/* Stack vertical en móvil */}
+                          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex flex-wrap items-center gap-2 mb-2">
                                 <h3 className="text-lg font-semibold">
                                   #{presupuesto.numero_presupuesto}
                                 </h3>
-                                <Badge variant="outline">
+                                <Badge variant="outline" className="truncate max-w-[150px]">
                                   {presupuesto.cliente?.nombre || 'Cliente'}
                                 </Badge>
                               </div>
 
-                              <div className="flex items-center gap-6 text-sm text-muted-foreground">
-                                <span>
-                                  📦 {presupuesto.items?.length || 0} items
-                                </span>
-                                <span>
-                                  ⚖️ {itemsPesables.length} pesables ({itemsPesados.length} de {itemsPesables.length} completados)
-                                </span>
-                                <span>
-                                  🏋️ {totalKg.toFixed(1)}kg estimados
-                                </span>
+                              {/* Stats con wrap */}
+                              <div className="flex flex-wrap items-center gap-3 md:gap-6 text-xs md:text-sm text-muted-foreground">
+                                <span>📦 {presupuesto.items?.length || 0} items</span>
+                                <span>⚖️ {itemsPesados.length}/{itemsPesables.length} pesados</span>
+                                <span>🏋️ {totalKg.toFixed(1)}kg</span>
                               </div>
                               {asignacionVehiculo && (
-                                <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-primary/5 px-3 py-1 text-sm text-primary">
-                                  <Truck className="h-4 w-4" />
-                                  Vehículo sugerido: {asignacionVehiculo.vehiculo?.patente || 'Por asignar'} ({asignacionVehiculo.peso_estimado.toFixed(1)} kg)
+                                <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-primary/5 px-3 py-1 text-xs md:text-sm text-primary">
+                                  <Truck className="h-4 w-4 shrink-0" />
+                                  <span className="truncate">{asignacionVehiculo.vehiculo?.patente || 'Por asignar'} ({asignacionVehiculo.peso_estimado.toFixed(1)} kg)</span>
                                 </div>
                               )}
                             </div>
 
-                            <div className="flex items-center gap-2">
+                            {/* Botones con wrap */}
+                            <div className="flex flex-wrap items-center gap-2">
                               <Button variant="outline" size="sm" asChild>
                                 <Link href={`/ventas/presupuestos/${presupuesto.id}`}>
-                                  Ver Detalle
+                                  Ver
                                 </Link>
                               </Button>
-                              <Button asChild className="bg-blue-600 hover:bg-blue-700">
+                              <Button asChild size="sm" className="bg-blue-600 hover:bg-blue-700">
                                 <Link href={`/almacen/presupuesto/${presupuesto.id}/pesaje`}>
-                                  <Scale className="mr-2 h-4 w-4" />
-                                  Comenzar Pesaje
+                                  <Scale className="mr-1 h-4 w-4" />
+                                  Pesaje
                                 </Link>
                               </Button>
                               <PresupuestoIndividualAccion presupuesto={presupuesto} />
@@ -657,58 +654,55 @@ async function PresupuestosDiaContent({
                   return (
                     <Card key={presupuesto.id} className="hover:shadow-md transition-shadow">
                       <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
+                        {/* Stack vertical en móvil */}
+                        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
                               <h3 className="text-lg font-semibold">
                                 #{presupuesto.numero_presupuesto}
                               </h3>
-                              <Badge variant="outline">
+                              <Badge variant="outline" className="truncate max-w-[120px]">
                                 {presupuesto.cliente?.nombre || 'Cliente'}
                               </Badge>
                               {presupuesto.zona && (
                                 <Badge variant="secondary" className="flex items-center gap-1">
                                   <MapPin className="h-3 w-3" />
-                                  {presupuesto.zona.nombre}
+                                  <span className="truncate max-w-[80px]">{presupuesto.zona.nombre}</span>
                                 </Badge>
                               )}
                             </div>
 
-                            <div className="flex items-center gap-6 text-sm text-muted-foreground">
+                            {/* Stats con wrap */}
+                            <div className="flex flex-wrap items-center gap-3 md:gap-6 text-xs md:text-sm text-muted-foreground">
                               <span>
                                 {presupuesto.fecha_entrega_estimada
                                   ? `📅 ${new Date(presupuesto.fecha_entrega_estimada).toLocaleDateString('es-AR')}`
                                   : '📅 Sin fecha'}
                               </span>
-                              <span>
-                                📦 {presupuesto.items?.length || 0} items
-                              </span>
-                              <span>
-                                ⚖️ {itemsPesables.length} pesables ({itemsPesados.length} de {itemsPesables.length} completados)
-                              </span>
-                              <span>
-                                🏋️ {totalKg.toFixed(1)}kg estimados
-                              </span>
+                              <span>📦 {presupuesto.items?.length || 0} items</span>
+                              <span>⚖️ {itemsPesados.length}/{itemsPesables.length} pesados</span>
+                              <span>🏋️ {totalKg.toFixed(1)}kg</span>
                             </div>
 
                             {asignacionVehiculo && (
-                              <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-primary/5 px-3 py-1 text-sm text-primary">
-                                <Truck className="h-4 w-4" />
-                                Vehículo sugerido: {asignacionVehiculo.vehiculo?.patente || 'Por asignar'} ({asignacionVehiculo.peso_estimado.toFixed(1)} kg)
+                              <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-primary/5 px-3 py-1 text-xs md:text-sm text-primary">
+                                <Truck className="h-4 w-4 shrink-0" />
+                                <span className="truncate">{asignacionVehiculo.vehiculo?.patente || 'Por asignar'} ({asignacionVehiculo.peso_estimado.toFixed(1)} kg)</span>
                               </div>
                             )}
                           </div>
 
-                          <div className="flex items-center gap-2">
+                          {/* Botones con wrap */}
+                          <div className="flex flex-wrap items-center gap-2">
                             <Button variant="outline" size="sm" asChild>
                               <Link href={`/ventas/presupuestos/${presupuesto.id}`}>
-                                Ver Detalle
+                                Ver
                               </Link>
                             </Button>
-                            <Button asChild className="bg-blue-600 hover:bg-blue-700">
+                            <Button asChild size="sm" className="bg-blue-600 hover:bg-blue-700">
                               <Link href={`/almacen/presupuesto/${presupuesto.id}/pesaje`}>
-                                <Scale className="mr-2 h-4 w-4" />
-                                Comenzar Pesaje
+                                <Scale className="mr-1 h-4 w-4" />
+                                Pesaje
                               </Link>
                             </Button>
                             <PresupuestoIndividualAccion presupuesto={presupuesto} />
