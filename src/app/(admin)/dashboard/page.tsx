@@ -63,13 +63,13 @@ export default async function AdminDashboard() {
 
   return (
     <div className="space-y-8">
-      {/* Header de bienvenida - Estilo profesional */}
-      <div className="bg-white rounded-lg border border-border p-6 shadow-sm">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">
+      {/* Header de bienvenida - Responsivo */}
+      <div className="bg-white rounded-lg border border-border p-4 md:p-6 shadow-sm">
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">
           Dashboard
         </h1>
-        <p className="text-muted-foreground mt-2">
-          Bienvenido de vuelta, <span className="font-semibold text-primary">{user?.nombre}</span>. Aquí tienes un resumen de tu negocio.
+        <p className="text-muted-foreground mt-1 md:mt-2 text-sm md:text-base">
+          Bienvenido, <span className="font-semibold text-primary">{user?.nombre}</span>. Resumen de tu negocio.
         </p>
       </div>
 
@@ -175,12 +175,12 @@ export default async function AdminDashboard() {
         </CardContent>
       </Card>
 
-      {/* Gráficos */}
+      {/* Gráficos - Responsivos */}
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-7">
-        <div className="col-span-4">
+        <div className="lg:col-span-4">
           <VentasMensualesChart />
         </div>
-        <div className="col-span-3">
+        <div className="lg:col-span-3">
           <ProductosPorCategoriaChart />
         </div>
       </div>
@@ -240,9 +240,9 @@ export default async function AdminDashboard() {
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-7">
         {/* Actividad reciente */}
-        <Card className="col-span-4">
+        <Card className="lg:col-span-4">
           <CardHeader className="pb-4">
             <CardTitle className="text-xl font-bold">Actividad Reciente</CardTitle>
             <CardDescription className="text-base mt-1">
@@ -294,7 +294,7 @@ export default async function AdminDashboard() {
         </Card>
 
         {/* Estado del sistema */}
-        <Card className="col-span-3">
+        <Card className="lg:col-span-3">
           <CardHeader className="pb-4">
             <CardTitle className="text-xl font-bold">Estado del Sistema</CardTitle>
             <CardDescription className="text-base mt-1">

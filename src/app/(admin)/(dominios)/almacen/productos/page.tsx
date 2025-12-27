@@ -16,26 +16,26 @@ export const metadata = {
 export default function ProductosPage() {
   return (
     <div className="space-y-6">
-      {/* Header - Estilo limpio y profesional */}
-      <div className="bg-white rounded-lg border border-border p-6 shadow-sm">
-        <div className="flex items-center justify-between">
+      {/* Header - Responsivo */}
+      <div className="bg-white rounded-lg border border-border p-4 md:p-6 shadow-sm">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">Productos</h1>
-            <p className="text-muted-foreground mt-2 text-base">
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">Productos</h1>
+            <p className="text-muted-foreground mt-1 md:mt-2 text-sm md:text-base">
               Gestiona el catálogo de productos de tu almacén
             </p>
           </div>
-          <Button asChild className="bg-primary hover:bg-primary/90 shadow-sm h-10 px-6">
+          <Button asChild size="sm" className="bg-primary hover:bg-primary/90 shadow-sm md:h-10 md:px-6 w-fit">
             <Link href="/almacen/productos/nuevo">
-              <Plus className="mr-2 h-5 w-5" />
+              <Plus className="mr-2 h-4 w-4" />
               Nuevo Producto
             </Link>
           </Button>
         </div>
       </div>
 
-      {/* Estadísticas rápidas */}
-      <div className="grid gap-4 md:grid-cols-3">
+      {/* Estadísticas - Responsivas */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
         <Card className="border-t-[4px] border-t-primary hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
             <CardTitle className="text-base font-semibold text-foreground">Total Productos</CardTitle>

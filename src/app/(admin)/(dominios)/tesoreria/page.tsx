@@ -12,36 +12,38 @@ export default async function TesoreriaPage() {
     listarCajasAction(),
     obtenerRutasPendientesValidacionAction(),
   ])
-  
+
   const rutasPendientesCount = rutasPendientes.success ? rutasPendientes.data?.length || 0 : 0
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-lg border border-border p-6 shadow-sm">
-        <div className="flex items-center justify-between">
+      {/* Header - Responsivo */}
+      <div className="bg-white rounded-lg border border-border p-4 md:p-6 shadow-sm">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">Tesorería</h1>
-            <p className="text-muted-foreground mt-2 text-base">
-              Control en tiempo real de tus cajas, egresos y flujo de efectivo
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">Tesorería</h1>
+            <p className="text-muted-foreground mt-1 md:mt-2 text-sm md:text-base">
+              Control de cajas, egresos y flujo de efectivo
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {rutasPendientesCount > 0 && (
-              <Button asChild variant="default" className="bg-yellow-600 hover:bg-yellow-700 shadow-sm">
+              <Button asChild variant="default" size="sm" className="bg-yellow-600 hover:bg-yellow-700 shadow-sm">
                 <Link href="/tesoreria/validar-rutas" className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4" />
                   Validar Rutas ({rutasPendientesCount})
                 </Link>
               </Button>
             )}
-            <Button asChild className="bg-primary hover:bg-primary/90 shadow-sm">
+            <Button asChild size="sm" className="bg-primary hover:bg-primary/90 shadow-sm">
               <Link href="/tesoreria/cajas">Gestionar cajas</Link>
             </Button>
           </div>
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      {/* Stats - Responsivo */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <Card className="border-t-[4px] border-t-primary hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
             <CardTitle className="text-base font-semibold text-foreground">Saldo total</CardTitle>
