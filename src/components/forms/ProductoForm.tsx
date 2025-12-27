@@ -402,8 +402,8 @@ export function ProductoForm({ producto, onSuccess }: ProductoFormProps) {
       </Card>
 
       {/* Acciones */}
-      <div className="flex items-center justify-between sticky bottom-4 bg-background/95 backdrop-blur-sm p-4 rounded-lg border border-primary/10 shadow-lg">
-        <Button type="button" variant="outline" asChild disabled={isLoading} className="hover:bg-primary/5 hover:text-primary hover:border-primary/30">
+      <div className="flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3 sticky bottom-4 bg-background/95 backdrop-blur-sm p-4 rounded-lg border border-primary/10 shadow-lg">
+        <Button type="button" variant="outline" asChild disabled={isLoading} className="hover:bg-primary/5 hover:text-primary hover:border-primary/30 w-full sm:w-auto">
           <Link href="/almacen/productos">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Volver
@@ -414,7 +414,7 @@ export function ProductoForm({ producto, onSuccess }: ProductoFormProps) {
           ref={submitButtonRef}
           type="submit"
           disabled={isLoading}
-          className="bg-primary hover:bg-primary/90 shadow-sm"
+          className="bg-primary hover:bg-primary/90 shadow-sm w-full sm:w-auto"
         >
           {isLoading ? (
             <>

@@ -192,7 +192,7 @@ export function PedidoForm({ pedido, onSuccess }: PedidoFormProps) {
       }
 
       const { crearPedidoAction } = await import('@/actions/ventas.actions')
-      
+
       const result = await crearPedidoAction({
         cliente_id: data.cliente_id,
         items: data.items.map(item => ({
@@ -294,14 +294,12 @@ export function PedidoForm({ pedido, onSuccess }: PedidoFormProps) {
           </div>
 
           {selectedCliente && (
-            <div className={`p-4 rounded-lg border ${
-              clienteBloqueado 
-                ? 'bg-destructive/10 border-destructive' 
+            <div className={`p-4 rounded-lg border ${clienteBloqueado
+                ? 'bg-destructive/10 border-destructive'
                 : 'bg-blue-50 border-blue-200'
-            }`}>
-              <h4 className={`font-medium mb-2 ${
-                clienteBloqueado ? 'text-destructive' : 'text-blue-900'
               }`}>
+              <h4 className={`font-medium mb-2 ${clienteBloqueado ? 'text-destructive' : 'text-blue-900'
+                }`}>
                 Cliente Seleccionado
                 {loadingCliente && (
                   <Loader2 className="ml-2 h-4 w-4 animate-spin inline" />
@@ -490,18 +488,18 @@ export function PedidoForm({ pedido, onSuccess }: PedidoFormProps) {
       </Card>
 
       {/* Acciones */}
-      <div className="flex items-center justify-between sticky bottom-4 bg-background/95 backdrop-blur-sm p-4 rounded-lg border border-primary/10 shadow-lg">
-        <Button type="button" variant="outline" asChild disabled={isLoading} className="hover:bg-primary/5 hover:text-primary hover:border-primary/30">
+      <div className="flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3 sticky bottom-4 bg-background/95 backdrop-blur-sm p-4 rounded-lg border border-primary/10 shadow-lg">
+        <Button type="button" variant="outline" asChild disabled={isLoading} className="hover:bg-primary/5 hover:text-primary hover:border-primary/30 w-full sm:w-auto">
           <Link href="/almacen/pedidos">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Volver
           </Link>
         </Button>
 
-        <Button 
-          type="submit" 
-          disabled={isLoading || clienteBloqueado || loadingCliente} 
-          className="bg-primary hover:bg-primary/90 shadow-sm"
+        <Button
+          type="submit"
+          disabled={isLoading || clienteBloqueado || loadingCliente}
+          className="bg-primary hover:bg-primary/90 shadow-sm w-full sm:w-auto"
         >
           {isLoading ? (
             <>
