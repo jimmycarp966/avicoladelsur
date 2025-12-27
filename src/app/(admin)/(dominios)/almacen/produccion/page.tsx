@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Factory, Package, Scale, TrendingDown } from 'lucide-react'
+import { Plus, Factory, Package, Scale, TrendingDown, Settings, Target } from 'lucide-react'
 import Link from 'next/link'
 import { obtenerOrdenesProduccionAction } from '@/actions/produccion.actions'
 import { formatDate } from '@/lib/utils'
@@ -70,6 +70,12 @@ async function OrdenesProduccionList() {
                                     <div className="flex flex-wrap items-center gap-2">
                                         <h3 className="font-semibold text-lg truncate">{orden.numero_orden}</h3>
                                         {getEstadoBadge(orden.estado)}
+                                        {orden.destino && (
+                                            <Badge variant="outline" className="bg-primary/5">
+                                                <Target className="h-3 w-3 mr-1" />
+                                                {orden.destino.nombre}
+                                            </Badge>
+                                        )}
                                     </div>
                                     <p className="text-sm text-muted-foreground truncate">
                                         {formatDate(orden.fecha_produccion)}
@@ -83,7 +89,7 @@ async function OrdenesProduccionList() {
                                 <div className="text-center">
                                     <div className="flex items-center gap-1 text-muted-foreground">
                                         <Package className="h-4 w-4" />
-                                        <span className="text-xs md:text-sm">Entrada</span>
+                                        <span className="text-xs md:text-sm">Consumido</span>
                                     </div>
                                     <p className="font-semibold text-sm md:text-base">{orden.peso_total_entrada?.toFixed(2) || '0'} kg</p>
                                 </div>
@@ -91,7 +97,7 @@ async function OrdenesProduccionList() {
                                 <div className="text-center">
                                     <div className="flex items-center gap-1 text-muted-foreground">
                                         <Scale className="h-4 w-4" />
-                                        <span className="text-xs md:text-sm">Salida</span>
+                                        <span className="text-xs md:text-sm">Generado</span>
                                     </div>
                                     <p className="font-semibold text-sm md:text-base">{orden.peso_total_salida?.toFixed(2) || '0'} kg</p>
                                 </div>
@@ -100,7 +106,7 @@ async function OrdenesProduccionList() {
                                     <div className="text-center">
                                         <div className="flex items-center gap-1 text-muted-foreground">
                                             <TrendingDown className="h-4 w-4" />
-                                            <span className="text-xs md:text-sm">Merma</span>
+                                            <span className="text-xs md:text-sm">Desperdicio</span>
                                         </div>
                                         <p className="font-semibold text-orange-600 text-sm md:text-base">
                                             {orden.merma_porcentaje?.toFixed(1) || '0'}%
@@ -134,10 +140,16 @@ export default function ProduccionPage() {
                     </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
+                    <Link href="/almacen/produccion/destinos">
+                        <Button variant="outline" size="sm" className="md:size-default">
+                            <Target className="mr-2 h-4 w-4" />
+                            <span className="hidden sm:inline">Configurar</span> Destinos
+                        </Button>
+                    </Link>
                     <Link href="/almacen/produccion/configuracion">
                         <Button variant="outline" size="sm" className="md:size-default">
-                            <Scale className="mr-2 h-4 w-4" />
-                            <span className="hidden sm:inline">Configurar</span> Balanza
+                            <Settings className="mr-2 h-4 w-4" />
+                            Balanza
                         </Button>
                     </Link>
                     <Link href="/almacen/produccion/nueva">
@@ -171,7 +183,7 @@ export default function ProduccionPage() {
                 </Card>
                 <Card>
                     <CardHeader className="pb-2">
-                        <CardDescription>Merma Promedio</CardDescription>
+                        <CardDescription>Desperdicio Promedio</CardDescription>
                         <CardTitle className="text-2xl text-orange-600">-</CardTitle>
                     </CardHeader>
                 </Card>
@@ -194,3 +206,4 @@ export default function ProduccionPage() {
         </div>
     )
 }
+

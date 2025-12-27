@@ -696,29 +696,53 @@ export interface ClienteListaPrecio extends BaseEntity {
 // Estado de orden de producción
 export type EstadoOrdenProduccion = 'en_proceso' | 'completada' | 'cancelada'
 
+// Destino de Producción (categoría)
+export interface DestinoProduccion extends BaseEntity {
+  nombre: string
+  descripcion?: string
+  activo: boolean
+  orden_display: number
+  // Relaciones
+  productos?: DestinoProducto[]
+}
+
+// Producto asociado a un destino
+export interface DestinoProducto extends BaseEntity {
+  destino_id: string
+  producto_id: string
+  es_desperdicio: boolean
+  orden: number
+  // Relaciones
+  producto?: Producto
+  destino?: DestinoProduccion
+}
+
 // Orden de Producción
 export interface OrdenProduccion extends BaseEntity {
   numero_orden: string
   fecha_produccion: string
   estado: EstadoOrdenProduccion
   operario_id?: string
+  destino_id?: string // Destino de producción seleccionado
   observaciones?: string
-  // Métricas
-  peso_total_entrada: number
-  peso_total_salida: number
-  merma_kg: number
+  // Métricas (NOTA: peso_total_entrada = lo que SALE del stock, peso_total_salida = lo que ENTRA)
+  peso_total_entrada: number // Peso de productos que SALEN del stock (consumidos)
+  peso_total_salida: number  // Peso de productos que ENTRAN al stock (generados)
+  merma_kg: number           // Desperdicio = entrada - salida
   merma_porcentaje: number
   // Relaciones
   operario?: Usuario
-  entradas?: OrdenProduccionEntrada[]
-  salidas?: OrdenProduccionSalida[]
+  destino?: DestinoProduccion
+  salidas?: OrdenProduccionSalida[]   // Productos que SALEN del stock (consumidos)
+  entradas?: OrdenProduccionEntrada[] // Productos que ENTRAN al stock (generados)
 }
 
-// Entrada de Producción (producto consumido)
-export interface OrdenProduccionEntrada extends BaseEntity {
+// Salida de Stock (producto que SALE del inventario - consumido)
+// NOTA: Antes se llamaba "Entrada" pero ahora refleja que SALE del stock
+export interface OrdenProduccionSalida extends BaseEntity {
   orden_id: string
   producto_id: string
-  lote_id?: string
+  lote_id?: string // Lote del que se consume
   cantidad: number
   peso_kg?: number
   // Relaciones
@@ -726,19 +750,24 @@ export interface OrdenProduccionEntrada extends BaseEntity {
   lote?: Lote
 }
 
-// Salida de Producción (producto generado)
-export interface OrdenProduccionSalida extends BaseEntity {
+// Entrada de Stock (producto que ENTRA al inventario - generado)
+// NOTA: Antes se llamaba "Salida" pero ahora refleja que ENTRA al stock
+export interface OrdenProduccionEntrada extends BaseEntity {
   orden_id: string
   producto_id: string
-  lote_generado_id?: string
+  destino_id?: string         // Destino de producción
+  lote_generado_id?: string   // Lote creado automáticamente
   cantidad: number
   peso_kg: number
   plu?: string
   fecha_vencimiento?: string
   pesaje_id?: string
+  merma_esperada_kg?: number  // Para fórmula futura
+  merma_real_kg?: number      // Calculada al completar
   // Relaciones
   producto?: Producto
   lote_generado?: Lote
+  destino?: DestinoProduccion
 }
 
 // Configuración de Balanza

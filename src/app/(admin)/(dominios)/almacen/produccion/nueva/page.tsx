@@ -25,24 +25,27 @@ import {
     Trash2,
     Factory,
     AlertCircle,
-    Camera
+    Target
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
     crearOrdenProduccionAction,
-    agregarEntradaProduccionAction,
-    agregarSalidaProduccionAction,
+    agregarSalidaStockAction,
+    agregarEntradaStockAction,
     completarOrdenProduccionAction,
     cancelarOrdenProduccionAction,
     obtenerLotesDisponiblesAction
 } from '@/actions/produccion.actions'
+import { obtenerDestinosProduccionListaAction, obtenerProductosPorDestinoAction } from '@/actions/destinos-produccion.actions'
 import { obtenerProductosAction, buscarProductoPorCodigoBarrasAction } from '@/actions/almacen.actions'
 import { ScanButton } from '@/components/barcode/BarcodeScanner'
 import { parseBarcodeEAN13 } from '@/lib/barcode-parser'
-import type { Producto } from '@/types/domain.types'
+import type { Producto, DestinoProduccion } from '@/types/domain.types'
 
 // Tipos locales para el formulario
-interface EntradaLocal {
+// NOTA: "Salida" = producto que SALE del stock (consumido)
+//       "Entrada" = producto que ENTRA al stock (generado)
+interface SalidaLocal {
     id?: string
     producto_id: string
     producto_nombre: string
@@ -52,10 +55,12 @@ interface EntradaLocal {
     peso_kg: number
 }
 
-interface SalidaLocal {
+interface EntradaLocal {
     id?: string
     producto_id: string
     producto_nombre: string
+    destino_id: string
+    destino_nombre: string
     peso_kg: number
     plu?: string
 }
@@ -76,39 +81,50 @@ export default function NuevaOrdenProduccionPage() {
 
     // Datos del formulario
     const [observaciones, setObservaciones] = useState('')
-    const [entradas, setEntradas] = useState<EntradaLocal[]>([])
-    const [salidas, setSalidas] = useState<SalidaLocal[]>([])
+    const [salidas, setSalidas] = useState<SalidaLocal[]>([])   // Productos que SALEN del stock
+    const [entradas, setEntradas] = useState<EntradaLocal[]>([]) // Productos que ENTRAN al stock
 
     // Datos para selección
     const [productos, setProductos] = useState<Producto[]>([])
+    const [destinos, setDestinos] = useState<DestinoProduccion[]>([])
     const [lotesDisponibles, setLotesDisponibles] = useState<LoteDisponible[]>([])
+    const [productosEntrada, setProductosEntrada] = useState<Array<{ id: string; codigo: string; nombre: string; es_desperdicio: boolean }>>([])
 
-    // Campos temporales para agregar
-    const [productoEntradaId, setProductoEntradaId] = useState('')
-    const [loteEntradaId, setLoteEntradaId] = useState('')
-    const [cantidadEntrada, setCantidadEntrada] = useState('')
-    const [pesoEntrada, setPesoEntrada] = useState('')
-
+    // Campos temporales para agregar SALIDA (producto que sale del stock)
     const [productoSalidaId, setProductoSalidaId] = useState('')
+    const [loteSalidaId, setLoteSalidaId] = useState('')
+    const [cantidadSalida, setCantidadSalida] = useState('')
     const [pesoSalida, setPesoSalida] = useState('')
-    const [pluSalida, setPluSalida] = useState('')
 
-    // Cargar productos al montar
+    // Campos temporales para agregar ENTRADA (producto que entra al stock)
+    const [productoEntradaId, setProductoEntradaId] = useState('')
+    const [destinoEntradaId, setDestinoEntradaId] = useState('')
+    const [pesoEntrada, setPesoEntrada] = useState('')
+    const [pluEntrada, setPluEntrada] = useState('')
+
+    // Cargar productos y destinos al montar
     useEffect(() => {
-        async function cargarProductos() {
-            const { data } = await obtenerProductosAction()
-            if (data) {
-                setProductos(data)
+        async function cargarDatos() {
+            const [productosRes, destinosRes] = await Promise.all([
+                obtenerProductosAction(),
+                obtenerDestinosProduccionListaAction()
+            ])
+
+            if (productosRes.data) {
+                setProductos(productosRes.data)
+            }
+            if (destinosRes.data) {
+                setDestinos(destinosRes.data)
             }
         }
-        cargarProductos()
+        cargarDatos()
     }, [])
 
-    // Cargar lotes cuando cambia el producto de entrada
+    // Cargar lotes cuando cambia el producto de salida
     useEffect(() => {
         async function cargarLotes() {
-            if (productoEntradaId) {
-                const { data } = await obtenerLotesDisponiblesAction(productoEntradaId)
+            if (productoSalidaId) {
+                const { data } = await obtenerLotesDisponiblesAction(productoSalidaId)
                 if (data) {
                     setLotesDisponibles(data)
                 }
@@ -117,40 +133,34 @@ export default function NuevaOrdenProduccionPage() {
             }
         }
         cargarLotes()
-    }, [productoEntradaId])
+    }, [productoSalidaId])
 
-    // Manejar escaneo de código de barras para entradas
-    const handleScanEntrada = useCallback(async (code: string) => {
-        const parsed = parseBarcodeEAN13(code)
-        console.log('[Producción] Código escaneado:', code, parsed)
-
-        if (!parsed.plu) {
-            toast.error('Código no válido')
-            return
+    // Cargar productos permitidos cuando cambia el destino de entrada
+    useEffect(() => {
+        async function cargarProductosDestino() {
+            if (destinoEntradaId) {
+                const { data } = await obtenerProductosPorDestinoAction(destinoEntradaId)
+                if (data && data.length > 0) {
+                    setProductosEntrada(data)
+                } else {
+                    // Si no hay productos asociados, mostrar todos
+                    setProductosEntrada(productos.map(p => ({
+                        id: p.id,
+                        codigo: p.codigo,
+                        nombre: p.nombre,
+                        es_desperdicio: false
+                    })))
+                }
+            } else {
+                setProductosEntrada([])
+            }
+            // Limpiar producto seleccionado al cambiar destino
+            setProductoEntradaId('')
         }
+        cargarProductosDestino()
+    }, [destinoEntradaId, productos])
 
-        // Buscar producto por PLU
-        const result = await buscarProductoPorCodigoBarrasAction(parsed.plu)
-
-        if (!result.success || !result.data) {
-            toast.error(result.error || 'Producto no encontrado')
-            return
-        }
-
-        const producto = result.data.producto
-        setProductoEntradaId(producto.id)
-
-        // Si el código tiene peso embebido, pre-llenar
-        if (parsed.isWeightCode && parsed.weight) {
-            setPesoEntrada(parsed.weight.toFixed(3))
-            setCantidadEntrada('1')
-            toast.success(`${producto.nombre} - ${parsed.weight.toFixed(3)} kg`)
-        } else {
-            toast.success(`Producto: ${producto.nombre}`)
-        }
-    }, [])
-
-    // Manejar escaneo de código de barras para salidas
+    // Manejar escaneo de código de barras para salidas (productos que salen)
     const handleScanSalida = useCallback(async (code: string) => {
         const parsed = parseBarcodeEAN13(code)
         console.log('[Producción] Código escaneado (salida):', code, parsed)
@@ -160,7 +170,6 @@ export default function NuevaOrdenProduccionPage() {
             return
         }
 
-        // Buscar producto por PLU
         const result = await buscarProductoPorCodigoBarrasAction(parsed.plu)
 
         if (!result.success || !result.data) {
@@ -170,11 +179,39 @@ export default function NuevaOrdenProduccionPage() {
 
         const producto = result.data.producto
         setProductoSalidaId(producto.id)
-        setPluSalida(parsed.plu)
 
-        // Si el código tiene peso embebido, pre-llenar
         if (parsed.isWeightCode && parsed.weight) {
             setPesoSalida(parsed.weight.toFixed(3))
+            setCantidadSalida('1')
+            toast.success(`${producto.nombre} - ${parsed.weight.toFixed(3)} kg`)
+        } else {
+            toast.success(`Producto: ${producto.nombre}`)
+        }
+    }, [])
+
+    // Manejar escaneo de código de barras para entradas (productos que entran)
+    const handleScanEntrada = useCallback(async (code: string) => {
+        const parsed = parseBarcodeEAN13(code)
+        console.log('[Producción] Código escaneado (entrada):', code, parsed)
+
+        if (!parsed.plu) {
+            toast.error('Código no válido')
+            return
+        }
+
+        const result = await buscarProductoPorCodigoBarrasAction(parsed.plu)
+
+        if (!result.success || !result.data) {
+            toast.error(result.error || 'Producto no encontrado')
+            return
+        }
+
+        const producto = result.data.producto
+        setProductoEntradaId(producto.id)
+        setPluEntrada(parsed.plu)
+
+        if (parsed.isWeightCode && parsed.weight) {
+            setPesoEntrada(parsed.weight.toFixed(3))
             toast.success(`${producto.nombre} - ${parsed.weight.toFixed(3)} kg`)
         } else {
             toast.success(`Producto: ${producto.nombre}`)
@@ -182,10 +219,12 @@ export default function NuevaOrdenProduccionPage() {
     }, [])
 
     // Calcular totales
-    const pesoTotalEntrada = entradas.reduce((sum, e) => sum + (e.peso_kg || 0), 0)
+    // NOTA: pesoTotalSalida = lo que SALE del stock (consumido)
+    //       pesoTotalEntrada = lo que ENTRA al stock (generado)
     const pesoTotalSalida = salidas.reduce((sum, s) => sum + (s.peso_kg || 0), 0)
-    const mermaKg = pesoTotalEntrada - pesoTotalSalida
-    const mermaPorcentaje = pesoTotalEntrada > 0 ? (mermaKg / pesoTotalEntrada) * 100 : 0
+    const pesoTotalEntrada = entradas.reduce((sum, e) => sum + (e.peso_kg || 0), 0)
+    const mermaKg = pesoTotalSalida - pesoTotalEntrada
+    const mermaPorcentaje = pesoTotalSalida > 0 ? (mermaKg / pesoTotalSalida) * 100 : 0
 
     // Crear orden al avanzar del paso 1 al 2
     const handleIniciarOrden = async () => {
@@ -207,58 +246,9 @@ export default function NuevaOrdenProduccionPage() {
         }
     }
 
-    // Agregar entrada
-    const handleAgregarEntrada = async () => {
-        if (!ordenId || !productoEntradaId || !loteEntradaId || !cantidadEntrada) {
-            toast.error('Completa todos los campos')
-            return
-        }
-
-        setLoading(true)
-        try {
-            const producto = productos.find(p => p.id === productoEntradaId)
-            const lote = lotesDisponibles.find(l => l.id === loteEntradaId)
-
-            const result = await agregarEntradaProduccionAction(
-                ordenId,
-                productoEntradaId,
-                loteEntradaId,
-                parseFloat(cantidadEntrada),
-                pesoEntrada ? parseFloat(pesoEntrada) : undefined
-            )
-
-            if (result.success) {
-                setEntradas([...entradas, {
-                    id: result.data?.entrada_id,
-                    producto_id: productoEntradaId,
-                    producto_nombre: producto?.nombre || '',
-                    lote_id: loteEntradaId,
-                    lote_numero: lote?.numero_lote || '',
-                    cantidad: parseFloat(cantidadEntrada),
-                    peso_kg: parseFloat(pesoEntrada) || 0
-                }])
-
-                // Limpiar campos
-                setProductoEntradaId('')
-                setLoteEntradaId('')
-                setCantidadEntrada('')
-                setPesoEntrada('')
-                setLotesDisponibles([])
-
-                toast.success('Entrada agregada')
-            } else {
-                toast.error(result.message || 'Error al agregar entrada')
-            }
-        } catch (error) {
-            toast.error('Error al agregar entrada')
-        } finally {
-            setLoading(false)
-        }
-    }
-
-    // Agregar salida
+    // Agregar SALIDA de stock (producto que SALE del inventario)
     const handleAgregarSalida = async () => {
-        if (!ordenId || !productoSalidaId || !pesoSalida) {
+        if (!ordenId || !productoSalidaId || !loteSalidaId || !cantidadSalida) {
             toast.error('Completa todos los campos')
             return
         }
@@ -266,13 +256,14 @@ export default function NuevaOrdenProduccionPage() {
         setLoading(true)
         try {
             const producto = productos.find(p => p.id === productoSalidaId)
+            const lote = lotesDisponibles.find(l => l.id === loteSalidaId)
 
-            const result = await agregarSalidaProduccionAction(
+            const result = await agregarSalidaStockAction(
                 ordenId,
                 productoSalidaId,
-                parseFloat(pesoSalida),
-                1,
-                pluSalida || undefined
+                loteSalidaId,
+                parseFloat(cantidadSalida),
+                pesoSalida ? parseFloat(pesoSalida) : undefined
             )
 
             if (result.success) {
@@ -280,21 +271,74 @@ export default function NuevaOrdenProduccionPage() {
                     id: result.data?.salida_id,
                     producto_id: productoSalidaId,
                     producto_nombre: producto?.nombre || '',
-                    peso_kg: parseFloat(pesoSalida),
-                    plu: pluSalida
+                    lote_id: loteSalidaId,
+                    lote_numero: lote?.numero_lote || '',
+                    cantidad: parseFloat(cantidadSalida),
+                    peso_kg: parseFloat(pesoSalida) || 0
                 }])
 
                 // Limpiar campos
                 setProductoSalidaId('')
+                setLoteSalidaId('')
+                setCantidadSalida('')
                 setPesoSalida('')
-                setPluSalida('')
+                setLotesDisponibles([])
 
-                toast.success('Salida agregada')
+                toast.success('Producto agregado (sale del stock)')
             } else {
-                toast.error(result.message || 'Error al agregar salida')
+                toast.error(result.message || 'Error al agregar')
             }
         } catch (error) {
-            toast.error('Error al agregar salida')
+            toast.error('Error al agregar')
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    // Agregar ENTRADA de stock (producto que ENTRA al inventario)
+    const handleAgregarEntrada = async () => {
+        if (!ordenId || !productoEntradaId || !destinoEntradaId || !pesoEntrada) {
+            toast.error('Completa todos los campos (incluyendo destino de producción)')
+            return
+        }
+
+        setLoading(true)
+        try {
+            const producto = productos.find(p => p.id === productoEntradaId)
+            const destino = destinos.find(d => d.id === destinoEntradaId)
+
+            const result = await agregarEntradaStockAction(
+                ordenId,
+                productoEntradaId,
+                destinoEntradaId,
+                parseFloat(pesoEntrada),
+                1,
+                pluEntrada || undefined
+            )
+
+            if (result.success) {
+                setEntradas([...entradas, {
+                    id: result.data?.entrada_id,
+                    producto_id: productoEntradaId,
+                    producto_nombre: producto?.nombre || '',
+                    destino_id: destinoEntradaId,
+                    destino_nombre: destino?.nombre || '',
+                    peso_kg: parseFloat(pesoEntrada),
+                    plu: pluEntrada
+                }])
+
+                // Limpiar campos
+                setProductoEntradaId('')
+                setPesoEntrada('')
+                setPluEntrada('')
+                // NO limpiar destino para mantener selección
+
+                toast.success('Producto agregado (entra al stock)')
+            } else {
+                toast.error(result.message || 'Error al agregar')
+            }
+        } catch (error) {
+            toast.error('Error al agregar')
         } finally {
             setLoading(false)
         }
@@ -304,8 +348,8 @@ export default function NuevaOrdenProduccionPage() {
     const handleCompletarOrden = async () => {
         if (!ordenId) return
 
-        if (salidas.length === 0) {
-            toast.error('Agrega al menos una salida')
+        if (entradas.length === 0) {
+            toast.error('Agrega al menos un producto generado')
             return
         }
 
@@ -400,8 +444,8 @@ export default function NuevaOrdenProduccionPage() {
             </div>
             <div className="flex justify-between text-sm text-muted-foreground px-2">
                 <span>Iniciar</span>
-                <span>Entradas</span>
-                <span>Salidas</span>
+                <span>Salidas Stock</span>
+                <span>Entradas Stock</span>
                 <span>Completar</span>
             </div>
 
@@ -438,208 +482,50 @@ export default function NuevaOrdenProduccionPage() {
                 </Card>
             )}
 
-            {/* PASO 2: Agregar entradas (producto a consumir) */}
+            {/* PASO 2: Agregar SALIDAS de stock (productos que SALEN - se consumen) */}
             {step === 2 && (
                 <Card>
                     <CardHeader>
                         <div className="flex items-center gap-2">
                             <Package className="h-5 w-5 text-orange-500" />
-                            <CardTitle>Productos a Consumir (Entradas)</CardTitle>
+                            <CardTitle>Productos que SALEN del Stock</CardTitle>
                         </div>
                         <CardDescription>
-                            Selecciona los lotes de producto origen que se van a despostar
+                            Selecciona los lotes de producto origen que se van a procesar (ej: cajones de pollo entero)
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                        {/* Lista de entradas agregadas */}
-                        {entradas.length > 0 && (
+                        {/* Lista de salidas agregadas */}
+                        {salidas.length > 0 && (
                             <div className="space-y-2">
-                                <Label>Entradas agregadas:</Label>
-                                {entradas.map((entrada, idx) => (
+                                <Label>Productos a consumir:</Label>
+                                {salidas.map((salida, idx) => (
                                     <div
                                         key={idx}
                                         className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-lg"
                                     >
                                         <div>
-                                            <span className="font-medium">{entrada.producto_nombre}</span>
+                                            <span className="font-medium">{salida.producto_nombre}</span>
                                             <span className="text-muted-foreground ml-2">
-                                                Lote: {entrada.lote_numero}
+                                                Lote: {salida.lote_numero}
                                             </span>
                                         </div>
                                         <div className="flex items-center gap-4">
-                                            <span>{entrada.cantidad} unidades</span>
-                                            {entrada.peso_kg > 0 && (
-                                                <span className="font-semibold">{entrada.peso_kg} kg</span>
+                                            <span>{salida.cantidad} unidades</span>
+                                            {salida.peso_kg > 0 && (
+                                                <span className="font-semibold">{salida.peso_kg} kg</span>
                                             )}
                                         </div>
                                     </div>
                                 ))}
                                 <div className="text-right font-semibold text-lg">
-                                    Total entrada: {pesoTotalEntrada.toFixed(2)} kg
+                                    Total a consumir: {pesoTotalSalida.toFixed(2)} kg
                                 </div>
                             </div>
                         )}
-
-                        {/* Formulario para agregar entrada */}
-                        <div className="grid grid-cols-2 gap-4 p-4 border rounded-lg bg-muted/30">
-                            <div>
-                                <div className="flex items-center justify-between mb-1">
-                                    <Label>Producto</Label>
-                                    <ScanButton
-                                        onScan={handleScanEntrada}
-                                        size="sm"
-                                        variant="ghost"
-                                        title="Escanear Producto"
-                                        description="Escanea el código de barras de la etiqueta"
-                                    />
-                                </div>
-                                <Select value={productoEntradaId} onValueChange={setProductoEntradaId}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Seleccionar producto..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {productos.map((p) => (
-                                            <SelectItem key={p.id} value={p.id}>
-                                                {p.codigo} - {p.nombre}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <div>
-                                <Label>Lote</Label>
-                                <Select
-                                    value={loteEntradaId}
-                                    onValueChange={setLoteEntradaId}
-                                    disabled={!productoEntradaId || lotesDisponibles.length === 0}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder={
-                                            !productoEntradaId
-                                                ? "Selecciona producto primero"
-                                                : lotesDisponibles.length === 0
-                                                    ? "Sin lotes disponibles"
-                                                    : "Seleccionar lote..."
-                                        } />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {lotesDisponibles.map((l) => (
-                                            <SelectItem key={l.id} value={l.id}>
-                                                {l.numero_lote} ({l.cantidad_disponible} disp.)
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <div>
-                                <Label>Cantidad (unidades)</Label>
-                                <Input
-                                    type="number"
-                                    placeholder="Ej: 10"
-                                    value={cantidadEntrada}
-                                    onChange={(e) => setCantidadEntrada(e.target.value)}
-                                />
-                            </div>
-
-                            <div>
-                                <Label>Peso (kg)</Label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="Ej: 200"
-                                    value={pesoEntrada}
-                                    onChange={(e) => setPesoEntrada(e.target.value)}
-                                />
-                            </div>
-
-                            <div className="col-span-2 flex justify-end">
-                                <Button onClick={handleAgregarEntrada} disabled={loading}>
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Agregar Entrada
-                                </Button>
-                            </div>
-                        </div>
-                    </CardContent>
-                    <CardFooter className="flex justify-between">
-                        <Button variant="outline" onClick={handleCancelarOrden} disabled={loading}>
-                            Cancelar Orden
-                        </Button>
-                        <Button
-                            onClick={() => setStep(3)}
-                            disabled={entradas.length === 0}
-                        >
-                            Siguiente: Salidas
-                            <ArrowRight className="ml-2 h-4 w-4" />
-                        </Button>
-                    </CardFooter>
-                </Card>
-            )}
-
-            {/* PASO 3: Agregar salidas (productos generados) */}
-            {step === 3 && (
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center gap-2">
-                            <Scale className="h-5 w-5 text-green-500" />
-                            <CardTitle>Productos Generados (Salidas)</CardTitle>
-                        </div>
-                        <CardDescription>
-                            Registra cada producto que sale del desposte con su peso
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        {/* Resumen de entrada */}
-                        <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                            <div className="flex items-center justify-between">
-                                <span className="text-muted-foreground">Total entrada:</span>
-                                <span className="font-semibold text-lg">{pesoTotalEntrada.toFixed(2)} kg</span>
-                            </div>
-                        </div>
-
-                        {/* Lista de salidas agregadas */}
-                        {salidas.length > 0 && (
-                            <div className="space-y-2">
-                                <Label>Salidas agregadas:</Label>
-                                {salidas.map((salida, idx) => (
-                                    <div
-                                        key={idx}
-                                        className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg"
-                                    >
-                                        <div>
-                                            <span className="font-medium">{salida.producto_nombre}</span>
-                                            {salida.plu && (
-                                                <Badge variant="outline" className="ml-2">
-                                                    PLU: {salida.plu}
-                                                </Badge>
-                                            )}
-                                        </div>
-                                        <span className="font-semibold">{salida.peso_kg} kg</span>
-                                    </div>
-                                ))}
-                                <div className="flex justify-between text-lg">
-                                    <span className="font-semibold">Total salida:</span>
-                                    <span className="font-semibold text-green-600">{pesoTotalSalida.toFixed(2)} kg</span>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Indicador de merma */}
-                        <div className={`p-3 rounded-lg ${mermaPorcentaje > 50 ? 'bg-red-50 border border-red-200' : 'bg-yellow-50 border border-yellow-200'}`}>
-                            <div className="flex items-center justify-between">
-                                <span className="flex items-center gap-2">
-                                    {mermaPorcentaje > 50 && <AlertCircle className="h-4 w-4 text-red-500" />}
-                                    Merma estimada:
-                                </span>
-                                <span className={`font-semibold ${mermaPorcentaje > 50 ? 'text-red-600' : 'text-orange-600'}`}>
-                                    {mermaKg.toFixed(2)} kg ({mermaPorcentaje.toFixed(1)}%)
-                                </span>
-                            </div>
-                        </div>
 
                         {/* Formulario para agregar salida */}
-                        <div className="grid grid-cols-3 gap-4 p-4 border rounded-lg bg-muted/30">
+                        <div className="grid grid-cols-2 gap-4 p-4 border rounded-lg bg-muted/30">
                             <div>
                                 <div className="flex items-center justify-between mb-1">
                                     <Label>Producto</Label>
@@ -666,29 +552,238 @@ export default function NuevaOrdenProduccionPage() {
                             </div>
 
                             <div>
+                                <Label>Lote</Label>
+                                <Select
+                                    value={loteSalidaId}
+                                    onValueChange={setLoteSalidaId}
+                                    disabled={!productoSalidaId || lotesDisponibles.length === 0}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder={
+                                            !productoSalidaId
+                                                ? "Selecciona producto primero"
+                                                : lotesDisponibles.length === 0
+                                                    ? "Sin lotes disponibles"
+                                                    : "Seleccionar lote..."
+                                        } />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {lotesDisponibles.map((l) => (
+                                            <SelectItem key={l.id} value={l.id}>
+                                                {l.numero_lote} ({l.cantidad_disponible} disp.)
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div>
+                                <Label>Cantidad (unidades)</Label>
+                                <Input
+                                    type="number"
+                                    placeholder="Ej: 10"
+                                    value={cantidadSalida}
+                                    onChange={(e) => setCantidadSalida(e.target.value)}
+                                />
+                            </div>
+
+                            <div>
                                 <Label>Peso (kg)</Label>
                                 <Input
                                     type="number"
                                     step="0.01"
-                                    placeholder="Ej: 10.5"
+                                    placeholder="Ej: 200"
                                     value={pesoSalida}
                                     onChange={(e) => setPesoSalida(e.target.value)}
                                 />
                             </div>
 
+                            <div className="col-span-2 flex justify-end">
+                                <Button onClick={handleAgregarSalida} disabled={loading}>
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Agregar (Sale del Stock)
+                                </Button>
+                            </div>
+                        </div>
+                    </CardContent>
+                    <CardFooter className="flex justify-between">
+                        <Button variant="outline" onClick={handleCancelarOrden} disabled={loading}>
+                            Cancelar Orden
+                        </Button>
+                        <Button
+                            onClick={() => setStep(3)}
+                            disabled={salidas.length === 0}
+                        >
+                            Siguiente: Productos Generados
+                            <ArrowRight className="ml-2 h-4 w-4" />
+                        </Button>
+                    </CardFooter>
+                </Card>
+            )}
+
+            {/* PASO 3: Agregar ENTRADAS de stock (productos que ENTRAN - se generan) */}
+            {step === 3 && (
+                <Card>
+                    <CardHeader>
+                        <div className="flex items-center gap-2">
+                            <Scale className="h-5 w-5 text-green-500" />
+                            <CardTitle>Productos que ENTRAN al Stock</CardTitle>
+                        </div>
+                        <CardDescription>
+                            Registra cada producto generado con su peso y destino de producción
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        {/* Resumen de lo que sale del stock */}
+                        <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                            <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground">Total consumido (sale del stock):</span>
+                                <span className="font-semibold text-lg">{pesoTotalSalida.toFixed(2)} kg</span>
+                            </div>
+                        </div>
+
+                        {/* Lista de entradas agregadas */}
+                        {entradas.length > 0 && (
+                            <div className="space-y-2">
+                                <Label>Productos generados:</Label>
+                                {entradas.map((entrada, idx) => (
+                                    <div
+                                        key={idx}
+                                        className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg"
+                                    >
+                                        <div>
+                                            <span className="font-medium">{entrada.producto_nombre}</span>
+                                            <Badge variant="outline" className="ml-2">
+                                                {entrada.destino_nombre}
+                                            </Badge>
+                                            {entrada.plu && (
+                                                <Badge variant="secondary" className="ml-2">
+                                                    PLU: {entrada.plu}
+                                                </Badge>
+                                            )}
+                                        </div>
+                                        <span className="font-semibold">{entrada.peso_kg} kg</span>
+                                    </div>
+                                ))}
+                                <div className="flex justify-between text-lg">
+                                    <span className="font-semibold">Total generado (entra al stock):</span>
+                                    <span className="font-semibold text-green-600">{pesoTotalEntrada.toFixed(2)} kg</span>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Indicador de merma/desperdicio */}
+                        <div className={`p-3 rounded-lg ${mermaPorcentaje > 50 ? 'bg-red-50 border border-red-200' : 'bg-yellow-50 border border-yellow-200'}`}>
+                            <div className="flex items-center justify-between">
+                                <span className="flex items-center gap-2">
+                                    {mermaPorcentaje > 50 && <AlertCircle className="h-4 w-4 text-red-500" />}
+                                    Desperdicio estimado:
+                                </span>
+                                <span className={`font-semibold ${mermaPorcentaje > 50 ? 'text-red-600' : 'text-orange-600'}`}>
+                                    {mermaKg.toFixed(2)} kg ({mermaPorcentaje.toFixed(1)}%)
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Formulario para agregar entrada */}
+                        <div className="grid grid-cols-2 gap-4 p-4 border rounded-lg bg-muted/30">
+                            {/* Selector de DESTINO DE PRODUCCIÓN (obligatorio) */}
+                            <div className="col-span-2">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <Target className="h-4 w-4 text-primary" />
+                                    <Label>Destino de Producción *</Label>
+                                </div>
+                                <Select value={destinoEntradaId} onValueChange={setDestinoEntradaId}>
+                                    <SelectTrigger className={!destinoEntradaId ? 'border-primary' : ''}>
+                                        <SelectValue placeholder="Seleccionar destino (Filet, Pechuga, Pollo Trozado)..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {destinos.map((d) => (
+                                            <SelectItem key={d.id} value={d.id}>
+                                                <div className="flex flex-col">
+                                                    <span className="font-medium">{d.nombre}</span>
+                                                    {d.descripcion && (
+                                                        <span className="text-xs text-muted-foreground">{d.descripcion}</span>
+                                                    )}
+                                                </div>
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                {!destinoEntradaId && (
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        Selecciona el tipo de producción antes de agregar productos
+                                    </p>
+                                )}
+                            </div>
+
                             <div>
-                                <Label>PLU (opcional)</Label>
+                                <div className="flex items-center justify-between mb-1">
+                                    <Label>Producto</Label>
+                                    <ScanButton
+                                        onScan={handleScanEntrada}
+                                        size="sm"
+                                        variant="ghost"
+                                        title="Escanear Producto"
+                                        description="Escanea el código de barras de la etiqueta"
+                                    />
+                                </div>
+                                <Select
+                                    value={productoEntradaId}
+                                    onValueChange={setProductoEntradaId}
+                                    disabled={!destinoEntradaId}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder={
+                                            !destinoEntradaId
+                                                ? "Selecciona destino primero"
+                                                : productosEntrada.length === 0
+                                                    ? "Sin productos configurados para este destino"
+                                                    : "Seleccionar producto..."
+                                        } />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {productosEntrada.map((p) => (
+                                            <SelectItem key={p.id} value={p.id}>
+                                                <span className={p.es_desperdicio ? 'text-orange-600' : ''}>
+                                                    {p.codigo} - {p.nombre}
+                                                    {p.es_desperdicio && ' (desperdicio)'}
+                                                </span>
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div>
+                                <Label>Peso (kg)</Label>
                                 <Input
-                                    placeholder="Ej: 0148"
-                                    value={pluSalida}
-                                    onChange={(e) => setPluSalida(e.target.value)}
+                                    type="number"
+                                    step="0.01"
+                                    placeholder="Ej: 10.5"
+                                    value={pesoEntrada}
+                                    onChange={(e) => setPesoEntrada(e.target.value)}
+                                    disabled={!destinoEntradaId}
                                 />
                             </div>
 
-                            <div className="col-span-3 flex justify-end">
-                                <Button onClick={handleAgregarSalida} disabled={loading}>
+                            <div className="col-span-2">
+                                <Label>PLU (opcional)</Label>
+                                <Input
+                                    placeholder="Ej: 0148"
+                                    value={pluEntrada}
+                                    onChange={(e) => setPluEntrada(e.target.value)}
+                                    disabled={!destinoEntradaId}
+                                />
+                            </div>
+
+                            <div className="col-span-2 flex justify-end">
+                                <Button
+                                    onClick={handleAgregarEntrada}
+                                    disabled={loading || !destinoEntradaId}
+                                >
                                     <Plus className="mr-2 h-4 w-4" />
-                                    Agregar Salida
+                                    Agregar (Entra al Stock)
                                 </Button>
                             </div>
                         </div>
@@ -696,11 +791,11 @@ export default function NuevaOrdenProduccionPage() {
                     <CardFooter className="flex justify-between">
                         <Button variant="outline" onClick={() => setStep(2)}>
                             <ArrowLeft className="mr-2 h-4 w-4" />
-                            Volver a Entradas
+                            Volver
                         </Button>
                         <Button
                             onClick={() => setStep(4)}
-                            disabled={salidas.length === 0}
+                            disabled={entradas.length === 0}
                         >
                             Siguiente: Completar
                             <ArrowRight className="ml-2 h-4 w-4" />
@@ -722,50 +817,55 @@ export default function NuevaOrdenProduccionPage() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                        {/* Resumen de entradas */}
+                        {/* Resumen de salidas (lo que se consume) */}
                         <div>
                             <h3 className="font-semibold mb-2 flex items-center gap-2">
                                 <Package className="h-4 w-4 text-orange-500" />
-                                Productos Consumidos
+                                Productos Consumidos (Salen del Stock)
                             </h3>
                             <div className="space-y-1">
-                                {entradas.map((entrada, idx) => (
+                                {salidas.map((salida, idx) => (
                                     <div key={idx} className="flex justify-between text-sm">
-                                        <span>{entrada.producto_nombre} (Lote: {entrada.lote_numero})</span>
-                                        <span>{entrada.cantidad} und. / {entrada.peso_kg} kg</span>
+                                        <span>{salida.producto_nombre} (Lote: {salida.lote_numero})</span>
+                                        <span>{salida.cantidad} und. / {salida.peso_kg} kg</span>
                                     </div>
                                 ))}
                             </div>
                             <div className="mt-2 pt-2 border-t flex justify-between font-semibold">
                                 <span>Total consumido:</span>
-                                <span className="text-orange-600">{pesoTotalEntrada.toFixed(2)} kg</span>
+                                <span className="text-orange-600">{pesoTotalSalida.toFixed(2)} kg</span>
                             </div>
                         </div>
 
-                        {/* Resumen de salidas */}
+                        {/* Resumen de entradas (lo que se genera) */}
                         <div>
                             <h3 className="font-semibold mb-2 flex items-center gap-2">
                                 <Scale className="h-4 w-4 text-green-500" />
-                                Productos Generados
+                                Productos Generados (Entran al Stock)
                             </h3>
                             <div className="space-y-1">
-                                {salidas.map((salida, idx) => (
+                                {entradas.map((entrada, idx) => (
                                     <div key={idx} className="flex justify-between text-sm">
-                                        <span>{salida.producto_nombre}</span>
-                                        <span>{salida.peso_kg} kg</span>
+                                        <span>
+                                            {entrada.producto_nombre}
+                                            <Badge variant="outline" className="ml-1 text-xs">
+                                                {entrada.destino_nombre}
+                                            </Badge>
+                                        </span>
+                                        <span>{entrada.peso_kg} kg</span>
                                     </div>
                                 ))}
                             </div>
                             <div className="mt-2 pt-2 border-t flex justify-between font-semibold">
                                 <span>Total generado:</span>
-                                <span className="text-green-600">{pesoTotalSalida.toFixed(2)} kg</span>
+                                <span className="text-green-600">{pesoTotalEntrada.toFixed(2)} kg</span>
                             </div>
                         </div>
 
-                        {/* Merma final */}
+                        {/* Desperdicio final */}
                         <div className={`p-4 rounded-lg ${mermaPorcentaje > 50 ? 'bg-red-100' : 'bg-yellow-100'}`}>
                             <div className="flex justify-between text-lg">
-                                <span className="font-semibold">Merma Total:</span>
+                                <span className="font-semibold">Desperdicio Total:</span>
                                 <span className={`font-bold ${mermaPorcentaje > 50 ? 'text-red-600' : 'text-orange-600'}`}>
                                     {mermaKg.toFixed(2)} kg ({mermaPorcentaje.toFixed(1)}%)
                                 </span>
@@ -782,7 +882,7 @@ export default function NuevaOrdenProduccionPage() {
                     <CardFooter className="flex justify-between">
                         <Button variant="outline" onClick={() => setStep(3)}>
                             <ArrowLeft className="mr-2 h-4 w-4" />
-                            Volver a Salidas
+                            Volver
                         </Button>
                         <div className="flex gap-2">
                             <Button variant="destructive" onClick={handleCancelarOrden} disabled={loading}>

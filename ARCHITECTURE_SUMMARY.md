@@ -102,12 +102,19 @@ supabase/                         # Scripts SQL y migraciones
 - **Checklists**: Control calidad obligatorio antes de salida
 - **Picking**: Optimización de preparación de pedidos
 - **Producción/Desposte**: Sistema completo de transformación de productos con trazabilidad
-  - **Órdenes de Producción**: Registro de transformación (ej: cajas pollo entero → patamuslo, suprema, etc.)
-  - **Entradas**: Productos consumidos con descuento automático de stock FIFO
-  - **Salidas**: Productos generados con peso individual y generación automática de lotes
-  - **Merma**: Cálculo automático de porcentaje de merma por orden
+  - **Órdenes de Producción**: Registro de transformación (ej: cajas pollo entero → filet, patamuslo, etc.)
+  - **Nomenclatura**: 
+    - **Salidas de Stock**: Productos que SALEN del inventario (se consumen, ej: cajas de pollo entero)
+    - **Entradas de Stock**: Productos que ENTRAN al inventario (se generan, ej: filet, patamuslo)
+  - **Destinos de Producción** (Diciembre 2025):
+    - Categorías configurables: Filet, Pechuga, Pollo Trozado
+    - Cada destino define productos permitidos (ej: Filet → patamuslo, filet, puchero, menudo)
+    - Selector obligatorio al agregar productos generados
+    - Tabla `destinos_produccion` + `destino_productos`
+  - **Desperdicio**: Calculado como diferencia final (peso consumido - peso generado)
+  - **Merma Individual**: Cada producto generado tiene campos `merma_esperada_kg` y `merma_real_kg`
   - **Integración Balanza**: Preparado para balanza SDP BBC-4030 (indicador SDP 32)
-  - **Rutas**: `/almacen/produccion`, `/almacen/produccion/nueva`
+  - **Rutas**: `/almacen/produccion`, `/almacen/produccion/nueva`, `/almacen/produccion/destinos`
 
 ### 💰 **Ventas (CRM)**: Gestión de Clientes y Pedidos
 - **Clientes**: Con zonas entrega, límites crédito, bloqueo automático, listas de precios asignadas
