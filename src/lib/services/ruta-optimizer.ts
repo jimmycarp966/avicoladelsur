@@ -4,13 +4,10 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { config } from '@/lib/config'
 import { getGoogleDirections, isGoogleDirectionsAvailable } from '@/lib/rutas/google-directions'
-import {
-  optimizeRouteLocal,
-  generateSimplePolyline,
-  type Point,
-} from '@/lib/rutas/local-optimizer'
+import type { Point } from '@/lib/rutas/local-optimizer' // Solo el tipo Point
 import { optimizeFleetRouting, isFleetRoutingAvailable, type FleetRoutingOptions } from '@/lib/services/google-cloud/fleet-routing'
 import { optimizeRoutes, isOptimizationAvailable, type OptimizationOptions } from '@/lib/services/google-cloud/optimization'
+import { calcularTiempoDescarga, verificarEnHorario, obtenerHorarioDelDia } from '@/lib/utils/eta-calculator'
 import type { Database } from '@/types/database.types'
 
 type GenerateRutaOptions = {
@@ -124,6 +121,14 @@ export async function generateRutaOptimizada({
             pedidoId: detalle.pedido_id,
             clienteId: clienteData.id,
             nombreCliente: clienteData.nombre,
+            // Horarios del cliente para calcular ETA
+            horario_lunes: clienteData.horario_lunes,
+            horario_martes: clienteData.horario_martes,
+            horario_miercoles: clienteData.horario_miercoles,
+            horario_jueves: clienteData.horario_jueves,
+            horario_viernes: clienteData.horario_viernes,
+            horario_sabado: clienteData.horario_sabado,
+            horario_domingo: clienteData.horario_domingo,
           })
         }
       }
@@ -168,52 +173,32 @@ export async function generateRutaOptimizada({
   let polyline = ''
   let distanciaTotal = 0
   let duracionTotal = 0
-  let optimizadaPor: 'google' | 'local' = 'local'
+  const optimizadaPor: 'google' = 'google' // Solo Google Cloud, sin fallback local
 
-  const puedeUsarGoogle = usarGoogle && isGoogleDirectionsAvailable()
-  console.log('[Optimizer] ¿Puede usar Google?', puedeUsarGoogle, '| usarGoogle:', usarGoogle, '| API disponible:', isGoogleDirectionsAvailable())
-
-  if (puedeUsarGoogle) {
-    console.log('[Optimizer] Llamando a Google Directions con', waypointsUnicos.length, 'clientes...')
-    const googleResult = await getGoogleDirections({
-      origin: { lat: origin.lat, lng: origin.lng },
-      destination: { lat: destination.lat, lng: destination.lng },
-      waypoints: waypointsUnicos, // Enviar TODOS los clientes como waypoints
-      optimize: waypointsUnicos.length > 1, // Optimizar si hay más de 1 cliente
-    })
-
-    console.log('[Optimizer] Resultado Google:', googleResult.success ? 'OK' : 'FALLBACK', googleResult.error || '')
-
-    if (googleResult.success && googleResult.orderedStops) {
-      ordenVisita = mapOrderedStops(googleResult.orderedStops, waypointsUnicos)
-      polyline = googleResult.polyline || ''
-      distanciaTotal = (googleResult.distance || 0) / 1000
-      duracionTotal = Math.round((googleResult.duration || 0) / 60)
-      optimizadaPor = 'google'
-      console.log('[Optimizer] ✅ Usando Google Directions - polyline length:', polyline.length)
-    } else {
-      console.warn('[Optimizer] Google Directions falló, usando fallback local:', googleResult.error)
-    }
+  // Verificar que Google esté disponible
+  if (!isGoogleDirectionsAvailable()) {
+    throw new Error('Google Directions API no está configurada. Verifica GOOGLE_MAPS_API_KEY en las variables de entorno.')
   }
 
-  if (optimizadaPor === 'local' || ordenVisita.length === 0) {
-    const localResult = optimizeRouteLocal(origin, waypointsUnicos, destination)
-    ordenVisita = localResult.orderedPoints
-      .filter((punto) => punto.detalleRutaId)
-      .map((punto, index) => ({
-        detalle_ruta_id: punto.detalleRutaId,
-        pedido_id: punto.pedidoId,
-        cliente_id: punto.clienteId,
-        cliente_nombre: punto.nombreCliente,
-        lat: punto.lat,
-        lng: punto.lng,
-        orden: index + 1,
-      }))
+  console.log('[Optimizer] Llamando a Google Directions con', waypointsUnicos.length, 'clientes...')
+  const googleResult = await getGoogleDirections({
+    origin: { lat: origin.lat, lng: origin.lng },
+    destination: { lat: destination.lat, lng: destination.lng },
+    waypoints: waypointsUnicos, // Enviar TODOS los clientes como waypoints
+    optimize: waypointsUnicos.length > 1, // Optimizar si hay más de 1 cliente
+  })
 
-    polyline = generateSimplePolyline(localResult.orderedPoints)
-    distanciaTotal = localResult.totalDistance
-    duracionTotal = localResult.estimatedDuration
+  console.log('[Optimizer] Resultado Google:', googleResult.success ? 'OK' : 'ERROR', googleResult.error || '')
+
+  if (!googleResult.success || !googleResult.orderedStops) {
+    throw new Error(`Error al optimizar ruta con Google: ${googleResult.error || 'Sin detalle'}`)
   }
+
+  ordenVisita = mapOrderedStops(googleResult.orderedStops, waypointsUnicos)
+  polyline = googleResult.polyline || ''
+  distanciaTotal = (googleResult.distance || 0) / 1000
+  duracionTotal = Math.round((googleResult.duration || 0) / 60)
+  console.log('[Optimizer] ✅ Ruta optimizada con Google Directions - polyline length:', polyline.length)
 
   // Actualizar ruta_planificada
   const { data: rutaPlanificada, error: saveError } = await (supabase as any)
@@ -258,13 +243,31 @@ export async function generateRutaOptimizada({
 
   // Sincronizar orden optimizado en la tabla entregas para que el repartidor vea el mismo orden
   // Esto es importante para pedidos agrupados donde cada cliente tiene un registro en entregas
-  console.log('[Optimizer] Sincronizando orden en tabla entregas para', ordenVisita.length, 'puntos...')
+  console.log('[Optimizer] Sincronizando orden y calculando ETAs para', ordenVisita.length, 'puntos...')
 
   // Obtener los pedido_ids de esta ruta para filtrar correctamente
   const pedidoIds = [...new Set(ordenVisita.map(p => p.pedido_id).filter(Boolean))]
   console.log('[Optimizer] Pedidos en la ruta:', pedidoIds)
 
-  for (const punto of ordenVisita) {
+  // Obtener hora_inicio_reparto de la ruta para calcular ETAs
+  const { data: rutaData } = await supabase
+    .from('rutas_reparto')
+    .select('hora_inicio_reparto, fecha_ruta')
+    .eq('id', rutaId)
+    .single()
+
+  const horaInicioReparto = rutaData?.hora_inicio_reparto
+    ? new Date(rutaData.hora_inicio_reparto)
+    : new Date() // Si no hay hora de inicio, usar hora actual
+
+  const fechaRuta = rutaData?.fecha_ruta ? new Date(rutaData.fecha_ruta) : new Date()
+
+  // Calcular tiempo acumulado en minutos desde hora_inicio_reparto
+  let tiempoAcumuladoMin = 0
+
+  for (let i = 0; i < ordenVisita.length; i++) {
+    const punto = ordenVisita[i]
+
     if (punto.cliente_id && punto.pedido_id) {
       // Buscar la entrega por pedido_id + cliente_id
       const { data: entrega, error: entregaFetchError } = await (supabase as any)
@@ -277,16 +280,59 @@ export async function generateRutaOptimizada({
       console.log('[Optimizer] Buscando entrega para cliente', punto.cliente_nombre, '(', punto.cliente_id, ') pedido', punto.pedido_id, '->', entrega ? 'encontrada' : 'no encontrada')
 
       if (!entregaFetchError && entrega) {
+        // Calcular tiempo de viaje (usar duración del tramo o estimación basada en distancia)
+        // Asumimos ~3 min por km como estimación si no tenemos datos precisos
+        const distanciaKm = distanciaTotal / ordenVisita.length // Distribución aproximada
+        const tiempoViajeMin = i === 0 ? 15 : Math.ceil(distanciaKm * 3) // 15 min al primer cliente
+        tiempoAcumuladoMin += tiempoViajeMin
+
+        // Calcular ETA
+        const eta = new Date(horaInicioReparto.getTime() + tiempoAcumuladoMin * 60 * 1000)
+
+        // Obtener peso de la entrega (si existe) para calcular tiempo de descarga
+        const { data: pesoData } = await (supabase as any)
+          .from('entregas')
+          .select('peso_total_kg')
+          .eq('id', (entrega as any).id)
+          .single()
+
+        const pesoKg = pesoData?.peso_total_kg || 20 // Default 20kg si no hay dato
+        const tiempoDescargaMin = calcularTiempoDescarga(pesoKg)
+
+        // Obtener horario del cliente según el día de la semana
+        const horarioCliente = obtenerHorarioDelDia({
+          horario_lunes: (punto as any).horario_lunes,
+          horario_martes: (punto as any).horario_martes,
+          horario_miercoles: (punto as any).horario_miercoles,
+          horario_jueves: (punto as any).horario_jueves,
+          horario_viernes: (punto as any).horario_viernes,
+          horario_sabado: (punto as any).horario_sabado,
+          horario_domingo: (punto as any).horario_domingo,
+        }, fechaRuta)
+
+        // Verificar si está en horario
+        const enHorario = verificarEnHorario(horarioCliente, eta)
+
+        // Actualizar entrega con orden, ETA, tiempo de descarga y estado de horario
         const { error: entregaUpdateError } = await (supabase as any)
           .from('entregas')
-          .update({ orden_entrega: punto.orden })
+          .update({
+            orden_entrega: punto.orden,
+            eta: eta.toISOString(),
+            tiempo_descarga_min: tiempoDescargaMin,
+            peso_entrega_kg: pesoKg,
+            en_horario: enHorario,
+          })
           .eq('id', (entrega as any).id)
 
         if (entregaUpdateError) {
-          console.warn(`[Optimizer] Error al actualizar orden_entrega para entrega ${(entrega as any).id}:`, entregaUpdateError)
+          console.warn(`[Optimizer] Error al actualizar entrega ${(entrega as any).id}:`, entregaUpdateError)
         } else {
-          console.log(`[Optimizer] ✅ Entrega ${(entrega as any).id} (${punto.cliente_nombre}) → orden ${punto.orden}`)
+          console.log(`[Optimizer] ✅ Entrega ${(entrega as any).id} (${punto.cliente_nombre}) → orden ${punto.orden}, ETA ${eta.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}, ${enHorario ? '🟢 en horario' : '🔴 fuera de horario'}`)
         }
+
+        // Sumar tiempo de descarga al acumulado para el siguiente cliente
+        tiempoAcumuladoMin += tiempoDescargaMin
       } else if (entregaFetchError) {
         console.warn(`[Optimizer] Error buscando entrega:`, entregaFetchError)
       }

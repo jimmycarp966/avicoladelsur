@@ -65,6 +65,58 @@ export const clienteSchema = z.object({
 
   activo: z
     .boolean(),
+
+  // Horarios de apertura por día (formato "HH:mm-HH:mm" o "HH:mm-HH:mm,HH:mm-HH:mm")
+  // Vacío o null = siempre disponible
+  horario_lunes: z
+    .string()
+    .optional()
+    .refine(
+      (val) => !val || /^(\d{2}:\d{2}-\d{2}:\d{2})(,\d{2}:\d{2}-\d{2}:\d{2})*$/.test(val),
+      { message: 'Formato inválido. Usar HH:mm-HH:mm (ej: 08:00-12:00,16:00-20:00)' }
+    ),
+  horario_martes: z
+    .string()
+    .optional()
+    .refine(
+      (val) => !val || /^(\d{2}:\d{2}-\d{2}:\d{2})(,\d{2}:\d{2}-\d{2}:\d{2})*$/.test(val),
+      { message: 'Formato inválido. Usar HH:mm-HH:mm' }
+    ),
+  horario_miercoles: z
+    .string()
+    .optional()
+    .refine(
+      (val) => !val || /^(\d{2}:\d{2}-\d{2}:\d{2})(,\d{2}:\d{2}-\d{2}:\d{2})*$/.test(val),
+      { message: 'Formato inválido. Usar HH:mm-HH:mm' }
+    ),
+  horario_jueves: z
+    .string()
+    .optional()
+    .refine(
+      (val) => !val || /^(\d{2}:\d{2}-\d{2}:\d{2})(,\d{2}:\d{2}-\d{2}:\d{2})*$/.test(val),
+      { message: 'Formato inválido. Usar HH:mm-HH:mm' }
+    ),
+  horario_viernes: z
+    .string()
+    .optional()
+    .refine(
+      (val) => !val || /^(\d{2}:\d{2}-\d{2}:\d{2})(,\d{2}:\d{2}-\d{2}:\d{2})*$/.test(val),
+      { message: 'Formato inválido. Usar HH:mm-HH:mm' }
+    ),
+  horario_sabado: z
+    .string()
+    .optional()
+    .refine(
+      (val) => !val || /^(\d{2}:\d{2}-\d{2}:\d{2})(,\d{2}:\d{2}-\d{2}:\d{2})*$/.test(val),
+      { message: 'Formato inválido. Usar HH:mm-HH:mm' }
+    ),
+  horario_domingo: z
+    .string()
+    .optional()
+    .refine(
+      (val) => !val || /^(\d{2}:\d{2}-\d{2}:\d{2})(,\d{2}:\d{2}-\d{2}:\d{2})*$/.test(val),
+      { message: 'Formato inválido. Usar HH:mm-HH:mm' }
+    ),
 })
 
 // Esquema para búsqueda y filtros de clientes

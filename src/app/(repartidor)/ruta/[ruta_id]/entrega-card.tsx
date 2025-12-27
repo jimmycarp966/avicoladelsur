@@ -10,13 +10,16 @@ import {
   CheckCircle,
   ChevronDown,
   ChevronUp,
-  AlertCircle
+  AlertCircle,
+  ArrowDown
 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import { toast } from 'sonner'
+import { moverClienteAlFinalAction } from '@/actions/reparto.actions'
 
 interface EntregaCardProps {
   entrega: any
@@ -26,6 +29,7 @@ interface EntregaCardProps {
 
 export function EntregaCard({ entrega, rutaId, rutaEstado }: EntregaCardProps) {
   const [productosExpandidos, setProductosExpandidos] = useState(false)
+  const [moviendoAlFinal, setMoviendoAlFinal] = useState(false)
   const pedido = entrega.pedido
   const cliente = pedido?.cliente
 
@@ -40,6 +44,24 @@ export function EntregaCard({ entrega, rutaId, rutaEstado }: EntregaCardProps) {
   const estadosPagoResueltos = ['pagado', 'cuenta_corriente', 'parcial']
   const estaPagado = estadosPagoResueltos.includes(estadoPago) || pedido?.pago_estado === 'pagado'
   const montoPendiente = !estaPagado ? (pedido?.total || 0) : 0
+
+  // Manejar mover cliente al final
+  async function handleMoverAlFinal() {
+    setMoviendoAlFinal(true)
+    try {
+      const result = await moverClienteAlFinalAction(rutaId, entrega.id)
+      if (result.success) {
+        toast.success('Cliente movido al final. ETAs recalculados.')
+        // La página se recargará automáticamente por revalidatePath
+      } else {
+        toast.error(result.error || 'Error al mover cliente')
+      }
+    } catch (error) {
+      toast.error('Error al mover cliente al final')
+    } finally {
+      setMoviendoAlFinal(false)
+    }
+  }
 
   return (
     <Card className={entrega.estado_entrega === 'entregado' ? 'opacity-75' : ''}>
@@ -102,6 +124,71 @@ export function EntregaCard({ entrega, rutaId, rutaEstado }: EntregaCardProps) {
               </Badge>
             )}
           </div>
+
+          {/* Información de ETA y horario de apertura */}
+          {(entrega.eta || entrega.tiempo_descarga_min || entrega.horario_cliente) && (
+            <div className="bg-slate-50 dark:bg-slate-900 p-3 rounded-md space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium flex items-center gap-1">
+                  ⏰ ETA
+                </span>
+                <div className="flex items-center gap-2">
+                  {entrega.eta && (
+                    <span className="font-bold text-lg">
+                      {typeof entrega.eta === 'string'
+                        ? new Date(entrega.eta).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+                        : entrega.eta.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
+                  {entrega.en_horario === true && (
+                    <Badge variant="default" className="bg-green-600">
+                      🟢 En horario
+                    </Badge>
+                  )}
+                  {entrega.en_horario === false && (
+                    <Badge variant="destructive">
+                      🔴 Fuera de horario
+                    </Badge>
+                  )}
+                </div>
+              </div>
+
+              {entrega.horario_cliente && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Horario del cliente:</span>
+                  <span className="font-medium">{entrega.horario_cliente}</span>
+                </div>
+              )}
+
+              {entrega.tiempo_descarga_min && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Tiempo de descarga:</span>
+                  <span className="font-medium">~{entrega.tiempo_descarga_min} min</span>
+                </div>
+              )}
+
+              {entrega.peso_entrega_kg && entrega.peso_entrega_kg > 0 && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Peso a entregar:</span>
+                  <span className="font-medium">{entrega.peso_entrega_kg} kg</span>
+                </div>
+              )}
+
+              {/* Botón para mover al final si está fuera de horario */}
+              {entrega.en_horario === false && puedeEditar && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full mt-2 text-amber-700 border-amber-400 hover:bg-amber-50"
+                  onClick={handleMoverAlFinal}
+                  disabled={moviendoAlFinal}
+                >
+                  <ArrowDown className="mr-2 h-4 w-4" />
+                  {moviendoAlFinal ? 'Moviendo...' : 'Mover al final de la ruta'}
+                </Button>
+              )}
+            </div>
+          )}
 
           <Separator />
 

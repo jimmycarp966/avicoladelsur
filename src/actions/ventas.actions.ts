@@ -26,6 +26,14 @@ export async function crearClienteAction(
     coordenadas?: { lat: number; lng: number }
     tipo_cliente?: string
     limite_credito?: number
+    // Horarios de apertura
+    horario_lunes?: string
+    horario_martes?: string
+    horario_miercoles?: string
+    horario_jueves?: string
+    horario_viernes?: string
+    horario_sabado?: string
+    horario_domingo?: string
   }
 ): Promise<ApiResponse<{ clienteId: string }>> {
   try {
@@ -47,13 +55,13 @@ export async function crearClienteAction(
 
     // Preparar datos para insertar
     const { coordenadas, ...restData } = clienteData
-    
+
     // Si hay coordenadas, usar función SQL para convertir a POINT
     let insertData: any = {
       ...restData,
       activo: true,
     }
-    
+
     if (coordenadas) {
       const { lat, lng } = coordenadas
       // Usar formato GeoJSON que Supabase acepta para PostGIS
@@ -136,7 +144,7 @@ export async function crearClienteDesdeBotAction(
         .select('id')
         .eq('codigo', codigoFinal)
         .single()
-      
+
       if (!existing) break
       codigoFinal = `${codigoAuto.slice(0, 45)}-${contador}`.slice(0, 50)
       contador++
@@ -248,6 +256,14 @@ export async function actualizarClienteAction(
     tipo_cliente?: string
     limite_credito?: number
     activo?: boolean
+    // Horarios de apertura
+    horario_lunes?: string
+    horario_martes?: string
+    horario_miercoles?: string
+    horario_jueves?: string
+    horario_viernes?: string
+    horario_sabado?: string
+    horario_domingo?: string
   }>
 ): Promise<ApiResponse> {
   try {
@@ -272,12 +288,12 @@ export async function actualizarClienteAction(
 
     // Preparar datos para actualizar
     const { coordenadas, ...restUpdates } = updates
-    
+
     let updateData: any = {
       ...restUpdates,
       updated_at: new Date().toISOString(),
     }
-    
+
     // Si hay coordenadas, convertir a formato PostGIS
     if (coordenadas) {
       const { lat, lng } = coordenadas
@@ -461,7 +477,7 @@ export async function obtenerClientePorIdAction(
     if (clienteRaw.coordenadas) {
       try {
         let coords: any = null
-        
+
         if (typeof clienteRaw.coordenadas === 'string') {
           const match = clienteRaw.coordenadas.match(/POINT\(([\d.-]+)\s+([\d.-]+)\)/)
           if (match) {
@@ -486,7 +502,7 @@ export async function obtenerClientePorIdAction(
             }
           }
         }
-        
+
         if (coords && typeof coords.lat === 'number' && typeof coords.lng === 'number') {
           coordenadas = { lat: coords.lat, lng: coords.lng }
         }
@@ -548,17 +564,17 @@ export async function crearPedidoAction(
 
     const pagoPayload = params.pago
       ? {
-          modalidad: params.pago.modalidad,
-          monto: params.pago.monto ?? null,
-          caja_id: params.pago.caja_id ?? null,
-          tipo_pago: params.pago.tipo_pago ?? 'efectivo',
-        }
+        modalidad: params.pago.modalidad,
+        monto: params.pago.monto ?? null,
+        caja_id: params.pago.caja_id ?? null,
+        tipo_pago: params.pago.tipo_pago ?? 'efectivo',
+      }
       : {
-          modalidad: 'contado' as const,
-          monto: null,
-          caja_id: null,
-          tipo_pago: 'efectivo' as const,
-        }
+        modalidad: 'contado' as const,
+        monto: null,
+        caja_id: null,
+        tipo_pago: 'efectivo' as const,
+      }
 
     const { data, error } = await supabase.rpc('fn_procesar_pedido', {
       p_cliente_id: params.cliente_id,
@@ -611,10 +627,10 @@ export async function crearPedidoBotAction(
       p_observaciones: params.observaciones,
       p_pago: params.pago
         ? {
-            modalidad: params.pago.modalidad,
-            monto: params.pago.monto ?? null,
-            tipo_pago: params.pago.tipo_pago ?? 'efectivo',
-          }
+          modalidad: params.pago.modalidad,
+          monto: params.pago.monto ?? null,
+          tipo_pago: params.pago.tipo_pago ?? 'efectivo',
+        }
         : null,
       p_fecha_entrega_estimada: params.fecha_entrega_estimada ?? null,
     })
@@ -1002,7 +1018,7 @@ export async function obtenerReclamosAction(
 
     const total = count || 0
     const pages = Math.ceil(total / limit)
-    
+
     return {
       success: true,
       data: data || [],

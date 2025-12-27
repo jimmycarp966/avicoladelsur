@@ -1598,10 +1598,13 @@ export async function asignarPedidoARutaDesdeAlmacen(
     // Iniciar la ruta automáticamente (cambiar estado a 'en_curso')
     // Esto permite que la ruta aparezca inmediatamente en rutas activas
     // y sea visible para el repartidor
+    // IMPORTANTE: hora_inicio_reparto se usa para calcular ETAs de cada cliente
+    const horaInicioReparto = new Date().toISOString()
     const { error: iniciarError } = await supabase
       .from('rutas_reparto')
       .update({
         estado: 'en_curso',
+        hora_inicio_reparto: horaInicioReparto,
         updated_at: new Date().toISOString(),
       })
       .eq('id', rutaId)
@@ -2041,6 +2044,203 @@ export async function obtenerRutaPorPedidoIdAction(pedidoId: string): Promise<Ap
     return {
       success: false,
       error: error.message || 'Error al obtener ruta por pedido',
+    }
+  }
+}
+
+// ============================================================================
+// FUNCIONES PARA MOVER CLIENTE Y RECALCULAR ETAs
+// ============================================================================
+
+import { calcularTiempoDescarga, verificarEnHorario, obtenerHorarioDelDia } from '@/lib/utils/eta-calculator'
+
+/**
+ * Mueve un cliente al final de la ruta y recalcula los ETAs de todos los clientes
+ * Usado por el repartidor cuando un cliente no puede recibir en su horario
+ */
+export async function moverClienteAlFinalAction(
+  rutaId: string,
+  entregaId: string
+): Promise<ApiResponse> {
+  try {
+    const supabase = await createClient()
+
+    // Obtener todas las entregas de la ruta ordenadas
+    const { data: entregas, error: entregasError } = await supabase
+      .from('entregas')
+      .select('id, orden_entrega, cliente_id, pedido_id')
+      .eq('pedido_id', (
+        await supabase
+          .from('detalles_ruta')
+          .select('pedido_id')
+          .eq('ruta_id', rutaId)
+      ).data?.map(d => d.pedido_id) || [])
+      .order('orden_entrega', { ascending: true })
+
+    if (entregasError || !entregas || entregas.length === 0) {
+      return {
+        success: false,
+        error: 'No se encontraron entregas en la ruta',
+      }
+    }
+
+    // Encontrar la entrega a mover
+    const entregaIndex = entregas.findIndex(e => e.id === entregaId)
+    if (entregaIndex === -1) {
+      return {
+        success: false,
+        error: 'Entrega no encontrada en la ruta',
+      }
+    }
+
+    // Reorganizar: mover la entrega al final
+    const entregaAMover = entregas[entregaIndex]
+    const entregasReorganizadas = [
+      ...entregas.slice(0, entregaIndex),
+      ...entregas.slice(entregaIndex + 1),
+      entregaAMover
+    ]
+
+    // Actualizar el orden de cada entrega
+    for (let i = 0; i < entregasReorganizadas.length; i++) {
+      const nuevoOrden = i + 1
+      await supabase
+        .from('entregas')
+        .update({ orden_entrega: nuevoOrden })
+        .eq('id', entregasReorganizadas[i].id)
+    }
+
+    // Recalcular ETAs
+    await recalcularETAsRuta(supabase, rutaId)
+
+    revalidatePath('/(repartidor)/ruta')
+    revalidatePath(`/(repartidor)/ruta/${rutaId}`)
+
+    return {
+      success: true,
+      message: 'Cliente movido al final exitosamente. ETAs recalculados.',
+    }
+  } catch (error: any) {
+    devError('Error al mover cliente al final:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al mover cliente al final',
+    }
+  }
+}
+
+/**
+ * Recalcula los ETAs de todas las entregas de una ruta
+ * Se llama automáticamente después de mover un cliente
+ */
+async function recalcularETAsRuta(
+  supabase: any,
+  rutaId: string
+): Promise<void> {
+  // Obtener hora_inicio_reparto de la ruta
+  const { data: rutaData } = await supabase
+    .from('rutas_reparto')
+    .select('hora_inicio_reparto, fecha_ruta')
+    .eq('id', rutaId)
+    .single()
+
+  const horaInicioReparto = rutaData?.hora_inicio_reparto
+    ? new Date(rutaData.hora_inicio_reparto)
+    : new Date()
+
+  const fechaRuta = rutaData?.fecha_ruta ? new Date(rutaData.fecha_ruta) : new Date()
+
+  // Obtener entregas ordenadas con datos de cliente
+  const { data: entregas } = await supabase
+    .from('entregas')
+    .select(`
+      id, 
+      orden_entrega, 
+      cliente_id, 
+      peso_entrega_kg,
+      clientes (
+        horario_lunes,
+        horario_martes,
+        horario_miercoles,
+        horario_jueves,
+        horario_viernes,
+        horario_sabado,
+        horario_domingo
+      )
+    `)
+    .eq('pedido_id', (
+      await supabase
+        .from('detalles_ruta')
+        .select('pedido_id')
+        .eq('ruta_id', rutaId)
+    ).data?.map((d: any) => d.pedido_id) || [])
+    .order('orden_entrega', { ascending: true })
+
+  if (!entregas || entregas.length === 0) return
+
+  // Calcular tiempo acumulado en minutos
+  let tiempoAcumuladoMin = 0
+  const tiempoViajeEstimadoMin = 10 // ~10 min entre clientes (estimación)
+
+  for (let i = 0; i < entregas.length; i++) {
+    const entrega = entregas[i] as any
+
+    // Tiempo de viaje
+    tiempoAcumuladoMin += i === 0 ? 15 : tiempoViajeEstimadoMin
+
+    // Calcular ETA
+    const eta = new Date(horaInicioReparto.getTime() + tiempoAcumuladoMin * 60 * 1000)
+
+    // Tiempo de descarga
+    const pesoKg = entrega.peso_entrega_kg || 20
+    const tiempoDescargaMin = calcularTiempoDescarga(pesoKg)
+
+    // Obtener horario del cliente
+    const cliente = entrega.clientes || {}
+    const horarioCliente = obtenerHorarioDelDia(cliente, fechaRuta)
+
+    // Verificar si está en horario
+    const enHorario = verificarEnHorario(horarioCliente, eta)
+
+    // Actualizar entrega
+    await supabase
+      .from('entregas')
+      .update({
+        eta: eta.toISOString(),
+        tiempo_descarga_min: tiempoDescargaMin,
+        en_horario: enHorario,
+      })
+      .eq('id', entrega.id)
+
+    // Sumar tiempo de descarga
+    tiempoAcumuladoMin += tiempoDescargaMin
+  }
+}
+
+/**
+ * Recalcula manualmente los ETAs de una ruta
+ * Usado si se necesita forzar un recálculo
+ */
+export async function recalcularETAsAction(
+  rutaId: string
+): Promise<ApiResponse> {
+  try {
+    const supabase = await createClient()
+
+    await recalcularETAsRuta(supabase, rutaId)
+
+    revalidatePath('/(repartidor)/ruta')
+    revalidatePath(`/(repartidor)/ruta/${rutaId}`)
+
+    return {
+      success: true,
+      message: 'ETAs recalculados exitosamente',
+    }
+  } catch (error: any) {
+    devError('Error al recalcular ETAs:', error)
+    return {
+      success: false,
+      error: error.message || 'Error al recalcular ETAs',
     }
   }
 }

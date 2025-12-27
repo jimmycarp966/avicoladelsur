@@ -129,7 +129,7 @@ supabase/                         # Scripts SQL y migraciones
 - **Sin Planificación Previa**: Las rutas se crean automáticamente al asignar pedidos, no requiere configuración previa
 - **Vehículos Base**: Fiorino (600kg), Hilux (1500kg), F-4000 (4000kg) precargados
 - **Asignación Automática**: fn_asignar_pedido_a_ruta() crea rutas con vehículo y repartidor automáticos
-- **Optimización Automática**: Al asignar cada pedido, la ruta se optimiza automáticamente usando Google Directions API (optimize:true) con fallback local (Nearest Neighbor + 2-opt)
+- **Optimización Automática**: Al asignar cada pedido, la ruta se optimiza automáticamente usando Google Directions API (optimize:true) - **sin fallback local** (error si Google falla)
 - **GPS Tracking**: PWA móvil envía ubicación cada 5s durante reparto activo
 - **Alertas Automáticas**: Desvío (>200m) y cliente saltado (<100m sin entrega)
 - **PWA Móvil**: Hoja ruta digital con GPS, entregas y registro de pagos
@@ -166,6 +166,24 @@ supabase/                         # Scripts SQL y migraciones
 - **Actualización Dinámica de Polyline**: La polyline se actualiza en tiempo real cuando se completan entregas
 - **Detección de Llegada Automática**: El sistema detecta automáticamente cuando el repartidor llega a destino (50m) y muestra panel de confirmación
 - **Finalización de Ruta**: Valida entregas individuales para pedidos agrupados antes de permitir finalizar
+- **Horarios de Apertura de Clientes** (Diciembre 2025):
+  - Cada cliente puede configurar horarios de apertura por día de la semana (lunes-domingo)
+  - Formato flexible: "08:00-18:00" o partido "08:00-12:00,16:00-20:00"
+  - Campo vacío = cliente disponible todo el día
+  - Funciones SQL: `fn_obtener_horario_cliente`, `fn_verificar_en_horario`
+- **Tiempo de Descarga por Peso**: Fórmula `5 min base + ceil(peso_kg / 20) * 2 min`
+  - Función SQL: `fn_calcular_tiempo_descarga`
+  - Utilitario TS: `eta-calculator.ts`
+- **Hora de Inicio de Reparto**: Campo `hora_inicio_reparto` en `rutas_reparto`
+  - Se registra cuando almacén presiona "Pasar a Ruta"
+  - Base para calcular ETA de cada cliente
+- **Visualización de ETA**: En `EntregaCard.tsx` se muestra:
+  - Hora estimada de llegada (ETA)
+  - Indicador 🟢 En horario / 🔴 Fuera de horario
+  - Tiempo de descarga estimado
+  - Peso a entregar
+  - Horario de apertura del cliente
+- **Motivo de Rechazo**: Nuevo motivo "cliente_fuera_de_horario" en devoluciones
 
 ### 💵 **Tesorería**: Control Financiero
 - **Cajas**: Por sucursal con saldos iniciales/actuales

@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Loader2, Save, X, Plus, Tag } from 'lucide-react'
+import { ArrowLeft, Loader2, Save, X, Plus, Tag, Clock } from 'lucide-react'
 import { GoogleMapSelector } from '@/components/ui/google-map-selector'
 import Link from 'next/link'
 import { clienteSchema, type ClienteFormData } from '@/lib/schemas/clientes.schema'
@@ -41,6 +41,14 @@ interface ClienteFormProps {
     tipo_cliente: string
     limite_credito: number
     activo: boolean
+    // Horarios de apertura
+    horario_lunes?: string
+    horario_martes?: string
+    horario_miercoles?: string
+    horario_jueves?: string
+    horario_viernes?: string
+    horario_sabado?: string
+    horario_domingo?: string
   }
   zonas?: Array<{ id: string; nombre: string }>
   onSuccess?: () => void
@@ -82,6 +90,14 @@ export function ClienteForm({ cliente, zonas = [], onSuccess }: ClienteFormProps
       tipo_cliente: cliente.tipo_cliente as 'minorista' | 'mayorista' | 'distribuidor',
       limite_credito: cliente.limite_credito,
       activo: cliente.activo,
+      // Horarios
+      horario_lunes: cliente.horario_lunes || '',
+      horario_martes: cliente.horario_martes || '',
+      horario_miercoles: cliente.horario_miercoles || '',
+      horario_jueves: cliente.horario_jueves || '',
+      horario_viernes: cliente.horario_viernes || '',
+      horario_sabado: cliente.horario_sabado || '',
+      horario_domingo: cliente.horario_domingo || '',
     } : {
       codigo: '',
       nombre: '',
@@ -93,6 +109,13 @@ export function ClienteForm({ cliente, zonas = [], onSuccess }: ClienteFormProps
       tipo_cliente: 'minorista' as const,
       limite_credito: 0,
       activo: true,
+      horario_lunes: '',
+      horario_martes: '',
+      horario_miercoles: '',
+      horario_jueves: '',
+      horario_viernes: '',
+      horario_sabado: '',
+      horario_domingo: '',
     },
   })
 
@@ -444,6 +467,51 @@ export function ClienteForm({ cliente, zonas = [], onSuccess }: ClienteFormProps
               Puedes editar manualmente la dirección si es necesario, o usar el mapa para autocompletar.
             </p>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Horarios de Apertura */}
+      <Card className="border-l-[3px] border-l-warning">
+        <CardHeader>
+          <CardTitle className="text-warning flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            Horarios de Apertura
+          </CardTitle>
+          <CardDescription>
+            Horarios en que el cliente puede recibir entregas. Dejar vacío si está disponible todo el día.
+            <br />
+            <span className="text-xs text-muted-foreground">Formato: HH:mm-HH:mm (ej: 08:00-12:00,16:00-20:00)</span>
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[
+              { id: 'horario_lunes', label: 'Lunes' },
+              { id: 'horario_martes', label: 'Martes' },
+              { id: 'horario_miercoles', label: 'Miércoles' },
+              { id: 'horario_jueves', label: 'Jueves' },
+              { id: 'horario_viernes', label: 'Viernes' },
+              { id: 'horario_sabado', label: 'Sábado' },
+              { id: 'horario_domingo', label: 'Domingo' },
+            ].map(({ id, label }) => (
+              <div key={id} className="space-y-2">
+                <Label htmlFor={id}>{label}</Label>
+                <Input
+                  id={id}
+                  placeholder="08:00-18:00"
+                  {...register(id as any)}
+                  disabled={isLoading}
+                />
+                {(errors as any)[id] && (
+                  <p className="text-sm text-destructive">{(errors as any)[id]?.message}</p>
+                )}
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            💡 Deja el campo vacío si el cliente puede recibir entregas a cualquier hora ese día.
+            Para horario partido usa coma: 08:00-12:00,16:00-20:00
+          </p>
         </CardContent>
       </Card>
 
