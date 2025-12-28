@@ -121,17 +121,17 @@ export default async function CuentaCorrientePage({ params }: CuentaCorrientePag
 
             {/* Resumen de cuenta */}
             <div className="grid gap-4 md:grid-cols-4">
-                <Card className={saldoActual > limiteCredito ? 'border-red-300 bg-red-50' : ''}>
+                <Card className={saldoActual > limiteCredito ? 'border-red-300 bg-red-50' : saldoActual < 0 ? 'border-green-300 bg-green-50' : ''}>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Saldo Actual</CardTitle>
-                        <DollarSign className="h-4 w-4 text-muted-foreground" />
+                        <DollarSign className={`h-4 w-4 ${saldoActual < 0 ? 'text-green-600' : 'text-muted-foreground'}`} />
                     </CardHeader>
                     <CardContent>
                         <div className={`text-2xl font-bold ${saldoActual > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                            {formatCurrency(saldoActual)}
+                            {formatCurrency(Math.abs(saldoActual))}
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                            {saldoActual > 0 ? 'Deuda pendiente' : 'Sin deuda'}
+                        <p className={`text-xs ${saldoActual < 0 ? 'text-green-700 font-medium' : 'text-muted-foreground'}`}>
+                            {saldoActual > 0 ? 'Deuda pendiente' : saldoActual < 0 ? 'Saldo a favor' : 'Al día'}
                         </p>
                     </CardContent>
                 </Card>

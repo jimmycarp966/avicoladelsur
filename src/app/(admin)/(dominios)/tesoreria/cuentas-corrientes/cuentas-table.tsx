@@ -5,11 +5,11 @@ import { ColumnDef } from '@tanstack/react-table'
 import { DataTable, SortableHeader } from '@/components/ui/data-table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Eye, Phone, MessageCircle, AlertTriangle, Clock } from 'lucide-react'
+import { Eye, Phone, MessageCircle, AlertTriangle, Clock, Wallet, CheckCircle2 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import Link from 'next/link'
 
-interface ClienteMoroso {
+interface ClienteCuenta {
     cliente_id: string
     cliente_nombre: string
     cliente_telefono: string | null
@@ -18,35 +18,31 @@ interface ClienteMoroso {
     limite_credito: number
     saldo_cuenta_corriente: number
     total_facturas_pendientes: number
-    total_deuda_facturas: number
-    factura_mas_antigua_fecha: string | null
-    dias_maximos_vencido: number
-    total_mora_calculada: number
+    ultimo_movimiento_fecha: string
+    estado_cuenta: 'deudor' | 'favor' | 'al_dia'
     dias_gracia: number
     porcentaje_mora: number
-    deuda_total: number
 }
 
-interface MoratoriasTableProps {
-    clientes: ClienteMoroso[]
+interface CuentasTableProps {
+    clientes: ClienteCuenta[]
 }
 
-export function MoratoriasTable({ clientes }: MoratoriasTableProps) {
-    const getUrgenciaBadge = (dias: number) => {
-        if (dias <= 0) {
-            return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Al día</Badge>
-        } else if (dias <= 7) {
-            return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">⚠️ {dias}d</Badge>
-        } else if (dias <= 30) {
-            return <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100">⏰ {dias}d</Badge>
-        } else if (dias <= 60) {
-            return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">🔴 {dias}d</Badge>
-        } else {
-            return <Badge variant="destructive">🚨 {dias}d</Badge>
+export function CuentasCorrientesTable({ clientes }: CuentasTableProps) {
+    const getEstadoBadge = (estado: string) => {
+        switch (estado) {
+            case 'deudor':
+                return <Badge variant="destructive">🔴 Deudor</Badge>
+            case 'favor':
+                return <Badge className="bg-green-100 text-green-800 hover:bg-green-200 border-green-200">🟢 A Favor</Badge>
+            case 'al_dia':
+                return <Badge variant="outline" className="text-gray-600">⚪ Al día</Badge>
+            default:
+                return <Badge variant="outline">{estado}</Badge>
         }
     }
 
-    const columns: ColumnDef<ClienteMoroso>[] = [
+    const columns: ColumnDef<ClienteCuenta>[] = [
         {
             accessorKey: 'cliente_nombre',
             header: ({ column }) => (
@@ -75,16 +71,45 @@ export function MoratoriasTable({ clientes }: MoratoriasTableProps) {
             },
         },
         {
-            accessorKey: 'dias_maximos_vencido',
+            accessorKey: 'estado_cuenta',
             header: ({ column }) => (
-                <SortableHeader column={column}>Días Vencido</SortableHeader>
+                <SortableHeader column={column}>Estado</SortableHeader>
+            ),
+            cell: ({ row }) => getEstadoBadge(row.getValue('estado_cuenta')),
+            filterFn: (row, id, value) => {
+                return value.includes(row.getValue(id))
+            },
+        },
+        {
+            accessorKey: 'saldo_cuenta_corriente',
+            header: ({ column }) => (
+                <SortableHeader column={column}>Saldo</SortableHeader>
             ),
             cell: ({ row }) => {
-                const dias = row.original.dias_maximos_vencido
+                const saldo = row.original.saldo_cuenta_corriente
+                if (saldo === 0) return <span className="text-muted-foreground">$0.00</span>
+
                 return (
-                    <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-muted-foreground" />
-                        {getUrgenciaBadge(dias)}
+                    <span className={`font-bold ${saldo > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        {formatCurrency(saldo)}
+                    </span>
+                )
+            },
+        },
+        {
+            accessorKey: 'limite_credito',
+            header: 'Límite / Disponible',
+            cell: ({ row }) => {
+                const limite = row.original.limite_credito
+                const saldo = row.original.saldo_cuenta_corriente
+                const disponible = limite - saldo
+
+                return (
+                    <div className="text-sm">
+                        <div className="text-muted-foreground">Lím: {formatCurrency(limite)}</div>
+                        <div className={`font-medium ${disponible < 0 ? 'text-red-500' : 'text-blue-600'}`}>
+                            Disp: {formatCurrency(disponible)}
+                        </div>
                     </div>
                 )
             },
@@ -96,74 +121,11 @@ export function MoratoriasTable({ clientes }: MoratoriasTableProps) {
             ),
             cell: ({ row }) => {
                 const cantidad = row.original.total_facturas_pendientes
+                if (cantidad === 0) return <span className="text-muted-foreground">-</span>
                 return (
                     <Badge variant="outline">
                         {cantidad} pendiente{cantidad !== 1 ? 's' : ''}
                     </Badge>
-                )
-            },
-        },
-        {
-            accessorKey: 'saldo_cuenta_corriente',
-            header: ({ column }) => (
-                <SortableHeader column={column}>Deuda CC</SortableHeader>
-            ),
-            cell: ({ row }) => {
-                const saldo = row.original.saldo_cuenta_corriente
-                return (
-                    <span className={saldo > 0 ? 'text-red-600 font-medium' : 'text-green-600'}>
-                        {formatCurrency(saldo)}
-                    </span>
-                )
-            },
-        },
-        {
-            accessorKey: 'total_mora_calculada',
-            header: ({ column }) => (
-                <SortableHeader column={column}>Mora</SortableHeader>
-            ),
-            cell: ({ row }) => {
-                const mora = row.original.total_mora_calculada
-                if (mora <= 0) {
-                    return <span className="text-muted-foreground">$0</span>
-                }
-                return (
-                    <span className="text-amber-600 font-medium">
-                        +{formatCurrency(mora)}
-                    </span>
-                )
-            },
-        },
-        {
-            accessorKey: 'deuda_total',
-            header: ({ column }) => (
-                <SortableHeader column={column}>Total Deuda</SortableHeader>
-            ),
-            cell: ({ row }) => {
-                const total = row.original.deuda_total
-                return (
-                    <span className="font-bold text-red-700">
-                        {formatCurrency(total)}
-                    </span>
-                )
-            },
-        },
-        {
-            accessorKey: 'limite_credito',
-            header: 'Límite',
-            cell: ({ row }) => {
-                const limite = row.original.limite_credito
-                const saldo = row.original.saldo_cuenta_corriente
-                const porcentaje = limite > 0 ? (saldo / limite) * 100 : 0
-                return (
-                    <div className="text-sm">
-                        <div>{formatCurrency(limite)}</div>
-                        {limite > 0 && (
-                            <div className="text-xs text-muted-foreground">
-                                {porcentaje.toFixed(0)}% usado
-                            </div>
-                        )}
-                    </div>
                 )
             },
         },
@@ -184,7 +146,7 @@ export function MoratoriasTable({ clientes }: MoratoriasTableProps) {
                         {cliente.cliente_whatsapp && (
                             <Button variant="ghost" size="sm" asChild className="text-green-600">
                                 <a
-                                    href={`https://wa.me/${cliente.cliente_whatsapp.replace(/[^\d]/g, '')}?text=Hola, le contactamos de Avícola del Sur respecto a su cuenta pendiente.`}
+                                    href={`https://wa.me/${cliente.cliente_whatsapp.replace(/[^\d]/g, '')}?text=Hola, le contactamos de Avícola del Sur.`}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     title="WhatsApp"
@@ -207,7 +169,7 @@ export function MoratoriasTable({ clientes }: MoratoriasTableProps) {
                         <Button variant="outline" size="sm" asChild>
                             <Link href={`/ventas/clientes/${cliente.cliente_id}/cuenta-corriente`}>
                                 <Eye className="h-4 w-4 mr-1" />
-                                Ver cuenta
+                                Gestionar
                             </Link>
                         </Button>
                     </div>

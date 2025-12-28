@@ -19,6 +19,43 @@ Sistema ERP modular completo para Avícola del Sur que unifica Almacén (WMS), V
 - **PDF/Reportes**: pdfkit + Supabase Storage
 - **Calidad**: ESLint + Prettier + TypeScript strict
 
+### ☁️ **Google Cloud Platform - Servicios Integrados**
+
+| Servicio | Uso | Variable de Entorno | Estado |
+|----------|-----|---------------------|--------|
+| **Google Maps JavaScript API** | Selector de ubicaciones, mapas de rutas | `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | ✅ Activo |
+| **Google Directions API** | Optimización de rutas de reparto | `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | ✅ Activo |
+| **Google Places API** | Autocompletado de direcciones | `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | ✅ Activo |
+| **Google Gemini AI** | Múltiples funcionalidades IA (ver abajo) | `GOOGLE_AI_API_KEY` | ✅ Activo |
+| **Google Cloud Optimization API** | Optimización avanzada de rutas | `GOOGLE_OPTIMIZATION_API_ENABLED` | ✅ Configurado |
+| **Google Dialogflow** | Bot conversacional | `GOOGLE_DIALOGFLOW_PROJECT_ID` | 🔧 Configurado |
+| **Google Document AI** | Procesamiento de facturas/remitos | `GOOGLE_DOCUMENT_AI_PROJECT_ID` | 🔧 Configurado |
+| **Google Speech-to-Text** | Transcripción de voz (es-AR) | `GOOGLE_SPEECH_TO_TEXT_ENABLED` | 🔧 Configurado |
+| **Google Vertex AI** | ML/AI avanzado | `GOOGLE_VERTEX_AI_ENABLED` | 🔧 Configurado |
+
+#### 🤖 **Funcionalidades Gemini AI Implementadas (Diciembre 2025)**
+
+| Funcionalidad | Endpoint/Archivo | Descripción |
+|---------------|------------------|-------------|
+| Detección peso anómalo | `/api/almacen/analizar-peso` | Detecta errores de digitación en pesaje |
+| Clasificación de gastos | `/api/ia/clasificar-gasto` | Sugiere categoría de gastos automáticamente |
+| Clientes en riesgo | `/api/ia/clientes-riesgo` | Detecta clientes con riesgo de abandono |
+| Predicción de stock | `/api/ia/prediccion-stock` | Predice demanda de productos |
+| Validación de cobros | `/api/ia/validar-cobro` | Detecta anomalías/fraudes en cobros |
+| Auditoría automática | `fn_auditar_cobros_automatico` | pg_cron cada 4h, notifica anomalías |
+| Bot WhatsApp inteligente | `whatsapp-ia-interpreter.ts` | Interpreta mensajes en lenguaje natural |
+
+#### 🔔 **Sistema de Notificaciones Centralizado**
+
+| Componente | Ruta/Archivo | Descripción |
+|------------|--------------|-------------|
+| Lista de Notificaciones | `/notificaciones` | Filtros, selección múltiple, acciones masivas |
+| Configuración | `/notificaciones/configuracion` | Toggles por categoría y push notifications |
+| Sidebar Badge | `AdminSidebar.tsx` | Contador de notificaciones no leídas |
+| Widgets Dashboard | `IAWidgetsContainer.tsx` | Clientes en riesgo + Predicción stock |
+
+**Archivos de servicios**: `src/lib/services/google-cloud/*.ts`, `src/lib/gemini.ts`
+
 ## 📁 Estructura de Carpetas (Alto Nivel)
 
 ```
@@ -114,6 +151,18 @@ supabase/                         # Scripts SQL y migraciones
   - **Desperdicio**: Calculado como diferencia final (peso consumido - peso generado)
   - **Merma Individual**: Cada producto generado tiene campos `merma_esperada_kg` y `merma_real_kg`
   - **Integración Balanza**: Preparado para balanza SDP BBC-4030 (indicador SDP 32)
+  - **Detección de Peso Anómalo con Google Gemini AI (Diciembre 2025)**: 
+    - Sistema IA que detecta errores de digitación en pesaje usando Google Gemini
+    - **Modelo**: `gemini-2.5-flash` (free tier con 5 RPM, 250K TPM, 20 RPD)
+    - Analiza contexto: producto, peso solicitado vs ingresado
+    - Detecta: teclas equivocadas, dígitos duplicados, orden de magnitud incorrecto
+    - Diálogo de confirmación con badge "🤖 Google AI"
+    - Muestra: peso solicitado, peso ingresado, diferencia, sugerencia de corrección
+    - Nivel de confianza del análisis (ej: 95%)
+    - Fallback automático a lógica local si Gemini no está disponible
+    - **Variable de entorno**: `GOOGLE_AI_API_KEY` (requerida para Vercel)
+    - **Endpoint**: `/api/almacen/analizar-peso`
+    - **Archivos**: `src/lib/gemini.ts`, `src/app/api/almacen/analizar-peso/route.ts`
   - **Rutas**: `/almacen/produccion`, `/almacen/produccion/nueva`, `/almacen/produccion/destinos`
 
 ### 💰 **Ventas (CRM)**: Gestión de Clientes y Pedidos

@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { obtenerMetricasEficienciaRutasAction } from '@/actions/dashboard.actions'
+import { IAWidgetsContainer } from '@/components/dashboard/IAWidgetsContainer'
 
 export const revalidate = 30 // Revalida cada 30 segundos
 
@@ -174,6 +175,9 @@ export default async function AdminDashboard() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Widgets de IA - Clientes en Riesgo y Predicción de Stock */}
+      <IAWidgetsContainer />
 
       {/* Gráficos - Responsivos */}
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-7">

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useCallback } from 'react'
 import { useForm, type Resolver, type SubmitHandler } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { registrarGastoSchema, type RegistrarGastoFormData } from '@/lib/schemas/tesoreria.schema'
@@ -9,13 +9,20 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { useNotificationStore } from '@/store/notificationStore'
-import { Loader2, Save, Upload, X } from 'lucide-react'
+import { Loader2, Save, Upload, X, Sparkles } from 'lucide-react'
 import { uploadFileToStorage } from '@/lib/supabase/storage'
 
 interface GastoFormProps {
   categorias: Array<{ id: string; nombre: string }>
   cajas: Array<{ id: string; nombre: string }>
+}
+
+interface SugerenciaIA {
+  categoria: string
+  confianza: number
+  razon: string
 }
 
 export function GastoForm({ categorias, cajas }: GastoFormProps) {
@@ -24,6 +31,8 @@ export function GastoForm({ categorias, cajas }: GastoFormProps) {
   const [error, setError] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploadingFile, setUploadingFile] = useState(false)
+  const [sugerenciaIA, setSugerenciaIA] = useState<SugerenciaIA | null>(null)
+  const [cargandoSugerencia, setCargandoSugerencia] = useState(false)
 
   const form = useForm<RegistrarGastoFormData>({
     resolver: zodResolver(registrarGastoSchema) as Resolver<RegistrarGastoFormData>,
@@ -54,6 +63,49 @@ export function GastoForm({ categorias, cajas }: GastoFormProps) {
   const removeFile = () => {
     setSelectedFile(null)
     form.setValue('comprobante_url', undefined)
+  }
+
+  // Función para obtener sugerencia de categoría con IA
+  const obtenerSugerenciaIA = useCallback(async (descripcion: string) => {
+    if (!descripcion || descripcion.length < 5) {
+      setSugerenciaIA(null)
+      return
+    }
+    setCargandoSugerencia(true)
+    try {
+      const response = await fetch('/api/ia/clasificar-gasto', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ descripcion }),
+      })
+      const data = await response.json()
+      if (data.success && data.categoria) {
+        setSugerenciaIA({
+          categoria: data.categoria,
+          confianza: data.confianza || 50,
+          razon: data.razon || '',
+        })
+      } else {
+        setSugerenciaIA(null)
+      }
+    } catch (err) {
+      console.error('Error obteniendo sugerencia:', err)
+      setSugerenciaIA(null)
+    } finally {
+      setCargandoSugerencia(false)
+    }
+  }, [])
+
+  // Aplicar sugerencia de categoría
+  const aplicarSugerencia = () => {
+    if (!sugerenciaIA) return
+    const categoriaMatch = categorias.find(
+      (c) => c.nombre.toLowerCase() === sugerenciaIA.categoria.toLowerCase()
+    )
+    if (categoriaMatch) {
+      form.setValue('categoria_id', categoriaMatch.id)
+      showToast('success', `Categoría "${categoriaMatch.nombre}" aplicada`)
+    }
   }
 
   const onSubmit: SubmitHandler<RegistrarGastoFormData> = (values) => {
@@ -211,8 +263,60 @@ export function GastoForm({ categorias, cajas }: GastoFormProps) {
           )}
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Descripción</label>
-            <Textarea rows={3} placeholder="Detalle del gasto" {...form.register('descripcion')} disabled={isPending} />
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">Descripción</label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => obtenerSugerenciaIA(form.watch('descripcion') || '')}
+                disabled={isPending || cargandoSugerencia || !form.watch('descripcion')}
+                className="h-7 text-xs"
+              >
+                {cargandoSugerencia ? (
+                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                ) : (
+                  <Sparkles className="h-3 w-3 mr-1" />
+                )}
+                Sugerir categoría con IA
+              </Button>
+            </div>
+            <Textarea
+              rows={3}
+              placeholder="Detalle del gasto (ej: Factura YPF Estación 1234)"
+              {...form.register('descripcion')}
+              disabled={isPending}
+              onBlur={(e) => {
+                if (e.target.value && e.target.value.length >= 5) {
+                  obtenerSugerenciaIA(e.target.value)
+                }
+              }}
+            />
+            {sugerenciaIA && (
+              <div className="flex items-center gap-2 p-2 bg-primary/5 rounded-md border border-primary/20">
+                <Sparkles className="h-4 w-4 text-primary shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm">
+                    Sugerencia: <span className="font-medium">{sugerenciaIA.categoria}</span>
+                    <Badge variant="outline" className="ml-2 text-xs">
+                      {sugerenciaIA.confianza}% confianza
+                    </Badge>
+                  </p>
+                  {sugerenciaIA.razon && (
+                    <p className="text-xs text-muted-foreground truncate">{sugerenciaIA.razon}</p>
+                  )}
+                </div>
+                <Button
+                  type="button"
+                  variant="default"
+                  size="sm"
+                  onClick={aplicarSugerencia}
+                  className="shrink-0"
+                >
+                  Aplicar
+                </Button>
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">

@@ -20,7 +20,19 @@
 - 🎯 **Pedidos Agrupados**: Sistema único donde pedidos agrupan múltiples entregas por turno/zona/fecha
 - 🏢 **Control de Sucursales**: Modelo completo de control mayorista/minorista con auditoría de precios, conteos físicos de stock y detección automática de desvíos
 - 🔄 **Redirección Automática**: Usuarios con sucursal asignada son redirigidos automáticamente al dashboard de su sucursal al iniciar sesión
-- 🤖 **Google Cloud AI Services**: Integración completa con Dialogflow, Speech-to-Text, Document AI, Vertex AI, AutoML y Gemini para predicciones inteligentes, procesamiento de documentos y análisis avanzado
+- 🤖 **Inteligencia Artificial (Gemini)**: 7 funcionalidades IA implementadas:
+  - Detección de peso anómalo en pesaje
+  - Clasificación automática de gastos
+  - Predicción de clientes en riesgo de abandono
+  - Predicción de stock y demanda
+  - Validación de cobros y detección de fraudes
+  - Auditoría automática de cobros (pg_cron cada 4h)
+  - Bot WhatsApp inteligente con interpretación de lenguaje natural
+- 🔔 **Centro de Notificaciones**: Sistema centralizado con:
+  - Filtros por tipo y estado
+  - Configuración por categoría
+  - Push notifications del navegador
+  - Widgets de IA en Dashboard
 
 ## 🚀 Inicio Rápido
 

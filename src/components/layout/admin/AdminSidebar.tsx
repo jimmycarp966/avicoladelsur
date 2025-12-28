@@ -24,6 +24,7 @@ import {
   Sparkles,
   Brain,
   FileSearch,
+  Bell,
 } from 'lucide-react'
 import type { Usuario } from '@/types/domain.types'
 
@@ -44,6 +45,17 @@ const navigation = [
     href: '/dashboard',
     icon: LayoutDashboard,
     roles: ['admin', 'vendedor', 'almacenista'],
+  },
+  {
+    name: 'Notificaciones',
+    href: '/notificaciones',
+    icon: Bell,
+    roles: ['admin', 'vendedor', 'almacenista', 'repartidor', 'tesorero'],
+    badge: 'notificaciones_unread',
+    children: [
+      { name: 'Todas', href: '/notificaciones' },
+      { name: 'Configuración', href: '/notificaciones/configuracion' },
+    ],
   },
   {
     name: 'Almacén',
@@ -94,7 +106,7 @@ const navigation = [
       { name: 'Cajas', href: '/tesoreria/cajas' },
       { name: 'Movimientos', href: '/tesoreria/movimientos' },
       { name: 'Validar rutas', href: '/tesoreria/validar-rutas' },
-      { name: 'Moratorias', href: '/tesoreria/moratorias' },
+      { name: 'Cuentas Corrientes', href: '/tesoreria/cuentas-corrientes' },
       { name: 'Cierres de Caja', href: '/tesoreria/cierre-caja' },
       { name: 'Tesoro', href: '/tesoreria/tesoro' },
       { name: 'Gastos', href: '/tesoreria/gastos' },
