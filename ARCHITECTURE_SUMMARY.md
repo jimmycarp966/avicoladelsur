@@ -825,6 +825,10 @@ Para el flujo de registro de nuevos clientes, el bot implementa una máquina de 
 - ✅ **Automatización de Pruebas**:
   - Refactorización de `TC003_Product_CRUD` con selectores robustos y datos aleatorios.
   - Implementación de selectores semánticos (`get_by_role`) para evitar fragilidad en tests.
+- ✅ **Fixes Críticos de Aplicación**:
+  - **Ruta `/logout`**: Implementada correctamente (Fix error 404) para redirección segura.
+  - **Schema BD**: Agregada columna crítica `metodo_pago` en `cuentas_movimientos`.
+  - **Integración IA**: Verificación de estabilidad en módulos de predicción.
 
 ---
 
