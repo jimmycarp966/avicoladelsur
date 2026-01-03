@@ -816,30 +816,17 @@ Para el flujo de registro de nuevos clientes, el bot implementa una máquina de 
 
 ---
 
-### **Automatización de QA y Hardening de Seguridad (Enero 2026)**
-- ✅ **Hardening de Roles (RLS)**:
-  - Validación de roles ('admin') en Server Actions críticos (`crearRutaAction`).
-  - Renderizado condicional de botones sensibles en UI ("Nueva Ruta").
-- ✅ **Estabilidad en Reparto**:
-  - Solución a "Null Pointer Exception" en vistas de entrega con pedidos agrupados desnormalizados.
-- ✅ **Automatización de Pruebas**:
-  - Refactorización de `TC003_Product_CRUD` con selectores robustos y datos aleatorios.
-  - Implementación de selectores semánticos (`get_by_role`) para evitar fragilidad en tests.
+### **Migraciones SQL de esta Sesión (21-22/12/2025)**
+```
+supabase/migrations/
+├── 20251222_mejoras_facturas_cuenta_corriente.sql  # Campos estado_pago, funciones CC
+├── 20251222_sistema_moras.sql                      # Funciones de cálculo de moras
+├── 20251222_fix_pago_cc_acreditar_caja.sql         # Pagos CC van a Caja Central
+├── 20251222_trigger_estado_pago_facturas.sql       # Trigger automático de estados
+├── 20251222_sistema_produccion_desposte.sql        # Sistema de producción/desposte + integración balanza
+```
 
 ---
 
-## 📎 Documentos Relacionados
-
-| Documento | Descripción |
-|-----------|-------------|
-| [PRD.md](./PRD.md) | Product Requirements Document - Requisitos y especificaciones del producto |
-| [ARCHITECTURE.MD](./ARCHITECTURE.MD) | Arquitectura técnica detallada |
-| [README.md](./README.md) | Guía de inicio rápido e instalación |
-| [TESTING.md](./TESTING.md) | Guía de pruebas del sistema |
-| [SUPABASE_SETUP.md](./SUPABASE_SETUP.md) | Configuración de base de datos |
-| [FIX_REPORT.md](./FIX_REPORT.md) | Reporte detallado de correcciones de bugs y QA |
-
----
-
-*Resumen actualizado el 03/01/2026 - QA Automation + Seguridad RLS + Fixes Críticos Reparto + PRD generado + Sistema de Producción/Desposte + Integración Balanza SDP BBC-4030 + Sistema de Moras y Moratorias + Gestión de Cuenta Corriente + Facturas con Estado de Pago + Mejoras en Validación de Rutas + Navegación integrada con voz + Correcciones de Optimización de Rutas + Estabilización de Dashboard Repartidor + Sistema de recargos por método de pago + Corrección de lógica de precios mayoristas en sucursales + Configuración de productos mayoristas implementada + Modelo de control para sucursales + Mejoras de UX y manejo de admins*
+*Resumen actualizado el 22/12/2025 - Sistema de Producción/Desposte + Integración Balanza SDP BBC-4030 + Sistema de Moras y Moratorias + Gestión de Cuenta Corriente + Facturas con Estado de Pago + Mejoras en Validación de Rutas + Navegación integrada con voz + Correcciones de Optimización de Rutas + Estabilización de Dashboard Repartidor + Sistema de recargos por método de pago + Corrección de lógica de precios mayoristas en sucursales + Configuración de productos mayoristas implementada + Modelo de control para sucursales + Mejoras de UX y manejo de admins*
 

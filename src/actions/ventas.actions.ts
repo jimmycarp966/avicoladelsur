@@ -1101,7 +1101,27 @@ export async function obtenerPedidosAction(
       .select(`
         *,
         cliente:clientes(id, nombre, telefono, zona_entrega),
-        vendedor:usuarios!pedidos_usuario_vendedor_fkey(id, nombre, apellido)
+        vendedor:usuarios!pedidos_usuario_vendedor_fkey(id, nombre, apellido),
+        entregas(
+          id,
+          cliente:clientes(id, nombre),
+          presupuesto_id,
+          presupuesto:presupuestos(
+            id,
+            numero_presupuesto,
+            items:presupuesto_items(
+              id,
+              cantidad_solicitada,
+              peso_final,
+              precio_unitario,
+              subtotal,
+              producto:productos(id, nombre, codigo, unidad_medida)
+            )
+          ),
+          subtotal,
+          total,
+          estado_entrega
+        )
       `)
       .order('created_at', { ascending: false })
 

@@ -113,3 +113,66 @@ export function normalizarMetodoPago(metodo: string): MetodoPago {
     }
     return metodo as MetodoPago
 }
+
+// ========================================
+// CONSTANTES ESPECIALES PARA SUCURSALES
+// Las sucursales minoristas NO aplican recargo en transferencias
+// ========================================
+
+// Recargos para sucursales (sin recargo en transferencias)
+export const RECARGOS_SUCURSAL: Record<MetodoPago, number> = {
+    efectivo: 0,
+    transferencia: 0, // SIN RECARGO en sucursales
+    tarjeta_debito: 0.15, // 15%
+    tarjeta_credito: 0.20, // 20%
+    mercado_pago: 0,
+    cuenta_corriente: 0,
+    qr: 0,
+}
+
+// Nombres para UI en sucursales (sin +5% en transferencia)
+export const METODO_PAGO_LABELS_SUCURSAL: Record<MetodoPago, string> = {
+    efectivo: 'Efectivo',
+    transferencia: 'Transferencia', // Sin +5%
+    tarjeta_debito: 'Tarjeta Débito (+15%)',
+    tarjeta_credito: 'Tarjeta Crédito (+20%)',
+    mercado_pago: 'Mercado Pago',
+    cuenta_corriente: 'Cuenta Corriente',
+    qr: 'QR',
+}
+
+/**
+ * Calcula el recargo para sucursales (sin recargo en transferencias)
+ */
+export function calcularRecargoSucursal(monto: number, metodoPago: MetodoPago): number {
+    const porcentajeRecargo = RECARGOS_SUCURSAL[metodoPago] || 0
+    return Math.round(monto * porcentajeRecargo * 100) / 100
+}
+
+/**
+ * Calcula el total con recargos para sucursales
+ */
+export function calcularTotalConRecargosSucursal(
+    pagos: Array<{ metodoPago: MetodoPago; monto: number }>
+): { subtotal: number; totalRecargos: number; total: number } {
+    let subtotal = 0
+    let totalRecargos = 0
+
+    for (const pago of pagos) {
+        subtotal += pago.monto
+        totalRecargos += calcularRecargoSucursal(pago.monto, pago.metodoPago)
+    }
+
+    return {
+        subtotal,
+        totalRecargos,
+        total: subtotal + totalRecargos,
+    }
+}
+
+/**
+ * Verifica si un método de pago tiene recargo en sucursales
+ */
+export function tieneRecargoSucursal(metodoPago: MetodoPago): boolean {
+    return RECARGOS_SUCURSAL[metodoPago] > 0
+}

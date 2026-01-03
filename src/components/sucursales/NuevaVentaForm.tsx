@@ -59,11 +59,10 @@ import { generarTicketTermicoAction } from '@/actions/pos-sucursal.actions'
 import { obtenerTodasListasActivasAction } from '@/actions/listas-precios.actions'
 import {
   MetodoPago,
-  METODO_PAGO_LABELS,
-  calcularRecargo,
-  calcularTotalConRecargos,
-  tieneRecargo,
-  obtenerPorcentajeRecargo,
+  METODO_PAGO_LABELS_SUCURSAL,
+  calcularRecargoSucursal,
+  calcularTotalConRecargosSucursal,
+  tieneRecargoSucursal,
 } from '@/lib/constants/payment-surcharges'
 
 // ===========================================
@@ -1278,7 +1277,7 @@ export function NuevaVentaForm({
                             </FormControl>
                             <SelectContent>
                               <SelectItem value="efectivo">Efectivo</SelectItem>
-                              <SelectItem value="transferencia">Transferencia (+5%)</SelectItem>
+                              <SelectItem value="transferencia">Transferencia</SelectItem>
                               <SelectItem value="tarjeta_debito">Tarjeta Débito (+15%)</SelectItem>
                               <SelectItem value="tarjeta_credito">Tarjeta Crédito (+20%)</SelectItem>
                               <SelectItem value="mercado_pago">Mercado Pago</SelectItem>
@@ -1335,7 +1334,7 @@ export function NuevaVentaForm({
                   </div>
                   {/* Calcular recargos dinámicamente */}
                   {(() => {
-                    const recargosCalculados = calcularTotalConRecargos(
+                    const recargosCalculados = calcularTotalConRecargosSucursal(
                       watchedPagos.map(p => ({
                         metodoPago: p.metodoPago as MetodoPago,
                         monto: p.monto
@@ -1386,7 +1385,7 @@ export function NuevaVentaForm({
           <div className="text-2xl font-bold flex items-center gap-2">
             <DollarSign className="w-6 h-6" />
             Total: ${(() => {
-              const recargos = calcularTotalConRecargos(
+              const recargos = calcularTotalConRecargosSucursal(
                 watchedPagos.map(p => ({
                   metodoPago: p.metodoPago as MetodoPago,
                   monto: p.monto

@@ -96,6 +96,7 @@ export default async function EntregaDetallePage({ params }: PageProps) {
         .single()
 
       if (entregaData?.cliente) {
+        if (!entrega.pedido) entrega.pedido = {}
         entrega.pedido.cliente = entregaData.cliente
         if (entregaData.total) entrega.pedido.total = entregaData.total
       }

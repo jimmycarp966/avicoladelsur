@@ -1564,6 +1564,20 @@ BOTPRESS_WEBHOOK_URL=https://your-botpress-webhook
 
 ---
 
+## 📚 Documentación
+
+| Documento | Descripción |
+|-----------|-------------|
+| [📋 PRD.md](./PRD.md) | **Product Requirements Document** - Requisitos, especificaciones y criterios de validación del producto |
+| [🏗️ ARCHITECTURE_SUMMARY.md](./ARCHITECTURE_SUMMARY.md) | Resumen ejecutivo de la arquitectura del sistema |
+| [📐 ARCHITECTURE.MD](./ARCHITECTURE.MD) | Arquitectura técnica detallada con diagramas |
+| [🧪 TESTING.md](./TESTING.md) | Guía completa de pruebas del sistema |
+| [🗃️ SUPABASE_SETUP.md](./SUPABASE_SETUP.md) | Configuración de la base de datos Supabase |
+| [👔 RRHH_README.md](./RRHH_README.md) | Documentación del módulo de Recursos Humanos |
+| [🔑 credenciales.md](./credenciales.md) | Credenciales de acceso para testing |
+
+---
+
 ## 🤝 Contribución
 
 1. Fork el proyecto

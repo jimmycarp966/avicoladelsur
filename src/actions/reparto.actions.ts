@@ -111,6 +111,23 @@ export async function crearRutaAction(
 
     const numeroRuta = numeroRutaData as string
 
+    // Obtener usuario actual
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      throw new Error('Usuario no autenticado')
+    }
+
+    // Verificar permisos de administrador
+    const { data: usuario } = await supabase
+      .from('usuarios')
+      .select('rol')
+      .eq('id', user.id)
+      .single()
+
+    if (!usuario || usuario.rol !== 'admin') {
+      throw new Error('Solo los administradores pueden crear rutas')
+    }
+
     // Obtener repartidor
     const { data: repartidor, error: repartidorError } = await supabase
       .from('usuarios')

@@ -15,7 +15,12 @@ export const metadata = {
   description: 'Gestión de rutas de reparto y entregas',
 }
 
-export default function RutasPage() {
+import { getCurrentUser } from '@/actions/auth.actions'
+
+export default async function RutasPage() {
+  const user = await getCurrentUser()
+  const isAdmin = user?.rol === 'admin'
+
   return (
     <div className="space-y-6">
       {/* Header - Responsivo */}
@@ -27,12 +32,14 @@ export default function RutasPage() {
               Planificación y seguimiento de rutas de entrega
             </p>
           </div>
-          <Button asChild size="sm" className="bg-primary hover:bg-primary/90 shadow-sm md:h-10 md:px-6 w-fit">
-            <Link href="/reparto/rutas/nueva">
-              <Plus className="mr-2 h-4 w-4" />
-              Nueva Ruta
-            </Link>
-          </Button>
+          {isAdmin && (
+            <Button asChild size="sm" className="bg-primary hover:bg-primary/90 shadow-sm md:h-10 md:px-6 w-fit">
+              <Link href="/reparto/rutas/nueva">
+                <Plus className="mr-2 h-4 w-4" />
+                Nueva Ruta
+              </Link>
+            </Button>
+          )}
         </div>
       </div>
 

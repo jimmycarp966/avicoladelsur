@@ -94,7 +94,7 @@ export function VentasTable({ ventas }: VentasTableProps) {
 
       const labels: Record<string, string> = {
         efectivo: "Efectivo",
-        transferencia: "Transf. (+5%)",
+        transferencia: "Transf.", // Sin recargo en sucursales
         tarjeta_debito: "Débito (+15%)",
         tarjeta_credito: "Crédito (+20%)",
         mercado_pago: "Mercado Pago",

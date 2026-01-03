@@ -37,6 +37,7 @@ export function BarcodeScanner({
     // Inicializar lector y solicitar permisos de cámara
     useEffect(() => {
         const hints = new Map()
+        // Formatos de código de barras soportados
         hints.set(DecodeHintType.POSSIBLE_FORMATS, [
             BarcodeFormat.EAN_13,
             BarcodeFormat.EAN_8,
@@ -45,10 +46,17 @@ export function BarcodeScanner({
             BarcodeFormat.QR_CODE,
             BarcodeFormat.UPC_A,
             BarcodeFormat.UPC_E,
+            BarcodeFormat.ITF, // Interleaved 2 of 5
+            BarcodeFormat.CODABAR,
         ])
+        // Configuraciones adicionales para mejor detección
         hints.set(DecodeHintType.TRY_HARDER, true)
+        hints.set(DecodeHintType.PURE_BARCODE, false) // No asumir que es una imagen pura de código
+        // @ts-ignore - ALSO_INVERTED puede no estar en los tipos pero es soportado
+        hints.set(DecodeHintType.ALSO_INVERTED, true) // Intentar leer códigos invertidos
 
-        readerRef.current = new BrowserMultiFormatReader(hints)
+        readerRef.current = new BrowserMultiFormatReader(hints, 100) // 100ms entre escaneos
+
 
         // Función para obtener cámaras después de tener permisos
         const getCameras = async () => {
@@ -58,9 +66,14 @@ export function BarcodeScanner({
                 addDebugLog('Solicitando permisos cámara...')
 
                 // Solicitar permiso de cámara primero (esto dispara el popup de permisos)
+                // Pedimos alta resolución y enfoque continuo para mejorar scaneo
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: {
-                        facingMode: 'environment' // Preferir cámara trasera
+                        facingMode: 'environment', // Preferir cámara trasera
+                        width: { min: 640, ideal: 1280, max: 1920 },
+                        height: { min: 480, ideal: 720, max: 1080 },
+                        // @ts-ignore - focusMode no está en todos los tipos de TS pero funciona en Chrome/Android
+                        advanced: [{ focusMode: 'continuous' }]
                     }
                 })
 
@@ -115,6 +128,15 @@ export function BarcodeScanner({
             if (!readerRef.current || !videoRef.current) return
 
             try {
+                // Log de resolución efectiva para debug
+                if (videoRef.current.srcObject) {
+                    const track = (videoRef.current.srcObject as MediaStream).getVideoTracks()[0];
+                    const settings = track?.getSettings();
+                    if (settings) {
+                        addDebugLog(`📷 Res: ${settings.width}x${settings.height}`);
+                    }
+                }
+
                 await readerRef.current.decodeFromVideoDevice(
                     selectedDevice,
                     videoRef.current,
@@ -128,10 +150,17 @@ export function BarcodeScanner({
                             readerRef.current?.reset()
                             setIsScanning(false)
                         }
-                        if (err && !(err.name === 'NotFoundException')) {
+                        // Filtrar errores normales del proceso de escaneo
+                        // Estos ocurren constantemente cuando no hay código visible en el frame
+                        if (err && ![
+                            'NotFoundException',
+                            'ChecksumException',
+                            'FormatException'
+                        ].includes(err.name) && !err.message?.includes('No MultiFormat Readers')) {
                             addDebugLog(`❌ ${err.name}: ${err.message}`)
                         }
                     }
+
                 )
 
                 if (isMounted) {
