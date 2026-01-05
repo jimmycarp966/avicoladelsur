@@ -30,3 +30,11 @@ await track.applyConstraints(constraints)
 
 1. `docs: optimizar escáner de código de barras - debounce, antorcha, vibración, mayor velocidad`
 2. `fix: corregir error TS con torch en BarcodeScanner`
+3. `docs: actualizar changelog + last_update — fix TS torch`
+4. `docs: agregar diagrama de arquitectura Mermaid`
+
+## Diagrama Generado
+
+- **Ruta**: `docs/diagrams/architecture.mmd`
+- **Tipo**: Mermaid (graph TB)
+- **Incluye**: Cliente, Frontend, Server Actions, APIs externas, Supabase
