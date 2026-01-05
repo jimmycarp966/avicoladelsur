@@ -152,30 +152,51 @@ export default function NuevaOrdenProduccionPage() {
         cargarLotes()
     }, [productoSalidaId])
 
-    // Cargar productos permitidos cuando cambia el destino de entrada
+    // Obtener destinos únicos de las salidas agregadas
+    const destinosUnicos = [...new Set(salidas.map(s => s.destino_id))].filter(Boolean)
+
+    // Cargar productos permitidos basándose en los destinos de las salidas
     useEffect(() => {
-        async function cargarProductosDestino() {
-            if (destinoEntradaId) {
-                const { data } = await obtenerProductosPorDestinoAction(destinoEntradaId)
-                if (data && data.length > 0) {
-                    setProductosEntrada(data)
-                } else {
-                    // Si no hay productos asociados, mostrar todos
-                    setProductosEntrada(productos.map(p => ({
-                        id: p.id,
-                        codigo: p.codigo,
-                        nombre: p.nombre,
-                        es_desperdicio: false
-                    })))
-                }
-            } else {
+        async function cargarProductosPorDestinos() {
+            if (destinosUnicos.length === 0) {
                 setProductosEntrada([])
+                return
             }
-            // Limpiar producto seleccionado al cambiar destino
-            setProductoEntradaId('')
+
+            // Obtener productos de todos los destinos únicos
+            const productosMap = new Map<string, { id: string; codigo: string; nombre: string; es_desperdicio: boolean; destino_nombre: string }>()
+
+            for (const destinoId of destinosUnicos) {
+                const { data } = await obtenerProductosPorDestinoAction(destinoId)
+                const destino = destinos.find(d => d.id === destinoId)
+                if (data && data.length > 0) {
+                    data.forEach(p => {
+                        // Usar producto_id como key para evitar duplicados
+                        if (!productosMap.has(p.id)) {
+                            productosMap.set(p.id, {
+                                ...p,
+                                destino_nombre: destino?.nombre || ''
+                            })
+                        }
+                    })
+                }
+            }
+
+            const productosArray = Array.from(productosMap.values())
+            if (productosArray.length > 0) {
+                setProductosEntrada(productosArray)
+            } else {
+                // Si no hay productos asociados a ningún destino, mostrar todos
+                setProductosEntrada(productos.map(p => ({
+                    id: p.id,
+                    codigo: p.codigo,
+                    nombre: p.nombre,
+                    es_desperdicio: false
+                })))
+            }
         }
-        cargarProductosDestino()
-    }, [destinoEntradaId, productos])
+        cargarProductosPorDestinos()
+    }, [destinosUnicos.join(','), productos, destinos])
 
     // Manejar escaneo de código de barras para salidas (productos que salen)
     const handleScanSalida = useCallback(async (code: string) => {
@@ -758,19 +779,26 @@ export default function NuevaOrdenProduccionPage() {
 
                         {/* Formulario para agregar entrada */}
                         <div className="grid grid-cols-2 gap-4 p-4 border rounded-lg bg-muted/30">
-                            {/* Mostrar destino seleccionado (ya se eligió en paso 2) */}
+                            {/* Mostrar destinos de producción (según las salidas del paso 2) */}
                             <div className="col-span-2">
-                                <div className="flex items-center justify-between p-3 bg-primary/10 rounded-lg">
-                                    <div className="flex items-center gap-2">
+                                <div className="p-3 bg-primary/10 rounded-lg">
+                                    <div className="flex items-center gap-2 mb-2">
                                         <Target className="h-4 w-4 text-primary" />
-                                        <span className="text-sm text-muted-foreground">Destino de producción:</span>
-                                        <Badge variant="default" className="text-sm">
-                                            {destinos.find(d => d.id === destinoEntradaId)?.nombre || 'No seleccionado'}
-                                        </Badge>
+                                        <span className="text-sm font-medium">Destinos de producción:</span>
                                     </div>
-                                    <Button variant="ghost" size="sm" onClick={() => setStep(2)}>
-                                        Cambiar
-                                    </Button>
+                                    <div className="flex flex-wrap gap-2">
+                                        {destinosUnicos.map(destinoId => {
+                                            const destino = destinos.find(d => d.id === destinoId)
+                                            return destino ? (
+                                                <Badge key={destinoId} variant="default">
+                                                    {destino.nombre}
+                                                </Badge>
+                                            ) : null
+                                        })}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mt-2">
+                                        Los productos disponibles están filtrados según los destinos del paso anterior
+                                    </p>
                                 </div>
                             </div>
 
