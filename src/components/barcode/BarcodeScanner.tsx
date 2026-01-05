@@ -61,10 +61,9 @@ export function BarcodeScanner({
         if (!track) return
 
         try {
-            // @ts-ignore - torch no está en todos los tipos de TS
-            await track.applyConstraints({
-                advanced: [{ torch: !torchEnabled }]
-            })
+            // La API de torch no está en los tipos de TS pero funciona en Chrome/Android
+            const constraints = { advanced: [{ torch: !torchEnabled }] } as MediaTrackConstraints
+            await track.applyConstraints(constraints)
             setTorchEnabled(!torchEnabled)
             addDebugLog(`💡 Antorcha: ${!torchEnabled ? 'ON' : 'OFF'}`)
         } catch (err) {
