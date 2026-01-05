@@ -819,14 +819,14 @@ export default function NuevaOrdenProduccionPage() {
                                         setProductoEntradaId(val)
                                         setBusquedaEntrada('') // Limpiar búsqueda al seleccionar
                                     }}
-                                    disabled={!destinoEntradaId}
+                                    disabled={destinosUnicos.length === 0}
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder={
-                                            !destinoEntradaId
-                                                ? "Selecciona destino primero"
+                                            destinosUnicos.length === 0
+                                                ? "No hay destinos seleccionados en paso 2"
                                                 : productosEntrada.length === 0
-                                                    ? "Sin productos configurados para este destino"
+                                                    ? "Cargando productos..."
                                                     : "Seleccionar producto..."
                                         } />
                                     </SelectTrigger>
