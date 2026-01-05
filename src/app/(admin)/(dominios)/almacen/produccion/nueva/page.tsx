@@ -509,6 +509,39 @@ export default function NuevaOrdenProduccionPage() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
+                        {/* Selector de DESTINO DE PRODUCCIÓN (obligatorio - se selecciona primero) */}
+                        <div className="p-4 border-2 border-primary/30 rounded-lg bg-primary/5">
+                            <div className="flex items-center gap-2 mb-2">
+                                <Target className="h-5 w-5 text-primary" />
+                                <Label className="text-base font-semibold">Destino de Producción *</Label>
+                            </div>
+                            <p className="text-sm text-muted-foreground mb-3">
+                                Selecciona primero qué tipo de producción vas a realizar
+                            </p>
+                            <Select value={destinoEntradaId} onValueChange={setDestinoEntradaId}>
+                                <SelectTrigger className={!destinoEntradaId ? 'border-primary ring-2 ring-primary/20' : 'border-green-500'}>
+                                    <SelectValue placeholder="Seleccionar destino (Filet, Pechuga, Pollo Trozado)..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {destinos.map((d) => (
+                                        <SelectItem key={d.id} value={d.id}>
+                                            <div className="flex flex-col">
+                                                <span className="font-medium">{d.nombre}</span>
+                                                {d.descripcion && (
+                                                    <span className="text-xs text-muted-foreground">{d.descripcion}</span>
+                                                )}
+                                            </div>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            {destinoEntradaId && (
+                                <p className="text-xs text-green-600 mt-1">
+                                    ✓ Destino seleccionado: {destinos.find(d => d.id === destinoEntradaId)?.nombre}
+                                </p>
+                            )}
+                        </div>
+
                         {/* Lista de salidas agregadas */}
                         {salidas.length > 0 && (
                             <div className="space-y-2">
@@ -644,7 +677,7 @@ export default function NuevaOrdenProduccionPage() {
                         </Button>
                         <Button
                             onClick={() => setStep(3)}
-                            disabled={salidas.length === 0}
+                            disabled={salidas.length === 0 || !destinoEntradaId}
                         >
                             Siguiente: Productos Generados
                             <ArrowRight className="ml-2 h-4 w-4" />
@@ -719,34 +752,20 @@ export default function NuevaOrdenProduccionPage() {
 
                         {/* Formulario para agregar entrada */}
                         <div className="grid grid-cols-2 gap-4 p-4 border rounded-lg bg-muted/30">
-                            {/* Selector de DESTINO DE PRODUCCIÓN (obligatorio) */}
+                            {/* Mostrar destino seleccionado (ya se eligió en paso 2) */}
                             <div className="col-span-2">
-                                <div className="flex items-center gap-2 mb-1">
-                                    <Target className="h-4 w-4 text-primary" />
-                                    <Label>Destino de Producción *</Label>
+                                <div className="flex items-center justify-between p-3 bg-primary/10 rounded-lg">
+                                    <div className="flex items-center gap-2">
+                                        <Target className="h-4 w-4 text-primary" />
+                                        <span className="text-sm text-muted-foreground">Destino de producción:</span>
+                                        <Badge variant="default" className="text-sm">
+                                            {destinos.find(d => d.id === destinoEntradaId)?.nombre || 'No seleccionado'}
+                                        </Badge>
+                                    </div>
+                                    <Button variant="ghost" size="sm" onClick={() => setStep(2)}>
+                                        Cambiar
+                                    </Button>
                                 </div>
-                                <Select value={destinoEntradaId} onValueChange={setDestinoEntradaId}>
-                                    <SelectTrigger className={!destinoEntradaId ? 'border-primary' : ''}>
-                                        <SelectValue placeholder="Seleccionar destino (Filet, Pechuga, Pollo Trozado)..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {destinos.map((d) => (
-                                            <SelectItem key={d.id} value={d.id}>
-                                                <div className="flex flex-col">
-                                                    <span className="font-medium">{d.nombre}</span>
-                                                    {d.descripcion && (
-                                                        <span className="text-xs text-muted-foreground">{d.descripcion}</span>
-                                                    )}
-                                                </div>
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                {!destinoEntradaId && (
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                        Selecciona el tipo de producción antes de agregar productos
-                                    </p>
-                                )}
                             </div>
 
                             <div>
