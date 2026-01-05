@@ -108,6 +108,9 @@ export default function NuevaOrdenProduccionPage() {
     const [pluEntrada, setPluEntrada] = useState('')
     const [busquedaEntrada, setBusquedaEntrada] = useState('') // Filtro de búsqueda
 
+    // Obtener destinos únicos de las salidas agregadas
+    const destinosUnicos = [...new Set(salidas.map(s => s.destino_id))].filter(Boolean)
+
     // Datos computados para la vista secuencial
     const activeDestinoIds = destinosUnicos
     const currentDestinoId = activeDestinoIds[currentDestinationIndex]
@@ -173,8 +176,7 @@ export default function NuevaOrdenProduccionPage() {
         cargarLotes()
     }, [productoSalidaId])
 
-    // Obtener destinos únicos de las salidas agregadas
-    const destinosUnicos = [...new Set(salidas.map(s => s.destino_id))].filter(Boolean)
+
 
     // Cargar productos permitidos basándose en los destinos de las salidas
     useEffect(() => {
