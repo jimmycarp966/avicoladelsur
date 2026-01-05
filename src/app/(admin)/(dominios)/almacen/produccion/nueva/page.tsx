@@ -90,7 +90,8 @@ export default function NuevaOrdenProduccionPage() {
     const [productos, setProductos] = useState<Producto[]>([])
     const [destinos, setDestinos] = useState<DestinoProduccion[]>([])
     const [lotesDisponibles, setLotesDisponibles] = useState<LoteDisponible[]>([])
-    const [productosEntrada, setProductosEntrada] = useState<Array<{ id: string; codigo: string; nombre: string; es_desperdicio: boolean }>>([])
+    const [productosPorDestino, setProductosPorDestino] = useState<Record<string, Producto[]>>({})
+    const [currentDestinationIndex, setCurrentDestinationIndex] = useState(0)
 
     // Campos temporales para agregar SALIDA (producto que sale del stock)
     const [productoSalidaId, setProductoSalidaId] = useState('')
@@ -102,19 +103,39 @@ export default function NuevaOrdenProduccionPage() {
 
     // Campos temporales para agregar ENTRADA (producto que entra al stock)
     const [productoEntradaId, setProductoEntradaId] = useState('')
-    const [destinoEntradaId, setDestinoEntradaId] = useState('')
+
     const [pesoEntrada, setPesoEntrada] = useState('')
     const [pluEntrada, setPluEntrada] = useState('')
     const [busquedaEntrada, setBusquedaEntrada] = useState('') // Filtro de búsqueda
 
-    // Productos filtrados para salidas
+    // Datos computados para la vista secuencial
+    const activeDestinoIds = destinosUnicos
+    const currentDestinoId = activeDestinoIds[currentDestinationIndex]
+    const currentDestino = destinos.find(d => d.id === currentDestinoId)
+
+    // Entradas para el destino actual
+    const entradasActuales = entradas.filter(e => e.destino_id === currentDestinoId)
+    const pesoGeneradoActual = entradasActuales.reduce((sum, e) => sum + e.peso_kg, 0)
+
+    // Calcular peso entrante para el destino actual (suma de salidas asignadas a este destino)
+    const pesoEntranteActual = salidas
+        .filter(s => s.destino_id === currentDestinoId)
+        .reduce((sum, s) => sum + (s.cantidad * s.peso_kg), 0)
+
+    const mermaActualKg = pesoEntranteActual - pesoGeneradoActual
+    const mermaActualPorcentaje = pesoEntranteActual > 0 ? (mermaActualKg / pesoEntranteActual) * 100 : 0
+
+    // Productos disponibles para el destino actual
+    const productosDisponiblesActual = productosPorDestino[currentDestinoId] || []
+
+    // Productos filtrados para salidas 
     const productosFiltradosSalida = productos.filter(p =>
         p.nombre.toLowerCase().includes(busquedaSalida.toLowerCase()) ||
         p.codigo.toLowerCase().includes(busquedaSalida.toLowerCase())
     )
 
-    // Productos filtrados para entradas
-    const productosFiltradosEntrada = productosEntrada.filter(p =>
+    // Productos filtrados para entradas (del destino actual)
+    const productosFiltradosEntrada = productosDisponiblesActual.filter(p =>
         p.nombre.toLowerCase().includes(busquedaEntrada.toLowerCase()) ||
         p.codigo.toLowerCase().includes(busquedaEntrada.toLowerCase())
     )
@@ -159,44 +180,23 @@ export default function NuevaOrdenProduccionPage() {
     useEffect(() => {
         async function cargarProductosPorDestinos() {
             if (destinosUnicos.length === 0) {
-                setProductosEntrada([])
+                setProductosPorDestino({})
                 return
             }
 
-            // Obtener productos de todos los destinos únicos
-            const productosMap = new Map<string, { id: string; codigo: string; nombre: string; es_desperdicio: boolean; destino_nombre: string }>()
+            const nuevoMap: Record<string, Producto[]> = {}
 
             for (const destinoId of destinosUnicos) {
                 const { data } = await obtenerProductosPorDestinoAction(destinoId)
-                const destino = destinos.find(d => d.id === destinoId)
-                if (data && data.length > 0) {
-                    data.forEach(p => {
-                        // Usar producto_id como key para evitar duplicados
-                        if (!productosMap.has(p.id)) {
-                            productosMap.set(p.id, {
-                                ...p,
-                                destino_nombre: destino?.nombre || ''
-                            })
-                        }
-                    })
+                if (data) {
+                    nuevoMap[destinoId] = data
                 }
             }
 
-            const productosArray = Array.from(productosMap.values())
-            if (productosArray.length > 0) {
-                setProductosEntrada(productosArray)
-            } else {
-                // Si no hay productos asociados a ningún destino, mostrar todos
-                setProductosEntrada(productos.map(p => ({
-                    id: p.id,
-                    codigo: p.codigo,
-                    nombre: p.nombre,
-                    es_desperdicio: false
-                })))
-            }
+            setProductosPorDestino(nuevoMap)
         }
         cargarProductosPorDestinos()
-    }, [destinosUnicos.join(','), productos, destinos])
+    }, [destinosUnicos.join(',')])
 
     // Manejar escaneo de código de barras para salidas (productos que salen)
     const handleScanSalida = useCallback(async (code: string) => {
@@ -339,20 +339,21 @@ export default function NuevaOrdenProduccionPage() {
 
     // Agregar ENTRADA de stock (producto que ENTRA al inventario)
     const handleAgregarEntrada = async () => {
-        if (!ordenId || !productoEntradaId || !destinoEntradaId || !pesoEntrada) {
-            toast.error('Completa todos los campos (incluyendo destino de producción)')
+        // Usar currentDestinoId en lugar de destinoEntradaId
+        if (!ordenId || !productoEntradaId || !currentDestinoId || !pesoEntrada) {
+            toast.error('Completa todos los campos')
             return
         }
 
         setLoading(true)
         try {
             const producto = productos.find(p => p.id === productoEntradaId)
-            const destino = destinos.find(d => d.id === destinoEntradaId)
+            const destino = destinos.find(d => d.id === currentDestinoId)
 
             const result = await agregarEntradaStockAction(
                 ordenId,
                 productoEntradaId,
-                destinoEntradaId,
+                currentDestinoId,
                 parseFloat(pesoEntrada),
                 1,
                 pluEntrada || undefined
@@ -363,7 +364,7 @@ export default function NuevaOrdenProduccionPage() {
                     id: result.data?.entrada_id,
                     producto_id: productoEntradaId,
                     producto_nombre: producto?.nombre || '',
-                    destino_id: destinoEntradaId,
+                    destino_id: currentDestinoId,
                     destino_nombre: destino?.nombre || '',
                     peso_kg: parseFloat(pesoEntrada),
                     plu: pluEntrada
@@ -722,179 +723,166 @@ export default function NuevaOrdenProduccionPage() {
                     <CardHeader>
                         <div className="flex items-center gap-2">
                             <Scale className="h-5 w-5 text-green-500" />
-                            <CardTitle>Productos que ENTRAN al Stock</CardTitle>
+                            <CardTitle>Paso 3: Productos Generados</CardTitle>
                         </div>
                         <CardDescription>
-                            Registra cada producto generado con su peso y destino de producción
+                            Procesa cada destino de producción secuencialmente. Completa los kilos para cada uno.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                        {/* Resumen de lo que sale del stock */}
-                        <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                            <div className="flex items-center justify-between">
-                                <span className="text-muted-foreground">Total consumido (sale del stock):</span>
-                                <span className="font-semibold text-lg">{pesoTotalSalida.toFixed(2)} kg</span>
-                            </div>
+
+                        {/* Navegación de Destinos (Tabs) */}
+                        <div className="flex flex-wrap gap-2 mb-4">
+                            {activeDestinoIds.map((destId, idx) => {
+                                const dest = destinos.find(d => d.id === destId)
+                                const isCompleted = idx < currentDestinationIndex
+                                const isActive = idx === currentDestinationIndex
+
+                                return (
+                                    <div
+                                        key={destId}
+                                        className={`px-3 py-1.5 rounded-full text-sm font-medium border flex items-center gap-2
+                                            ${isActive
+                                                ? 'bg-primary text-primary-foreground border-primary'
+                                                : isCompleted
+                                                    ? 'bg-green-100 text-green-800 border-green-200'
+                                                    : 'bg-muted text-muted-foreground border-transparent'
+                                            }`}
+                                    >
+                                        {isCompleted && <Check className="h-3 w-3" />}
+                                        {idx + 1}. {dest?.nombre}
+                                    </div>
+                                )
+                            })}
                         </div>
 
-                        {/* Lista de entradas agregadas */}
-                        {entradas.length > 0 && (
-                            <div className="space-y-2">
-                                <Label>Productos generados:</Label>
-                                {entradas.map((entrada, idx) => (
-                                    <div
-                                        key={idx}
-                                        className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg"
-                                    >
-                                        <div className="flex flex-col gap-1">
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-medium">{entrada.producto_nombre}</span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <Target className="h-3 w-3 text-green-600" />
-                                                <Badge variant="secondary" className="text-xs">
-                                                    ← {entrada.destino_nombre}
-                                                </Badge>
-                                            </div>
-                                        </div>
-                                        <span className="font-semibold">{entrada.peso_kg} kg</span>
+                        {/* Panel del Destino Actual */}
+                        {currentDestino && (
+                            <div className="border rounded-lg p-4 bg-slate-50 dark:bg-slate-900/50 space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-lg font-bold text-primary flex items-center gap-2">
+                                        <Target className="h-5 w-5" />
+                                        Procesando: {currentDestino.nombre}
+                                    </h3>
+                                    <Badge variant={mermaActualPorcentaje > 20 ? "destructive" : "outline"}>
+                                        Merma: {mermaActualPorcentaje.toFixed(1)}%
+                                    </Badge>
+                                </div>
+
+                                {/* Barra de Progreso de Kilos */}
+                                <div className="space-y-2">
+                                    <div className="flex justify-between text-sm">
+                                        <span>Generado: <strong>{pesoGeneradoActual.toFixed(2)} kg</strong></span>
+                                        <span>Meta (Entrante): <strong>{pesoEntranteActual.toFixed(2)} kg</strong></span>
                                     </div>
-                                ))}
-                                <div className="flex justify-between text-lg">
-                                    <span className="font-semibold">Total generado (entra al stock):</span>
-                                    <span className="font-semibold text-green-600">{pesoTotalEntrada.toFixed(2)} kg</span>
+                                    <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-green-500 transition-all duration-500"
+                                            style={{ width: `${Math.min((pesoGeneradoActual / pesoEntranteActual) * 100, 100)}%` }}
+                                        />
+                                    </div>
+                                    <p className="text-xs text-muted-foreground text-right">
+                                        Faltan procesar: {Math.max(0, pesoEntranteActual - pesoGeneradoActual).toFixed(2)} kg
+                                    </p>
+                                </div>
+
+                                {/* Lista de productos generados para este destino */}
+                                {entradasActuales.length > 0 && (
+                                    <div className="bg-white dark:bg-black border rounded-md p-2 space-y-1 max-h-40 overflow-y-auto">
+                                        {entradasActuales.map((entrada, idx) => (
+                                            <div key={idx} className="flex justify-between items-center text-sm p-2 hover:bg-slate-50 rounded">
+                                                <span>{entrada.producto_nombre}</span>
+                                                <Badge variant="secondary">{entrada.peso_kg} kg</Badge>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Formulario de agregado */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t mt-2">
+                                    <div className="space-y-2">
+                                        <Label>Producto Salida ({currentDestino.nombre})</Label>
+                                        <div className="flex gap-2">
+                                            <Select
+                                                value={productoEntradaId}
+                                                onValueChange={(val) => {
+                                                    setProductoEntradaId(val)
+                                                    setBusquedaEntrada('')
+                                                }}
+                                            >
+                                                <SelectTrigger className="w-full">
+                                                    <SelectValue placeholder="Seleccionar producto..." />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <div className="px-2 pb-2">
+                                                        <Input
+                                                            placeholder="Buscar..."
+                                                            value={busquedaEntrada}
+                                                            onChange={(e) => setBusquedaEntrada(e.target.value)}
+                                                            className="h-8"
+                                                            autoFocus
+                                                        />
+                                                    </div>
+                                                    {productosFiltradosEntrada.length === 0 ? (
+                                                        <div className="p-2 text-sm text-center text-muted-foreground">
+                                                            No hay productos para {currentDestino.nombre}
+                                                        </div>
+                                                    ) : (
+                                                        productosFiltradosEntrada.map(p => (
+                                                            <SelectItem key={p.id} value={p.id}>
+                                                                {p.codigo} - {p.nombre}
+                                                            </SelectItem>
+                                                        ))
+                                                    )}
+                                                </SelectContent>
+                                            </Select>
+                                            <ScanButton onScan={handleScanEntrada} />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Peso (kg)</Label>
+                                        <div className="flex gap-2">
+                                            <Input
+                                                type="number"
+                                                value={pesoEntrada}
+                                                onChange={e => setPesoEntrada(e.target.value)}
+                                                placeholder="0.00"
+                                            />
+                                            <Button onClick={handleAgregarEntrada} disabled={!productoEntradaId || !pesoEntrada}>
+                                                <Plus className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         )}
 
-                        {/* Indicador de merma/desperdicio */}
-                        <div className={`p-3 rounded-lg ${mermaPorcentaje > 50 ? 'bg-red-50 border border-red-200' : 'bg-yellow-50 border border-yellow-200'}`}>
-                            <div className="flex items-center justify-between">
-                                <span className="flex items-center gap-2">
-                                    {mermaPorcentaje > 50 && <AlertCircle className="h-4 w-4 text-red-500" />}
-                                    Desperdicio estimado:
-                                </span>
-                                <span className={`font-semibold ${mermaPorcentaje > 50 ? 'text-red-600' : 'text-orange-600'}`}>
-                                    {mermaKg.toFixed(2)} kg ({mermaPorcentaje.toFixed(1)}%)
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* Formulario para agregar entrada */}
-                        <div className="grid grid-cols-2 gap-4 p-4 border rounded-lg bg-muted/30">
-                            {/* Mostrar destinos de producción (según las salidas del paso 2) */}
-                            <div className="col-span-2">
-                                <div className="p-3 bg-primary/10 rounded-lg">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <Target className="h-4 w-4 text-primary" />
-                                        <span className="text-sm font-medium">Destinos de producción:</span>
-                                    </div>
-                                    <div className="flex flex-wrap gap-2">
-                                        {destinosUnicos.map(destinoId => {
-                                            const destino = destinos.find(d => d.id === destinoId)
-                                            return destino ? (
-                                                <Badge key={destinoId} variant="default">
-                                                    {destino.nombre}
-                                                </Badge>
-                                            ) : null
-                                        })}
-                                    </div>
-                                    <p className="text-xs text-muted-foreground mt-2">
-                                        Los productos disponibles están filtrados según los destinos del paso anterior
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div>
-                                <div className="flex items-center justify-between mb-1">
-                                    <Label>Producto</Label>
-                                    <ScanButton
-                                        onScan={handleScanEntrada}
-                                        size="sm"
-                                        variant="ghost"
-                                        title="Escanear Producto"
-                                        description="Escanea el código de barras de la etiqueta"
-                                    />
-                                </div>
-                                <Select
-                                    value={productoEntradaId}
-                                    onValueChange={(val) => {
-                                        setProductoEntradaId(val)
-                                        setBusquedaEntrada('') // Limpiar búsqueda al seleccionar
-                                    }}
-                                    disabled={destinosUnicos.length === 0}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder={
-                                            destinosUnicos.length === 0
-                                                ? "No hay destinos seleccionados en paso 2"
-                                                : productosEntrada.length === 0
-                                                    ? "Cargando productos..."
-                                                    : "Seleccionar producto..."
-                                        } />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <div className="px-2 pb-2">
-                                            <Input
-                                                placeholder="Buscar producto..."
-                                                value={busquedaEntrada}
-                                                onChange={(e) => setBusquedaEntrada(e.target.value)}
-                                                className="h-8"
-                                                autoFocus
-                                            />
-                                        </div>
-                                        {productosFiltradosEntrada.length === 0 ? (
-                                            <div className="p-2 text-sm text-muted-foreground text-center">
-                                                No se encontraron productos
-                                            </div>
-                                        ) : (
-                                            productosFiltradosEntrada.map((p) => (
-                                                <SelectItem key={p.id} value={p.id}>
-                                                    <span className={p.es_desperdicio ? 'text-orange-600' : ''}>
-                                                        {p.codigo} - {p.nombre}
-                                                        {p.es_desperdicio && ' (desperdicio)'}
-                                                    </span>
-                                                </SelectItem>
-                                            ))
-                                        )}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <div>
-                                <Label>Peso (kg)</Label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="Ej: 10.5"
-                                    value={pesoEntrada}
-                                    onChange={(e) => setPesoEntrada(e.target.value)}
-                                />
-                            </div>
-
-                            <div className="col-span-2 flex justify-end">
-                                <Button
-                                    onClick={handleAgregarEntrada}
-                                    disabled={loading || destinosUnicos.length === 0}
-                                >
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Agregar (Entra al Stock)
-                                </Button>
-                            </div>
-                        </div>
                     </CardContent>
                     <CardFooter className="flex justify-between">
-                        <Button variant="outline" onClick={() => setStep(2)}>
+                        <Button variant="outline" onClick={() => {
+                            if (currentDestinationIndex > 0) {
+                                setCurrentDestinationIndex(prev => prev - 1)
+                            } else {
+                                setStep(2)
+                            }
+                        }}>
                             <ArrowLeft className="mr-2 h-4 w-4" />
-                            Volver
+                            {currentDestinationIndex > 0 ? 'Destino Anterior' : 'Volver a Stock'}
                         </Button>
-                        <Button
-                            onClick={() => setStep(4)}
-                            disabled={entradas.length === 0}
-                        >
-                            Siguiente: Completar
-                            <ArrowRight className="ml-2 h-4 w-4" />
-                        </Button>
+
+                        <div className="flex gap-2">
+                            {currentDestinationIndex < activeDestinoIds.length - 1 ? (
+                                <Button onClick={() => setCurrentDestinationIndex(prev => prev + 1)}>
+                                    Siguiente Destino
+                                    <ArrowRight className="ml-2 h-4 w-4" />
+                                </Button>
+                            ) : (
+                                <Button onClick={() => setStep(4)} className="bg-green-600 hover:bg-green-700">
+                                    Finalizar Producción
+                                    <Check className="ml-2 h-4 w-4" />
+                                </Button>
+                            )}
+                        </div>
                     </CardFooter>
                 </Card>
             )}

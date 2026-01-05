@@ -55,3 +55,18 @@ La propiedad `torch` es una API experimental de navegadores (Chrome/Android) que
 
 **Archivos modificados:**
 - `src/components/barcode/BarcodeScanner.tsx`
+
+---
+
+## 2026-01-05 — Gemini
+**feat: Flujo secuencial y filtrado de destinos en Orden de Producción**
+
+Se refinó el proceso de "Nueva Orden de Producción" implementando un flujo secuencial estricto por destino:
+- **Lógica paso a paso**: Se procesan los destinos de uno en uno (ej. Filet -> Pechuga).
+- **Filtrado contextual**: El selector de productos de entrada (generados) ahora muestra únicamente los productos permitidos para el destino activo.
+- **Corrección de estado**: Refactorización de `handleAgregarEntrada` y `useEffect` correspondiente para usar `currentDestinoId` y garantizar la integridad de datos.
+- **Feedback visual**: Mensajes de éxito que confirman el destino afectado.
+
+**Archivos modificados:**
+- `src/app/(admin)/(dominios)/almacen/produccion/nueva/page.tsx`
+- `ARCHITECTURE_SUMMARY.md`

@@ -146,7 +146,8 @@ supabase/                         # Scripts SQL y migraciones
   - **Destinos de Producción** (Diciembre 2025):
     - Categorías configurables: Filet, Pechuga, Pollo Trozado
     - Cada destino define productos permitidos (ej: Filet → patamuslo, filet, puchero, menudo)
-    - Selector obligatorio al agregar productos generados
+    - **Flujo Secuencial (Enero 2026)**: Proceso paso a paso por destino. Se valida y completa cada destino individualmente.
+    - Visualización de progreso y merma en tiempo real por destino.
     - Tabla `destinos_produccion` + `destino_productos`
   - **Desperdicio**: Calculado como diferencia final (peso consumido - peso generado)
   - **Merma Individual**: Cada producto generado tiene campos `merma_esperada_kg` y `merma_real_kg`
@@ -851,6 +852,13 @@ Para el flujo de registro de nuevos clientes, el bot implementa una máquina de 
 - ✅ **Manejo de OverconstrainedError**: Para dispositivos con limitaciones de cámara
 - ✅ **Librería**: `@zxing/library` v0.21.3 con formatos EAN-13, EAN-8, Code128, Code39, QR, UPC-A, UPC-E, ITF, Codabar
 
+### **Mejoras en Órdenes de Producción (Enero 2026)**
+- ✅ **Flujo Secuencial por Destino**: Implementación de un proceso paso a paso para completar la producción.
+- ✅ **Validación por Destino**: El sistema ahora asegura que los productos generados correspondan al destino activo.
+- ✅ **Progreso Visual**: Barras de progreso que comparan el peso entrante vs generado por destino en tiempo real.
+- ✅ **Cálculo de Merma Individual**: Métrica de desperdicio calculada y mostrada para cada destino de producción individualmente.
+- ✅ ** UX Mejorada**: Navegación clara entre destinos con validación de estado antes de finalizar la orden.
+
 ---
 
 ## 📎 Documentos Relacionados
@@ -866,5 +874,5 @@ Para el flujo de registro de nuevos clientes, el bot implementa una máquina de 
 
 ---
 
-*Resumen actualizado el 05/01/2026 - Optimización del Escáner de Código de Barras + QA Automation + Seguridad RLS + Fixes Críticos Reparto + PRD generado + Sistema de Producción/Desposte + Integración Balanza SDP BBC-4030 + Sistema de Moras y Moratorias + Gestión de Cuenta Corriente + Facturas con Estado de Pago + Mejoras en Validación de Rutas + Navegación integrada con voz + Correcciones de Optimización de Rutas + Estabilización de Dashboard Repartidor + Sistema de recargos por método de pago + Corrección de lógica de precios mayoristas en sucursales + Configuración de productos mayoristas implementada + Modelo de control para sucursales + Mejoras de UX y manejo de admins*
+*Resumen actualizado el 05/01/2026 - Flujo Secuencial en Órdenes de Producción + Optimización del Escáner de Código de Barras + QA Automation + Seguridad RLS + Fixes Críticos Reparto + PRD generado + Sistema de Producción/Desposte + Integración Balanza SDP BBC-4030 + Sistema de Moras y Moratorias + Gestión de Cuenta Corriente + Facturas con Estado de Pago + Mejoras en Validación de Rutas + Navegación integrada con voz + Correcciones de Optimización de Rutas + Estabilización de Dashboard Repartidor + Sistema de recargos por método de pago + Corrección de lógica de precios mayoristas en sucursales + Configuración de productos mayoristas implementada + Modelo de control para sucursales + Mejoras de UX y manejo de admins*
 
