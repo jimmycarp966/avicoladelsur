@@ -1,33 +1,32 @@
 # Última Actualización
 
-**Fecha y hora:** 2026-01-05 03:50:00 (America/Argentina/Buenos_Aires)
+**Fecha y hora:** 2026-01-05 04:22:00 (America/Argentina/Buenos_Aires)
 
 ## Archivos Modificados
 
 - `src/components/barcode/BarcodeScanner.tsx`
-- `ARCHITECTURE_SUMMARY.md`
-- `docs/CHANGELOG.md` (nuevo)
 
 ## Resumen del Cambio
 
-Se optimizó el componente `BarcodeScanner.tsx` para mejorar la lectura de códigos de barras desde dispositivos móviles, incluyendo:
+Se corrigió el error de TypeScript con la propiedad `torch` en el escáner de código de barras, impacto: ninguno (solo tipos TS, no afecta runtime).
 
-1. **Velocidad mejorada**: Intervalo de escaneo reducido de 100ms a 50ms
-2. **Debounce**: Prevención de escaneos duplicados (1.5s entre mismo código)
-3. **Control de antorcha**: Botón para activar/desactivar flash
-4. **Vibración táctil**: Feedback al usuario al detectar código
-5. **Mayor resolución**: Hasta 1920x1080 para mejor detección
-6. **Configuración avanzada de cámara**: Enfoque, exposición y balance de blancos automáticos
-7. **Guía visual mejorada**: Esquinas verdes y animación de línea de escaneo
-8. **Mejor compatibilidad**: Detección de cámara trasera en más dispositivos/idiomas
-9. **Manejo de errores**: Soporte para `OverconstrainedError`
+## Detalle
+
+El error `"Object literal may only specify known properties, and 'torch' does not exist in type 'MediaTrackConstraintSet'"` se resolvió usando un cast explícito:
+
+```typescript
+const constraints = { advanced: [{ torch: !torchEnabled }] } as MediaTrackConstraints
+await track.applyConstraints(constraints)
+```
 
 ## Impacto
 
 - **Base de datos**: Ninguno
 - **Contratos API**: Ninguno  
 - **Backward compatibility**: Completa
+- **Runtime**: Sin cambios (solo fix de tipos TS)
 
-## Diagramas
+## Commits realizados
 
-No se requieren actualizaciones de diagramas para este cambio.
+1. `docs: optimizar escáner de código de barras - debounce, antorcha, vibración, mayor velocidad`
+2. `fix: corregir error TS con torch en BarcodeScanner`

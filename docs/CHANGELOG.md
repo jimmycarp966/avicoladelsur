@@ -19,3 +19,15 @@ Se mejoró el componente `BarcodeScanner.tsx` con las siguientes optimizaciones:
 
 **Archivos modificados:**
 - `src/components/barcode/BarcodeScanner.tsx`
+
+---
+
+## 2026-01-05 — Daniel
+**Fix: Error de TypeScript con propiedad 'torch'**
+
+Se corrigió el error de TypeScript `"Object literal may only specify known properties, and 'torch' does not exist in type 'MediaTrackConstraintSet'"` mediante un cast explícito a `MediaTrackConstraints`.
+
+La propiedad `torch` es una API experimental de navegadores (Chrome/Android) que no está en los tipos oficiales de TypeScript, pero funciona correctamente en runtime.
+
+**Archivos modificados:**
+- `src/components/barcode/BarcodeScanner.tsx`
