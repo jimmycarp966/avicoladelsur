@@ -53,6 +53,8 @@ interface SalidaLocal {
     lote_numero: string
     cantidad: number
     peso_kg: number
+    destino_id: string
+    destino_nombre: string
 }
 
 interface EntradaLocal {
@@ -96,6 +98,7 @@ export default function NuevaOrdenProduccionPage() {
     const [cantidadSalida, setCantidadSalida] = useState('')
     const [pesoSalida, setPesoSalida] = useState('')
     const [busquedaSalida, setBusquedaSalida] = useState('') // Filtro de búsqueda
+    const [destinoSalidaId, setDestinoSalidaId] = useState('') // Destino para este producto
 
     // Campos temporales para agregar ENTRADA (producto que entra al stock)
     const [productoEntradaId, setProductoEntradaId] = useState('')
@@ -262,8 +265,8 @@ export default function NuevaOrdenProduccionPage() {
 
     // Agregar SALIDA de stock (producto que SALE del inventario)
     const handleAgregarSalida = async () => {
-        if (!ordenId || !productoSalidaId || !loteSalidaId || !cantidadSalida) {
-            toast.error('Completa todos los campos')
+        if (!ordenId || !productoSalidaId || !loteSalidaId || !cantidadSalida || !destinoSalidaId) {
+            toast.error('Completa todos los campos (incluyendo destino)')
             return
         }
 
@@ -271,6 +274,7 @@ export default function NuevaOrdenProduccionPage() {
         try {
             const producto = productos.find(p => p.id === productoSalidaId)
             const lote = lotesDisponibles.find(l => l.id === loteSalidaId)
+            const destino = destinos.find(d => d.id === destinoSalidaId)
 
             const result = await agregarSalidaStockAction(
                 ordenId,
@@ -288,10 +292,12 @@ export default function NuevaOrdenProduccionPage() {
                     lote_id: loteSalidaId,
                     lote_numero: lote?.numero_lote || '',
                     cantidad: parseFloat(cantidadSalida),
-                    peso_kg: parseFloat(pesoSalida) || 0
+                    peso_kg: parseFloat(pesoSalida) || 0,
+                    destino_id: destinoSalidaId,
+                    destino_nombre: destino?.nombre || ''
                 }])
 
-                // Limpiar campos
+                // Limpiar campos (pero mantener destino para agregar más del mismo tipo)
                 setProductoSalidaId('')
                 setLoteSalidaId('')
                 setCantidadSalida('')
@@ -509,39 +515,6 @@ export default function NuevaOrdenProduccionPage() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                        {/* Selector de DESTINO DE PRODUCCIÓN (obligatorio - se selecciona primero) */}
-                        <div className="p-4 border-2 border-primary/30 rounded-lg bg-primary/5">
-                            <div className="flex items-center gap-2 mb-2">
-                                <Target className="h-5 w-5 text-primary" />
-                                <Label className="text-base font-semibold">Destino de Producción *</Label>
-                            </div>
-                            <p className="text-sm text-muted-foreground mb-3">
-                                Selecciona primero qué tipo de producción vas a realizar
-                            </p>
-                            <Select value={destinoEntradaId} onValueChange={setDestinoEntradaId}>
-                                <SelectTrigger className={!destinoEntradaId ? 'border-primary ring-2 ring-primary/20' : 'border-green-500'}>
-                                    <SelectValue placeholder="Seleccionar destino (Filet, Pechuga, Pollo Trozado)..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {destinos.map((d) => (
-                                        <SelectItem key={d.id} value={d.id}>
-                                            <div className="flex flex-col">
-                                                <span className="font-medium">{d.nombre}</span>
-                                                {d.descripcion && (
-                                                    <span className="text-xs text-muted-foreground">{d.descripcion}</span>
-                                                )}
-                                            </div>
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            {destinoEntradaId && (
-                                <p className="text-xs text-green-600 mt-1">
-                                    ✓ Destino seleccionado: {destinos.find(d => d.id === destinoEntradaId)?.nombre}
-                                </p>
-                            )}
-                        </div>
-
                         {/* Lista de salidas agregadas */}
                         {salidas.length > 0 && (
                             <div className="space-y-2">
@@ -551,11 +524,19 @@ export default function NuevaOrdenProduccionPage() {
                                         key={idx}
                                         className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-lg"
                                     >
-                                        <div>
-                                            <span className="font-medium">{salida.producto_nombre}</span>
-                                            <span className="text-muted-foreground ml-2">
-                                                Lote: {salida.lote_numero}
-                                            </span>
+                                        <div className="flex flex-col gap-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-medium">{salida.producto_nombre}</span>
+                                                <Badge variant="outline" className="text-xs">
+                                                    Lote: {salida.lote_numero}
+                                                </Badge>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <Target className="h-3 w-3 text-primary" />
+                                                <Badge variant="secondary" className="text-xs">
+                                                    → {salida.destino_nombre}
+                                                </Badge>
+                                            </div>
                                         </div>
                                         <div className="flex items-center gap-4">
                                             <span>{salida.cantidad} unidades</span>
@@ -663,6 +644,31 @@ export default function NuevaOrdenProduccionPage() {
                                 />
                             </div>
 
+                            {/* Selector de destino para esta salida */}
+                            <div className="col-span-2">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <Target className="h-4 w-4 text-primary" />
+                                    <Label>Destino de Producción *</Label>
+                                </div>
+                                <Select value={destinoSalidaId} onValueChange={setDestinoSalidaId}>
+                                    <SelectTrigger className={!destinoSalidaId ? 'border-primary' : ''}>
+                                        <SelectValue placeholder="¿Para qué se usará este producto? (Filet, Pechuga, etc.)" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {destinos.map((d) => (
+                                            <SelectItem key={d.id} value={d.id}>
+                                                <div className="flex flex-col">
+                                                    <span className="font-medium">{d.nombre}</span>
+                                                    {d.descripcion && (
+                                                        <span className="text-xs text-muted-foreground">{d.descripcion}</span>
+                                                    )}
+                                                </div>
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
                             <div className="col-span-2 flex justify-end">
                                 <Button onClick={handleAgregarSalida} disabled={loading}>
                                     <Plus className="mr-2 h-4 w-4" />
@@ -677,7 +683,7 @@ export default function NuevaOrdenProduccionPage() {
                         </Button>
                         <Button
                             onClick={() => setStep(3)}
-                            disabled={salidas.length === 0 || !destinoEntradaId}
+                            disabled={salidas.length === 0}
                         >
                             Siguiente: Productos Generados
                             <ArrowRight className="ml-2 h-4 w-4" />
