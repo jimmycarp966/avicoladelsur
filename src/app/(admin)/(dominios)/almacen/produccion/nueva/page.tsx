@@ -259,7 +259,8 @@ export default function NuevaOrdenProduccionPage() {
     // Calcular totales
     // NOTA: pesoTotalSalida = lo que SALE del stock (consumido)
     //       pesoTotalEntrada = lo que ENTRA al stock (generado)
-    const pesoTotalSalida = salidas.reduce((sum, s) => sum + (s.peso_kg || 0), 0)
+    //       peso_kg en salidas = peso por unidad, se multiplica por cantidad
+    const pesoTotalSalida = salidas.reduce((sum, s) => sum + (s.cantidad * (s.peso_kg || 0)), 0)
     const pesoTotalEntrada = entradas.reduce((sum, e) => sum + (e.peso_kg || 0), 0)
     const mermaKg = pesoTotalSalida - pesoTotalEntrada
     const mermaPorcentaje = pesoTotalSalida > 0 ? (mermaKg / pesoTotalSalida) * 100 : 0
@@ -559,10 +560,12 @@ export default function NuevaOrdenProduccionPage() {
                                                 </Badge>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-4">
+                                        <div className="flex items-center gap-4 text-right">
                                             <span>{salida.cantidad} unidades</span>
                                             {salida.peso_kg > 0 && (
-                                                <span className="font-semibold">{salida.peso_kg} kg</span>
+                                                <span className="font-semibold">
+                                                    {(salida.cantidad * salida.peso_kg).toFixed(2)} kg
+                                                </span>
                                             )}
                                         </div>
                                     </div>
@@ -743,16 +746,16 @@ export default function NuevaOrdenProduccionPage() {
                                         key={idx}
                                         className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg"
                                     >
-                                        <div>
-                                            <span className="font-medium">{entrada.producto_nombre}</span>
-                                            <Badge variant="outline" className="ml-2">
-                                                {entrada.destino_nombre}
-                                            </Badge>
-                                            {entrada.plu && (
-                                                <Badge variant="secondary" className="ml-2">
-                                                    PLU: {entrada.plu}
+                                        <div className="flex flex-col gap-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-medium">{entrada.producto_nombre}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <Target className="h-3 w-3 text-green-600" />
+                                                <Badge variant="secondary" className="text-xs">
+                                                    ← {entrada.destino_nombre}
                                                 </Badge>
-                                            )}
+                                            </div>
                                         </div>
                                         <span className="font-semibold">{entrada.peso_kg} kg</span>
                                     </div>
