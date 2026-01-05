@@ -42,11 +42,21 @@ export default function NotificacionesPage() {
     }, [filtroTipo, filtroLeida])
 
     async function loadNotifications() {
+        console.log('[DEBUG Notificaciones] Iniciando carga...')
         try {
             setLoading(true)
-            const { data: { user } } = await supabase.auth.getUser()
-            if (!user) return
+            console.log('[DEBUG Notificaciones] Obteniendo usuario...')
+            const { data: { user }, error: userError } = await supabase.auth.getUser()
+            console.log('[DEBUG Notificaciones] Usuario:', user?.id, 'Error:', userError)
 
+            if (!user) {
+                console.log('[DEBUG Notificaciones] No hay usuario autenticado, saliendo')
+                setNotifications([])
+                setLoading(false) // IMPORTANTE: setear loading antes de return
+                return
+            }
+
+            console.log('[DEBUG Notificaciones] Construyendo query...')
             let query = supabase
                 .from('notificaciones')
                 .select('*')
@@ -64,13 +74,18 @@ export default function NotificacionesPage() {
                 query = query.eq('leida', false)
             }
 
+            console.log('[DEBUG Notificaciones] Ejecutando query...')
             const { data, error } = await query
+            console.log('[DEBUG Notificaciones] Resultado:', { data, error, count: data?.length })
 
             if (error) throw error
             setNotifications(data || [])
+            console.log('[DEBUG Notificaciones] Notificaciones seteadas:', data?.length)
         } catch (error) {
-            console.error('Error cargando notificaciones:', error)
+            console.error('[DEBUG Notificaciones] ERROR:', error)
+            setNotifications([])
         } finally {
+            console.log('[DEBUG Notificaciones] Finalizando, setLoading(false)')
             setLoading(false)
         }
     }
@@ -288,8 +303,8 @@ export default function NotificacionesPage() {
                             <Card
                                 key={notification.id}
                                 className={`transition-all ${!notification.leida
-                                        ? getNotificationColor(notification.tipo)
-                                        : 'bg-white'
+                                    ? getNotificationColor(notification.tipo)
+                                    : 'bg-white'
                                     } ${selectedIds.has(notification.id) ? 'ring-2 ring-primary' : ''}`}
                             >
                                 <CardContent className="py-4">

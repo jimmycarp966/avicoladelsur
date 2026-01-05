@@ -2,6 +2,18 @@
 
 Historial de cambios del proyecto.
 
+## 2026-01-05 — Gemini
+**Fix: Página de notificaciones quedaba en "Cargando..."**
+
+La página `/notificaciones` se quedaba en estado de carga infinita porque la tabla `notificaciones` no tenía el campo `categoria` que la UI esperaba.
+
+**Cambios:**
+- Agregada migración `20260105_agregar_categoria_notificaciones.sql` que añade el campo `categoria` a la tabla `notificaciones`
+
+**Acción requerida:** Ejecutar la migración en Supabase SQL Editor.
+
+---
+
 ## 2026-01-05 — Daniel
 **Optimización del escáner de códigos de barras**
 

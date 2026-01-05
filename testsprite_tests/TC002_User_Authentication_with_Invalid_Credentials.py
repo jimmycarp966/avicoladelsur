@@ -46,55 +46,28 @@ async def run_test():
                 pass
         
         # Interact with the page elements to simulate user flow
-        # -> Input valid username and password for admin role and submit login form
+        # -> Input invalid username and password, then submit the login form.
         frame = context.pages[-1]
-        # Input valid username for admin role
+        # Input invalid email in the email field
         elem = frame.locator('xpath=html/body/div[2]/div[3]/div/div[2]/form/div/input').nth(0)
-        await page.wait_for_timeout(3000); await elem.fill('admin@avicoladelsur.com')
+        await page.wait_for_timeout(3000); await elem.fill('wronguser@example.com')
         
 
         frame = context.pages[-1]
-        # Input valid password for admin role
+        # Input invalid password in the password field
         elem = frame.locator('xpath=html/body/div[2]/div[3]/div/div[2]/form/div[2]/div/input').nth(0)
-        await page.wait_for_timeout(3000); await elem.fill('123456')
+        await page.wait_for_timeout(3000); await elem.fill('wrongpassword')
         
 
         frame = context.pages[-1]
-        # Click on 'Iniciar Sesión' button to submit login form
+        # Click the 'Iniciar Sesión' button to submit the login form
         elem = frame.locator('xpath=html/body/div[2]/div[3]/div/div[2]/form/button').nth(0)
-        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
-        
-
-        # -> Attempt to log out and log in with another user role to verify login and RLS permissions for that role
-        frame = context.pages[-1]
-        # Click on 'Reportes' or a menu item to find logout or user settings option
-        elem = frame.locator('xpath=html/body/div[2]/div/div/nav/ul/li/ul/li[10]/div/a').nth(0)
-        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
-        
-
-        # -> Find and click the logout button or user menu to log out admin user
-        await page.mouse.wheel(0, await page.evaluate('() => window.innerHeight'))
-        
-
-        frame = context.pages[-1]
-        # Click on user menu or profile to find logout option
-        elem = frame.locator('xpath=html/body/div[2]/div/div/nav/ul/li/ul/li[10]/div/div/a[9]').nth(0)
-        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
-        
-
-        # -> Locate and click on user profile or menu to find logout option
-        frame = context.pages[-1]
-        # Click on user profile or admin name to open user menu for logout option
-        elem = frame.locator('xpath=html/body/div[2]/div[3]/div/div/div/img').nth(0)
         await page.wait_for_timeout(3000); await elem.click(timeout=5000)
         
 
         # --> Assertions to verify final state
         frame = context.pages[-1]
-        try:
-            await expect(frame.locator('text=Access Denied: Invalid Role Permissions').first).to_be_visible(timeout=1000)
-        except AssertionError:
-            raise AssertionError("Test case failed: The login test for different user roles did not pass successfully. Expected to verify successful login and valid JWT token with correct RLS permissions, but the test plan execution failed.")
+        await expect(frame.locator('text=Invalid login credentials').first).to_be_visible(timeout=30000)
         await asyncio.sleep(5)
     
     finally:

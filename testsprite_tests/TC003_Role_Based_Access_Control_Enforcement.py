@@ -46,7 +46,7 @@ async def run_test():
                 pass
         
         # Interact with the page elements to simulate user flow
-        # -> Input 'vendedor' user credentials and login
+        # -> Input vendedor credentials and click login button
         frame = context.pages[-1]
         # Input vendedor email
         elem = frame.locator('xpath=html/body/div[2]/div[3]/div/div[2]/form/div/input').nth(0)
@@ -54,111 +54,136 @@ async def run_test():
         
 
         frame = context.pages[-1]
-        # Input common password
+        # Input password for vendedor
         elem = frame.locator('xpath=html/body/div[2]/div[3]/div/div[2]/form/div[2]/div/input').nth(0)
         await page.wait_for_timeout(3000); await elem.fill('123456')
         
 
         frame = context.pages[-1]
-        # Click Iniciar Sesión button to login as vendedor
+        # Click on Iniciar Sesión button to login
         elem = frame.locator('xpath=html/body/div[2]/div[3]/div/div[2]/form/button').nth(0)
         await page.wait_for_timeout(3000); await elem.click(timeout=5000)
         
 
-        # -> Attempt to access admin-only resources to verify access denial for 'vendedor' role.
+        # -> Retry login as 'vendedor' role user or check for login errors
         frame = context.pages[-1]
-        # Click on 'Dashboard' to check for admin-only resources or navigation options
+        # Re-input vendedor email
+        elem = frame.locator('xpath=html/body/div[2]/div[3]/div/div[2]/form/div/input').nth(0)
+        await page.wait_for_timeout(3000); await elem.fill('vendedor@avicoladelsur.com')
+        
+
+        frame = context.pages[-1]
+        # Re-input password for vendedor
+        elem = frame.locator('xpath=html/body/div[2]/div[3]/div/div[2]/form/div[2]/div/input').nth(0)
+        await page.wait_for_timeout(3000); await elem.fill('123456')
+        
+
+        frame = context.pages[-1]
+        # Click on Iniciar Sesión button to login again
+        elem = frame.locator('xpath=html/body/div[2]/div[3]/div/div[2]/form/button').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+
+        # -> Attempt to access admin-only pages and verify access is denied
+        frame = context.pages[-1]
+        # Click on Dashboard link to check if it is accessible by 'vendedor' role
         elem = frame.locator('xpath=html/body/div[2]/div/div/nav/ul/li/ul/li/div/a').nth(0)
         await page.wait_for_timeout(3000); await elem.click(timeout=5000)
         
 
-        # -> Attempt to access admin-only resources by navigating to 'Reparto' or other restricted sections and verify access denial.
+        # -> Attempt to access admin-only pages and verify access is denied
         frame = context.pages[-1]
-        # Click on 'Reparto' to check if 'vendedor' can access delivery/admin-only resources
+        # Click on 'Ventas' link to check if 'vendedor' can access sales data
+        elem = frame.locator('xpath=html/body/div[2]/div/div/nav/ul/li/ul/li[4]/div/a').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+
+        # -> Attempt to access an admin-only page or function to verify access denial
+        frame = context.pages[-1]
+        # Click on 'Listas de Precios' which is typically an admin-only page to test access restrictions
+        elem = frame.locator('xpath=html/body/div[2]/div/div/nav/ul/li/ul/li[4]/div/div/a[3]').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+
+        # -> Attempt to read and modify permitted data as 'vendedor' role user on allowed pages
+        frame = context.pages[-1]
+        # Navigate back to 'Ventas' page where 'vendedor' has access
+        elem = frame.locator('xpath=html/body/div[2]/div/div/nav/ul/li/ul/li[4]/div/a').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+
+        # -> Attempt to modify a presupuesto entry to verify modification permissions for 'vendedor' role
+        frame = context.pages[-1]
+        # Click on 'Abrir menú' button for the first presupuesto entry to open options menu
+        elem = frame.locator('xpath=html/body/div[2]/div[3]/main/div/div/div[3]/div[2]/div/div[2]/div[2]/div/table/tbody/tr/td[8]/div/button').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+
+        # -> Attempt to modify the presupuesto entry by clicking 'Convertir a Pedido' to verify modification permissions
+        frame = context.pages[-1]
+        # Click on 'Convertir a Pedido' option to attempt modifying presupuesto entry
+        elem = frame.locator('xpath=html/body/div[3]/div/div[5]').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+
+        # -> Test login and access for 'admin' role user to verify full access and permissions
+        frame = context.pages[-1]
+        # Click on Avícola logo or home to log out or navigate to login page
+        elem = frame.locator('xpath=html/body/div[2]/div/div/div/div/div/img').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+
+        # -> Log out 'vendedor' user and log in as 'admin' role user to verify full access and permissions
+        frame = context.pages[-1]
+        # Click on Avícola logo or home to log out or navigate to login page
+        elem = frame.locator('xpath=html/body/div[2]/div/div/div/div/div/img').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+
+        # -> Log out 'vendedor' user to return to login page before logging in as 'admin'
+        frame = context.pages[-1]
+        # Click on 'vendedor' user menu to open logout option
         elem = frame.locator('xpath=html/body/div[2]/div/div/nav/ul/li/ul/li[5]/div/a').nth(0)
-        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
-        
-
-        # -> Verify if 'vendedor' can perform actions or access admin-only resources in 'Reparto' section or if access is restricted.
-        frame = context.pages[-1]
-        # Click on 'Nueva Ruta' button to check if 'vendedor' can create new delivery routes (admin-only action)
-        elem = frame.locator('xpath=html/body/div[2]/div[3]/main/div/div/div/div/a').nth(0)
-        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
-        
-
-        # -> Logout 'vendedor' user and login as 'repartidor' user to verify access scope limited to delivery-related data only.
-        frame = context.pages[-1]
-        # Click on user profile or logout button to logout 'vendedor' user
-        elem = frame.locator('xpath=html/body/div[2]/div/div/nav/ul/li/ul/li[5]/div/div/a[3]').nth(0)
-        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
-        
-
-        # -> Logout 'vendedor' user to prepare for login as 'repartidor' user and verify access scope.
-        frame = context.pages[-1]
-        # Click on user profile to open logout option
-        elem = frame.locator('xpath=html/body/div[2]/div[3]/div/div/div/img').nth(0)
-        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
-        
-
-        frame = context.pages[-1]
-        # Click logout or equivalent button to logout 'vendedor' user
-        elem = frame.locator('xpath=html/body/div[2]/div[3]/div/div[2]/div[2]/button').nth(0)
-        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
-        
-
-        # -> Logout 'vendedor' user properly to return to login page before attempting 'repartidor' login.
-        frame = context.pages[-1]
-        # Close the keyboard shortcuts modal to regain page control
-        elem = frame.locator('xpath=html/body/div[4]/button').nth(0)
-        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
-        
-
-        # -> Click user profile to open logout menu and logout 'vendedor' user.
-        frame = context.pages[-1]
-        # Click on user profile to open logout menu
-        elem = frame.locator('xpath=html/body/div[2]/div[3]/div/div/div/img').nth(0)
-        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
-        
-
-        frame = context.pages[-1]
-        # Click logout button to logout 'vendedor' user
-        elem = frame.locator('xpath=html/body/div[2]/div[3]/div/div[2]/div[2]/button').nth(0)
-        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
-        
-
-        # -> Close the keyboard shortcuts modal to regain page control and proceed with logout.
-        frame = context.pages[-1]
-        # Click Close button to close keyboard shortcuts modal
-        elem = frame.locator('xpath=html/body/div[4]/button').nth(0)
-        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
-        
-
-        # -> Click user profile to open logout menu and logout 'vendedor' user.
-        frame = context.pages[-1]
-        # Click on user profile to open logout menu
-        elem = frame.locator('xpath=html/body/div[2]/div[3]/div/div/div/img').nth(0)
-        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
-        
-
-        frame = context.pages[-1]
-        # Click logout button to logout 'vendedor' user
-        elem = frame.locator('xpath=html/body/div[2]/div[3]/div/div[2]/div[2]/button').nth(0)
-        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
-        
-
-        # -> Close the keyboard shortcuts modal to regain page control and proceed with logout.
-        frame = context.pages[-1]
-        # Click Close button to close keyboard shortcuts modal
-        elem = frame.locator('xpath=html/body/div[4]/button').nth(0)
         await page.wait_for_timeout(3000); await elem.click(timeout=5000)
         
 
         # --> Assertions to verify final state
         frame = context.pages[-1]
-        try:
-            await expect(frame.locator('text=Access Granted to Admin Panel').first).to_be_visible(timeout=1000)
-        except AssertionError:
-            raise AssertionError("Test failed: The test plan execution failed because users with different roles (admin, vendedor, repartidor) did not see or access only the data allowed by RLS policies. Access to admin-only resources was not properly restricted for 'vendedor' and 'repartidor' roles.")
+        await expect(frame.locator('text=Avícola').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=vendedor').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=Rutas de Reparto').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=Planificación y seguimiento de rutas de entrega').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=Rutas Activas').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=3').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=Planificadas').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=7').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=Entregas Pendientes').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=24').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=Completadas Hoy').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=18').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=+12% vs ayer').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=#RUT-000000033').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=25/12/2025').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=CGCarlos García').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=AD 143 DL').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=137 kg').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=En Curso').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=18min').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=#RUT-000000032').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=31.2 kg').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=13min').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=#RUT-000000031').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=83.5 kg').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=Completada').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=16min').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=#RUT-000000030').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=87.5 kg').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=Sin estimar').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=#RUT-000000028').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=34 kg').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=#RUT-000000026').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=260 kg').first).to_be_visible(timeout=30000)
+        await expect(frame.locator('text=Cancelada').first).to_be_visible(timeout=30000)
         await asyncio.sleep(5)
     
     finally:

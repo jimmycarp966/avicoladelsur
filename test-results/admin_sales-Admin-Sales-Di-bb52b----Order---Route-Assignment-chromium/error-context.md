@@ -1,0 +1,219 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e4]:
+      - generic [ref=e7]:
+        - img "Avícola del Sur" [ref=e8]
+        - generic [ref=e9]:
+          - generic [ref=e10]: Avícola
+          - generic [ref=e11]: del Sur
+      - navigation [ref=e12]:
+        - list [ref=e13]:
+          - listitem [ref=e14]:
+            - list [ref=e15]:
+              - listitem [ref=e16]:
+                - link "Dashboard" [ref=e18] [cursor=pointer]:
+                  - /url: /dashboard
+                  - img [ref=e20]
+                  - generic [ref=e25]: Dashboard
+              - listitem [ref=e26]:
+                - link "Notificaciones" [ref=e28] [cursor=pointer]:
+                  - /url: /notificaciones
+                  - img [ref=e29]
+                  - generic [ref=e32]: Notificaciones
+              - listitem [ref=e33]:
+                - link "Almacén" [ref=e35] [cursor=pointer]:
+                  - /url: /almacen
+                  - img [ref=e36]
+                  - generic [ref=e40]: Almacén
+              - listitem [ref=e41]:
+                - link "Ventas" [ref=e43] [cursor=pointer]:
+                  - /url: /ventas
+                  - img [ref=e44]
+                  - generic [ref=e48]: Ventas
+              - listitem [ref=e49]:
+                - link "Reparto" [ref=e51] [cursor=pointer]:
+                  - /url: /reparto
+                  - img [ref=e52]
+                  - generic [ref=e57]: Reparto
+              - listitem [ref=e58]:
+                - link "Tesorería" [ref=e60] [cursor=pointer]:
+                  - /url: /tesoreria
+                  - img [ref=e61]
+                  - generic [ref=e63]: Tesorería
+              - listitem [ref=e64]:
+                - link "IA" [ref=e66] [cursor=pointer]:
+                  - /url: /dashboard/predicciones
+                  - img [ref=e67]
+                  - generic [ref=e70]: IA
+              - listitem [ref=e71]:
+                - link "Sucursales" [ref=e73] [cursor=pointer]:
+                  - /url: /sucursales
+                  - img [ref=e74]
+                  - generic [ref=e78]: Sucursales
+              - listitem [ref=e79]:
+                - link "RRHH" [ref=e81] [cursor=pointer]:
+                  - /url: /rrhh
+                  - img [ref=e82]
+                  - generic [ref=e86]: RRHH
+              - listitem [ref=e87]:
+                - link "Reportes" [ref=e89] [cursor=pointer]:
+                  - /url: /reportes
+                  - img [ref=e90]
+                  - generic [ref=e93]: Reportes
+      - generic [ref=e95]:
+        - generic [ref=e97]: AS
+        - generic [ref=e98]:
+          - paragraph [ref=e99]: Administrador Sistema
+          - paragraph [ref=e100]: admin
+    - generic [ref=e101]:
+      - generic [ref=e102]:
+        - generic [ref=e103]:
+          - generic [ref=e104]:
+            - img "Avícola del Sur" [ref=e105]
+            - generic [ref=e106]:
+              - generic [ref=e107]: Avícola
+              - generic [ref=e108]: del Sur
+          - generic [ref=e109]: Admin
+        - generic [ref=e112]:
+          - button "Atajos de teclado (F12)" [ref=e113]:
+            - img
+          - button [ref=e115]:
+            - img
+          - button "AS" [ref=e116]:
+            - generic [ref=e118]: AS
+      - main [ref=e119]:
+        - generic [ref=e121]:
+          - generic [ref=e122]:
+            - heading "Dashboard" [level=1] [ref=e123]
+            - paragraph [ref=e124]: Bienvenido, Administrador. Resumen de tu negocio.
+          - generic [ref=e125]:
+            - generic [ref=e126]:
+              - generic [ref=e127]:
+                - generic [ref=e128]: Productos
+                - img [ref=e130]
+              - generic [ref=e134]:
+                - generic [ref=e135]: "415"
+                - paragraph [ref=e136]: +0.2% desde el mes pasado
+            - generic [ref=e137]:
+              - generic [ref=e138]:
+                - generic [ref=e139]: Pedidos Pendientes
+                - img [ref=e141]
+              - generic [ref=e144]:
+                - generic [ref=e145]: "6"
+                - paragraph [ref=e146]: Requieren atención
+            - generic [ref=e147]:
+              - generic [ref=e148]:
+                - generic [ref=e149]: Entregas Hoy
+                - img [ref=e151]
+              - generic [ref=e156]:
+                - generic [ref=e157]: "0"
+                - paragraph [ref=e158]: 0 completadas, 0 pendientes
+            - generic [ref=e159]:
+              - generic [ref=e160]:
+                - generic [ref=e161]: Clientes Activos
+                - img [ref=e163]
+              - generic [ref=e168]:
+                - generic [ref=e169]: "221"
+                - paragraph [ref=e170]: 0.0% desde el mes pasado
+          - generic [ref=e171]:
+            - generic [ref=e172]:
+              - generic [ref=e173]: Eficiencia de Rutas
+              - img [ref=e175]
+            - generic [ref=e180]:
+              - generic [ref=e181]:
+                - generic [ref=e182]: "Ahorro esta semana:"
+                - generic [ref=e183]: $0
+              - generic [ref=e184]:
+                - generic [ref=e185]: "Distancia ahorrada:"
+                - generic [ref=e186]: 0 km
+              - generic [ref=e187]:
+                - generic [ref=e188]: "Tiempo ahorrado:"
+                - generic [ref=e189]: 0 horas
+              - link "Ver Detalles" [ref=e191] [cursor=pointer]:
+                - /url: /reparto/rutas
+                - button "Ver Detalles" [ref=e192]
+          - generic [ref=e193]:
+            - generic [ref=e196]:
+              - img [ref=e197]
+              - text: Clientes en Riesgo
+            - generic [ref=e206]:
+              - img [ref=e207]
+              - text: Predicción de Stock
+          - generic [ref=e216]:
+            - generic [ref=e218]:
+              - generic [ref=e219]:
+                - generic [ref=e220]: Ventas Mensuales
+                - generic [ref=e221]: Evolución de ventas y pedidos en el último año
+              - paragraph [ref=e224]: Cargando datos...
+            - generic [ref=e226]:
+              - generic [ref=e227]:
+                - generic [ref=e228]: Productos por Categoría
+                - generic [ref=e229]: Distribución del catálogo por categorías
+              - paragraph [ref=e232]: Cargando datos...
+          - generic [ref=e233]:
+            - generic [ref=e235]:
+              - generic [ref=e236]:
+                - generic [ref=e237]: Entregas por Día
+                - generic [ref=e238]: Rendimiento semanal de entregas y kilometraje
+              - paragraph [ref=e241]: Cargando datos...
+            - generic [ref=e242]:
+              - generic [ref=e243]:
+                - generic [ref=e244]: Métricas de Rendimiento
+                - generic [ref=e245]: Indicadores clave de rendimiento del mes
+              - generic [ref=e246]:
+                - generic [ref=e247]:
+                  - generic [ref=e248]:
+                    - img [ref=e249]
+                    - generic [ref=e252]: Crecimiento de Ventas
+                  - generic [ref=e253]: "-100.0%"
+                - generic [ref=e254]:
+                  - generic [ref=e255]:
+                    - img [ref=e256]
+                    - generic [ref=e259]: Tiempo Promedio de Entrega
+                  - generic [ref=e260]: 0.0 horas
+                - generic [ref=e261]:
+                  - generic [ref=e262]:
+                    - img [ref=e263]
+                    - generic [ref=e266]: Tasa de Satisfacción
+                  - generic [ref=e267]: 100.0%
+                - generic [ref=e268]:
+                  - generic [ref=e269]:
+                    - img [ref=e270]
+                    - generic [ref=e272]: Productos con Stock Bajo
+                  - generic [ref=e273]: 2 productos
+          - generic [ref=e274]:
+            - generic [ref=e275]:
+              - generic [ref=e276]:
+                - generic [ref=e277]: Actividad Reciente
+                - generic [ref=e278]: Las últimas acciones en el sistema
+              - paragraph [ref=e281]: No hay actividad reciente
+            - generic [ref=e282]:
+              - generic [ref=e283]:
+                - generic [ref=e284]: Estado del Sistema
+                - generic [ref=e285]: Componentes del ERP
+              - generic [ref=e286]:
+                - generic [ref=e287]:
+                  - generic [ref=e290]: Base de Datos
+                  - generic [ref=e291]: Operativo
+                - generic [ref=e292]:
+                  - generic [ref=e295]: API de Ventas
+                  - generic [ref=e296]: Operativo
+                - generic [ref=e297]:
+                  - generic [ref=e300]: Bot WhatsApp
+                  - generic [ref=e301]: Configuración pendiente
+                - generic [ref=e302]:
+                  - generic [ref=e305]: Sistema de Reportes
+                  - generic [ref=e306]: Operativo
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e312] [cursor=pointer]:
+    - generic [ref=e315]:
+      - text: Compiling
+      - generic [ref=e316]:
+        - generic [ref=e317]: .
+        - generic [ref=e318]: .
+        - generic [ref=e319]: .
+  - alert [ref=e320]
+```

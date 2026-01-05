@@ -30,7 +30,7 @@ async def run_test():
         page = await context.new_page()
         
         # Navigate to your target URL and wait until the network request is committed
-        await page.goto("http://localhost:3000/login", wait_until="commit", timeout=10000)
+        await page.goto("http://localhost:3000", wait_until="commit", timeout=10000)
         
         # Wait for the main page to reach DOMContentLoaded state (optional for stability)
         try:
@@ -46,73 +46,80 @@ async def run_test():
                 pass
         
         # Interact with the page elements to simulate user flow
-        # -> Input admin email and password, then click 'Iniciar Sesión' button to login
+        # -> Input email and password, then click login button
         frame = context.pages[-1]
-        # Input admin email
+        # Input email for admin login
         elem = frame.locator('xpath=html/body/div[2]/div[3]/div/div[2]/form/div/input').nth(0)
         await page.wait_for_timeout(3000); await elem.fill('admin@avicoladelsur.com')
         
 
         frame = context.pages[-1]
-        # Input admin password
+        # Input password for admin login
         elem = frame.locator('xpath=html/body/div[2]/div[3]/div/div[2]/form/div[2]/div/input').nth(0)
         await page.wait_for_timeout(3000); await elem.fill('123456')
         
 
         frame = context.pages[-1]
-        # Click 'Iniciar Sesión' button to login
+        # Click Iniciar Sesión button to login
         elem = frame.locator('xpath=html/body/div[2]/div[3]/div/div[2]/form/button').nth(0)
         await page.wait_for_timeout(3000); await elem.click(timeout=5000)
         
 
-        # -> Click 'Iniciar Sesión' button to attempt login with correct credentials
+        # -> Navigate to treasury module or collections section to input payment data for a delivery with full payment
         frame = context.pages[-1]
-        # Click 'Iniciar Sesión' button to login with correct credentials
-        elem = frame.locator('xpath=html/body/div[2]/div/div/nav/ul/li/ul/li[4]/div/a').nth(0)
+        # Click on the main menu or navigation to find treasury module
+        elem = frame.locator('xpath=html/body/div[2]/div[3]/div/div/div/div/img').nth(0)
         await page.wait_for_timeout(3000); await elem.click(timeout=5000)
         
 
-        # -> Navigate to 'Tesorería' (Treasury) section to start payment recording and validation
+        # -> Retry login or check for error messages on login page
         frame = context.pages[-1]
-        # Click 'Tesorería' menu item to access treasury module
+        # Click Iniciar Sesión button again to retry login
+        elem = frame.locator('xpath=html/body/div[2]/div[3]/div/div[2]/form/button').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+
+        # -> Click 'Iniciar Sesión' button to login as admin and access the treasury module
+        frame = context.pages[-1]
+        # Click 'Iniciar Sesión' button to login as admin
+        elem = frame.locator('xpath=html/body/div[2]/div[3]/div/div[2]/form/button').nth(0)
+        await page.wait_for_timeout(3000); await elem.click(timeout=5000)
+        
+
+        # -> Click on Tesorería (Treasury) module to start testing collections and payments
+        frame = context.pages[-1]
+        # Click on Tesorería (Treasury) module in sidebar
         elem = frame.locator('xpath=html/body/div[2]/div/div/nav/ul/li/ul/li[6]/div/a').nth(0)
         await page.wait_for_timeout(3000); await elem.click(timeout=5000)
         
 
-        # -> Navigate to 'Cuentas Corrientes' section to find customer accounts for payment recording
+        # -> Navigate to input payment data for a delivery with full payment
         frame = context.pages[-1]
-        # Click 'Cuentas Corrientes' menu item to access customer accounts
-        elem = frame.locator('xpath=html/body/div[2]/div/div/nav/ul/li/ul/li[6]/div/div/a[4]').nth(0)
+        # Click on 'Cajas' to manage cash boxes and input payment data
+        elem = frame.locator('xpath=html/body/div[2]/div/div/nav/ul/li/ul/li[6]/div/div/a').nth(0)
         await page.wait_for_timeout(3000); await elem.click(timeout=5000)
         
 
-        # -> Click 'Gestionar' link for the first customer account 'SAN MARTIN (P)' to record a payment
+        # -> Navigate to input payment data for a delivery with full payment
         frame = context.pages[-1]
-        # Click 'Gestionar' for SAN MARTIN (P) account to manage payments
-        elem = frame.locator('xpath=html/body/div[2]/div[3]/main/div/div/div[3]/div[2]/div/div[2]/div[2]/div/table/tbody/tr[6]/td[7]/div/a').nth(0)
+        # Click on 'Ventas' module to find deliveries or payments input section
+        elem = frame.locator('xpath=html/body/div[2]/div/div/nav/ul/li/ul/li[4]/div/a').nth(0)
         await page.wait_for_timeout(3000); await elem.click(timeout=5000)
         
 
-        # -> Input a partial payment amount of $10,000 in the 'Monto a abonar' field and submit the payment.
+        # -> Click on the budget with status 'En Almacén' and total $1,120.00 (PR-000000031) to open details and input full payment
         frame = context.pages[-1]
-        # Input partial payment amount of $10,000
-        elem = frame.locator('xpath=html/body/div[2]/div[3]/main/div/div/div[3]/div/div[2]/form/div[2]/div/input').nth(0)
-        await page.wait_for_timeout(3000); await elem.fill('10000')
-        
-
-        # -> Click 'Registrar Pago de $10,000.00' button to record the payment and verify updates in cashbox and customer account
-        frame = context.pages[-1]
-        # Click 'Registrar Pago de $10,000.00' button to submit payment
-        elem = frame.locator('xpath=html/body/div[2]/div[3]/main/div/div/div[3]/div/div[2]/form/button').nth(0)
+        # Click on budget PR-000000031 with status 'En Almacén' to open details for payment input
+        elem = frame.locator('xpath=html/body/div[2]/div[3]/main/div/div/div[3]/div[2]/div/div[2]/div[2]/div/table/tbody/tr').nth(0)
         await page.wait_for_timeout(3000); await elem.click(timeout=5000)
         
 
         # --> Assertions to verify final state
         frame = context.pages[-1]
         try:
-            await expect(frame.locator('text=Pago registrado exitosamente').first).to_be_visible(timeout=5000)
+            await expect(frame.locator('text=Full payment processed successfully').first).to_be_visible(timeout=1000)
         except AssertionError:
-            raise AssertionError("Test case failed: Treasury module did not correctly record payments, update cashboxes and customer accounts, calculate moras automatically, or reflect changes in reports as per the test plan.")
+            raise AssertionError("Test case failed: Treasury module validation failed. Collections from deliveries, cash box movements, account corriente updates, and mora calculations were not verified successfully as per the test plan.")
         await asyncio.sleep(5)
     
     finally:
