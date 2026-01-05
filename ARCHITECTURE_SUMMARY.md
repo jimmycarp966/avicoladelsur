@@ -828,7 +828,28 @@ Para el flujo de registro de nuevos clientes, el bot implementa una máquina de 
 - ✅ **Fixes Críticos de Aplicación**:
   - **Ruta `/logout`**: Implementada correctamente (Fix error 404) para redirección segura.
   - **Schema BD**: Agregada columna crítica `metodo_pago` en `cuentas_movimientos`.
-  - **Integración IA**: Verificación de estabilidad en módulos de predicción.
+  - ✅ **Integración IA**: Verificación de estabilidad en módulos de predicción.
+
+### **Hardening de Accesos Restringidos (Enero 2026)**
+- ✅ **Protección de Rutas Críticas**:
+  - Implementado `src/app/(admin)/(dominios)/rrhh/layout.tsx` para verificar explícitamente el rol `admin`.
+  - Cierre de vulnerabilidad donde usuarios 'vendedor' podían acceder a RRHH si superaban el layout padre.
+  - Validación con Test Automatizado `TC003` (RBAC) que ahora confirma redirección a `/unauthorized`.
+- ✅ **Refactorización de Tests (Workaround TestSprite)**:
+  - Recuperación y ejecución manual de scripts de prueba Playwright (`TC001`, `TC003`, `TC010`, `TC006`).
+  - Mejora de selectores y aserciones para la interfaz en español.
+
+### **Optimización del Escáner de Código de Barras (Enero 2026)**
+- ✅ **Intervalo de escaneo reducido**: De 100ms a 50ms para detección más rápida
+- ✅ **Debounce implementado**: 1.5 segundos entre escaneos del mismo código para evitar duplicados
+- ✅ **Control de antorcha/flash**: Botón para encender/apagar flash de cámara (si disponible)
+- ✅ **Vibración táctil**: Feedback al usuario al detectar código exitosamente
+- ✅ **Mayor resolución de cámara**: Hasta 1920x1080 (antes 1280x720)
+- ✅ **Configuración avanzada de cámara**: Enfoque continuo, exposición y balance de blancos automáticos
+- ✅ **Guía visual mejorada**: Esquinas verdes destacadas y animación de línea de escaneo
+- ✅ **Mejor detección de cámara trasera**: Más términos de búsqueda para dispositivos en diferentes idiomas
+- ✅ **Manejo de OverconstrainedError**: Para dispositivos con limitaciones de cámara
+- ✅ **Librería**: `@zxing/library` v0.21.3 con formatos EAN-13, EAN-8, Code128, Code39, QR, UPC-A, UPC-E, ITF, Codabar
 
 ---
 
@@ -845,5 +866,5 @@ Para el flujo de registro de nuevos clientes, el bot implementa una máquina de 
 
 ---
 
-*Resumen actualizado el 03/01/2026 - QA Automation + Seguridad RLS + Fixes Críticos Reparto + PRD generado + Sistema de Producción/Desposte + Integración Balanza SDP BBC-4030 + Sistema de Moras y Moratorias + Gestión de Cuenta Corriente + Facturas con Estado de Pago + Mejoras en Validación de Rutas + Navegación integrada con voz + Correcciones de Optimización de Rutas + Estabilización de Dashboard Repartidor + Sistema de recargos por método de pago + Corrección de lógica de precios mayoristas en sucursales + Configuración de productos mayoristas implementada + Modelo de control para sucursales + Mejoras de UX y manejo de admins*
+*Resumen actualizado el 05/01/2026 - Optimización del Escáner de Código de Barras + QA Automation + Seguridad RLS + Fixes Críticos Reparto + PRD generado + Sistema de Producción/Desposte + Integración Balanza SDP BBC-4030 + Sistema de Moras y Moratorias + Gestión de Cuenta Corriente + Facturas con Estado de Pago + Mejoras en Validación de Rutas + Navegación integrada con voz + Correcciones de Optimización de Rutas + Estabilización de Dashboard Repartidor + Sistema de recargos por método de pago + Corrección de lógica de precios mayoristas en sucursales + Configuración de productos mayoristas implementada + Modelo de control para sucursales + Mejoras de UX y manejo de admins*
 

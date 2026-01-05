@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from '@zxing/library'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { X, Camera, SwitchCamera, Scan } from 'lucide-react'
+import { X, Camera, SwitchCamera, Scan, Flashlight, FlashlightOff } from 'lucide-react'
 
 interface BarcodeScannerProps {
     onScan: (code: string) => void
@@ -12,6 +12,12 @@ interface BarcodeScannerProps {
     title?: string
     description?: string
 }
+
+// Intervalo de escaneo optimizado (ms) - más rápido = mejor respuesta
+const SCAN_INTERVAL_MS = 50
+
+// Tiempo mínimo entre escaneos del mismo código (debounce)
+const DEBOUNCE_MS = 1500
 
 export function BarcodeScanner({
     onScan,
@@ -24,7 +30,13 @@ export function BarcodeScanner({
     const [error, setError] = useState<string | null>(null)
     const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
     const [selectedDevice, setSelectedDevice] = useState<string | null>(null)
+    const [torchEnabled, setTorchEnabled] = useState(false)
+    const [torchSupported, setTorchSupported] = useState(false)
     const readerRef = useRef<BrowserMultiFormatReader | null>(null)
+    const streamRef = useRef<MediaStream | null>(null)
+
+    // Debounce: último código escaneado y timestamp
+    const lastScannedRef = useRef<{ code: string; time: number } | null>(null)
 
     // Debug logs para mostrar en pantalla (móvil)
     const [debugLogs, setDebugLogs] = useState<string[]>([])
@@ -33,6 +45,32 @@ export function BarcodeScanner({
         setDebugLogs(prev => [...prev.slice(-4), `${timestamp}: ${msg}`])
         console.log('[BarcodeScanner]', msg)
     }
+
+    // Vibrar el dispositivo (feedback táctil)
+    const vibrate = useCallback(() => {
+        if ('vibrate' in navigator) {
+            navigator.vibrate([100, 50, 100]) // Patrón: vibrar 100ms, pausa 50ms, vibrar 100ms
+        }
+    }, [])
+
+    // Toggle antorcha/flash
+    const toggleTorch = useCallback(async () => {
+        if (!streamRef.current) return
+
+        const track = streamRef.current.getVideoTracks()[0]
+        if (!track) return
+
+        try {
+            // @ts-ignore - torch no está en todos los tipos de TS
+            await track.applyConstraints({
+                advanced: [{ torch: !torchEnabled }]
+            })
+            setTorchEnabled(!torchEnabled)
+            addDebugLog(`💡 Antorcha: ${!torchEnabled ? 'ON' : 'OFF'}`)
+        } catch (err) {
+            console.warn('Torch not supported:', err)
+        }
+    }, [torchEnabled])
 
     // Inicializar lector y solicitar permisos de cámara
     useEffect(() => {
@@ -55,7 +93,7 @@ export function BarcodeScanner({
         // @ts-ignore - ALSO_INVERTED puede no estar en los tipos pero es soportado
         hints.set(DecodeHintType.ALSO_INVERTED, true) // Intentar leer códigos invertidos
 
-        readerRef.current = new BrowserMultiFormatReader(hints, 100) // 100ms entre escaneos
+        readerRef.current = new BrowserMultiFormatReader(hints, SCAN_INTERVAL_MS)
 
 
         // Función para obtener cámaras después de tener permisos
@@ -69,13 +107,27 @@ export function BarcodeScanner({
                 // Pedimos alta resolución y enfoque continuo para mejorar scaneo
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: {
-                        facingMode: 'environment', // Preferir cámara trasera
-                        width: { min: 640, ideal: 1280, max: 1920 },
-                        height: { min: 480, ideal: 720, max: 1080 },
-                        // @ts-ignore - focusMode no está en todos los tipos de TS pero funciona en Chrome/Android
-                        advanced: [{ focusMode: 'continuous' }]
+                        facingMode: { ideal: 'environment' }, // Preferir cámara trasera
+                        width: { min: 640, ideal: 1920, max: 4096 },
+                        height: { min: 480, ideal: 1080, max: 2160 },
+                        // Configuraciones avanzadas para mejor enfoque y calidad
+                        // @ts-ignore - estas propiedades pueden no estar en todos los tipos de TS
+                        focusMode: { ideal: 'continuous' },
+                        exposureMode: { ideal: 'continuous' },
+                        whiteBalanceMode: { ideal: 'continuous' },
                     }
                 })
+
+                // Verificar si la antorcha está soportada
+                const track = stream.getVideoTracks()[0]
+                if (track) {
+                    const capabilities = track.getCapabilities?.()
+                    // @ts-ignore
+                    if (capabilities?.torch) {
+                        setTorchSupported(true)
+                        addDebugLog('💡 Antorcha disponible')
+                    }
+                }
 
                 // Detener el stream temporal (solo lo usamos para obtener permisos)
                 stream.getTracks().forEach(track => track.stop())
@@ -88,12 +140,17 @@ export function BarcodeScanner({
                 setDevices(videoDevices)
 
                 // Preferir cámara trasera si está disponible
-                const backCamera = videoDevices.find(d =>
-                    d.label.toLowerCase().includes('back') ||
-                    d.label.toLowerCase().includes('trasera') ||
-                    d.label.toLowerCase().includes('rear') ||
-                    d.label.toLowerCase().includes('environment')
-                )
+                // Buscar por varios términos comunes en diferentes idiomas/dispositivos
+                const backCamera = videoDevices.find(d => {
+                    const label = d.label.toLowerCase()
+                    return label.includes('back') ||
+                        label.includes('trasera') ||
+                        label.includes('rear') ||
+                        label.includes('environment') ||
+                        label.includes('posterior') ||
+                        label.includes('main') ||
+                        label.includes('0') // En algunos dispositivos, cámara 0 es la trasera
+                })
                 setSelectedDevice(backCamera?.deviceId || videoDevices[0]?.deviceId || null)
 
             } catch (err: any) {
@@ -105,6 +162,8 @@ export function BarcodeScanner({
                     setError('No se encontró ninguna cámara en este dispositivo.')
                 } else if (err.name === 'NotReadableError') {
                     setError('La cámara está siendo usada por otra aplicación.')
+                } else if (err.name === 'OverconstrainedError') {
+                    setError('La cámara no soporta la configuración solicitada. Intentando con configuración básica...')
                 } else {
                     setError('No se pudo acceder a la cámara: ' + err.message)
                 }
@@ -115,6 +174,7 @@ export function BarcodeScanner({
 
         return () => {
             readerRef.current?.reset()
+            streamRef.current?.getTracks().forEach(track => track.stop())
         }
     }, [])
 
@@ -128,15 +188,6 @@ export function BarcodeScanner({
             if (!readerRef.current || !videoRef.current) return
 
             try {
-                // Log de resolución efectiva para debug
-                if (videoRef.current.srcObject) {
-                    const track = (videoRef.current.srcObject as MediaStream).getVideoTracks()[0];
-                    const settings = track?.getSettings();
-                    if (settings) {
-                        addDebugLog(`📷 Res: ${settings.width}x${settings.height}`);
-                    }
-                }
-
                 await readerRef.current.decodeFromVideoDevice(
                     selectedDevice,
                     videoRef.current,
@@ -145,7 +196,24 @@ export function BarcodeScanner({
 
                         if (result) {
                             const code = result.getText()
+                            const now = Date.now()
+
+                            // Debounce: evitar escaneos duplicados del mismo código
+                            if (lastScannedRef.current &&
+                                lastScannedRef.current.code === code &&
+                                now - lastScannedRef.current.time < DEBOUNCE_MS) {
+                                return // Ignorar escaneo duplicado
+                            }
+
+                            // Guardar último escaneo
+                            lastScannedRef.current = { code, time: now }
+
                             addDebugLog(`✅ Código: ${code}`)
+
+                            // Feedback táctil
+                            vibrate()
+
+                            // Notificar al componente padre
                             onScan(code)
                             readerRef.current?.reset()
                             setIsScanning(false)
@@ -162,6 +230,24 @@ export function BarcodeScanner({
                     }
 
                 )
+
+                // Guardar referencia al stream para control de antorcha
+                if (videoRef.current.srcObject) {
+                    streamRef.current = videoRef.current.srcObject as MediaStream
+
+                    // Verificar soporte de antorcha con el stream activo
+                    const track = streamRef.current.getVideoTracks()[0]
+                    if (track) {
+                        const settings = track.getSettings()
+                        addDebugLog(`📷 Res: ${settings.width}x${settings.height}`)
+
+                        const capabilities = track.getCapabilities?.()
+                        // @ts-ignore
+                        if (capabilities?.torch) {
+                            setTorchSupported(true)
+                        }
+                    }
+                }
 
                 if (isMounted) {
                     setIsScanning(true)
@@ -182,7 +268,7 @@ export function BarcodeScanner({
             isMounted = false
             readerRef.current?.reset()
         }
-    }, [selectedDevice, onScan])
+    }, [selectedDevice, onScan, vibrate])
 
     const switchCamera = useCallback(() => {
         if (devices.length <= 1) return
@@ -190,6 +276,8 @@ export function BarcodeScanner({
         const currentIndex = devices.findIndex(d => d.deviceId === selectedDevice)
         const nextIndex = (currentIndex + 1) % devices.length
         setSelectedDevice(devices[nextIndex].deviceId)
+        // Resetear estado de antorcha al cambiar cámara
+        setTorchEnabled(false)
     }, [devices, selectedDevice])
 
     return (
@@ -228,35 +316,60 @@ export function BarcodeScanner({
                                 className="w-full h-full object-cover"
                                 playsInline
                                 muted
+                                autoPlay
                             />
 
                             {/* Overlay con guía de escaneo */}
                             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                 <div className="w-3/4 h-1/3 border-2 border-white/50 rounded-lg relative">
-                                    {/* Indicador de escaneo */}
+                                    {/* Esquinas destacadas */}
+                                    <div className="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-green-500 rounded-tl" />
+                                    <div className="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-green-500 rounded-tr" />
+                                    <div className="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-green-500 rounded-bl" />
+                                    <div className="absolute bottom-0 right-0 w-4 h-4 border-b-4 border-r-4 border-green-500 rounded-br" />
+                                    {/* Indicador de escaneo animado */}
                                     {isScanning && (
-                                        <div className="absolute inset-x-0 top-1/2 h-0.5 bg-green-500 animate-pulse" />
+                                        <div className="absolute inset-x-0 top-1/2 h-0.5 bg-green-500 animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.8)]" />
                                     )}
                                 </div>
                             </div>
 
-                            {/* Estado de escaneo */}
+                            {/* Controles de cámara */}
                             <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
                                 <span className={`text-xs px-2 py-1 rounded ${isScanning ? 'bg-green-500/80' : 'bg-gray-500/80'} text-white`}>
                                     {isScanning ? '● Escaneando...' : '○ Detenido'}
                                 </span>
 
-                                {devices.length > 1 && (
-                                    <Button
-                                        size="sm"
-                                        variant="secondary"
-                                        className="bg-white/20 hover:bg-white/30"
-                                        onClick={switchCamera}
-                                    >
-                                        <SwitchCamera className="h-4 w-4 mr-1" />
-                                        Cambiar
-                                    </Button>
-                                )}
+                                <div className="flex gap-1">
+                                    {/* Botón de antorcha */}
+                                    {torchSupported && (
+                                        <Button
+                                            size="sm"
+                                            variant="secondary"
+                                            className={`${torchEnabled ? 'bg-yellow-500/80 hover:bg-yellow-600/80' : 'bg-white/20 hover:bg-white/30'}`}
+                                            onClick={toggleTorch}
+                                        >
+                                            {torchEnabled ? (
+                                                <Flashlight className="h-4 w-4" />
+                                            ) : (
+                                                <FlashlightOff className="h-4 w-4" />
+                                            )}
+                                        </Button>
+                                    )}
+
+                                    {/* Botón cambiar cámara */}
+                                    {devices.length > 1 && (
+                                        <Button
+                                            size="sm"
+                                            variant="secondary"
+                                            className="bg-white/20 hover:bg-white/30"
+                                            onClick={switchCamera}
+                                        >
+                                            <SwitchCamera className="h-4 w-4 mr-1" />
+                                            Cambiar
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     )}
