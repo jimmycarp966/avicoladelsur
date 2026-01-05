@@ -59,6 +59,13 @@ export default function DestinosProduccionPage() {
     // Para asociar productos
     const [selectedDestino, setSelectedDestino] = useState<string | null>(null)
     const [productoAAsociar, setProductoAAsociar] = useState('')
+    const [busquedaProducto, setBusquedaProducto] = useState('') // Filtro de búsqueda
+
+    // Productos filtrados por búsqueda
+    const productosFiltrados = productos.filter(p =>
+        p.nombre.toLowerCase().includes(busquedaProducto.toLowerCase()) ||
+        p.codigo.toLowerCase().includes(busquedaProducto.toLowerCase())
+    )
 
     useEffect(() => {
         cargarDatos()
@@ -348,17 +355,35 @@ export default function DestinosProduccionPage() {
                                     <div className="flex gap-2">
                                         <Select
                                             value={productoAAsociar}
-                                            onValueChange={setProductoAAsociar}
+                                            onValueChange={(val) => {
+                                                setProductoAAsociar(val)
+                                                setBusquedaProducto('') // Limpiar búsqueda al seleccionar
+                                            }}
                                         >
                                             <SelectTrigger className="flex-1">
                                                 <SelectValue placeholder="Seleccionar producto..." />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                {productos.map((p) => (
-                                                    <SelectItem key={p.id} value={p.id}>
-                                                        {p.codigo} - {p.nombre}
-                                                    </SelectItem>
-                                                ))}
+                                                <div className="px-2 pb-2">
+                                                    <Input
+                                                        placeholder="Buscar producto..."
+                                                        value={busquedaProducto}
+                                                        onChange={(e) => setBusquedaProducto(e.target.value)}
+                                                        className="h-8"
+                                                        autoFocus
+                                                    />
+                                                </div>
+                                                {productosFiltrados.length === 0 ? (
+                                                    <div className="p-2 text-sm text-muted-foreground text-center">
+                                                        No se encontraron productos
+                                                    </div>
+                                                ) : (
+                                                    productosFiltrados.map((p) => (
+                                                        <SelectItem key={p.id} value={p.id}>
+                                                            {p.codigo} - {p.nombre}
+                                                        </SelectItem>
+                                                    ))
+                                                )}
                                             </SelectContent>
                                         </Select>
                                         <Button size="icon" onClick={handleAsociarProducto}>
@@ -370,6 +395,7 @@ export default function DestinosProduccionPage() {
                                             onClick={() => {
                                                 setSelectedDestino(null)
                                                 setProductoAAsociar('')
+                                                setBusquedaProducto('') // Limpiar búsqueda al cerrar
                                             }}
                                         >
                                             <Trash2 className="h-4 w-4" />
