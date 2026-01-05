@@ -866,24 +866,13 @@ export default function NuevaOrdenProduccionPage() {
                                     placeholder="Ej: 10.5"
                                     value={pesoEntrada}
                                     onChange={(e) => setPesoEntrada(e.target.value)}
-                                    disabled={!destinoEntradaId}
-                                />
-                            </div>
-
-                            <div className="col-span-2">
-                                <Label>PLU (opcional)</Label>
-                                <Input
-                                    placeholder="Ej: 0148"
-                                    value={pluEntrada}
-                                    onChange={(e) => setPluEntrada(e.target.value)}
-                                    disabled={!destinoEntradaId}
                                 />
                             </div>
 
                             <div className="col-span-2 flex justify-end">
                                 <Button
                                     onClick={handleAgregarEntrada}
-                                    disabled={loading || !destinoEntradaId}
+                                    disabled={loading || destinosUnicos.length === 0}
                                 >
                                     <Plus className="mr-2 h-4 w-4" />
                                     Agregar (Entra al Stock)
