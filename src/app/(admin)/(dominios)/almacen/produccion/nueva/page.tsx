@@ -95,12 +95,26 @@ export default function NuevaOrdenProduccionPage() {
     const [loteSalidaId, setLoteSalidaId] = useState('')
     const [cantidadSalida, setCantidadSalida] = useState('')
     const [pesoSalida, setPesoSalida] = useState('')
+    const [busquedaSalida, setBusquedaSalida] = useState('') // Filtro de búsqueda
 
     // Campos temporales para agregar ENTRADA (producto que entra al stock)
     const [productoEntradaId, setProductoEntradaId] = useState('')
     const [destinoEntradaId, setDestinoEntradaId] = useState('')
     const [pesoEntrada, setPesoEntrada] = useState('')
     const [pluEntrada, setPluEntrada] = useState('')
+    const [busquedaEntrada, setBusquedaEntrada] = useState('') // Filtro de búsqueda
+
+    // Productos filtrados para salidas
+    const productosFiltradosSalida = productos.filter(p =>
+        p.nombre.toLowerCase().includes(busquedaSalida.toLowerCase()) ||
+        p.codigo.toLowerCase().includes(busquedaSalida.toLowerCase())
+    )
+
+    // Productos filtrados para entradas
+    const productosFiltradosEntrada = productosEntrada.filter(p =>
+        p.nombre.toLowerCase().includes(busquedaEntrada.toLowerCase()) ||
+        p.codigo.toLowerCase().includes(busquedaEntrada.toLowerCase())
+    )
 
     // Cargar productos y destinos al montar
     useEffect(() => {
@@ -537,16 +551,34 @@ export default function NuevaOrdenProduccionPage() {
                                         description="Escanea el código de barras de la etiqueta"
                                     />
                                 </div>
-                                <Select value={productoSalidaId} onValueChange={setProductoSalidaId}>
+                                <Select value={productoSalidaId} onValueChange={(val) => {
+                                    setProductoSalidaId(val)
+                                    setBusquedaSalida('') // Limpiar búsqueda al seleccionar
+                                }}>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Seleccionar producto..." />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {productos.map((p) => (
-                                            <SelectItem key={p.id} value={p.id}>
-                                                {p.codigo} - {p.nombre}
-                                            </SelectItem>
-                                        ))}
+                                        <div className="px-2 pb-2">
+                                            <Input
+                                                placeholder="Buscar producto..."
+                                                value={busquedaSalida}
+                                                onChange={(e) => setBusquedaSalida(e.target.value)}
+                                                className="h-8"
+                                                autoFocus
+                                            />
+                                        </div>
+                                        {productosFiltradosSalida.length === 0 ? (
+                                            <div className="p-2 text-sm text-muted-foreground text-center">
+                                                No se encontraron productos
+                                            </div>
+                                        ) : (
+                                            productosFiltradosSalida.map((p) => (
+                                                <SelectItem key={p.id} value={p.id}>
+                                                    {p.codigo} - {p.nombre}
+                                                </SelectItem>
+                                            ))
+                                        )}
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -730,7 +762,10 @@ export default function NuevaOrdenProduccionPage() {
                                 </div>
                                 <Select
                                     value={productoEntradaId}
-                                    onValueChange={setProductoEntradaId}
+                                    onValueChange={(val) => {
+                                        setProductoEntradaId(val)
+                                        setBusquedaEntrada('') // Limpiar búsqueda al seleccionar
+                                    }}
                                     disabled={!destinoEntradaId}
                                 >
                                     <SelectTrigger>
@@ -743,14 +778,29 @@ export default function NuevaOrdenProduccionPage() {
                                         } />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {productosEntrada.map((p) => (
-                                            <SelectItem key={p.id} value={p.id}>
-                                                <span className={p.es_desperdicio ? 'text-orange-600' : ''}>
-                                                    {p.codigo} - {p.nombre}
-                                                    {p.es_desperdicio && ' (desperdicio)'}
-                                                </span>
-                                            </SelectItem>
-                                        ))}
+                                        <div className="px-2 pb-2">
+                                            <Input
+                                                placeholder="Buscar producto..."
+                                                value={busquedaEntrada}
+                                                onChange={(e) => setBusquedaEntrada(e.target.value)}
+                                                className="h-8"
+                                                autoFocus
+                                            />
+                                        </div>
+                                        {productosFiltradosEntrada.length === 0 ? (
+                                            <div className="p-2 text-sm text-muted-foreground text-center">
+                                                No se encontraron productos
+                                            </div>
+                                        ) : (
+                                            productosFiltradosEntrada.map((p) => (
+                                                <SelectItem key={p.id} value={p.id}>
+                                                    <span className={p.es_desperdicio ? 'text-orange-600' : ''}>
+                                                        {p.codigo} - {p.nombre}
+                                                        {p.es_desperdicio && ' (desperdicio)'}
+                                                    </span>
+                                                </SelectItem>
+                                            ))
+                                        )}
                                     </SelectContent>
                                 </Select>
                             </div>
