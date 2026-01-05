@@ -3,6 +3,18 @@
 Historial de cambios del proyecto.
 
 ## 2026-01-05 — Gemini
+**feat: Búsqueda en selectores de productos - Nueva Orden de Producción**
+
+Agregado campo de búsqueda en los selectores de productos de `/almacen/produccion/nueva`:
+- **Paso 2 (Salidas Stock)**: Filtrar productos por código o nombre
+- **Paso 3 (Entradas Stock)**: Filtrar productos por código o nombre
+
+**Archivos modificados:**
+- `src/app/(admin)/(dominios)/almacen/produccion/nueva/page.tsx`
+
+---
+
+## 2026-01-05 — Gemini
 **Fix: Página de notificaciones quedaba en "Cargando..."**
 
 La página `/notificaciones` se quedaba en estado de carga infinita porque la tabla `notificaciones` no tenía el campo `categoria` que la UI esperaba.
