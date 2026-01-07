@@ -436,6 +436,12 @@ supabase/                         # Scripts SQL y migraciones
   - `encargado_sucursal`: Acceso completo a módulos de su sucursal (dashboard, inventario, ventas POS, tesorería), solo lectura de presupuestos/pedidos, puede recibir transferencias pero no crearlas
   - `vendedor`: Acceso a módulos centrales (presupuestos, clientes, listas de precios, facturas, almacén central, rutas de reparto), solo lectura de sucursales
 
+### **Auditoría de Índices y Optimización de Base de Datos (Enero 2026)**
+- ✅ **Índices en Claves Foráneas**: Se identificaron y crearon índices faltantes en claves foráneas de tablas críticas (`movimientos_stock`, `conteo_stock_items`, `ordenes_produccion`, etc.) para mejorar drásticamente el rendimiento de los JOINs.
+- ✅ **Eliminación de Redundancia**: Se eliminaron índices duplicados detectados (ej: en `facturas`).
+- ✅ **Mejora en Tiempos de Respuesta**: Reducción significativa en la carga de CPU y tiempos de consulta en dashboards y reportes que cruzan múltiples tablas.
+
+
 ### **Vista Previa de Clientes en Monitor GPS (Diciembre 2025)**
 - ✅ **Panel lateral de números**: Lista clickeable de clientes con números ordenados por ruta seleccionada
 - ✅ **Modal de vista previa**: Información completa del cliente (nombre, dirección, teléfono) y lista de productos

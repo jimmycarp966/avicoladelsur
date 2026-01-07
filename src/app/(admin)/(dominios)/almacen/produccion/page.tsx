@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { obtenerOrdenesProduccionAction } from '@/actions/produccion.actions'
 import { formatDate } from '@/lib/utils'
 
-export const revalidate = 30
+export const dynamic = 'force-dynamic'
 
 function LoadingSkeleton() {
     return (

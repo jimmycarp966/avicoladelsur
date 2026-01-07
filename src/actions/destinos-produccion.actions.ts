@@ -176,6 +176,7 @@ export async function obtenerProductosDestinoAction(
             .from('destino_productos')
             .select(`
                 *,
+                es_desperdicio_solido,
                 producto:productos(id, codigo, nombre, categoria)
             `)
             .eq('destino_id', destinoId)
@@ -266,14 +267,18 @@ export async function desasociarProductoDestinoAction(
 export async function actualizarDesperdicioProductoAction(
     destinoId: string,
     productoId: string,
-    esDesperdicio: boolean
+    esDesperdicio: boolean,
+    esDesperdicioSolido: boolean = false
 ): Promise<FormResponse<void>> {
     try {
         const supabase = await createClient()
 
         const { error } = await supabase
             .from('destino_productos')
-            .update({ es_desperdicio: esDesperdicio })
+            .update({
+                es_desperdicio: esDesperdicio,
+                es_desperdicio_solido: esDesperdicioSolido
+            })
             .eq('destino_id', destinoId)
             .eq('producto_id', productoId)
 
@@ -302,6 +307,7 @@ export async function obtenerProductosPorDestinoAction(
     nombre: string
     categoria?: string
     es_desperdicio: boolean
+    es_desperdicio_solido: boolean
 }>>> {
     try {
         const supabase = await createClient()
@@ -311,6 +317,7 @@ export async function obtenerProductosPorDestinoAction(
             .select(`
                 producto_id,
                 es_desperdicio,
+                es_desperdicio_solido,
                 producto:productos(id, codigo, nombre, categoria)
             `)
             .eq('destino_id', destinoId)
@@ -327,7 +334,8 @@ export async function obtenerProductosPorDestinoAction(
             codigo: item.producto?.codigo || '',
             nombre: item.producto?.nombre || '',
             categoria: item.producto?.categoria,
-            es_desperdicio: item.es_desperdicio
+            es_desperdicio: item.es_desperdicio,
+            es_desperdicio_solido: item.es_desperdicio_solido || false
         }))
 
         return { success: true, data: productos }

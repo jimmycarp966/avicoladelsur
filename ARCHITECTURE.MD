@@ -2139,6 +2139,7 @@ CREATE POLICY "repartidor_rutas_propias" ON pedidos FOR SELECT USING (
   - `idx_lotes_producto_sucursal_vencimiento`: Optimización FIFO
   - `idx_transferencias_estado_fecha`: Transferencias por estado y fecha
   - `idx_alertas_stock_sucursal_estado`: Alertas por sucursal/estado/fecha
+  - **Índices de Claves Foráneas (Enero 2026)**: Cobertura completa de índices en FKs para tablas transaccionales (`movimientos_stock`, `ordenes_produccion`, etc.) eliminando sequential scans en JOINs.
 - **Materialized Views**: KPIs de ventas pre-calculados
   - `mv_kpis_ventas_diarias`: Agregados diarios (últimos 90 días)
   - `mv_kpis_ventas_mensuales`: Agregados mensuales (últimos 12 meses)

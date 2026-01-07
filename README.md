@@ -126,6 +126,7 @@
   - Lotes por sucursal/producto/estado
   - Transferencias por estado/fecha
   - Alertas de stock por sucursal/estado
+  - **Índices de Claves Foráneas (Enero 2026)**: Cobertura completa de índices en FKs para tablas transaccionales (`movimientos_stock`, `ordenes_produccion`, etc.) eliminando sequential scans en JOINs.
 - **Materialized Views**: KPIs de ventas pre-calculados (diarias y mensuales)
 - **Funciones RPC Optimizadas**: Validación batch, conversión masiva, aprobación masiva
 

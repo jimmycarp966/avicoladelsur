@@ -38,6 +38,7 @@ import {
 } from '@/actions/produccion.actions'
 import { obtenerDestinosProduccionListaAction, obtenerProductosPorDestinoAction } from '@/actions/destinos-produccion.actions'
 import { obtenerProductosAction, buscarProductoPorCodigoBarrasAction } from '@/actions/almacen.actions'
+import { obtenerPrediccionRendimientoAction, type PrediccionRendimiento } from '@/actions/rendimientos.actions'
 import { ScanButton } from '@/components/barcode/BarcodeScanner'
 import { parseBarcodeEAN13 } from '@/lib/barcode-parser'
 import type { Producto, DestinoProduccion } from '@/types/domain.types'
@@ -64,6 +65,8 @@ interface EntradaLocal {
     destino_id: string
     destino_nombre: string
     peso_kg: number
+    peso_esperado?: number
+    es_desperdicio_solido?: boolean
     plu?: string
 }
 
@@ -91,6 +94,7 @@ export default function NuevaOrdenProduccionPage() {
     const [destinos, setDestinos] = useState<DestinoProduccion[]>([])
     const [lotesDisponibles, setLotesDisponibles] = useState<LoteDisponible[]>([])
     const [productosPorDestino, setProductosPorDestino] = useState<Record<string, Producto[]>>({})
+    const [prediccionesPorDestino, setPrediccionesPorDestino] = useState<Record<string, PrediccionRendimiento[]>>({})
     const [currentDestinationIndex, setCurrentDestinationIndex] = useState(0)
 
     // Campos temporales para agregar SALIDA (producto que sale del stock)
@@ -199,6 +203,46 @@ export default function NuevaOrdenProduccionPage() {
         }
         cargarProductosPorDestinos()
     }, [destinosUnicos.join(',')])
+
+    // Cargar predicciones de rendimiento para cada destino
+    useEffect(() => {
+        async function cargarPredicciones() {
+            if (destinosUnicos.length === 0 || salidas.length === 0) {
+                setPrediccionesPorDestino({})
+                return
+            }
+
+            const prediccionesMap: Record<string, PrediccionRendimiento[]> = {}
+
+            for (const destinoId of destinosUnicos) {
+                // Calcular peso de entrada para este destino
+                const pesoEntradaDestino = salidas
+                    .filter(s => s.destino_id === destinoId)
+                    .reduce((sum, s) => sum + (s.cantidad * s.peso_kg), 0)
+
+                if (pesoEntradaDestino > 0) {
+                    const { data } = await obtenerPrediccionRendimientoAction(
+                        destinoId,
+                        pesoEntradaDestino,
+                        'GENERICO' // TODO: Detectar proveedor del lote
+                    )
+                    if (data) {
+                        prediccionesMap[destinoId] = data
+                    }
+                }
+            }
+
+            setPrediccionesPorDestino(prediccionesMap)
+        }
+        cargarPredicciones()
+    }, [destinosUnicos.join(','), salidas.length])
+
+    // Obtener predicción para un producto específico del destino actual
+    const obtenerPrediccionProducto = useCallback((productoId: string): PrediccionRendimiento | undefined => {
+        const predicciones = prediccionesPorDestino[currentDestinoId] || []
+        return predicciones.find(p => p.producto_id === productoId)
+    }, [prediccionesPorDestino, currentDestinoId])
+
 
     // Manejar escaneo de código de barras para salidas (productos que salen)
     const handleScanSalida = useCallback(async (code: string) => {
@@ -352,13 +396,21 @@ export default function NuevaOrdenProduccionPage() {
             const producto = productos.find(p => p.id === productoEntradaId)
             const destino = destinos.find(d => d.id === currentDestinoId)
 
+            // Buscar datos de predicción/configuración
+            const prediccion = prediccionesPorDestino[currentDestinoId]?.find(p => p.producto_id === productoEntradaId)
+
             const result = await agregarEntradaStockAction(
                 ordenId,
                 productoEntradaId,
                 currentDestinoId,
                 parseFloat(pesoEntrada),
                 1,
-                pluEntrada || undefined
+                pluEntrada || undefined,
+                undefined, // Fecha vencimiento
+                undefined, // Pesaje ID
+                0, // Merma esperada (legacy)
+                prediccion?.peso_predicho_kg || undefined,
+                prediccion?.es_desperdicio_solido || false
             )
 
             if (result.success) {
@@ -369,7 +421,9 @@ export default function NuevaOrdenProduccionPage() {
                     destino_id: currentDestinoId,
                     destino_nombre: destino?.nombre || '',
                     peso_kg: parseFloat(pesoEntrada),
-                    plu: pluEntrada
+                    plu: pluEntrada,
+                    peso_esperado: prediccion?.peso_predicho_kg,
+                    es_desperdicio_solido: prediccion?.es_desperdicio_solido
                 }])
 
                 // Limpiar campos
@@ -733,27 +787,34 @@ export default function NuevaOrdenProduccionPage() {
                     </CardHeader>
                     <CardContent className="space-y-6">
 
-                        {/* Navegación de Destinos (Tabs) */}
+                        {/* Navegación de Destinos (Tabs) - LIBRE */}
                         <div className="flex flex-wrap gap-2 mb-4">
                             {activeDestinoIds.map((destId, idx) => {
                                 const dest = destinos.find(d => d.id === destId)
-                                const isCompleted = idx < currentDestinationIndex
+                                const entradasDestino = entradas.filter(e => e.destino_id === destId)
+                                const pesoDestinoGenerado = entradasDestino.reduce((sum, e) => sum + e.peso_kg, 0)
                                 const isActive = idx === currentDestinationIndex
+                                const tieneProductos = entradasDestino.length > 0
 
                                 return (
-                                    <div
+                                    <button
                                         key={destId}
-                                        className={`px-3 py-1.5 rounded-full text-sm font-medium border flex items-center gap-2
+                                        type="button"
+                                        onClick={() => setCurrentDestinationIndex(idx)}
+                                        className={`px-3 py-1.5 rounded-full text-sm font-medium border flex items-center gap-2 cursor-pointer transition-all hover:shadow-md
                                             ${isActive
-                                                ? 'bg-primary text-primary-foreground border-primary'
-                                                : isCompleted
-                                                    ? 'bg-green-100 text-green-800 border-green-200'
-                                                    : 'bg-muted text-muted-foreground border-transparent'
+                                                ? 'bg-primary text-primary-foreground border-primary ring-2 ring-primary/30'
+                                                : tieneProductos
+                                                    ? 'bg-green-100 text-green-800 border-green-300 hover:bg-green-200'
+                                                    : 'bg-muted text-muted-foreground border-gray-300 hover:bg-gray-200'
                                             }`}
                                     >
-                                        {isCompleted && <Check className="h-3 w-3" />}
+                                        {tieneProductos && <Check className="h-3 w-3" />}
                                         {idx + 1}. {dest?.nombre}
-                                    </div>
+                                        {tieneProductos && (
+                                            <span className="text-xs opacity-75">({pesoDestinoGenerado.toFixed(1)}kg)</span>
+                                        )}
+                                    </button>
                                 )
                             })}
                         </div>
@@ -788,74 +849,97 @@ export default function NuevaOrdenProduccionPage() {
                                     </p>
                                 </div>
 
-                                {/* Lista de productos generados para este destino */}
-                                {entradasActuales.length > 0 && (
-                                    <div className="bg-white dark:bg-black border rounded-md p-2 space-y-1 max-h-40 overflow-y-auto">
-                                        {entradasActuales.map((entrada, idx) => (
-                                            <div key={idx} className="flex justify-between items-center text-sm p-2 hover:bg-slate-50 rounded">
-                                                <span>{entrada.producto_nombre}</span>
-                                                <Badge variant="secondary">{entrada.peso_kg} kg</Badge>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
+                                {/* Lista de productos a cargar (TODOS los del destino) */}
+                                <div className="space-y-3">
+                                    <Label className="text-sm font-medium">Productos a generar:</Label>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {(prediccionesPorDestino[currentDestinoId] || productosDisponiblesActual.map(p => ({
+                                            producto_id: p.id,
+                                            producto_nombre: p.nombre,
+                                            producto_codigo: p.codigo,
+                                            porcentaje_esperado: 0,
+                                            peso_predicho_kg: 0,
+                                            tolerancia: 5,
+                                            peso_min_kg: 0,
+                                            peso_max_kg: 0,
+                                            es_desperdicio_solido: false
+                                        }))).map((pred) => {
+                                            const entradaExistente = entradasActuales.find(e => e.producto_id === pred.producto_id)
+                                            const pesoReal = entradaExistente?.peso_kg || 0
+                                            const desviacion = pred.peso_predicho_kg > 0
+                                                ? ((pesoReal - pred.peso_predicho_kg) / pred.peso_predicho_kg) * 100
+                                                : 0
+                                            const dentroTolerancia = Math.abs(desviacion) <= (pred.tolerancia || 5)
 
-                                {/* Formulario de agregado */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t mt-2">
-                                    <div className="space-y-2">
-                                        <Label>Producto Salida ({currentDestino.nombre})</Label>
-                                        <div className="flex gap-2">
-                                            <Select
-                                                value={productoEntradaId}
-                                                onValueChange={(val) => {
-                                                    setProductoEntradaId(val)
-                                                    setBusquedaEntrada('')
-                                                }}
-                                            >
-                                                <SelectTrigger className="w-full">
-                                                    <SelectValue placeholder="Seleccionar producto..." />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <div className="px-2 pb-2">
-                                                        <Input
-                                                            placeholder="Buscar..."
-                                                            value={busquedaEntrada}
-                                                            onChange={(e) => setBusquedaEntrada(e.target.value)}
-                                                            className="h-8"
-                                                            autoFocus
-                                                        />
-                                                    </div>
-                                                    {productosFiltradosEntrada.length === 0 ? (
-                                                        <div className="p-2 text-sm text-center text-muted-foreground">
-                                                            No hay productos para {currentDestino.nombre}
+                                            return (
+                                                <div
+                                                    key={pred.producto_id}
+                                                    className={`p-3 rounded-lg border-2 transition-all ${entradaExistente
+                                                        ? dentroTolerancia
+                                                            ? 'bg-green-50 border-green-300'
+                                                            : 'bg-yellow-50 border-yellow-400'
+                                                        : 'bg-white border-gray-200 hover:border-primary/50'
+                                                        } ${pred.es_desperdicio_solido ? 'ring-1 ring-orange-300' : ''}`}
+                                                >
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <div>
+                                                            <span className="font-medium">{pred.producto_nombre}</span>
+                                                            {pred.es_desperdicio_solido && (
+                                                                <Badge variant="outline" className="ml-2 text-xs border-orange-400 text-orange-600">
+                                                                    Desperdicio
+                                                                </Badge>
+                                                            )}
                                                         </div>
-                                                    ) : (
-                                                        productosFiltradosEntrada.map(p => (
-                                                            <SelectItem key={p.id} value={p.id}>
-                                                                {p.codigo} - {p.nombre}
-                                                            </SelectItem>
-                                                        ))
+                                                        {entradaExistente && (
+                                                            <Badge variant={dentroTolerancia ? 'default' : 'secondary'} className={!dentroTolerancia ? 'bg-yellow-500' : ''}>
+                                                                {pesoReal.toFixed(2)} kg
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+
+                                                    {pred.peso_predicho_kg > 0 && (
+                                                        <div className="text-xs text-muted-foreground mb-2">
+                                                            Sugerido: <strong>{pred.peso_predicho_kg.toFixed(2)} kg</strong>
+                                                            <span className="ml-2">({pred.porcentaje_esperado}% ± {pred.tolerancia}%)</span>
+                                                        </div>
                                                     )}
-                                                </SelectContent>
-                                            </Select>
-                                            <ScanButton onScan={handleScanEntrada} />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Peso (kg)</Label>
-                                        <div className="flex gap-2">
-                                            <Input
-                                                type="number"
-                                                value={pesoEntrada}
-                                                onChange={e => setPesoEntrada(e.target.value)}
-                                                placeholder="0.00"
-                                            />
-                                            <Button onClick={handleAgregarEntrada} disabled={!productoEntradaId || !pesoEntrada}>
-                                                <Plus className="h-4 w-4" />
-                                            </Button>
-                                        </div>
+
+                                                    {!entradaExistente && (
+                                                        <div className="flex gap-2 mt-2">
+                                                            <Input
+                                                                type="number"
+                                                                step="0.01"
+                                                                placeholder={pred.peso_predicho_kg > 0 ? pred.peso_predicho_kg.toFixed(2) : "Peso kg"}
+                                                                className="h-8 text-sm"
+                                                                value={productoEntradaId === pred.producto_id ? pesoEntrada : ''}
+                                                                onFocus={() => setProductoEntradaId(pred.producto_id)}
+                                                                onChange={(e) => {
+                                                                    setProductoEntradaId(pred.producto_id)
+                                                                    setPesoEntrada(e.target.value)
+                                                                }}
+                                                            />
+                                                            <Button
+                                                                size="sm"
+                                                                disabled={productoEntradaId !== pred.producto_id || !pesoEntrada}
+                                                                onClick={handleAgregarEntrada}
+                                                            >
+                                                                <Plus className="h-4 w-4" />
+                                                            </Button>
+                                                        </div>
+                                                    )}
+
+                                                    {entradaExistente && !dentroTolerancia && (
+                                                        <div className="text-xs text-yellow-700 mt-1 flex items-center gap-1">
+                                                            <AlertCircle className="h-3 w-3" />
+                                                            Desviación: {desviacion > 0 ? '+' : ''}{desviacion.toFixed(1)}%
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )
+                                        })}
                                     </div>
                                 </div>
+
                             </div>
                         )}
 
@@ -902,46 +986,91 @@ export default function NuevaOrdenProduccionPage() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                        {/* Resumen de salidas (lo que se consume) */}
+                        {/* Resumen de salidas (lo que se consume) - CARDS */}
                         <div>
-                            <h3 className="font-semibold mb-2 flex items-center gap-2">
+                            <h3 className="font-semibold mb-3 flex items-center gap-2">
                                 <Package className="h-4 w-4 text-orange-500" />
                                 Productos Consumidos (Salen del Stock)
                             </h3>
-                            <div className="space-y-1">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 {salidas.map((salida, idx) => (
-                                    <div key={idx} className="flex justify-between text-sm">
-                                        <span>{salida.producto_nombre} (Lote: {salida.lote_numero})</span>
-                                        <span>{salida.cantidad} und. / {salida.peso_kg} kg</span>
+                                    <div
+                                        key={idx}
+                                        className="p-3 bg-orange-50 border border-orange-200 rounded-lg flex items-center justify-between"
+                                    >
+                                        <div className="flex-1 min-w-0">
+                                            <div className="font-medium truncate">{salida.producto_nombre}</div>
+                                            <div className="text-xs text-muted-foreground">Lote: {salida.lote_numero}</div>
+                                            <div className="text-sm">{salida.cantidad} und. × {salida.peso_kg} kg = <strong>{(salida.cantidad * salida.peso_kg).toFixed(2)} kg</strong></div>
+                                        </div>
+                                        <Badge variant="secondary" className="ml-2 shrink-0 bg-primary/10 text-primary">
+                                            <Target className="h-3 w-3 mr-1" />
+                                            {salida.destino_nombre}
+                                        </Badge>
                                     </div>
                                 ))}
                             </div>
-                            <div className="mt-2 pt-2 border-t flex justify-between font-semibold">
+                            <div className="mt-3 pt-3 border-t flex justify-between font-semibold text-lg">
                                 <span>Total consumido:</span>
                                 <span className="text-orange-600">{pesoTotalSalida.toFixed(2)} kg</span>
                             </div>
                         </div>
 
-                        {/* Resumen de entradas (lo que se genera) */}
+                        {/* Resumen de entradas (lo que se genera) - CARDS con ALERTAS */}
                         <div>
-                            <h3 className="font-semibold mb-2 flex items-center gap-2">
+                            <h3 className="font-semibold mb-3 flex items-center gap-2">
                                 <Scale className="h-4 w-4 text-green-500" />
                                 Productos Generados (Entran al Stock)
                             </h3>
-                            <div className="space-y-1">
-                                {entradas.map((entrada, idx) => (
-                                    <div key={idx} className="flex justify-between text-sm">
-                                        <span>
-                                            {entrada.producto_nombre}
-                                            <Badge variant="outline" className="ml-1 text-xs">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {entradas.map((entrada, idx) => {
+                                    // Calcular desviación si hay peso esperado
+                                    let desviacion = 0
+                                    let mostrarAlerta = false
+                                    if (entrada.peso_esperado && entrada.peso_esperado > 0) {
+                                        desviacion = ((entrada.peso_kg - entrada.peso_esperado) / entrada.peso_esperado) * 100
+                                        mostrarAlerta = Math.abs(desviacion) > 5 // Umbral fijo visual del 5% o usar tolerancia si la tuviéramos
+                                    }
+
+                                    return (
+                                        <div
+                                            key={idx}
+                                            className={`p-3 border rounded-lg flex items-center justify-between ${mostrarAlerta ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-200'
+                                                }`}
+                                        >
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-medium truncate">{entrada.producto_nombre}</span>
+                                                    {entrada.es_desperdicio_solido && (
+                                                        <Badge variant="outline" className="text-[10px] border-orange-400 text-orange-600 px-1 py-0 h-4">
+                                                            Desp.
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-2 text-sm mt-1">
+                                                    <strong>{entrada.peso_kg.toFixed(2)} kg</strong>
+                                                    {entrada.peso_esperado && (
+                                                        <span className="text-xs text-muted-foreground">
+                                                            (Esp: {entrada.peso_esperado.toFixed(2)}kg)
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {mostrarAlerta && (
+                                                    <div className="text-xs text-yellow-700 mt-1 flex items-center gap-1 font-medium">
+                                                        <AlertCircle className="h-3 w-3" />
+                                                        Desviación: {desviacion > 0 ? '+' : ''}{desviacion.toFixed(1)}%
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <Badge variant="secondary" className="ml-2 shrink-0 bg-primary/10 text-primary">
+                                                <Target className="h-3 w-3 mr-1" />
                                                 {entrada.destino_nombre}
                                             </Badge>
-                                        </span>
-                                        <span>{entrada.peso_kg} kg</span>
-                                    </div>
-                                ))}
+                                        </div>
+                                    )
+                                })}
                             </div>
-                            <div className="mt-2 pt-2 border-t flex justify-between font-semibold">
+                            <div className="mt-3 pt-3 border-t flex justify-between font-semibold text-lg">
                                 <span>Total generado:</span>
                                 <span className="text-green-600">{pesoTotalEntrada.toFixed(2)} kg</span>
                             </div>

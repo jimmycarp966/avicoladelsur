@@ -232,7 +232,9 @@ export async function agregarEntradaStockAction(
     plu?: string,
     fechaVencimiento?: string,
     pesajeId?: string,
-    mermaEsperadaKg?: number
+    mermaEsperadaKg?: number,
+    pesoEsperadoKg?: number,
+    esDesperdicioSolido?: boolean
 ): Promise<FormResponse<{ entrada_id: string }>> {
     try {
         const supabase = await createClient()
@@ -246,7 +248,9 @@ export async function agregarEntradaStockAction(
             p_plu: plu || null,
             p_fecha_vencimiento: fechaVencimiento || null,
             p_pesaje_id: pesajeId || null,
-            p_merma_esperada_kg: mermaEsperadaKg || 0
+            p_merma_esperada_kg: mermaEsperadaKg || 0,
+            p_peso_esperado_kg: pesoEsperadoKg || null,
+            p_es_desperdicio_solido: esDesperdicioSolido || false
         })
 
         if (error) {

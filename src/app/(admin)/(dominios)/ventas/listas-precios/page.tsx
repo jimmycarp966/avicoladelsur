@@ -12,9 +12,11 @@ export const metadata = {
   description: 'Gestión de listas de precios',
 }
 
+export const dynamic = 'force-dynamic'
+
 async function ListasPreciosContent() {
   const supabase = await createClient()
-  
+
   // Verificar permisos (solo admin)
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
