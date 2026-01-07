@@ -232,9 +232,10 @@ export function BarcodeScanner({
             if (!readerRef.current || !videoRef.current) return
 
             try {
-                // Usar decodeFromConstraints para forzar resolución alta durante el escaneo
-                // (decodeFromVideoDevice usa restricciones por defecto que resultan en baja resolución)
-                const constraints: MediaStreamConstraints = {
+                addDebugLog('Iniciando escaneo HD...')
+
+                // Obtener stream manualmente para control total
+                const stream = await navigator.mediaDevices.getUserMedia({
                     video: {
                         deviceId: selectedDevice ? { exact: selectedDevice } : undefined,
                         facingMode: { ideal: 'environment' },
@@ -242,97 +243,105 @@ export function BarcodeScanner({
                         height: { min: 720, ideal: 1080 },
                         // @ts-ignore
                         focusMode: { ideal: 'continuous' },
-                        // @ts-ignore
-                        exposureMode: { ideal: 'continuous' },
                     }
-                }
+                })
 
-                addDebugLog('Iniciando escaneo HD...')
+                // Asignar stream al video
+                videoRef.current.srcObject = stream
+                streamRef.current = stream
 
-                await readerRef.current.decodeFromConstraints(
-                    constraints,
-                    videoRef.current,
-                    (result, err) => {
-                        if (!isMounted) return
-
-                        if (result) {
-                            const code = result.getText()
-                            const now = Date.now()
-
-                            // Debounce: evitar escaneos duplicados del mismo código
-                            if (lastScannedRef.current &&
-                                lastScannedRef.current.code === code &&
-                                now - lastScannedRef.current.time < DEBOUNCE_MS) {
-                                return // Ignorar escaneo duplicado
-                            }
-
-                            // Guardar último escaneo
-                            lastScannedRef.current = { code, time: now }
-
-                            addDebugLog(`✅ Código detectado: ${code}`)
-
-                            // Log explícito de éxito con detalles
-                            logToServer('info', 'Código escaneado con éxito', {
-                                code,
-                                format: result.getBarcodeFormat(),
-                                timestamp: now
-                            })
-
-                            // Feedback táctil
-                            vibrate()
-
-                            // Notificar al componente padre
-                            onScan(code)
-                            readerRef.current?.reset()
-                            setIsScanning(false)
-                        }
-                        // Contar frames procesados
-                        frameCountRef.current++
-
-                        // Cada 100 frames, loguear que sigue activo
-                        if (frameCountRef.current % 100 === 0) {
-                            addDebugLog(`🔍 Buscando... (${frameCountRef.current} frames)`)
-                        }
-
-                        // Filtrar errores normales del proceso de escaneo
-                        if (err && ![
-                            'NotFoundException',
-                            'ChecksumException',
-                            'FormatException'
-                        ].includes(err.name) && !err.message?.includes('No MultiFormat Readers')) {
-                            // Solo loguear errores inesperados
-                            addDebugLog(`⚠️ ${err.name}: ${err.message}`, true)
-                        }
+                // Esperar a que el video esté listo
+                await new Promise<void>((resolve) => {
+                    if (!videoRef.current) return resolve()
+                    videoRef.current.onloadedmetadata = () => {
+                        videoRef.current?.play()
+                        resolve()
                     }
+                })
 
-                )
+                const track = stream.getVideoTracks()[0]
+                const settings = track?.getSettings()
+                addDebugLog(`📷 Video: ${settings?.width}x${settings?.height}`)
 
-                // Guardar referencia al stream para control de antorcha
-                if (videoRef.current.srcObject) {
-                    streamRef.current = videoRef.current.srcObject as MediaStream
-
-                    // Verificar soporte de antorcha con el stream activo
-                    const track = streamRef.current.getVideoTracks()[0]
-                    if (track) {
-                        const settings = track.getSettings()
-                        addDebugLog(`📷 Escaneo activo: ${settings.width}x${settings.height}`)
-
-                        const capabilities = track.getCapabilities?.()
-                        // @ts-ignore
-                        if (capabilities?.torch) {
-                            setTorchSupported(true)
-                        }
-                    }
+                // Verificar antorcha
+                const capabilities = track?.getCapabilities?.()
+                // @ts-ignore
+                if (capabilities?.torch) {
+                    setTorchSupported(true)
+                    addDebugLog('💡 Antorcha disponible')
                 }
 
                 if (isMounted) {
                     setIsScanning(true)
                     setError(null)
                 }
+
+                // Loop de escaneo manual usando decodeFromVideoElement
+                const scanLoop = setInterval(async () => {
+                    if (!isMounted || !readerRef.current || !videoRef.current) {
+                        clearInterval(scanLoop)
+                        return
+                    }
+
+                    frameCountRef.current++
+
+                    // Log cada 100 frames
+                    if (frameCountRef.current % 100 === 0) {
+                        addDebugLog(`🔍 Frame ${frameCountRef.current}...`)
+                    }
+
+                    try {
+                        // Intentar decodificar del video element actual
+                        const result = await readerRef.current.decodeFromVideoElement(videoRef.current)
+
+                        if (result) {
+                            const code = result.getText()
+                            const now = Date.now()
+
+                            // Debounce
+                            if (lastScannedRef.current &&
+                                lastScannedRef.current.code === code &&
+                                now - lastScannedRef.current.time < DEBOUNCE_MS) {
+                                return
+                            }
+
+                            lastScannedRef.current = { code, time: now }
+
+                            clearInterval(scanLoop)
+                            addDebugLog(`✅ Código: ${code}`)
+
+                            logToServer('info', 'Código escaneado', {
+                                code,
+                                format: result.getBarcodeFormat(),
+                                frames: frameCountRef.current
+                            })
+
+                            vibrate()
+                            onScan(code)
+                            setIsScanning(false)
+
+                            // Detener stream
+                            stream.getTracks().forEach(t => t.stop())
+                        }
+                    } catch (err: any) {
+                        // NotFoundException es normal cuando no hay código visible
+                        if (err.name !== 'NotFoundException') {
+                            // Solo loguear errores inesperados cada 50 frames para no inundar
+                            if (frameCountRef.current % 50 === 0) {
+                                addDebugLog(`⚠️ ${err.name}`, true)
+                            }
+                        }
+                    }
+                }, SCAN_INTERVAL_MS)
+
+                // Guardar referencia para limpieza
+                // @ts-ignore
+                videoRef.current.scanLoop = scanLoop
+
             } catch (err: any) {
-                addDebugLog(`❌ No se pudo iniciar cámara: ${err.message}`, true)
+                addDebugLog(`❌ Error cámara: ${err.message}`, true)
                 if (isMounted) {
-                    setError('No se pudo iniciar la cámara. Verifica los permisos.')
+                    setError('No se pudo iniciar la cámara: ' + err.message)
                     setIsScanning(false)
                 }
             }
@@ -343,8 +352,16 @@ export function BarcodeScanner({
         return () => {
             isMounted = false
             readerRef.current?.reset()
+            // Limpiar loop de escaneo
+            // @ts-ignore
+            if (videoRef.current?.scanLoop) {
+                // @ts-ignore
+                clearInterval(videoRef.current.scanLoop)
+            }
+            // Detener stream
+            streamRef.current?.getTracks().forEach(t => t.stop())
         }
-    }, [selectedDevice, onScan, vibrate])
+    }, [selectedDevice, onScan, vibrate, logToServer])
 
     const switchCamera = useCallback(() => {
         if (devices.length <= 1) return
