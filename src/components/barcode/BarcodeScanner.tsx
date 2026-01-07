@@ -231,8 +231,25 @@ export function BarcodeScanner({
             if (!readerRef.current || !videoRef.current) return
 
             try {
-                await readerRef.current.decodeFromVideoDevice(
-                    selectedDevice,
+                // Usar decodeFromConstraints para forzar resolución alta durante el escaneo
+                // (decodeFromVideoDevice usa restricciones por defecto que resultan en baja resolución)
+                const constraints: MediaStreamConstraints = {
+                    video: {
+                        deviceId: selectedDevice ? { exact: selectedDevice } : undefined,
+                        facingMode: { ideal: 'environment' },
+                        width: { min: 1280, ideal: 1920 },
+                        height: { min: 720, ideal: 1080 },
+                        // @ts-ignore
+                        focusMode: { ideal: 'continuous' },
+                        // @ts-ignore
+                        exposureMode: { ideal: 'continuous' },
+                    }
+                }
+
+                addDebugLog('Iniciando escaneo HD...')
+
+                await readerRef.current.decodeFromConstraints(
+                    constraints,
                     videoRef.current,
                     (result, err) => {
                         if (!isMounted) return
@@ -269,15 +286,13 @@ export function BarcodeScanner({
                             setIsScanning(false)
                         }
                         // Filtrar errores normales del proceso de escaneo
-                        // Estos ocurren constantemente cuando no hay código visible en el frame
                         if (err && ![
                             'NotFoundException',
                             'ChecksumException',
                             'FormatException'
                         ].includes(err.name) && !err.message?.includes('No MultiFormat Readers')) {
-                            // No loguear al servidor estos errores frecuentes para no inundar logs
-                            // Solo localmente si es necesario, o ignorar
-                            // addDebugLog(`❌ ${err.name}: ${err.message}`, true) 
+                            // Solo loguear errores inesperados
+                            addDebugLog(`⚠️ ${err.name}`, true)
                         }
                     }
 
@@ -291,7 +306,7 @@ export function BarcodeScanner({
                     const track = streamRef.current.getVideoTracks()[0]
                     if (track) {
                         const settings = track.getSettings()
-                        addDebugLog(`📷 Cámara iniciada: ${settings.width}x${settings.height}`)
+                        addDebugLog(`📷 Escaneo activo: ${settings.width}x${settings.height}`)
 
                         const capabilities = track.getCapabilities?.()
                         // @ts-ignore
