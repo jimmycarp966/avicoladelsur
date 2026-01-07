@@ -195,6 +195,34 @@ export function PesajeItemCard({
     }
   }
 
+  // Handler para verificar anomalía al perder foco (onBlur)
+  const handleBlur = async () => {
+    const peso = parseFloat(pesoInput)
+    if (isNaN(peso) || peso <= 0) return
+
+    // Evitar re-analizar si ya se mostró diálogo o si el peso no cambió significativamente
+    // (Podríamos agregar más lógica aquí para no spammear)
+
+    setIsAnalyzing(true)
+    try {
+      const resultado = await analizarPesoConGemini(peso)
+
+      if (resultado.esAnomalo) {
+        setAnomalyInfo({
+          pesoIngresado: peso,
+          pesoSolicitado: pesoSolicitadoKg,
+          razon: resultado.razon,
+          sugerencia: resultado.sugerencia,
+          confianza: resultado.confianza,
+          usandoIA: resultado.usandoIA
+        })
+        setShowAnomalyDialog(true)
+      }
+    } finally {
+      setIsAnalyzing(false)
+    }
+  }
+
   // Confirmar aplicación de peso a pesar de la anomalía
   const confirmarPesoAnomalo = async () => {
     if (anomalyInfo) {
@@ -314,7 +342,7 @@ export function PesajeItemCard({
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor={`peso-${item.id}`}>Peso Final (kg)</Label>
                 <Input
@@ -324,6 +352,7 @@ export function PesajeItemCard({
                   placeholder="0.00"
                   value={pesoInput}
                   onChange={(e) => setPesoInput(e.target.value)}
+                  onBlur={handleBlur}
                   className="text-lg"
                   disabled={estaActualizando}
                 />
@@ -336,8 +365,8 @@ export function PesajeItemCard({
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <div className="text-sm">
+            <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
+              <div className="text-sm w-full md:w-auto">
                 <div className="text-muted-foreground">
                   Subtotal estimado: <span className="font-medium">${(item.subtotal_est || 0).toFixed(2)}</span>
                 </div>
@@ -354,13 +383,14 @@ export function PesajeItemCard({
                 ) : null}
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2 w-full md:w-auto justify-end">
                 <ScanButton
                   onScan={handleScan}
                   size="sm"
                   variant="outline"
                   title="Escanear Etiqueta"
                   description="Escanea la etiqueta de la balanza para obtener el peso"
+                  className="flex-1 md:flex-none"
                 />
                 <Button
                   type="button"
@@ -371,20 +401,22 @@ export function PesajeItemCard({
                     await onSimularPeso() // El peso se obtendrá de la API
                   }}
                   disabled={estaActualizando}
+                  className="flex-1 md:flex-none"
                 >
                   <Scale className="mr-2 h-4 w-4" />
-                  Simular Peso
+                  Simular
                 </Button>
 
                 <Button
                   type="button"
                   disabled={estaPesado || estaActualizando || isAnalyzing || !pesoInput || parseFloat(pesoInput) <= 0}
                   onClick={handleAplicarPesoConValidacion}
+                  className="flex-1 md:flex-none whitespace-nowrap"
                 >
                   {isAnalyzing ? (
                     <>
                       <Scale className="mr-2 h-4 w-4 animate-spin" />
-                      Analizando con IA...
+                      Analizando...
                     </>
                   ) : estaActualizando ? (
                     <>

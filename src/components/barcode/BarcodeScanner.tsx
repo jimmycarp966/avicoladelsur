@@ -74,23 +74,22 @@ export function BarcodeScanner({
     // Inicializar lector y solicitar permisos de cámara
     useEffect(() => {
         const hints = new Map()
-        // Formatos de código de barras soportados
+        // Formatos de código de barras soportados - Optimizados para velocidad
         hints.set(DecodeHintType.POSSIBLE_FORMATS, [
             BarcodeFormat.EAN_13,
-            BarcodeFormat.EAN_8,
             BarcodeFormat.CODE_128,
-            BarcodeFormat.CODE_39,
             BarcodeFormat.QR_CODE,
             BarcodeFormat.UPC_A,
-            BarcodeFormat.UPC_E,
-            BarcodeFormat.ITF, // Interleaved 2 of 5
-            BarcodeFormat.CODABAR,
+            BarcodeFormat.EAN_8,
+            // Formatos secundarios
+            // BarcodeFormat.CODE_39,
+            // BarcodeFormat.ITF,
         ])
         // Configuraciones adicionales para mejor detección
         hints.set(DecodeHintType.TRY_HARDER, true)
-        hints.set(DecodeHintType.PURE_BARCODE, false) // No asumir que es una imagen pura de código
-        // @ts-ignore - ALSO_INVERTED puede no estar en los tipos pero es soportado
-        hints.set(DecodeHintType.ALSO_INVERTED, true) // Intentar leer códigos invertidos
+        hints.set(DecodeHintType.PURE_BARCODE, false)
+        // @ts-ignore
+        hints.set(DecodeHintType.ALSO_INVERTED, true)
 
         readerRef.current = new BrowserMultiFormatReader(hints, SCAN_INTERVAL_MS)
 
@@ -102,17 +101,18 @@ export function BarcodeScanner({
                 // con getUserMedia ANTES de poder enumerar dispositivos
                 addDebugLog('Solicitando permisos cámara...')
 
-                // Solicitar permiso de cámara primero (esto dispara el popup de permisos)
-                // Pedimos alta resolución y enfoque continuo para mejorar scaneo
+                // Solicitar permiso de cámara con resolución HD para mejor enfoque en códigos barras
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: {
-                        facingMode: { ideal: 'environment' }, // Preferir cámara trasera
-                        width: { min: 640, ideal: 1920, max: 4096 },
-                        height: { min: 480, ideal: 1080, max: 2160 },
-                        // Configuraciones avanzadas para mejor enfoque y calidad
-                        // @ts-ignore - estas propiedades pueden no estar en todos los tipos de TS
+                        facingMode: { ideal: 'environment' },
+                        // Preferir 720p/1080p para mejor detalle en códigos de barras
+                        width: { min: 1280, ideal: 1920, max: 2560 },
+                        height: { min: 720, ideal: 1080, max: 1440 },
+                        // @ts-ignore
                         focusMode: { ideal: 'continuous' },
+                        // @ts-ignore
                         exposureMode: { ideal: 'continuous' },
+                        // @ts-ignore
                         whiteBalanceMode: { ideal: 'continuous' },
                     }
                 })

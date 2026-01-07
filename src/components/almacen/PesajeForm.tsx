@@ -217,28 +217,28 @@ export function PesajeForm({ presupuesto, itemsPesables, presupuestoId }: Pesaje
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="outline" size="sm" asChild>
+      <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4">
+        <Button variant="outline" size="sm" asChild className="w-full md:w-auto justify-start">
           <Link href="/almacen/presupuestos-dia">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Volver a Presupuestos del Día
+            Volver
           </Link>
         </Button>
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold">Pesaje - {presupuesto.numero_presupuesto}</h1>
-            <Badge variant="outline" className="bg-blue-50">
+        <div className="flex-1 space-y-1">
+          <div className="flex flex-wrap items-center gap-2 md:gap-3">
+            <h1 className="text-xl md:text-2xl font-bold truncate">Pesaje - {presupuesto.numero_presupuesto}</h1>
+            <Badge variant="outline" className="bg-blue-50 shrink-0">
               <Scale className="mr-1 h-3 w-3" />
               BALANZA
             </Badge>
           </div>
-          <p className="text-muted-foreground">Cliente: {presupuesto.cliente?.nombre}</p>
+          <p className="text-sm md:text-base text-muted-foreground truncate">Cliente: {presupuesto.cliente?.nombre}</p>
         </div>
         {todosPesados && (
           <Button
             type="button"
             size="lg"
-            className="bg-green-600 hover:bg-green-700"
+            className="w-full md:w-auto bg-green-600 hover:bg-green-700 mt-2 md:mt-0"
             onClick={handleFinalizarPesaje}
             disabled={isFinalizing}
           >
