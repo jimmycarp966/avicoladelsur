@@ -28,6 +28,7 @@ export function BarcodeScanner({
     const scanIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
     const [isScanning, setIsScanning] = useState(false)
+    const [cameraStarted, setCameraStarted] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [torchEnabled, setTorchEnabled] = useState(false)
     const [torchSupported, setTorchSupported] = useState(false)
@@ -62,136 +63,132 @@ export function BarcodeScanner({
         if (navigator.vibrate) navigator.vibrate(100)
     }, [])
 
-    // Iniciar cámara y escaneo
-    useEffect(() => {
-        let isMounted = true
+    // Iniciar cámara (debe ser llamado por user gesture en iOS)
+    const startCamera = useCallback(async () => {
+        if (!videoRef.current) return
 
-        const startCamera = async () => {
-            if (!videoRef.current) return
+        setCameraStarted(true)
+        let currentStream: MediaStream | null = null
 
-            try {
-                addDebugLog('Solicitando permisos...')
+        try {
+            addDebugLog('Solicitando permisos...')
 
-                // Obtener stream (igual que en test-camera que funcionó)
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: 'environment',
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    }
-                })
-
-                if (!isMounted) {
-                    stream.getTracks().forEach(t => t.stop())
-                    return
+            // Obtener stream
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: 'environment',
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
                 }
+            })
 
-                addDebugLog('Stream obtenido')
+            currentStream = stream
+            addDebugLog('Stream obtenido')
 
-                // Asignar stream al video
-                videoRef.current.srcObject = stream
-                streamRef.current = stream
+            // Asignar stream al video
+            videoRef.current.srcObject = stream
+            streamRef.current = stream
 
-                // Esperar metadata
-                videoRef.current.onloadedmetadata = () => {
-                    if (videoRef.current) {
-                        setVideoSize({
-                            width: videoRef.current.videoWidth,
-                            height: videoRef.current.videoHeight
-                        })
-                        addDebugLog(`📷 Video: ${videoRef.current.videoWidth}x${videoRef.current.videoHeight}`)
-                    }
+            // Esperar metadata
+            videoRef.current.onloadedmetadata = () => {
+                if (videoRef.current) {
+                    setVideoSize({
+                        width: videoRef.current.videoWidth,
+                        height: videoRef.current.videoHeight
+                    })
+                    addDebugLog(`📷 Video: ${videoRef.current.videoWidth}x${videoRef.current.videoHeight}`)
                 }
-
-                // Reproducir
-                await videoRef.current.play()
-                addDebugLog('Video reproduciendo')
-
-                // Verificar antorcha
-                const track = stream.getVideoTracks()[0]
-                const caps = track.getCapabilities?.()
-                // @ts-ignore
-                if (caps?.torch) {
-                    setTorchSupported(true)
-                    addDebugLog('💡 Antorcha disponible')
-                }
-
-                // Configurar lector de códigos
-                const hints = new Map()
-                hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-                    BarcodeFormat.EAN_13,
-                    BarcodeFormat.CODE_128,
-                    BarcodeFormat.QR_CODE,
-                    BarcodeFormat.UPC_A,
-                    BarcodeFormat.EAN_8,
-                ])
-                hints.set(DecodeHintType.TRY_HARDER, true)
-
-                readerRef.current = new BrowserMultiFormatReader(hints)
-
-                setIsScanning(true)
-                setError(null)
-                addDebugLog('🔍 Escaneando...')
-
-                // Loop de escaneo
-                let frameCount = 0
-                scanIntervalRef.current = setInterval(async () => {
-                    if (!isMounted || !readerRef.current || !videoRef.current) return
-
-                    frameCount++
-
-                    // Log cada 200 frames
-                    if (frameCount % 200 === 0) {
-                        addDebugLog(`🔍 Frame ${frameCount}...`)
-                    }
-
-                    try {
-                        const result = await readerRef.current.decodeFromVideoElement(videoRef.current)
-
-                        if (result) {
-                            const code = result.getText()
-                            const now = Date.now()
-
-                            // Debounce
-                            if (lastScannedRef.current &&
-                                lastScannedRef.current.code === code &&
-                                now - lastScannedRef.current.time < DEBOUNCE_MS) {
-                                return
-                            }
-
-                            lastScannedRef.current = { code, time: now }
-
-                            addDebugLog(`✅ CÓDIGO: ${code}`)
-                            logToServer('info', 'Código escaneado', { code })
-
-                            vibrate()
-
-                            // Limpiar y notificar
-                            if (scanIntervalRef.current) clearInterval(scanIntervalRef.current)
-                            stream.getTracks().forEach(t => t.stop())
-
-                            onScan(code)
-                        }
-                    } catch {
-                        // NotFoundException es normal
-                    }
-                }, 100)
-
-            } catch (err: any) {
-                addDebugLog(`❌ Error: ${err.message}`, true)
-                setError('No se pudo acceder a la cámara: ' + err.message)
             }
+
+            // Reproducir
+            await videoRef.current.play()
+            addDebugLog('Video reproduciendo')
+
+            // Verificar antorcha
+            const track = stream.getVideoTracks()[0]
+            const caps = track.getCapabilities?.()
+            // @ts-ignore
+            if (caps?.torch) {
+                setTorchSupported(true)
+                addDebugLog('💡 Antorcha disponible')
+            }
+
+            // Configurar lector de códigos
+            const hints = new Map()
+            hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+                BarcodeFormat.EAN_13,
+                BarcodeFormat.CODE_128,
+                BarcodeFormat.QR_CODE,
+                BarcodeFormat.UPC_A,
+                BarcodeFormat.EAN_8,
+            ])
+            hints.set(DecodeHintType.TRY_HARDER, true)
+
+            readerRef.current = new BrowserMultiFormatReader(hints)
+
+            setIsScanning(true)
+            setError(null)
+            addDebugLog('🔍 Escaneando...')
+
+            // Loop de escaneo
+            let frameCount = 0
+            scanIntervalRef.current = setInterval(async () => {
+                if (!readerRef.current || !videoRef.current) return
+
+                frameCount++
+
+                // Log cada 200 frames
+                if (frameCount % 200 === 0) {
+                    addDebugLog(`🔍 Frame ${frameCount}...`)
+                }
+
+                try {
+                    const result = await readerRef.current.decodeFromVideoElement(videoRef.current)
+
+                    if (result) {
+                        const code = result.getText()
+                        const now = Date.now()
+
+                        // Debounce
+                        if (lastScannedRef.current &&
+                            lastScannedRef.current.code === code &&
+                            now - lastScannedRef.current.time < DEBOUNCE_MS) {
+                            return
+                        }
+
+                        lastScannedRef.current = { code, time: now }
+
+                        addDebugLog(`✅ CÓDIGO: ${code}`)
+                        logToServer('info', 'Código escaneado', { code })
+
+                        vibrate()
+
+                        // Limpiar y notificar
+                        if (scanIntervalRef.current) clearInterval(scanIntervalRef.current)
+                        stream.getTracks().forEach(t => t.stop())
+
+                        onScan(code)
+                    }
+                } catch {
+                    // NotFoundException es normal
+                }
+            }, 100)
+
+        } catch (err: any) {
+            addDebugLog(`❌ Error: ${err.message}`, true)
+            setError('No se pudo acceder a la cámara: ' + err.message)
+            setCameraStarted(false)
         }
+    }, [addDebugLog, logToServer, onScan, vibrate])
 
-        startCamera()
-
+    // Cleanup al desmontar
+    useEffect(() => {
         return () => {
-            isMounted = false
             if (scanIntervalRef.current) clearInterval(scanIntervalRef.current)
             readerRef.current?.reset()
             streamRef.current?.getTracks().forEach(t => t.stop())
         }
-    }, [addDebugLog, logToServer, onScan, vibrate])
+    }, [])
 
     // Toggle antorcha
     const toggleTorch = useCallback(async () => {
@@ -242,10 +239,24 @@ export function BarcodeScanner({
                                 Reintentar
                             </Button>
                         </div>
+                    ) : !cameraStarted ? (
+                        <div
+                            className="bg-gray-100 rounded-lg flex flex-col items-center justify-center"
+                            style={{ width: '100%', height: '300px' }}
+                        >
+                            <Scan className="h-16 w-16 text-gray-400 mb-4" />
+                            <p className="text-sm text-gray-600 mb-4 text-center px-4">
+                                Toca el botón para activar la cámara y escanear
+                            </p>
+                            <Button onClick={startCamera} size="lg">
+                                <Scan className="h-5 w-5 mr-2" />
+                                Iniciar Cámara
+                            </Button>
+                        </div>
                     ) : (
                         <div
                             className="relative bg-black rounded-lg overflow-hidden"
-                            style={{ width: '100%', height: '300px' }}
+                            style={{ width: '100%', height: '300px', position: 'relative' }}
                         >
                             <video
                                 ref={videoRef}
