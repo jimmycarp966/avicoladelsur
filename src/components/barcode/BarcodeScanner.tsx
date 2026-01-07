@@ -175,7 +175,7 @@ export function BarcodeScanner({
                     } catch {
                         // NotFoundException es normal
                     }
-                }, 50) // Intervalo rápido para detección más veloz
+                }, 100)
 
             } catch (err: any) {
                 addDebugLog(`❌ Error: ${err.message}`, true)
