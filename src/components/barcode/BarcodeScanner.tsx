@@ -239,25 +239,12 @@ export function BarcodeScanner({
                                 Reintentar
                             </Button>
                         </div>
-                    ) : !cameraStarted ? (
-                        <div
-                            className="bg-gray-100 rounded-lg flex flex-col items-center justify-center"
-                            style={{ width: '100%', height: '300px' }}
-                        >
-                            <Scan className="h-16 w-16 text-gray-400 mb-4" />
-                            <p className="text-sm text-gray-600 mb-4 text-center px-4">
-                                Toca el botón para activar la cámara y escanear
-                            </p>
-                            <Button onClick={startCamera} size="lg">
-                                <Scan className="h-5 w-5 mr-2" />
-                                Iniciar Cámara
-                            </Button>
-                        </div>
                     ) : (
                         <div
                             className="relative bg-black rounded-lg overflow-hidden"
                             style={{ width: '100%', height: '300px', position: 'relative' }}
                         >
+                            {/* Video siempre presente para tener la ref */}
                             <video
                                 ref={videoRef}
                                 style={{
@@ -270,6 +257,20 @@ export function BarcodeScanner({
                                 muted
                                 autoPlay
                             />
+
+                            {/* Overlay de inicio si no ha empezado */}
+                            {!cameraStarted && (
+                                <div className="absolute inset-0 z-20 bg-gray-100 flex flex-col items-center justify-center">
+                                    <Scan className="h-16 w-16 text-gray-400 mb-4" />
+                                    <p className="text-sm text-gray-600 mb-4 text-center px-4">
+                                        Toca para activar la cámara
+                                    </p>
+                                    <Button onClick={startCamera} size="lg">
+                                        <Scan className="h-5 w-5 mr-2" />
+                                        Iniciar Cámara
+                                    </Button>
+                                </div>
+                            )}
 
                             {/* Guía de escaneo */}
                             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
