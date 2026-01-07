@@ -3,6 +3,26 @@
 Historial de cambios del proyecto.
 
 ## 2026-01-07 — Antigravity
+**Feat: Mejoras integrales Módulo Producción (Rendimientos, Predicciones, UI)**
+
+Se implementaron mejoras para optimizar el flujo de producción y control de mermas:
+- **Rendimientos Esperados**: Nueva tabla y configuración para definir rendimientos estándar por destino/producto/proveedor.
+- **Predicción IA**: Sugerencia automática de pesos en "Entradas de Stock" basada en configuración histórica.
+- **Alertas de Desviación**: Feedback visual inmediato (amarillo/rojo) al desviarse de la tolerancia configurada.
+- **Navegación Libre**: Pestañas en Paso 3 para procesar destinos en cualquier orden.
+- **Desperdicios Sólidos**: Flag para diferenciar desperdicios sólidos ("Piel") de merma líquida en el cálculo final.
+- **Resumen Mejorado**: Visualización con tarjetas y alertas diferidas en el paso final.
+
+**Archivos modificados:**
+- `src/app/(admin)/(dominios)/almacen/produccion/nueva/page.tsx`
+- `src/app/(admin)/(dominios)/almacen/produccion/rendimientos/page.tsx`
+- `src/actions/rendimientos.actions.ts`
+- `src/actions/produccion.actions.ts`
+- `supabase/migrations/20260107_rendimientos_esperados_produccion.sql`
+
+---
+
+## 2026-01-07 — Antigravity
 **Fix: Pantalla negra en escáner móvil y separación lógica video/scanner**
 
 Se implementó una solución robusta para el escaneo de códigos de barras en dispositivos móviles (iOS/Android) que soluciona la pantalla negra:

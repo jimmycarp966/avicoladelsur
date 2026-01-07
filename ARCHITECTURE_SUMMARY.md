@@ -1,6 +1,6 @@
 # 🏗️ Arquitectura del Sistema - Avícola del Sur ERP
 
-**Cambio reciente:** Se refactorizó BarcodeScanner para desacoplar video/scanning y requerir gesto de usuario, solucionando pantalla negra en móviles.
+**Cambio reciente:** Se implementó sistema de Rendimientos Esperados, Predicción IA, Navegación Libre y distinción de Desperdicios Sólidos en el Módulo de Producción.
 
 ## 📋 TL;DR (Resumen Ejecutivo)
 
@@ -145,14 +145,14 @@ supabase/                         # Scripts SQL y migraciones
   - **Nomenclatura**: 
     - **Salidas de Stock**: Productos que SALEN del inventario (se consumen, ej: cajas de pollo entero)
     - **Entradas de Stock**: Productos que ENTRAN al inventario (se generan, ej: filet, patamuslo)
-  - **Destinos de Producción** (Diciembre 2025):
+  - **Destinos de Producción** (Enero 2026):
     - Categorías configurables: Filet, Pechuga, Pollo Trozado
-    - Cada destino define productos permitidos (ej: Filet → patamuslo, filet, puchero, menudo)
-    - **Flujo Secuencial (Enero 2026)**: Proceso paso a paso por destino. Se valida y completa cada destino individualmente.
-    - Visualización de progreso y merma en tiempo real por destino.
-    - Tabla `destinos_produccion` + `destino_productos`
-  - **Desperdicio**: Calculado como diferencia final (peso consumido - peso generado)
-  - **Merma Individual**: Cada producto generado tiene campos `merma_esperada_kg` y `merma_real_kg`
+    - **Navegación Libre (Pestañas)**: Flujo flexible que permite procesar destinos en el orden deseado.
+    - **Rendimientos Esperados**: Configuración de % esperado por producto/proveedor (`rendimientos_esperados`).
+    - **Predicción IA**: Sugerencia automática de pesos basada en rendimientos configurados.
+    - **Alertas de Desviación**: Visualización inmediata en UI de desviaciones fuera de tolerancia (amarillo/rojo).
+    - **Desperdicios Sólidos**: Distinción entre Merma Líquida y Desperdicio Sólido (ej: Piel) para cálculos precisos.
+  - **Desperdicio**: Calculado como diferencia final (peso consumido - peso generado - desperdicio sólido)
   - **Integración Balanza**: Preparado para balanza SDP BBC-4030 (indicador SDP 32)
   - **Detección de Peso Anómalo con Google Gemini AI (Diciembre 2025)**: 
     - Sistema IA que detecta errores de digitación en pesaje usando Google Gemini

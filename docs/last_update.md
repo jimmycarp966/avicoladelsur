@@ -1,15 +1,18 @@
-# Última Actualización del Sistema
+# Última Actualización
 
-**Fecha:** 2026-01-07 20:25:00
-**Autor:** Antigravity (Assistant)
+**Fecha:** 2026-01-07
+**Autor:** Antigravity
 
-**Resumen del cambio:**
-Se refactorizó BarcodeScanner para desacoplar video/scanning y requerir gesto de usuario, solucionando pantalla negra en móviles (iOS/Android).
+**Resumen:**
+Se implementó sistema de Rendimientos Esperados, Predicción IA, Navegación Libre y distinción de Desperdicios Sólidos en el Módulo de Producción.
 
-**Archivos modificados:**
-- src/components/barcode/BarcodeScanner.tsx
-- docs/CHANGELOG.md
-- ARCHITECTURE_SUMMARY.md
+**Archivos Modificados:**
+- `src/app/(admin)/(dominios)/almacen/produccion/nueva/page.tsx`
+- `src/app/(admin)/(dominios)/almacen/produccion/rendimientos/page.tsx`
+- `src/actions/rendimientos.actions.ts`
+- `src/actions/produccion.actions.ts`
+- `supabase/migrations/20260107_rendimientos_esperados_produccion.sql`
+- `ARCHITECTURE_SUMMARY.md`
+- `docs/CHANGELOG.md`
 
-**Diagramas:**
-No hubo cambios en la arquitectura de alto nivel que requieran actualización de diagramas.
+**Diagrama:** N/A (Cambios de lógica de negocio y UI interna)
