@@ -1,7 +1,14 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from '@zxing/library'
+import {
+    MultiFormatReader,
+    BarcodeFormat,
+    DecodeHintType,
+    RGBLuminanceSource,
+    BinaryBitmap,
+    HybridBinarizer
+} from '@zxing/library'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { X, Scan, Flashlight, FlashlightOff } from 'lucide-react'
@@ -23,12 +30,14 @@ export function BarcodeScanner({
     description = 'Apunta la cámara al código de barras'
 }: BarcodeScannerProps) {
     const videoRef = useRef<HTMLVideoElement>(null)
-    const readerRef = useRef<BrowserMultiFormatReader | null>(null)
     const streamRef = useRef<MediaStream | null>(null)
     const scanIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+    const canvasRef = useRef<HTMLCanvasElement | null>(null)
+    const readerRef = useRef<MultiFormatReader | null>(null)
 
+    // Estado
     const [isScanning, setIsScanning] = useState(false)
-    const [cameraStarted, setCameraStarted] = useState(false)
+    const [cameraStarted, setCameraStarted] = useState(false) // Control para user gesture
     const [error, setError] = useState<string | null>(null)
     const [torchEnabled, setTorchEnabled] = useState(false)
     const [torchSupported, setTorchSupported] = useState(false)
@@ -63,12 +72,30 @@ export function BarcodeScanner({
         if (navigator.vibrate) navigator.vibrate(100)
     }, [])
 
-    // Iniciar cámara (debe ser llamado por user gesture en iOS)
+    // Inicializar Reader (una sola vez)
+    useEffect(() => {
+        const hints = new Map()
+        hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+            BarcodeFormat.EAN_13,
+            BarcodeFormat.CODE_128,
+            BarcodeFormat.QR_CODE,
+            BarcodeFormat.UPC_A,
+            BarcodeFormat.EAN_8,
+        ])
+        hints.set(DecodeHintType.TRY_HARDER, true)
+
+        readerRef.current = new MultiFormatReader()
+        readerRef.current.setHints(hints)
+
+        // Crear canvas offscreen
+        canvasRef.current = document.createElement('canvas')
+    }, [])
+
+    // Función para iniciar cámara (User Gesture Triggered)
     const startCamera = useCallback(async () => {
         if (!videoRef.current) return
 
         setCameraStarted(true)
-        let currentStream: MediaStream | null = null
 
         try {
             addDebugLog('Solicitando permisos...')
@@ -82,25 +109,29 @@ export function BarcodeScanner({
                 }
             })
 
-            currentStream = stream
             addDebugLog('Stream obtenido')
 
             // Asignar stream al video
             videoRef.current.srcObject = stream
             streamRef.current = stream
 
-            // Esperar metadata
+            // Esperar metadata y reproducir
             videoRef.current.onloadedmetadata = () => {
                 if (videoRef.current) {
                     setVideoSize({
                         width: videoRef.current.videoWidth,
                         height: videoRef.current.videoHeight
                     })
-                    addDebugLog(`📷 Video: ${videoRef.current.videoWidth}x${videoRef.current.videoHeight}`)
+                    addDebugLog(`📷 Video metadata: ${videoRef.current.videoWidth}x${videoRef.current.videoHeight}`)
+
+                    // Ajustar canvas al tamaño del video
+                    if (canvasRef.current) {
+                        canvasRef.current.width = videoRef.current.videoWidth
+                        canvasRef.current.height = videoRef.current.videoHeight
+                    }
                 }
             }
 
-            // Reproducir
             await videoRef.current.play()
             addDebugLog('Video reproduciendo')
 
@@ -113,37 +144,51 @@ export function BarcodeScanner({
                 addDebugLog('💡 Antorcha disponible')
             }
 
-            // Configurar lector de códigos
-            const hints = new Map()
-            hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-                BarcodeFormat.EAN_13,
-                BarcodeFormat.CODE_128,
-                BarcodeFormat.QR_CODE,
-                BarcodeFormat.UPC_A,
-                BarcodeFormat.EAN_8,
-            ])
-            hints.set(DecodeHintType.TRY_HARDER, true)
-
-            readerRef.current = new BrowserMultiFormatReader(hints)
-
             setIsScanning(true)
             setError(null)
-            addDebugLog('🔍 Escaneando...')
+            addDebugLog('🔍 Escaneando (Canvas Mode)...')
 
-            // Loop de escaneo
+            // Loop de escaneo MANUAL (sin tocar el video)
             let frameCount = 0
-            scanIntervalRef.current = setInterval(async () => {
-                if (!readerRef.current || !videoRef.current) return
+            scanIntervalRef.current = setInterval(() => {
+                if (!readerRef.current || !videoRef.current || !canvasRef.current) return
+                if (videoRef.current.readyState !== videoRef.current.HAVE_ENOUGH_DATA) return
 
                 frameCount++
-
-                // Log cada 200 frames
                 if (frameCount % 200 === 0) {
-                    addDebugLog(`🔍 Frame ${frameCount}...`)
+                    addDebugLog(`🔍 Frame ${frameCount} (Canvas)`)
                 }
 
                 try {
-                    const result = await readerRef.current.decodeFromVideoElement(videoRef.current)
+                    // 1. Dibujar frame en canvas
+                    const ctx = canvasRef.current.getContext('2d')
+                    if (!ctx) return
+
+                    ctx.drawImage(videoRef.current, 0, 0)
+
+                    // 2. Obtener datos de imagen
+                    const { width, height } = canvasRef.current
+                    const imageData = ctx.getImageData(0, 0, width, height)
+
+                    // 3. Crear LuminanceSource desde los pixels
+                    // @ts-ignore - RGBLuminanceSource espera Uint8ClampedArray pero acepta number[] en algun version
+                    const len = imageData.data.length
+                    const luminances = new Uint8ClampedArray(len / 4)
+
+                    // Convertir a Grayscale manualmente para evitar deps
+                    for (let i = 0; i < len; i += 4) {
+                        const r = imageData.data[i]
+                        const g = imageData.data[i + 1]
+                        const b = imageData.data[i + 2]
+                        // Promedio ponderado o simple
+                        luminances[i / 4] = ((r * 2 + g * 5 + b * 1) >> 3) & 0xFF
+                    }
+
+                    const source = new RGBLuminanceSource(luminances, width, height)
+
+                    // 4. Decodificar
+                    const binaryBitmap = new BinaryBitmap(new HybridBinarizer(source))
+                    const result = readerRef.current.decode(binaryBitmap)
 
                     if (result) {
                         const code = result.getText()
@@ -163,13 +208,11 @@ export function BarcodeScanner({
 
                         vibrate()
 
-                        // Limpiar y notificar
-                        if (scanIntervalRef.current) clearInterval(scanIntervalRef.current)
-                        stream.getTracks().forEach(t => t.stop())
-
+                        // Detener
+                        stopAll()
                         onScan(code)
                     }
-                } catch {
+                } catch (e) {
                     // NotFoundException es normal
                 }
             }, 100)
@@ -181,19 +224,22 @@ export function BarcodeScanner({
         }
     }, [addDebugLog, logToServer, onScan, vibrate])
 
-    // Cleanup al desmontar
+    const stopAll = useCallback(() => {
+        if (scanIntervalRef.current) clearInterval(scanIntervalRef.current)
+        streamRef.current?.getTracks().forEach(t => t.stop())
+        readerRef.current?.reset()
+    }, [])
+
+    // Cleanup
     useEffect(() => {
         return () => {
-            if (scanIntervalRef.current) clearInterval(scanIntervalRef.current)
-            readerRef.current?.reset()
-            streamRef.current?.getTracks().forEach(t => t.stop())
+            stopAll()
         }
-    }, [])
+    }, [stopAll])
 
     // Toggle antorcha
     const toggleTorch = useCallback(async () => {
         if (!streamRef.current) return
-
         try {
             const track = streamRef.current.getVideoTracks()[0]
             const newState = !torchEnabled
@@ -206,12 +252,11 @@ export function BarcodeScanner({
         }
     }, [torchEnabled, addDebugLog])
 
-    // Cerrar
+    // Cerrar UI
     const handleClose = useCallback(() => {
-        if (scanIntervalRef.current) clearInterval(scanIntervalRef.current)
-        streamRef.current?.getTracks().forEach(t => t.stop())
+        stopAll()
         onClose()
-    }, [onClose])
+    }, [onClose, stopAll])
 
     return (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
@@ -244,7 +289,7 @@ export function BarcodeScanner({
                             className="relative bg-black rounded-lg overflow-hidden"
                             style={{ width: '100%', height: '300px', position: 'relative' }}
                         >
-                            {/* Video siempre presente para tener la ref */}
+                            {/* Video: Siempre montado, gestionado manualmente */}
                             <video
                                 ref={videoRef}
                                 style={{
@@ -258,7 +303,7 @@ export function BarcodeScanner({
                                 autoPlay
                             />
 
-                            {/* Overlay de inicio si no ha empezado */}
+                            {/* Botón de Inicio (Overlay) */}
                             {!cameraStarted && (
                                 <div className="absolute inset-0 z-20 bg-gray-100 flex flex-col items-center justify-center">
                                     <Scan className="h-16 w-16 text-gray-400 mb-4" />
@@ -285,10 +330,10 @@ export function BarcodeScanner({
                                 </div>
                             </div>
 
-                            {/* Controles */}
+                            {/* Info bar */}
                             <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
                                 <span className={`text-xs px-2 py-1 rounded ${isScanning ? 'bg-green-500/80' : 'bg-gray-500/80'} text-white`}>
-                                    {isScanning ? `● ${videoSize.width}x${videoSize.height}` : '○ Iniciando...'}
+                                    {isScanning ? `● ${videoSize.width}x${videoSize.height}` : '○ Esperando'}
                                 </span>
 
                                 <div className="flex gap-1">
@@ -307,7 +352,7 @@ export function BarcodeScanner({
                         </div>
                     )}
 
-                    {/* Debug panel */}
+                    {/* Logs de depuración */}
                     {showDebug && (
                         <div className="bg-black text-green-400 p-2 rounded text-xs font-mono max-h-32 overflow-y-auto">
                             {debugLogs.length > 0 ? (
@@ -336,7 +381,7 @@ export function BarcodeScanner({
     )
 }
 
-// Componente auxiliar para el botón de escaneo
+// Componente auxiliar
 interface ScanButtonProps {
     onScan: (code: string) => void
     className?: string
