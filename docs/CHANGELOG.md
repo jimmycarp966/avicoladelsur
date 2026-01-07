@@ -2,6 +2,19 @@
 
 Historial de cambios del proyecto.
 
+## 2026-01-07 — Antigravity
+**Fix: Pantalla negra en escáner móvil y separación lógica video/scanner**
+
+Se implementó una solución robusta para el escaneo de códigos de barras en dispositivos móviles (iOS/Android) que soluciona la pantalla negra:
+- **Gestión nativa del video**: El componente controla directamente el elemento `<video>` sin interferencia de la librería de escaneo.
+- **Canvas decoding**: Los frames se capturan en un canvas invisible y se pasan manualmente al decodificador ZXing.
+- **User Gesture**: Se requiere interacción explícita ("Iniciar Cámara") para cumplir políticas de autoplay de iOS.
+
+**Archivos modificados:**
+- `src/components/barcode/BarcodeScanner.tsx`
+
+---
+
 ## 2026-01-05 — Gemini
 **feat: Búsqueda en selectores de productos - Nueva Orden de Producción**
 

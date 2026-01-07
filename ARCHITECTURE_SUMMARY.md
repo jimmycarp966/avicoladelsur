@@ -1,5 +1,7 @@
 # 🏗️ Arquitectura del Sistema - Avícola del Sur ERP
 
+**Cambio reciente:** Se refactorizó BarcodeScanner para desacoplar video/scanning y requerir gesto de usuario, solucionando pantalla negra en móviles.
+
 ## 📋 TL;DR (Resumen Ejecutivo)
 
 Sistema ERP modular completo para Avícola del Sur que unifica Almacén (WMS), Ventas (CRM), Reparto (TMS), Tesorería y Sucursales en una única fuente de verdad con Supabase. Incluye bot de WhatsApp automatizado para pedidos, PWA móvil para repartidores con GPS tracking, planificación semanal de rutas, optimización automática con Google Directions + fallback local, sistema de listas de precios con margen de ganancia automático, gestión multi-sucursal con inventario distribuido y alertas de stock automático, y arquitectura server-side con Next.js 15, React 19, TypeScript y Server Actions. Implementa FIFO automático, RLS completo, validaciones atómicas y trazabilidad total desde ingreso hasta entrega.

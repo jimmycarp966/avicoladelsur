@@ -1,13 +1,15 @@
-# Última Actualización
+# Última Actualización del Sistema
 
-**Fecha:** 2026-01-05 18:27:37-03:00
+**Fecha:** 2026-01-07 20:25:00
+**Autor:** Antigravity (Assistant)
 
-**Archivos Modificados:**
-- `src/app/(admin)/(dominios)/almacen/produccion/nueva/page.tsx`
-- `ARCHITECTURE_SUMMARY.md`
+**Resumen del cambio:**
+Se refactorizó BarcodeScanner para desacoplar video/scanning y requerir gesto de usuario, solucionando pantalla negra en móviles (iOS/Android).
 
-**Resumen:**
-Se ajustó `NuevaOrdenProduccionPage` para implementar flujo secuencial de destinos y corregir filtrado de productos y asignación de stock, impacto: UX mejora crítica en producción, sin cambios de esquema DB.
+**Archivos modificados:**
+- src/components/barcode/BarcodeScanner.tsx
+- docs/CHANGELOG.md
+- ARCHITECTURE_SUMMARY.md
 
-**Diagrama de Arquitectura:**
-`docs/diagrams/architecture.mmd` (Existente)
+**Diagramas:**
+No hubo cambios en la arquitectura de alto nivel que requieran actualización de diagramas.
