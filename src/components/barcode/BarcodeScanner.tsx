@@ -96,202 +96,85 @@ export function BarcodeScanner({
         }
     }, [torchEnabled])
 
-    // Inicializar lector y solicitar permisos de cámara
+    // SOLUCIÓN DEFINITIVA: Un solo useEffect que maneja todo el flujo
     useEffect(() => {
+        if (!videoRef.current) return
+
+        let isMounted = true
+        let scanInterval: ReturnType<typeof setInterval> | null = null
+
+        // Configurar el lector
         const hints = new Map()
-        // Formatos de código de barras soportados - Ampliado para mayor compatibilidad
         hints.set(DecodeHintType.POSSIBLE_FORMATS, [
             BarcodeFormat.EAN_13,
             BarcodeFormat.CODE_128,
             BarcodeFormat.QR_CODE,
             BarcodeFormat.UPC_A,
             BarcodeFormat.EAN_8,
-            BarcodeFormat.CODE_39,
-            BarcodeFormat.ITF,
         ])
-        // Configuraciones adicionales para mejor detección
         hints.set(DecodeHintType.TRY_HARDER, true)
-        hints.set(DecodeHintType.PURE_BARCODE, false)
-        // @ts-ignore
-        hints.set(DecodeHintType.ALSO_INVERTED, true)
 
-        readerRef.current = new BrowserMultiFormatReader(hints, SCAN_INTERVAL_MS)
+        readerRef.current = new BrowserMultiFormatReader(hints)
 
-
-        // Función para obtener cámaras después de tener permisos
-        const getCameras = async () => {
+        const startCamera = async () => {
             try {
-                addDebugLog('Iniciando proceso de cámara...')
+                addDebugLog('Iniciando cámara...')
 
-                let stream: MediaStream | null = null
-
-                // Estrategia de reintento escalonada: 1080p -> 720p -> VGA/Default
-                const resolutions = [
-                    { label: '1080p', width: { min: 1920 }, height: { min: 1080 } },
-                    { label: '720p', width: { min: 1280 }, height: { min: 720 } },
-                    { label: 'Estándar', width: { ideal: 1280 }, height: { ideal: 720 } }, // Ideal pero no estricto
-                    { label: 'Básica', facingMode: { ideal: 'environment' } } // Lo que sea que funcione
-                ]
-
-                for (const res of resolutions) {
-                    try {
-                        addDebugLog(`Probando perfil: ${res.label}`)
-                        const constraints: MediaStreamConstraints = {
-                            video: {
-                                facingMode: { ideal: 'environment' },
-                                ...res,
-                                // @ts-ignore
-                                focusMode: { ideal: 'continuous' },
-                                // @ts-ignore
-                                exposureMode: { ideal: 'continuous' },
-                                // @ts-ignore
-                                whiteBalanceMode: { ideal: 'continuous' },
-                            }
-                        }
-
-                        stream = await navigator.mediaDevices.getUserMedia(constraints)
-                        // Si llegamos aquí, tuvimos éxito
-                        addDebugLog(`✅ Cámara iniciada con: ${res.label}`)
-                        break
-                    } catch (e) {
-                        // Continuar al siguiente nivel
-                    }
-                }
-
-                if (!stream) {
-                    throw new Error('No se pudo iniciar la cámara con ninguna configuración.')
-                }
-
-                // Verificar soporte de antorcha
-                const track = stream.getVideoTracks()[0]
-                if (track) {
-                    const capabilities = track.getCapabilities?.()
-                    // @ts-ignore
-                    if (capabilities?.torch) {
-                        setTorchSupported(true)
-                        addDebugLog('💡 Antorcha disponible')
-                    }
-                }
-
-                // Detener stream temporal
-                stream.getTracks().forEach(track => track.stop())
-
-                // Enumerar dispositivos
-                const deviceList = await navigator.mediaDevices.enumerateDevices()
-                const videoDevices = deviceList.filter(d => d.kind === 'videoinput')
-
-                addDebugLog(`Permisos OK - ${videoDevices.length} cámaras encontradas`)
-                setDevices(videoDevices)
-
-                // Preferir cámara trasera
-                const backCamera = videoDevices.find(d => {
-                    const label = d.label.toLowerCase()
-                    return label.includes('back') ||
-                        label.includes('trasera') ||
-                        label.includes('rear') ||
-                        label.includes('environment') ||
-                        label.includes('posterior') ||
-                        label.includes('main') ||
-                        label.includes('0')
-                })
-
-                setSelectedDevice(backCamera?.deviceId || videoDevices[0]?.deviceId || null)
-
-            } catch (err: any) {
-                addDebugLog(`❌ Error: ${err.name} - ${err.message}`, true)
-
-                if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                    setError('Permisos de cámara denegados. Por favor, habilita el acceso a la cámara en la configuración de tu navegador.')
-                } else if (err.name === 'NotFoundError') {
-                    setError('No se encontró ninguna cámara en este dispositivo.')
-                } else if (err.name === 'NotReadableError') {
-                    setError('La cámara está siendo usada por otra aplicación.')
-                } else if (err.name === 'OverconstrainedError') {
-                    setError('La cámara no soporta la configuración solicitada. Intentando con configuración básica...')
-                } else {
-                    setError('No se pudo acceder a la cámara: ' + err.message)
-                }
-            }
-        }
-
-        getCameras()
-
-        return () => {
-            readerRef.current?.reset()
-            streamRef.current?.getTracks().forEach(track => track.stop())
-        }
-    }, []) // Se mantiene vacío para ejecutarse una sola vez al montar
-
-    // Iniciar escaneo cuando se selecciona un dispositivo
-    useEffect(() => {
-        if (!selectedDevice || !videoRef.current || !readerRef.current) return
-
-        let isMounted = true
-
-        const startScanning = async () => {
-            if (!readerRef.current || !videoRef.current) return
-
-            try {
-                addDebugLog('Iniciando escaneo HD...')
-
-                // Obtener stream manualmente para control total
+                // Obtener stream con resolución alta
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: {
-                        deviceId: selectedDevice ? { exact: selectedDevice } : undefined,
                         facingMode: { ideal: 'environment' },
-                        width: { min: 1280, ideal: 1920 },
-                        height: { min: 720, ideal: 1080 },
-                        // @ts-ignore
-                        focusMode: { ideal: 'continuous' },
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 },
                     }
                 })
 
-                // Asignar stream al video
+                if (!isMounted || !videoRef.current) {
+                    stream.getTracks().forEach(t => t.stop())
+                    return
+                }
+
+                // Asignar stream al video y mostrarlo
                 videoRef.current.srcObject = stream
                 streamRef.current = stream
 
-                // Esperar a que el video esté listo
-                await new Promise<void>((resolve) => {
-                    if (!videoRef.current) return resolve()
-                    videoRef.current.onloadedmetadata = () => {
-                        videoRef.current?.play()
-                        resolve()
-                    }
-                })
+                // Esperar a que el video esté listo para reproducir
+                await videoRef.current.play()
 
                 const track = stream.getVideoTracks()[0]
-                const settings = track?.getSettings()
-                addDebugLog(`📷 Video: ${settings?.width}x${settings?.height}`)
+                const settings = track.getSettings()
+                addDebugLog(`📷 Cámara: ${settings.width}x${settings.height}`)
 
                 // Verificar antorcha
-                const capabilities = track?.getCapabilities?.()
+                const caps = track.getCapabilities?.()
                 // @ts-ignore
-                if (capabilities?.torch) {
+                if (caps?.torch) {
                     setTorchSupported(true)
                     addDebugLog('💡 Antorcha disponible')
                 }
 
-                if (isMounted) {
-                    setIsScanning(true)
-                    setError(null)
-                }
+                // Enumerar dispositivos para el selector
+                const devices = await navigator.mediaDevices.enumerateDevices()
+                const videoDevices = devices.filter(d => d.kind === 'videoinput')
+                setDevices(videoDevices)
+                setSelectedDevice(track.getSettings().deviceId || null)
 
-                // Loop de escaneo manual usando decodeFromVideoElement
-                const scanLoop = setInterval(async () => {
-                    if (!isMounted || !readerRef.current || !videoRef.current) {
-                        clearInterval(scanLoop)
-                        return
-                    }
+                setIsScanning(true)
+                setError(null)
+
+                // Iniciar loop de escaneo
+                addDebugLog('🔍 Escaneando...')
+                scanInterval = setInterval(async () => {
+                    if (!isMounted || !readerRef.current || !videoRef.current) return
 
                     frameCountRef.current++
 
-                    // Log cada 100 frames
-                    if (frameCountRef.current % 100 === 0) {
-                        addDebugLog(`🔍 Frame ${frameCountRef.current}...`)
+                    // Log cada 200 frames (~10 segundos)
+                    if (frameCountRef.current % 200 === 0) {
+                        addDebugLog(`🔍 Buscando... (${frameCountRef.current})`)
                     }
 
                     try {
-                        // Intentar decodificar del video element actual
                         const result = await readerRef.current.decodeFromVideoElement(videoRef.current)
 
                         if (result) {
@@ -307,61 +190,38 @@ export function BarcodeScanner({
 
                             lastScannedRef.current = { code, time: now }
 
-                            clearInterval(scanLoop)
-                            addDebugLog(`✅ Código: ${code}`)
-
-                            logToServer('info', 'Código escaneado', {
-                                code,
-                                format: result.getBarcodeFormat(),
-                                frames: frameCountRef.current
-                            })
+                            addDebugLog(`✅ CÓDIGO: ${code}`)
+                            logToServer('info', 'Código escaneado', { code, frames: frameCountRef.current })
 
                             vibrate()
-                            onScan(code)
-                            setIsScanning(false)
 
-                            // Detener stream
+                            // Limpiar antes de notificar
+                            if (scanInterval) clearInterval(scanInterval)
                             stream.getTracks().forEach(t => t.stop())
+
+                            onScan(code)
                         }
-                    } catch (err: any) {
-                        // NotFoundException es normal cuando no hay código visible
-                        if (err.name !== 'NotFoundException') {
-                            // Solo loguear errores inesperados cada 50 frames para no inundar
-                            if (frameCountRef.current % 50 === 0) {
-                                addDebugLog(`⚠️ ${err.name}`, true)
-                            }
-                        }
+                    } catch {
+                        // NotFoundException es normal - ignorar
                     }
                 }, SCAN_INTERVAL_MS)
 
-                // Guardar referencia para limpieza
-                // @ts-ignore
-                videoRef.current.scanLoop = scanLoop
-
             } catch (err: any) {
-                addDebugLog(`❌ Error cámara: ${err.message}`, true)
-                if (isMounted) {
-                    setError('No se pudo iniciar la cámara: ' + err.message)
-                    setIsScanning(false)
-                }
+                addDebugLog(`❌ Error: ${err.message}`, true)
+                setError('No se pudo acceder a la cámara: ' + err.message)
+                setIsScanning(false)
             }
         }
 
-        startScanning()
+        startCamera()
 
         return () => {
             isMounted = false
+            if (scanInterval) clearInterval(scanInterval)
             readerRef.current?.reset()
-            // Limpiar loop de escaneo
-            // @ts-ignore
-            if (videoRef.current?.scanLoop) {
-                // @ts-ignore
-                clearInterval(videoRef.current.scanLoop)
-            }
-            // Detener stream
             streamRef.current?.getTracks().forEach(t => t.stop())
         }
-    }, [selectedDevice, onScan, vibrate, logToServer])
+    }, [onScan, vibrate, logToServer])
 
     const switchCamera = useCallback(() => {
         if (devices.length <= 1) return
