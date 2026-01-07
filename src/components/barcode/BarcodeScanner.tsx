@@ -41,10 +41,33 @@ export function BarcodeScanner({
 
     // Debug logs para mostrar en pantalla (móvil)
     const [debugLogs, setDebugLogs] = useState<string[]>([])
-    const addDebugLog = (msg: string) => {
+
+    // Función para enviar logs a Vercel
+    const logToServer = useCallback(async (level: 'info' | 'error' | 'warn', msg: string, details?: any) => {
+        try {
+            // No esperar respuesta para no bloquear UI
+            fetch('/api/debug/log', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    component: 'BarcodeScanner',
+                    level,
+                    message: msg,
+                    details
+                })
+            }).catch(e => console.error('Error enviando log remoto:', e))
+        } catch (e) {
+            // Ignorar errores de logging
+        }
+    }, [])
+
+    const addDebugLog = (msg: string, isError = false) => {
         const timestamp = new Date().toLocaleTimeString()
         setDebugLogs(prev => [...prev.slice(-4), `${timestamp}: ${msg}`])
         console.log('[BarcodeScanner]', msg)
+
+        // Enviar también al servidor para debugging remoto
+        logToServer(isError ? 'error' : 'info', msg)
     }
 
     // Vibrar el dispositivo (feedback táctil)
@@ -153,7 +176,7 @@ export function BarcodeScanner({
                 setSelectedDevice(backCamera?.deviceId || videoDevices[0]?.deviceId || null)
 
             } catch (err: any) {
-                addDebugLog(`❌ Error: ${err.name} - ${err.message}`)
+                addDebugLog(`❌ Error: ${err.name} - ${err.message}`, true)
 
                 if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
                     setError('Permisos de cámara denegados. Por favor, habilita el acceso a la cámara en la configuración de tu navegador.')
@@ -175,7 +198,7 @@ export function BarcodeScanner({
             readerRef.current?.reset()
             streamRef.current?.getTracks().forEach(track => track.stop())
         }
-    }, [])
+    }, []) // Se mantiene vacío para ejecutarse una sola vez al montar
 
     // Iniciar escaneo cuando se selecciona un dispositivo
     useEffect(() => {
@@ -207,7 +230,14 @@ export function BarcodeScanner({
                             // Guardar último escaneo
                             lastScannedRef.current = { code, time: now }
 
-                            addDebugLog(`✅ Código: ${code}`)
+                            addDebugLog(`✅ Código detectado: ${code}`)
+
+                            // Log explícito de éxito con detalles
+                            logToServer('info', 'Código escaneado con éxito', {
+                                code,
+                                format: result.getBarcodeFormat(),
+                                timestamp: now
+                            })
 
                             // Feedback táctil
                             vibrate()
@@ -224,7 +254,9 @@ export function BarcodeScanner({
                             'ChecksumException',
                             'FormatException'
                         ].includes(err.name) && !err.message?.includes('No MultiFormat Readers')) {
-                            addDebugLog(`❌ ${err.name}: ${err.message}`)
+                            // No loguear al servidor estos errores frecuentes para no inundar logs
+                            // Solo localmente si es necesario, o ignorar
+                            // addDebugLog(`❌ ${err.name}: ${err.message}`, true) 
                         }
                     }
 
@@ -238,7 +270,7 @@ export function BarcodeScanner({
                     const track = streamRef.current.getVideoTracks()[0]
                     if (track) {
                         const settings = track.getSettings()
-                        addDebugLog(`📷 Res: ${settings.width}x${settings.height}`)
+                        addDebugLog(`📷 Cámara iniciada: ${settings.width}x${settings.height}`)
 
                         const capabilities = track.getCapabilities?.()
                         // @ts-ignore
@@ -253,7 +285,7 @@ export function BarcodeScanner({
                     setError(null)
                 }
             } catch (err: any) {
-                addDebugLog(`❌ No se pudo iniciar cámara: ${err.message}`)
+                addDebugLog(`❌ No se pudo iniciar cámara: ${err.message}`, true)
                 if (isMounted) {
                     setError('No se pudo iniciar la cámara. Verifica los permisos.')
                     setIsScanning(false)
