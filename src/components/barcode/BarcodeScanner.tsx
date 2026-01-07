@@ -120,27 +120,48 @@ export function BarcodeScanner({
         // Función para obtener cámaras después de tener permisos
         const getCameras = async () => {
             try {
-                // IMPORTANTE: En iOS y algunos Android, necesitamos solicitar permisos
-                // con getUserMedia ANTES de poder enumerar dispositivos
-                addDebugLog('Solicitando permisos cámara...')
+                addDebugLog('Iniciando proceso de cámara...')
 
-                // Solicitar permiso de cámara con configuración más compatible
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: { ideal: 'environment' },
-                        // Usar ideal en lugar de min/max estrictos para evitar OverconstrainedError
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 },
-                        // @ts-ignore
-                        focusMode: { ideal: 'continuous' },
-                        // @ts-ignore
-                        exposureMode: { ideal: 'continuous' },
-                        // @ts-ignore
-                        whiteBalanceMode: { ideal: 'continuous' },
+                let stream: MediaStream | null = null
+
+                // Estrategia de reintento escalonada: 1080p -> 720p -> VGA/Default
+                const resolutions = [
+                    { label: '1080p', width: { min: 1920 }, height: { min: 1080 } },
+                    { label: '720p', width: { min: 1280 }, height: { min: 720 } },
+                    { label: 'Estándar', width: { ideal: 1280 }, height: { ideal: 720 } }, // Ideal pero no estricto
+                    { label: 'Básica', facingMode: { ideal: 'environment' } } // Lo que sea que funcione
+                ]
+
+                for (const res of resolutions) {
+                    try {
+                        addDebugLog(`Probando perfil: ${res.label}`)
+                        const constraints: MediaStreamConstraints = {
+                            video: {
+                                facingMode: { ideal: 'environment' },
+                                ...res,
+                                // @ts-ignore
+                                focusMode: { ideal: 'continuous' },
+                                // @ts-ignore
+                                exposureMode: { ideal: 'continuous' },
+                                // @ts-ignore
+                                whiteBalanceMode: { ideal: 'continuous' },
+                            }
+                        }
+
+                        stream = await navigator.mediaDevices.getUserMedia(constraints)
+                        // Si llegamos aquí, tuvimos éxito
+                        addDebugLog(`✅ Cámara iniciada con: ${res.label}`)
+                        break
+                    } catch (e) {
+                        // Continuar al siguiente nivel
                     }
-                })
+                }
 
-                // Verificar si la antorcha está soportada
+                if (!stream) {
+                    throw new Error('No se pudo iniciar la cámara con ninguna configuración.')
+                }
+
+                // Verificar soporte de antorcha
                 const track = stream.getVideoTracks()[0]
                 if (track) {
                     const capabilities = track.getCapabilities?.()
@@ -151,18 +172,17 @@ export function BarcodeScanner({
                     }
                 }
 
-                // Detener el stream temporal (solo lo usamos para obtener permisos)
+                // Detener stream temporal
                 stream.getTracks().forEach(track => track.stop())
 
-                // Ahora sí podemos enumerar los dispositivos correctamente
+                // Enumerar dispositivos
                 const deviceList = await navigator.mediaDevices.enumerateDevices()
                 const videoDevices = deviceList.filter(d => d.kind === 'videoinput')
 
-                addDebugLog(`Permisos OK - ${videoDevices.length} cámaras`)
+                addDebugLog(`Permisos OK - ${videoDevices.length} cámaras encontradas`)
                 setDevices(videoDevices)
 
-                // Preferir cámara trasera si está disponible
-                // Buscar por varios términos comunes en diferentes idiomas/dispositivos
+                // Preferir cámara trasera
                 const backCamera = videoDevices.find(d => {
                     const label = d.label.toLowerCase()
                     return label.includes('back') ||
@@ -171,8 +191,9 @@ export function BarcodeScanner({
                         label.includes('environment') ||
                         label.includes('posterior') ||
                         label.includes('main') ||
-                        label.includes('0') // En algunos dispositivos, cámara 0 es la trasera
+                        label.includes('0')
                 })
+
                 setSelectedDevice(backCamera?.deviceId || videoDevices[0]?.deviceId || null)
 
             } catch (err: any) {
