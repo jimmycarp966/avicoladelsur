@@ -269,14 +269,17 @@ export function BarcodeScanner({
                             </Button>
                         </div>
                     ) : (
-                        <div className="relative bg-black rounded-lg overflow-hidden" style={{ minHeight: '300px' }}>
+                        <div className="relative bg-black rounded-lg overflow-hidden" style={{ height: '350px' }}>
                             <video
                                 ref={videoRef}
-                                className="w-full h-full object-cover"
-                                style={{ minHeight: '300px' }}
+                                style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: 'cover',
+                                    display: 'block'
+                                }}
                                 playsInline
                                 muted
-                                autoPlay
                             />
 
                             {/* Overlay con guía de escaneo */}
