@@ -13,8 +13,8 @@ interface BarcodeScannerProps {
     description?: string
 }
 
-// Intervalo de escaneo optimizado (ms)
-const SCAN_INTERVAL_MS = 100
+// Intervalo de escaneo optimizado (ms) - más rápido = más intentos
+const SCAN_INTERVAL_MS = 50
 
 // Tiempo mínimo entre escaneos del mismo código (debounce)
 const DEBOUNCE_MS = 1500
@@ -35,6 +35,7 @@ export function BarcodeScanner({
     const [showDebug, setShowDebug] = useState(false)
     const readerRef = useRef<BrowserMultiFormatReader | null>(null)
     const streamRef = useRef<MediaStream | null>(null)
+    const frameCountRef = useRef<number>(0)
 
     // Debounce: último código escaneado y timestamp
     const lastScannedRef = useRef<{ code: string; time: number } | null>(null)
@@ -285,6 +286,14 @@ export function BarcodeScanner({
                             readerRef.current?.reset()
                             setIsScanning(false)
                         }
+                        // Contar frames procesados
+                        frameCountRef.current++
+
+                        // Cada 100 frames, loguear que sigue activo
+                        if (frameCountRef.current % 100 === 0) {
+                            addDebugLog(`🔍 Buscando... (${frameCountRef.current} frames)`)
+                        }
+
                         // Filtrar errores normales del proceso de escaneo
                         if (err && ![
                             'NotFoundException',
@@ -292,7 +301,7 @@ export function BarcodeScanner({
                             'FormatException'
                         ].includes(err.name) && !err.message?.includes('No MultiFormat Readers')) {
                             // Solo loguear errores inesperados
-                            addDebugLog(`⚠️ ${err.name}`, true)
+                            addDebugLog(`⚠️ ${err.name}: ${err.message}`, true)
                         }
                     }
 
