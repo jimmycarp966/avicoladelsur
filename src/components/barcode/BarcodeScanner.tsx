@@ -13,8 +13,8 @@ interface BarcodeScannerProps {
     description?: string
 }
 
-// Intervalo de escaneo optimizado (ms) - más rápido = mejor respuesta
-const SCAN_INTERVAL_MS = 50
+// Intervalo de escaneo optimizado (ms)
+const SCAN_INTERVAL_MS = 100
 
 // Tiempo mínimo entre escaneos del mismo código (debounce)
 const DEBOUNCE_MS = 1500
@@ -32,6 +32,7 @@ export function BarcodeScanner({
     const [selectedDevice, setSelectedDevice] = useState<string | null>(null)
     const [torchEnabled, setTorchEnabled] = useState(false)
     const [torchSupported, setTorchSupported] = useState(false)
+    const [showDebug, setShowDebug] = useState(false)
     const readerRef = useRef<BrowserMultiFormatReader | null>(null)
     const streamRef = useRef<MediaStream | null>(null)
 
@@ -74,16 +75,15 @@ export function BarcodeScanner({
     // Inicializar lector y solicitar permisos de cámara
     useEffect(() => {
         const hints = new Map()
-        // Formatos de código de barras soportados - Optimizados para velocidad
+        // Formatos de código de barras soportados - Ampliado para mayor compatibilidad
         hints.set(DecodeHintType.POSSIBLE_FORMATS, [
             BarcodeFormat.EAN_13,
             BarcodeFormat.CODE_128,
             BarcodeFormat.QR_CODE,
             BarcodeFormat.UPC_A,
             BarcodeFormat.EAN_8,
-            // Formatos secundarios
-            // BarcodeFormat.CODE_39,
-            // BarcodeFormat.ITF,
+            BarcodeFormat.CODE_39,
+            BarcodeFormat.ITF,
         ])
         // Configuraciones adicionales para mejor detección
         hints.set(DecodeHintType.TRY_HARDER, true)
@@ -101,13 +101,13 @@ export function BarcodeScanner({
                 // con getUserMedia ANTES de poder enumerar dispositivos
                 addDebugLog('Solicitando permisos cámara...')
 
-                // Solicitar permiso de cámara con resolución HD para mejor enfoque en códigos barras
+                // Solicitar permiso de cámara con configuración más compatible
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: {
                         facingMode: { ideal: 'environment' },
-                        // Preferir 720p/1080p para mejor detalle en códigos de barras
-                        width: { min: 1280, ideal: 1920, max: 2560 },
-                        height: { min: 720, ideal: 1080, max: 1440 },
+                        // Usar ideal en lugar de min/max estrictos para evitar OverconstrainedError
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
                         // @ts-ignore
                         focusMode: { ideal: 'continuous' },
                         // @ts-ignore
@@ -374,7 +374,7 @@ export function BarcodeScanner({
                     )}
 
                     {/* Panel de Debug (visible en móvil) */}
-                    {debugLogs.length > 0 && (
+                    {showDebug && debugLogs.length > 0 && (
                         <div className="bg-black/80 rounded-lg p-2 text-xs font-mono text-green-400 max-h-24 overflow-y-auto">
                             <div className="text-white/50 mb-1">Debug:</div>
                             {debugLogs.map((log, i) => (
@@ -383,10 +383,20 @@ export function BarcodeScanner({
                         </div>
                     )}
 
-                    <div className="flex gap-2">
-                        <Button variant="outline" className="flex-1" onClick={onClose}>
-                            Cancelar
-                        </Button>
+                    <div className="flex flex-col gap-2">
+                        <div className="flex gap-2">
+                            <Button variant="outline" className="flex-1" onClick={onClose}>
+                                Cancelar
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-xs text-muted-foreground"
+                                onClick={() => setShowDebug(!showDebug)}
+                            >
+                                {showDebug ? 'Ocultar Debug' : 'Debug'}
+                            </Button>
+                        </div>
                     </div>
                 </CardContent>
             </Card>

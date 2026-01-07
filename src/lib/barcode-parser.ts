@@ -15,6 +15,7 @@ export interface BarcodeResult {
   isValid: boolean
   isWeightCode: boolean
   plu: string | null
+  pluExtended?: string | null
   weight: number | null
   rawCode: string
   error?: string
@@ -95,12 +96,20 @@ export function parseBarcodeEAN13(code: string): BarcodeResult {
   }
 
   // Formato SDP: 20 + PLU(4) + FLAG(1) + PESO(5) + CHECK(1)
+  // O Alternativa 5 dígitos PLU: 20 + PLU(5) + PESO(5) + CHECK(1)
+  // Como no podemos estar seguros, extraemos estándar pero permitimos variantes
   const pluRaw = rawCode.substring(2, 6)   // 4 dígitos de PLU (posición 2-5)
   const flag = rawCode.substring(6, 7)      // 1 dígito flag (posición 6)
   const weightRaw = rawCode.substring(7, 12)  // 5 dígitos de peso (posición 7-11)
 
+  // Variante 5 dígitos (si el formato es PPPPP sin flag)
+  // Esto es útil si el PLU real es de 5 dígitos (ej: 00055)
+  const pluRawExtended = rawCode.substring(2, 7)
+
   // Limpiar PLU: remover ceros a la izquierda
+  // Devolvemos el PLU estándar, pero getPLUVariants debería considerar pluRawExtended si es necesario
   const plu = pluRaw.replace(/^0+/, '') || '0'
+  const pluExtended = pluRawExtended.replace(/^0+/, '') || '0'
 
   // Convertir peso: los 5 dígitos representan gramos (ej: 11650 = 11.650 kg)
   const weightGrams = parseInt(weightRaw, 10)
@@ -119,6 +128,7 @@ export function parseBarcodeEAN13(code: string): BarcodeResult {
     isValid: true,
     isWeightCode: true,
     plu,
+    pluExtended,
     weight,
     rawCode
   }
@@ -141,6 +151,7 @@ export function parseGenericBarcode(code: string): BarcodeResult {
     isValid: true,
     isWeightCode: false,
     plu: rawCode,
+    pluExtended: rawCode,
     weight: null,
     rawCode
   }
