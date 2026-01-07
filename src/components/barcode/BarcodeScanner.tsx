@@ -137,9 +137,15 @@ export function BarcodeScanner({
                 // Asignar stream al video y mostrarlo
                 videoRef.current.srcObject = stream
                 streamRef.current = stream
+                addDebugLog('Stream asignado al video')
 
                 // Esperar a que el video esté listo para reproducir
-                await videoRef.current.play()
+                try {
+                    await videoRef.current.play()
+                    addDebugLog('Video reproduciendo')
+                } catch (playError: any) {
+                    addDebugLog(`⚠️ Play error: ${playError.message}`, true)
+                }
 
                 const track = stream.getVideoTracks()[0]
                 const settings = track.getSettings()
@@ -263,10 +269,11 @@ export function BarcodeScanner({
                             </Button>
                         </div>
                     ) : (
-                        <div className="relative aspect-[4/3] bg-black rounded-lg overflow-hidden">
+                        <div className="relative bg-black rounded-lg overflow-hidden" style={{ minHeight: '300px' }}>
                             <video
                                 ref={videoRef}
                                 className="w-full h-full object-cover"
+                                style={{ minHeight: '300px' }}
                                 playsInline
                                 muted
                                 autoPlay
