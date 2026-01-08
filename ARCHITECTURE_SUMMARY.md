@@ -1,6 +1,6 @@
 # 🏗️ Arquitectura del Sistema - Avícola del Sur ERP
 
-**Cambio reciente:** Se implementó sistema de Rendimientos Esperados, Predicción IA, Navegación Libre y distinción de Desperdicios Sólidos en el Módulo de Producción.
+**Cambio reciente:** Se implementó módulo de Conciliación Bancaria Automática con soporte de IA (Gemini), procesamiento de archivos en memoria, motor de reglas de matching y UI dedicada.
 
 ## 📋 TL;DR (Resumen Ejecutivo)
 

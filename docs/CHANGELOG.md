@@ -1,6 +1,24 @@
 # Changelog - Avícola del Sur ERP
 
-Historial de cambios del proyecto.
+
+## 2026-01-08 — Antigravity
+**Feat: Módulo de Conciliación Bancaria Automática**
+
+Se implementó un módulo completo para la conciliación de movimientos bancarios con pagos esperados:
+- **Conciliación Inteligente**: Motor de reglas (Monto, Fecha, DNI/CUIT) + Integración con IA (Gemini) para casos complejos.
+- **Importación Flexible**: Soporte para CSV, Excel y lectura visual de PDF/Imágenes mediante IA sin almacenamiento en disco.
+- **UI Dedicada**: Dashboard de 3 columnas para revisión eficiente, página de importación y herramientas de conciliación masiva.
+- **Seguridad**: Tablas con RLS restringidas a roles 'admin' y 'tesorero'.
+
+**Archivos principales:**
+- `src/app/tesoreria/conciliacion/*`
+- `src/lib/conciliacion/motor-conciliacion.ts`
+- `src/lib/conciliacion/gemini-matcher.ts`
+- `src/actions/conciliacion.actions.ts`
+- `supabase/migrations/20260107223000_conciliacion_bancaria.sql`
+
+---
+
 
 ## 2026-01-07 — Antigravity
 **Feat: Mejoras integrales Módulo Producción (Rendimientos, Predicciones, UI)**
