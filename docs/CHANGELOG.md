@@ -2,6 +2,36 @@
 
 
 ## 2026-01-08 — Antigravity
+**Fix: RLS en Rutas de Reparto y Coordenadas PostGIS**
+
+Se corrigió un error que impedía crear rutas de reparto desde la interfaz de usuario:
+- **RLS `rutas_reparto`**: Agregadas políticas `SELECT`, `INSERT`, `UPDATE` y `DELETE` para usuarios autenticados.
+- **RLS `detalles_ruta`**: Agregadas políticas `SELECT`, `INSERT`, `UPDATE` y `DELETE` para usuarios autenticados.
+- **Función RPC `fn_get_cliente_con_coordenadas`**: Corregida para extraer lat/lng desde tipo **PostGIS geometry** usando `ST_Y()` y `ST_X()` (antes fallaba tratando coordenadas como JSONB).
+- **Optimización de rutas**: Ahora funciona correctamente con Google Directions API.
+
+**Scripts SQL ejecutados directamente en Supabase:**
+```sql
+-- Políticas RLS rutas_reparto
+CREATE POLICY "rutas_reparto_select_authenticated" ON rutas_reparto FOR SELECT TO authenticated USING (true);
+CREATE POLICY "rutas_reparto_update_authenticated" ON rutas_reparto FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+
+-- Políticas RLS detalles_ruta  
+CREATE POLICY "detalles_ruta_select_authenticated" ON detalles_ruta FOR SELECT TO authenticated USING (true);
+CREATE POLICY "detalles_ruta_insert_authenticated" ON detalles_ruta FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "detalles_ruta_update_authenticated" ON detalles_ruta FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "detalles_ruta_delete_authenticated" ON detalles_ruta FOR DELETE TO authenticated USING (true);
+
+-- Fix función coordenadas PostGIS
+CREATE OR REPLACE FUNCTION fn_get_cliente_con_coordenadas(p_cliente_id UUID) ...
+  ST_Y(c.coordenadas::geometry) as lat,
+  ST_X(c.coordenadas::geometry) as lng,
+...
+```
+
+---
+
+## 2026-01-08 — Antigravity
 **Feat: Alias Bancarios para Clientes y Hard Delete**
 
 Se implementó sistema de Identificadores Adicionales (Alias) en Clientes para mejorar la conciliación bancaria inteligente:

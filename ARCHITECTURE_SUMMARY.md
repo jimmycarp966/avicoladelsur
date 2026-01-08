@@ -1,6 +1,6 @@
 # 🏗️ Arquitectura del Sistema - Avícola del Sur ERP
 
-**Cambio reciente:** Se implementó soporte integral para **Alias Bancarios / Identificadores Adicionales** en Clientes para conciliación bancaria inteligente. Permite asociar múltiples DNIs y nombres (ej: cónyuges) a un cliente. El motor de conciliación ahora busca por estos alias y usa sus nombres para el matching, resolviendo pagos de terceros automáticamente. También se agregó **Hard Delete** con limpieza de dependencias para clientes.
+**Cambio reciente:** Se corrigieron **políticas RLS** en tablas `rutas_reparto` y `detalles_ruta` que bloqueaban la creación de rutas desde la UI. Se actualizó la función RPC `fn_get_cliente_con_coordenadas` para extraer correctamente coordenadas desde tipo **PostGIS geometry** (antes fallaba tratándolas como JSONB). Ahora la optimización de rutas con Google Directions funciona correctamente.
 
 
 ## 📋 TL;DR (Resumen Ejecutivo)
