@@ -146,6 +146,12 @@ export default function ProduccionPage() {
                             <span className="hidden sm:inline">Configurar</span> Destinos
                         </Button>
                     </Link>
+                    <Link href="/almacen/produccion/rendimientos">
+                        <Button variant="outline" size="sm" className="md:size-default">
+                            <TrendingDown className="mr-2 h-4 w-4" />
+                            Rendimientos
+                        </Button>
+                    </Link>
                     <Link href="/almacen/produccion/configuracion">
                         <Button variant="outline" size="sm" className="md:size-default">
                             <Settings className="mr-2 h-4 w-4" />
