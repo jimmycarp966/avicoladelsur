@@ -1176,8 +1176,10 @@ export async function obtenerPedidosAction(
               id,
               cantidad_solicitada,
               peso_final,
-              precio_unitario,
-              subtotal,
+              precio_unit_est,
+              precio_unit_final,
+              subtotal_est,
+              subtotal_final,
               producto:productos(id, nombre, codigo, unidad_medida)
             )
           ),
