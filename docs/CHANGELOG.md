@@ -13,8 +13,10 @@ Se agregaron controles en la interfaz de "Destinos de Producción" para gestiona
 - `src/app/(admin)/(dominios)/almacen/produccion/destinos/page.tsx`
 - `ARCHITECTURE_SUMMARY.md`
 
-**Refinamieto UI (Desperdicio vs Merma):**
-Se ajustó el Resumen de Orden de Producción para separar explícitamente el **Desperdicio Sólido** (hueso, piel) de la **Merma Líquida** (pérdida de proceso), mejorando la claridad operativa.
+**Refinamiento UI (Desperdicio vs Merma):**
+- Separación visual de "Desperdicio Sólido" y "Merma de Proceso" en el resumen de orden.
+- Corrección de cálculo de merma líquida.
+- Configuración de flags `es_desperdicio` en destinos.
 
 ---
 
