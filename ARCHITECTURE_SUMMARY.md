@@ -287,9 +287,9 @@ supabase/                         # Scripts SQL y migraciones
   - `fn_obtener_clientes_morosos`: Lista de clientes con deuda, ordenados por días vencidos
   - `fn_actualizar_moras_facturas`: Calcula y actualiza moras en facturas vencidas
   - `fn_obtener_facturas_vencidas_cliente`: Facturas pendientes de un cliente con moras
-- **Sistema de Moras**:
-  - Página `/tesoreria/moratorias` con estadísticas de deuda total, moras y clientes bloqueados
-  - Tabla de clientes morosos ordenable por días vencidos
+- **Sistema de Moras** (integrado en Cuentas Corrientes):
+  - Integrado en `/tesoreria/cuentas-corrientes` con estadísticas de deuda total y moras
+  - Vista de clientes morosos ordenable por días vencidos
   - Cálculo de mora: `saldo * (porcentaje_mensual / 100) * (días_vencidos / 30)`
   - Días de gracia configurables por cliente (default 7)
   - Porcentaje de mora mensual configurable por cliente
