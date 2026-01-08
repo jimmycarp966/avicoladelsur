@@ -156,7 +156,7 @@ supabase/                         # Scripts SQL y migraciones
   - **Integración Balanza**: Preparado para balanza SDP BBC-4030 (indicador SDP 32)
   - **Detección de Peso Anómalo con Google Gemini AI (Diciembre 2025)**: 
     - Sistema IA que detecta errores de digitación en pesaje usando Google Gemini
-    - **Modelo**: `gemini-1.5-flash` (optimizado para latencia y costo)
+    - **Modelo**: `gemini-2.5-flash` (free tier con 5 RPM, 250K TPM, 20 RPD)
     - Analiza contexto: producto, peso solicitado vs ingresado
     - Detecta: teclas equivocadas, dígitos duplicados, orden de magnitud incorrecto
     - Diálogo de confirmación con badge "🤖 Google AI"
