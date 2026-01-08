@@ -241,10 +241,14 @@ export default async function EntregaDetallePage({ params }: PageProps) {
           producto: dp.producto
         }))
 
+        // Construir pedido base - puede ser null si es pedido agrupado sin datos directos
+        const pedidoBase = (detalleRutaPadre.pedido as any) || {}
+
         entrega = {
           ...detalleRutaPadre, // Heredar props del padre (incluye orden_entrega del detalle_ruta)
           id: entregaIndividual.id, // SOBRESCRIBIR ID con el de la entrega individual
           detalle_ruta_id_padre: detalleRutaPadre.id, // Guardar ref al padre por si acaso
+          pedido_id: entregaIndividual.pedido_id, // Agregar pedido_id a nivel raíz también
           estado_entrega: entregaIndividual.estado_entrega, // Estado especifico
           fecha_hora_entrega: entregaIndividual.fecha_hora_entrega,
           // Usar orden_entrega de la entrega individual si existe, sino del padre
@@ -257,8 +261,8 @@ export default async function EntregaDetallePage({ params }: PageProps) {
           metodo_pago_registrado: entregaIndividual.metodo_pago,
           // Cliente especifico de esta entrega
           pedido: {
-            ...(detalleRutaPadre.pedido as any),
-            // IMPORTANTE: Usar el pedido_id de la entrega individual
+            ...pedidoBase,
+            // IMPORTANTE: Asegurar que id SIEMPRE tenga el pedido_id de la entrega
             id: entregaIndividual.pedido_id,
             cliente: entregaIndividual.cliente,
             // Usar productos del PRESUPUESTO original
@@ -269,6 +273,13 @@ export default async function EntregaDetallePage({ params }: PageProps) {
           // Factura asociada a esta entrega
           factura: facturaData
         }
+
+        console.log('[EntregaDetallePage] Entrega construida:', {
+          entregaId: entrega.id,
+          pedidoId: entrega.pedido?.id,
+          pedidoIdRaiz: entrega.pedido_id,
+          clienteNombre: entrega.pedido?.cliente?.nombre
+        })
       }
     }
   }

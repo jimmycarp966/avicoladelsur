@@ -91,8 +91,12 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
     console.log('[handleRegistrarPago] pedido:', pedido)
     console.log('[handleRegistrarPago] pedido?.id:', pedido?.id)
     console.log('[handleRegistrarPago] entrega.id:', entrega.id)
+    console.log('[handleRegistrarPago] entrega.pedido_id:', (entrega as any).pedido_id)
 
-    if (!pedido?.id) {
+    // Usar pedido?.id o fallback a entrega.pedido_id (para entregas individuales)
+    const pedidoId = pedido?.id || (entrega as any).pedido_id
+
+    if (!pedidoId) {
       toast.error('Error: No se encontró el ID del pedido')
       return
     }
@@ -106,7 +110,7 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
 
     // Preparar datos según el estado de pago
     const bodyData: any = {
-      pedido_id: pedido.id,
+      pedido_id: pedidoId, // Usar la variable con fallback
       entrega_id: entrega.id, // Para entregas individuales (pedidos agrupados)
       notas_entrega: notasEntrega || undefined,
     }
