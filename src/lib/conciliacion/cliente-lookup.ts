@@ -40,8 +40,22 @@ export async function buscarClientesPorDNIBatch(
     console.log('[ClienteLookup] Cliente Supabase creado para batch.');
 
     // 1. Buscar en tabla PRINCIPAL (clientes)
-    const condiciones = dnisUnicos.map(dni => `cuit.ilike.%${dni}%`).join(',')
-    console.log(`[ClienteLookup] Condición 'or' generada para clientes: ${condiciones}`);
+    // Generar variantes con y sin guiones para mejorar el match
+    const terminosBusqueda = new Set<string>()
+    dnisUnicos.forEach(dni => {
+        terminosBusqueda.add(dni) // Plano
+        if (dni.length === 11) {
+            // Formato XX-XXXXXXXX-X
+            terminosBusqueda.add(`${dni.slice(0, 2)}-${dni.slice(2, 10)}-${dni.slice(10, 11)}`)
+        }
+    })
+
+    // Convertir a array para generar query
+    const terminosArray = Array.from(terminosBusqueda)
+    console.log(`[ClienteLookup] Términos de búsqueda generados (variantes):`, terminosArray);
+
+    const condiciones = terminosArray.map(t => `cuit.ilike.%${t}%`).join(',')
+    console.log(`[ClienteLookup] Condición 'or' generada para clientes (longitud query aprox): ${condiciones.length}`);
 
     const { data: clientes, error } = await supabase
         .from('clientes')
@@ -81,7 +95,8 @@ export async function buscarClientesPorDNIBatch(
     // Por ahora buscamos TODOS los alias, por si acaso.
 
     try {
-        const condicionesAlias = dnisUnicos.map(dni => `dni_cuit.ilike.%${dni}%`).join(',')
+        // Usar los mismos términos (variantes) para buscar en alias
+        const condicionesAlias = terminosArray.map(t => `dni_cuit.ilike.%${t}%`).join(',')
         console.log(`[ClienteLookup] Buscando en identificadores adicionales...`)
 
         const { data: aliasList, error: aliasError } = await supabase
