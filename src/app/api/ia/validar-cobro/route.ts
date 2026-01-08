@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { GEMINI_MODEL_FLASH } from '@/lib/constants/gemini-models'
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '')
 
@@ -85,7 +86,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<ValidarCo
         let sugerencia = ''
         if (nivelRiesgo === 'alto' && alertas.length > 0) {
             try {
-                const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+                const model = genAI.getGenerativeModel({ model: GEMINI_MODEL_FLASH })
 
                 const prompt = `Eres un auditor de una empresa avícola. Se detectó una anomalía en un cobro:
 

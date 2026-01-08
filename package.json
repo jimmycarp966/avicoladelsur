@@ -15,6 +15,7 @@
     "test:sucursales": "npx tsx scripts/test-sucursales-robot.ts"
   },
   "dependencies": {
+    "@google-cloud/storage-mcp": "^0.3.2",
     "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "^5.2.2",
     "@mediapipe/tasks-vision": "^0.10.22-rc.20250304",
@@ -52,6 +53,7 @@
     "dotenv": "^17.2.3",
     "framer-motion": "^12.23.25",
     "google-auth-library": "^10.5.0",
+    "googleapis": "^170.0.0",
     "html5-qrcode": "^2.3.8",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.552.0",
@@ -70,6 +72,7 @@
     "three": "^0.181.2",
     "xlsx": "^0.18.5",
     "zod": "^4.3.5",
+    "zod-to-json-schema": "^3.25.1",
     "zustand": "^5.0.8"
   },
   "devDependencies": {

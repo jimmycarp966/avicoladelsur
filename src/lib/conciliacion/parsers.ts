@@ -3,12 +3,13 @@ import { parse } from 'csv-parse/sync'
 import * as XLSX from 'xlsx'
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { config } from "@/lib/config"
+import { GEMINI_MODEL_PRO } from "@/lib/constants/gemini-models"
 
-// Instancia de Gemini para parseo visual - usar modelo configurado
+// Instancia de Gemini para parseo visual de documentos
 const apiKey = config.googleCloud.gemini.apiKey || process.env.GOOGLE_GEMINI_API_KEY
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null
-// Usar el modelo configurado (gemini-3-pro-preview por defecto o el configurado)
-const modelName = config.googleCloud.gemini.model || "gemini-3-pro-preview"
+// Modelo PRO para análisis profundo de documentos (PDFs, imágenes)
+const modelName = GEMINI_MODEL_PRO
 
 // Configuración de tolerancia (configurable)
 export const TOLERANCIA_MONTO_PORCENTAJE = 2 // 2% de diferencia aceptable

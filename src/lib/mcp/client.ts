@@ -32,12 +32,14 @@ export class AvicolaMCPClient {
      * Conecta a un servidor MCP local o remoto
      * @param command Comando para ejecutar el servidor (ej: 'npx')
      * @param args Argumentos del comando
+     * @param env Variables de entorno opcionales para el proceso hijo
      */
-    async connectStdio(command: string, args: string[]) {
+    async connectStdio(command: string, args: string[], env?: Record<string, string>) {
         try {
             this.transport = new StdioClientTransport({
                 command,
                 args,
+                env,
             });
 
             await this.client.connect(this.transport);

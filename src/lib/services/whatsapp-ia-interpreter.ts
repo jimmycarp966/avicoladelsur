@@ -6,6 +6,7 @@
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { GEMINI_MODEL_FLASH } from '@/lib/constants/gemini-models'
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '')
 
@@ -53,8 +54,8 @@ export async function interpretarMensajeConIA(
     historialConversacion?: string[]
 ): Promise<InterpretacionResponse> {
     try {
-        // Intentar con Gemini
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+        // Intentar con Gemini - modelo flash estandarizado
+        const model = genAI.getGenerativeModel({ model: GEMINI_MODEL_FLASH })
 
         const historialContext = historialConversacion && historialConversacion.length > 0
             ? `Historial reciente:\n${historialConversacion.slice(-5).join('\n')}\n\n`
@@ -233,7 +234,7 @@ export async function generarRespuestaIA(
     }
 ): Promise<string> {
     try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+        const model = genAI.getGenerativeModel({ model: GEMINI_MODEL_FLASH })
 
         const prompt = `Eres el bot de WhatsApp de una avícola argentina. Genera una respuesta amigable y concisa.
 

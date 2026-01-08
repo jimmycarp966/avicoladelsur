@@ -4,6 +4,7 @@
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { GEMINI_MODEL_FLASH } from '@/lib/constants/gemini-models'
 
 // Inicializar cliente de Gemini
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '')
@@ -27,8 +28,8 @@ export interface DatosPesaje {
  */
 export async function analizarPesoConIA(datos: DatosPesaje): Promise<AnalisisPesoAnomalo> {
     try {
-        // NOTA: Se usa gemini-2.5-flash intencionalmente (versión específica funcional para este módulo)
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+        // Modelo flash estandarizado para análisis rápidos
+        const model = genAI.getGenerativeModel({ model: GEMINI_MODEL_FLASH })
 
         const prompt = `Eres un asistente experto en control de calidad para una avícola. 
 Analiza si hay un posible ERROR DE DIGITACIÓN en el siguiente pesaje:

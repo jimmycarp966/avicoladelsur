@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { GEMINI_MODEL_FLASH } from '@/lib/constants/gemini-models'
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '')
 
@@ -103,7 +104,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<Clasifica
 
         // Intentar con Gemini AI
         try {
-            const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+            const model = genAI.getGenerativeModel({ model: GEMINI_MODEL_FLASH })
 
             const prompt = `Eres un asistente de contabilidad para una empresa avícola argentina.
 Debes clasificar el siguiente gasto en UNA de estas categorías:

@@ -36,17 +36,35 @@ Sistema ERP modular completo para Avícola del Sur que unifica Almacén (WMS), V
 | **Google Speech-to-Text** | Transcripción de voz (es-AR) | `GOOGLE_SPEECH_TO_TEXT_ENABLED` | 🔧 Configurado |
 | **Google Vertex AI** | ML/AI avanzado | `GOOGLE_VERTEX_AI_ENABLED` | 🔧 Configurado |
 
-#### 🤖 **Funcionalidades Gemini AI Implementadas (Diciembre 2025)**
+#### 🤖 **Modelos Gemini AI Estandarizados (Enero 2026)**
 
-| Funcionalidad | Endpoint/Archivo | Descripción |
-|---------------|------------------|-------------|
-| Detección peso anómalo | `/api/almacen/analizar-peso` | Detecta errores de digitación en pesaje |
-| Clasificación de gastos | `/api/ia/clasificar-gasto` | Sugiere categoría de gastos automáticamente |
-| Clientes en riesgo | `/api/ia/clientes-riesgo` | Detecta clientes con riesgo de abandono |
-| Predicción de stock | `/api/ia/prediccion-stock` | Predice demanda de productos |
-| Validación de cobros | `/api/ia/validar-cobro` | Detecta anomalías/fraudes en cobros |
-| Auditoría automática | `fn_auditar_cobros_automatico` | pg_cron cada 4h, notifica anomalías |
-| Bot WhatsApp inteligente | `whatsapp-ia-interpreter.ts` | Interpreta mensajes en lenguaje natural |
+| Modelo | Constante | Uso |
+|--------|-----------|-----|
+| `gemini-2.5-flash` | `GEMINI_MODEL_FLASH` | Tareas rápidas: clasificaciones, detecciones, chat, matching |
+| `gemini-3-pro` | `GEMINI_MODEL_PRO` | Análisis complejos: parseo de documentos, reportes inteligentes |
+
+**Archivo de constantes**: `src/lib/constants/gemini-models.ts`
+
+#### 🤖 **Funcionalidades Gemini AI Implementadas (Enero 2026)**
+
+| Funcionalidad | Endpoint/Archivo | Modelo |
+|---------------|------------------|--------|
+| Detección peso anómalo | `/api/almacen/analizar-peso` | FLASH |
+| Clasificación de gastos | `/api/ia/clasificar-gasto` | FLASH |
+| Validación de cobros | `/api/ia/validar-cobro` | FLASH |
+| Bot WhatsApp inteligente | `whatsapp-ia-interpreter.ts` | FLASH |
+| Conciliación bancaria (parseo) | `conciliacion/parsers.ts` | PRO |
+| Matching de transacciones | `conciliacion/gemini-matcher.ts` | FLASH |
+
+#### 🔌 **Model Context Protocol (MCP) - Enero 2026**
+
+| Servidor MCP | Paquete | Uso | Estado |
+|--------------|---------|-----|--------|
+| **Sheets Personalizado** | `src/lib/mcp/servers/sheets-server.ts` | Leer/crear hojas de cálculo | ✅ Activo |
+| **Google Storage** | `@google-cloud/storage-mcp` | Gestión de PDFs y archivos | ✅ Configurado |
+| **Supabase** | `supabase-mcp-server` | Consultas BD vía IA | ✅ Activo |
+
+**Hub de configuración**: `src/lib/mcp/mcp-hub.ts`
 
 #### 🔔 **Sistema de Notificaciones Centralizado**
 
@@ -883,5 +901,5 @@ Para el flujo de registro de nuevos clientes, el bot implementa una máquina de 
 
 ---
 
-*Resumen actualizado el 05/01/2026 - Flujo Secuencial en Órdenes de Producción + Optimización del Escáner de Código de Barras + QA Automation + Seguridad RLS + Fixes Críticos Reparto + PRD generado + Sistema de Producción/Desposte + Integración Balanza SDP BBC-4030 + Sistema de Moras y Moratorias + Gestión de Cuenta Corriente + Facturas con Estado de Pago + Mejoras en Validación de Rutas + Navegación integrada con voz + Correcciones de Optimización de Rutas + Estabilización de Dashboard Repartidor + Sistema de recargos por método de pago + Corrección de lógica de precios mayoristas en sucursales + Configuración de productos mayoristas implementada + Modelo de control para sucursales + Mejoras de UX y manejo de admins*
+*Resumen actualizado el 08/01/2026 - Auditoría Google Cloud + Estandarización Modelos Gemini + MCP Hub Configurado + Flujo Secuencial en Órdenes de Producción + Optimización del Escáner de Código de Barras + QA Automation + Seguridad RLS + Fixes Críticos Reparto + PRD generado + Sistema de Producción/Desposte + Integración Balanza SDP BBC-4030 + Sistema de Moras y Moratorias + Gestión de Cuenta Corriente + Facturas con Estado de Pago + Mejoras en Validación de Rutas + Navegación integrada con voz + Correcciones de Optimización de Rutas + Estabilización de Dashboard Repartidor + Sistema de recargos por método de pago + Corrección de lógica de precios mayoristas en sucursales + Configuración de productos mayoristas implementada + Modelo de control para sucursales + Mejoras de UX y manejo de admins*
 

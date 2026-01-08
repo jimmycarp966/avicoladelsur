@@ -1,12 +1,13 @@
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { config } from "@/lib/config"
 import { MovimientoBancario, PagoEsperado } from "@/types/conciliacion"
+import { GEMINI_MODEL_FLASH } from "@/lib/constants/gemini-models"
 
 // Initialize Gemini
 const apiKey = config.googleCloud.gemini.apiKey || process.env.GOOGLE_GEMINI_API_KEY
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null
-// Usar modelo flash para rapidez y costo
-const modelName = "gemini-1.5-flash"
+// Usar modelo flash estandarizado para rapidez y costo
+const modelName = GEMINI_MODEL_FLASH
 
 interface GeminiMatchResponse {
     match_id: string | null
