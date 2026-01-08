@@ -30,8 +30,20 @@ import {
     Edit2,
     Package,
     ArrowLeft,
-    Check
+    Check,
+    MoreHorizontal,
+    Recycle,
+    Trash
 } from 'lucide-react'
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+    DropdownMenuCheckboxItem,
+} from "@/components/ui/dropdown-menu"
 import Link from 'next/link'
 import { toast } from 'sonner'
 import {
@@ -40,7 +52,8 @@ import {
     actualizarDestinoProduccionAction,
     eliminarDestinoProduccionAction,
     asociarProductoDestinoAction,
-    desasociarProductoDestinoAction
+    desasociarProductoDestinoAction,
+    actualizarDesperdicioProductoAction
 } from '@/actions/destinos-produccion.actions'
 import { obtenerProductosAction } from '@/actions/almacen.actions'
 import type { DestinoProduccion, Producto } from '@/types/domain.types'
@@ -180,6 +193,34 @@ export default function DestinosProduccionPage() {
             }
         } catch (error) {
             toast.error('Error al desasociar')
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handleToggleDesperdicio = async (
+        destinoId: string,
+        productoId: string,
+        esDesperdicio: boolean,
+        esDesperdicioSolido: boolean
+    ) => {
+        setLoading(true)
+        try {
+            const result = await actualizarDesperdicioProductoAction(
+                destinoId,
+                productoId,
+                esDesperdicio,
+                esDesperdicioSolido
+            )
+
+            if (result.success) {
+                toast.success('Configuración actualizada')
+                await cargarDatos()
+            } else {
+                toast.error(result.message || 'Error al actualizar')
+            }
+        } catch (error) {
+            toast.error('Error al actualizar desperdicio')
         } finally {
             setLoading(false)
         }
@@ -331,15 +372,49 @@ export default function DestinosProduccionPage() {
                                                 <Badge
                                                     key={dp.producto_id}
                                                     variant={dp.es_desperdicio ? 'destructive' : 'secondary'}
-                                                    className="flex items-center gap-1"
+                                                    className="flex items-center gap-1 pr-1"
                                                 >
+                                                    {dp.es_desperdicio && (
+                                                        <Recycle className="h-3 w-3 mr-1" />
+                                                    )}
                                                     {dp.producto_nombre || dp.producto?.nombre}
-                                                    <button
-                                                        onClick={() => handleDesasociarProducto(destino.id, dp.producto_id)}
-                                                        className="ml-1 hover:bg-black/10 rounded-full p-0.5"
-                                                    >
-                                                        <Trash2 className="h-3 w-3" />
-                                                    </button>
+
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <button className="ml-1 p-0.5 hover:bg-black/10 rounded-full focus:outline-none">
+                                                                <MoreHorizontal className="h-3 w-3" />
+                                                            </button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="start">
+                                                            <DropdownMenuLabel className="text-xs">Configuración</DropdownMenuLabel>
+                                                            <DropdownMenuSeparator />
+                                                            <DropdownMenuCheckboxItem
+                                                                checked={dp.es_desperdicio}
+                                                                onCheckedChange={(checked) =>
+                                                                    handleToggleDesperdicio(destino.id, dp.producto_id, checked, dp.es_desperdicio_solido)
+                                                                }
+                                                            >
+                                                                Es Desperdicio
+                                                            </DropdownMenuCheckboxItem>
+                                                            <DropdownMenuCheckboxItem
+                                                                checked={dp.es_desperdicio_solido}
+                                                                disabled={!dp.es_desperdicio}
+                                                                onCheckedChange={(checked) =>
+                                                                    handleToggleDesperdicio(destino.id, dp.producto_id, dp.es_desperdicio, checked)
+                                                                }
+                                                            >
+                                                                Es Desperdicio Sólido
+                                                            </DropdownMenuCheckboxItem>
+                                                            <DropdownMenuSeparator />
+                                                            <DropdownMenuItem
+                                                                className="text-destructive focus:text-destructive"
+                                                                onClick={() => handleDesasociarProducto(destino.id, dp.producto_id)}
+                                                            >
+                                                                <Trash2 className="mr-2 h-4 w-4" />
+                                                                Quitar producto
+                                                            </DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
                                                 </Badge>
                                             ))}
                                         </div>

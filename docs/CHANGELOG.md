@@ -2,6 +2,23 @@
 
 
 ## 2026-01-08 — Antigravity
+**Feat: Configuración de Desperdicios en Destinos de Producción**
+
+Se agregaron controles en la interfaz de "Destinos de Producción" para gestionar la clasificación de productos como desperdicio:
+- **Toggles UI**: Menú desplegable en cada producto asociado para marcar/desmarcar "Es Desperdicio" y "Es Desperdicio Sólido".
+- **Visualización**: Icono de reciclaje ♻️ para identificar visualmente los productos marcados como desperdicio.
+- **Acciones**: Integración con `actualizarDesperdicioProductoAction` para persistir los cambios.
+
+**Archivos modificados:**
+- `src/app/(admin)/(dominios)/almacen/produccion/destinos/page.tsx`
+- `ARCHITECTURE_SUMMARY.md`
+
+**Refinamieto UI (Desperdicio vs Merma):**
+Se ajustó el Resumen de Orden de Producción para separar explícitamente el **Desperdicio Sólido** (hueso, piel) de la **Merma Líquida** (pérdida de proceso), mejorando la claridad operativa.
+
+---
+
+## 2026-01-08 — Antigravity
 **Feat: Módulo de Conciliación Bancaria Automática**
 
 Se implementó un módulo completo para la conciliación de movimientos bancarios con pagos esperados:

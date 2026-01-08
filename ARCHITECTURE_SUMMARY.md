@@ -1,6 +1,6 @@
 # 🏗️ Arquitectura del Sistema - Avícola del Sur ERP
 
-**Cambio reciente:** Módulo de Conciliación Bancaria completamente refactorizado. Nuevo flujo: sube PDF de sábana bancaria + múltiples imágenes de comprobantes → IA (Gemini) extrae datos → matching automático → busca cliente por DNI/CUIT → acredita saldos en cuentas corrientes → genera reporte PDF. Preparado para integración futura con sucursales y bot de WhatsApp.
+**Cambio reciente:** Se agregaron controles de UI en "Destinos de Producción" para configurar productos como Desperdicio y Desperdicio Sólido, permitiendo diferenciar mermas en el cálculo de producción.
 
 
 ## 📋 TL;DR (Resumen Ejecutivo)
@@ -171,7 +171,7 @@ supabase/                         # Scripts SQL y migraciones
     - **Predicción IA**: Sugerencia automática de pesos basada en rendimientos configurados.
     - **Alertas de Desviación**: Visualización inmediata en UI de desviaciones fuera de tolerancia (amarillo/rojo).
     - **Desperdicios Sólidos**: Distinción entre Merma Líquida y Desperdicio Sólido (ej: Piel) para cálculos precisos.
-  - **Desperdicio**: Calculado como diferencia final (peso consumido - peso generado - desperdicio sólido)
+  - **Desperdicio**: Se divide en "Desperdicio Sólido" (pesado) y "Merma de Proceso" (líquido/invisible = salida - entrada total)
   - **Integración Balanza**: Preparado para balanza SDP BBC-4030 (indicador SDP 32)
   - **Detección de Peso Anómalo con Google Gemini AI (Diciembre 2025)**: 
     - Sistema IA que detecta errores de digitación en pesaje usando Google Gemini

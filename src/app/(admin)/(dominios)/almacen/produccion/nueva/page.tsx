@@ -25,7 +25,8 @@ import {
     Trash2,
     Factory,
     AlertCircle,
-    Target
+    Target,
+    Droplets
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -307,9 +308,21 @@ export default function NuevaOrdenProduccionPage() {
     //       pesoTotalEntrada = lo que ENTRA al stock (generado)
     //       peso_kg en salidas = peso por unidad, se multiplica por cantidad
     const pesoTotalSalida = salidas.reduce((sum, s) => sum + (s.cantidad * (s.peso_kg || 0)), 0)
-    const pesoTotalEntrada = entradas.reduce((sum, e) => sum + (e.peso_kg || 0), 0)
-    const mermaKg = pesoTotalSalida - pesoTotalEntrada
-    const mermaPorcentaje = pesoTotalSalida > 0 ? (mermaKg / pesoTotalSalida) * 100 : 0
+
+    // Separar productos reales de desperdicios sólidos
+    const pesoTotalProducto = entradas
+        .filter(e => !e.es_desperdicio_solido)
+        .reduce((sum, e) => sum + (e.peso_kg || 0), 0)
+
+    const pesoTotalDesperdicioSolido = entradas
+        .filter(e => e.es_desperdicio_solido)
+        .reduce((sum, e) => sum + (e.peso_kg || 0), 0)
+
+    const pesoTotalEntrada = pesoTotalProducto + pesoTotalDesperdicioSolido
+
+    // Merma Líquida/Proceso = Lo que falta para llegar al total de salida
+    const mermaLiquidaKg = pesoTotalSalida - pesoTotalEntrada
+    const mermaLiquidaPorcentaje = pesoTotalSalida > 0 ? (mermaLiquidaKg / pesoTotalSalida) * 100 : 0
 
     // Crear orden al avanzar del paso 1 al 2
     const handleIniciarOrden = async () => {
@@ -1070,19 +1083,35 @@ export default function NuevaOrdenProduccionPage() {
                                     )
                                 })}
                             </div>
-                            <div className="mt-3 pt-3 border-t flex justify-between font-semibold text-lg">
-                                <span>Total generado:</span>
-                                <span className="text-green-600">{pesoTotalEntrada.toFixed(2)} kg</span>
+                            <div className="mt-3 pt-3 border-t">
+                                <div className="flex justify-between mb-1 text-sm text-muted-foreground">
+                                    <span>Producto Terminado:</span>
+                                    <span>{pesoTotalProducto.toFixed(2)} kg</span>
+                                </div>
+                                <div className="flex justify-between mb-2 text-sm text-orange-600">
+                                    <span>Desperdicio Sólido (Hueso/Piel):</span>
+                                    <span>{pesoTotalDesperdicioSolido.toFixed(2)} kg</span>
+                                </div>
+                                <div className="flex justify-between font-semibold text-lg border-t pt-2">
+                                    <span>Total generado:</span>
+                                    <span className="text-green-600">{pesoTotalEntrada.toFixed(2)} kg</span>
+                                </div>
                             </div>
                         </div>
 
-                        {/* Desperdicio final */}
-                        <div className={`p-4 rounded-lg ${mermaPorcentaje > 50 ? 'bg-red-100' : 'bg-yellow-100'}`}>
-                            <div className="flex justify-between text-lg">
-                                <span className="font-semibold">Desperdicio Total:</span>
-                                <span className={`font-bold ${mermaPorcentaje > 50 ? 'text-red-600' : 'text-orange-600'}`}>
-                                    {mermaKg.toFixed(2)} kg ({mermaPorcentaje.toFixed(1)}%)
+                        {/* Merma Líquida / Proceso */}
+                        <div className={`p-4 rounded-lg ${mermaLiquidaPorcentaje > 10 ? 'bg-red-100' : 'bg-blue-50'}`}>
+                            <div className="flex justify-between items-center mb-1">
+                                <span className="font-semibold flex items-center gap-2">
+                                    <Droplets className="h-4 w-4" />
+                                    Merma de Proceso / Líquida:
                                 </span>
+                                <span className={`font-bold ${mermaLiquidaPorcentaje > 10 ? 'text-red-600' : 'text-blue-700'}`}>
+                                    {mermaLiquidaKg.toFixed(2)} kg ({mermaLiquidaPorcentaje.toFixed(1)}%)
+                                </span>
+                            </div>
+                            <div className="text-xs text-muted-foreground ml-6">
+                                (Diferencia invisible entre Salida y entradas)
                             </div>
                         </div>
 
