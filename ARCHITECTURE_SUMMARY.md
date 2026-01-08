@@ -821,13 +821,13 @@ Para el flujo de registro de nuevos clientes, el bot implementa una máquina de 
 
 ---
 
-### **Sistema de Moras y Moratorias (Diciembre 2025)**
-- ✅ **Nueva página `/tesoreria/moratorias`**:
-  - Estadísticas: Clientes con deuda, Deuda total, Moras calculadas, Bloqueados
-  - Tabla de clientes morosos ordenable por días vencidos
+### **Sistema de Moras y Cuentas Corrientes (Diciembre 2025 - Enero 2026)**
+- ✅ **Integrado en `/tesoreria/cuentas-corrientes`**:
+  - Estadísticas: Clientes con deuda, Deuda total, Moras calculadas
+  - Vista de clientes morosos ordenable por días vencidos
   - Badges de urgencia según días: ⚠️ (1-7d), ⏰ (8-30d), 🔴 (31-60d), 🚨 (+60d)
   - Botones de contacto directo (teléfono, WhatsApp)
-  - Enlace a cuenta corriente del cliente
+  - Acceso directo desde cuenta corriente del cliente
 - ✅ **Botón "Recalcular Moras"** (`ActualizarMorasButton.tsx`):
   - Ejecuta función RPC `fn_actualizar_moras_facturas`
   - Muestra cantidad de facturas actualizadas y total de mora
@@ -840,7 +840,7 @@ Para el flujo de registro de nuevos clientes, el bot implementa una máquina de 
   - `porcentaje_mora_mensual`: % mensual a aplicar (default 0 = sin mora)
   - `mora_habilitada`: Flag para activar cálculo de moras
 - ✅ **Fórmula de mora**: `saldo * (porcentaje_mensual / 100) * (días_vencidos / 30)`
-- ✅ **Enlace en Sidebar**: "Moratorias" agregado en menú de Tesorería
+- ✅ **Enlace en Sidebar**: Acceso vía "Cuentas Corrientes" en menú de Tesorería
 
 ---
 

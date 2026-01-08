@@ -309,7 +309,7 @@ scripts/                         # Scripts de automatización
   - Estados: `pendiente`, `parcial`, `pagada`, `anulada`
   - Trigger automático actualiza estado según pagos recibidos
   - Tabla visual con badges y colores por estado
-- **Sistema de Moras** (`/tesoreria/moratorias`):
+- **Sistema de Moras** (integrado en `/tesoreria/cuentas-corrientes`):
   - Clientes morosos ordenados por días vencidos
   - Cálculo automático de mora: `saldo * (% mensual / 100) * (días / 30)`
   - Configuración por cliente: días de gracia, % mora mensual
