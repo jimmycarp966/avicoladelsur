@@ -4,7 +4,7 @@
 **Autor:** Antigravity
 
 **Resumen:**
-Se implementó soporte integral para Alias Bancarios en Clientes, permitiendo asociar múltiples DNIs para conciliación inteligente. También se habilitó Hard Delete para limpieza de clientes.
+Se implementó soporte integral para Alias Bancarios en Clientes, permitiendo asociar múltiples DNIs para conciliación inteligente. También se habilitó Hard Delete para limpieza de clientes y se mejoró la UX de Conciliación mostrando el detalle de las reglas de matching (etiquetas) en la tabla de revisión.
 
 **Archivos Detectados:**
 - src/actions/conciliacion.actions.ts

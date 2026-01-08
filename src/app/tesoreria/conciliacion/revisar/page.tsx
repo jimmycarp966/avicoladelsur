@@ -351,9 +351,20 @@ function RevisarConciliacionPage() {
                                             </TableCell>
                                             <TableCell>
                                                 {comp.confianza_score ? (
-                                                    <span className={`font-medium ${comp.confianza_score >= 0.7 ? 'text-green-600' : comp.confianza_score >= 0.4 ? 'text-yellow-600' : 'text-red-600'}`}>
-                                                        {Math.round(comp.confianza_score * 100)}%
-                                                    </span>
+                                                    <div className="flex flex-col">
+                                                        <span className={`font-medium ${comp.confianza_score >= 0.7 ? 'text-green-600' : comp.confianza_score >= 0.4 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                                            {Math.round(comp.confianza_score * 100)}%
+                                                        </span>
+                                                        {Array.isArray(comp.etiquetas) && comp.etiquetas.length > 0 && (
+                                                            <div className="flex flex-col gap-1 mt-1">
+                                                                {comp.etiquetas.map((tag, idx) => (
+                                                                    <span key={idx} className="text-[10px] text-muted-foreground leading-tight bg-gray-100 px-1 py-0.5 rounded border border-gray-200 w-fit whitespace-nowrap">
+                                                                        {tag}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 ) : '-'}
                                             </TableCell>
                                             <TableCell>

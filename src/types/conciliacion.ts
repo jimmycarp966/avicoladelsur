@@ -56,6 +56,7 @@ export interface ComprobanteConciliacion extends BaseEntity {
   cliente_id?: string
   movimiento_match_id?: string
   confianza_score?: number
+  etiquetas?: string[]
   // Para futuras integraciones
   sucursal_origen_id?: string
   origen: OrigenComprobante

@@ -7,7 +7,7 @@
 Se implementó sistema de Identificadores Adicionales (Alias) en Clientes para mejorar la conciliación bancaria inteligente:
 - **Base de Datos**: Nueva tabla `clientes_identificadores_adicionales`.
 - **UI Cliente**: Sección en formulario para gestionar múltiples DNIs y nombres (ej: cónyuges).
-- **Backend Conciliación**: Motor de matching actualizado para buscar por alias y validar nombres alternativos.
+- **Backend Conciliación**: Motor de matching actualizado para buscar por alias y validar nombres alternativos. Ahora persiste y muestra las razones del match (etiquetas) en la UI.
 - **Gestión Clientes**: Implementado Hard Delete (borrado físico) con limpieza manual de dependencias (`auditoria_listas_precios`, `identificadores`) para eliminación real de registros.
 
 **Archivos modificados:**

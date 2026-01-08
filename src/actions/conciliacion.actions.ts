@@ -220,7 +220,8 @@ export async function procesarConciliacionCompletaAction(formData: FormData): Pr
             confianza_score: r.confianza_score / 100,
             origen: 'manual' as const,
             acreditado: false,
-            notas: comprobantesParseados[i].error || null
+            notas: comprobantesParseados[i].error || null,
+            etiquetas: r.etiquetas || []
         }))
         console.log('[Conciliación Server] Comprobantes a guardar:', comprobantesParaDb.length)
 
@@ -454,6 +455,7 @@ export async function obtenerDetalleSesionAction(sesionId: string): Promise<{
             .from('comprobantes_conciliacion')
             .select(`
                 *,
+                etiquetas,
                 cliente:clientes(id, nombre, cuit),
                 movimiento_match:movimientos_bancarios(id, fecha, monto, referencia)
             `)
