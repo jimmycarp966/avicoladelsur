@@ -1,6 +1,7 @@
 # 🏗️ Arquitectura del Sistema - Avícola del Sur ERP
 
-**Cambio reciente:** Se implementó módulo de Conciliación Bancaria Automática con soporte de IA (Gemini), procesamiento de archivos en memoria, motor de reglas de matching y UI dedicada.
+**Cambio reciente:** Módulo de Conciliación Bancaria completamente refactorizado. Nuevo flujo: sube PDF de sábana bancaria + múltiples imágenes de comprobantes → IA (Gemini) extrae datos → matching automático → busca cliente por DNI/CUIT → acredita saldos en cuentas corrientes → genera reporte PDF. Preparado para integración futura con sucursales y bot de WhatsApp.
+
 
 ## 📋 TL;DR (Resumen Ejecutivo)
 

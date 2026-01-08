@@ -7,10 +7,120 @@ import { z } from 'zod'
 
 export type EstadoConciliacion = 'pendiente' | 'conciliado' | 'revisado' | 'descartado'
 export type TipoMatch = 'exacto' | 'automatico' | 'manual' | 'ia'
-export type OrigenPago = 'pedido' | 'factura' | 'manual'
+export type OrigenComprobante = 'manual' | 'sucursal' | 'whatsapp'
+export type EstadoValidacion = 'pendiente' | 'validado' | 'no_encontrado' | 'sin_cliente' | 'error'
+export type EstadoSesion = 'en_proceso' | 'completada' | 'con_errores'
 
 // ===========================================
-// DOMAIN INTERFACES
+// DOMAIN INTERFACES - Nuevo Flujo
+// ===========================================
+
+/**
+ * Sesión de conciliación: representa una ejecución completa del proceso
+ * (1 PDF sábana + N imágenes de comprobantes)
+ */
+export interface SesionConciliacion extends BaseEntity {
+  fecha: string
+  sabana_archivo: string
+  total_movimientos_sabana: number
+  total_comprobantes: number
+  validados: number
+  no_encontrados: number
+  monto_total_acreditado: number
+  usuario_id: string
+  reporte_url?: string
+  estado: EstadoSesion
+  notas?: string
+  // Relaciones
+  usuario?: {
+    id: string
+    nombre?: string
+    email?: string
+  }
+  comprobantes?: ComprobanteConciliacion[]
+}
+
+/**
+ * Comprobante de pago procesado (imagen de transferencia)
+ */
+export interface ComprobanteConciliacion extends BaseEntity {
+  sesion_id: string
+  fecha?: string
+  monto: number
+  dni_cuit?: string
+  referencia?: string
+  descripcion?: string
+  // Estado de validación
+  estado_validacion: EstadoValidacion
+  // Relaciones encontradas
+  cliente_id?: string
+  movimiento_match_id?: string
+  confianza_score?: number
+  // Para futuras integraciones
+  sucursal_origen_id?: string
+  origen: OrigenComprobante
+  // Metadatos
+  notas?: string
+  acreditado: boolean
+  // Relaciones expandidas
+  cliente?: {
+    id: string
+    nombre: string
+    cuit?: string
+  }
+  movimiento_match?: MovimientoBancario
+}
+
+/**
+ * Datos extraídos de un comprobante (imagen) por Gemini
+ */
+export interface DatosComprobante {
+  fecha?: string
+  monto: number
+  dni_cuit?: string
+  referencia?: string
+  descripcion?: string
+  // Metadatos de extracción
+  confianza_extraccion?: number
+  campos_detectados?: string[]
+}
+
+/**
+ * Resultado de validación de un comprobante contra la sábana
+ */
+export interface ResultadoValidacion {
+  comprobante: DatosComprobante
+  estado: EstadoValidacion
+  movimiento_match?: MovimientoBancario
+  cliente?: {
+    id: string
+    nombre: string
+    cuit?: string
+  }
+  confianza_score: number
+  etiquetas: string[]
+  detalles: Record<string, number>
+  acreditado: boolean
+  error?: string
+}
+
+/**
+ * Resumen de una sesión de conciliación
+ */
+export interface ResumenConciliacion {
+  sesion_id: string
+  total_comprobantes: number
+  validados: number
+  no_encontrados: number
+  sin_cliente: number
+  errores: number
+  monto_total_acreditado: number
+  detalles: ResultadoValidacion[]
+  reporte_url?: string
+}
+
+// ===========================================
+// LEGACY INTERFACES (para compatibilidad)
 // ===========================================
 
 export interface CuentaBancaria extends BaseEntity {
@@ -23,7 +133,7 @@ export interface CuentaBancaria extends BaseEntity {
 }
 
 export interface MovimientoBancario extends BaseEntity {
-  cuenta_bancaria_id: string
+  cuenta_bancaria_id?: string
   fecha: string // YYYY-MM-DD
   monto: number
   referencia?: string
@@ -31,51 +141,9 @@ export interface MovimientoBancario extends BaseEntity {
   descripcion?: string
   archivo_origen?: string
   estado_conciliacion: EstadoConciliacion
-  metadata?: Record<string, any>
+  metadata?: Record<string, unknown>
   // Relaciones
   cuenta_bancaria?: CuentaBancaria
-  conciliaciones?: Conciliacion[]
-}
-
-export interface PagoEsperado extends BaseEntity {
-  pedido_id?: string
-  cliente_id?: string
-  monto_esperado: number
-  fecha_esperada?: string
-  referencia?: string
-  dni_cuit?: string
-  estado: 'pendiente' | 'conciliado' | 'cancelado'
-  origen: OrigenPago
-  // Relaciones
-  cliente?: {
-    id: string
-    nombre: string
-    cuit?: string
-  }
-  pedido?: {
-    id: string
-    numero_pedido: string
-    total: number
-  }
-}
-
-export interface Conciliacion extends BaseEntity {
-  movimiento_bancario_id: string
-  pago_esperado_id: string
-  monto_conciliado: number
-  diferencia: number
-  tipo_match: TipoMatch
-  confianza_score: number // 0-100
-  conciliado_por?: string
-  notas?: string
-  // Relaciones
-  movimiento_bancario?: MovimientoBancario
-  pago_esperado?: PagoEsperado
-  usuario?: {
-    id: string
-    nombre?: string
-    email?: string
-  }
 }
 
 // ===========================================
@@ -92,10 +160,23 @@ export const MovimientoBancarioSchema = z.object({
 
 export type MovimientoBancarioInput = z.infer<typeof MovimientoBancarioSchema>
 
-export const ConciliacionManualSchema = z.object({
-  movimientoBancarioId: z.string().uuid(),
-  pagoEsperadoId: z.string().uuid(),
-  notas: z.string().optional(),
+export const ComprobanteSchema = z.object({
+  fecha: z.string().optional(),
+  monto: z.number().positive(),
+  dni_cuit: z.string().optional(),
+  referencia: z.string().optional(),
+  descripcion: z.string().optional(),
 })
 
-export type ConciliacionManualInput = z.infer<typeof ConciliacionManualSchema>
+export type ComprobanteInput = z.infer<typeof ComprobanteSchema>
+
+// Schema para validación manual
+export const ValidacionManualSchema = z.object({
+  comprobanteId: z.string().uuid(),
+  clienteId: z.string().uuid().optional(),
+  movimientoId: z.string().uuid().optional(),
+  notas: z.string().optional(),
+  acreditar: z.boolean().default(true),
+})
+
+export type ValidacionManualInput = z.infer<typeof ValidacionManualSchema>

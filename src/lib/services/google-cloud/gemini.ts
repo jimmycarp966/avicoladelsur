@@ -3,9 +3,12 @@
  * 
  * Integración con Google Gemini API para generar reportes inteligentes
  * y análisis de datos en lenguaje natural.
+ * 
+ * Actualizado: Uso de SDK oficial @google/generative-ai
  */
 
-import { getAccessToken, isGoogleCloudConfigured } from './auth'
+import { GoogleGenerativeAI } from '@google/generative-ai'
+import { isGoogleCloudConfigured } from './auth'
 import { config } from '@/lib/config'
 
 export interface GeminiRequest {
@@ -21,21 +24,37 @@ export interface GeminiResponse {
   error?: string
 }
 
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1'
-
 /**
  * Verifica si Gemini está disponible
  */
 export function isGeminiAvailable(): boolean {
   return (
     isGoogleCloudConfigured() &&
-    !!config.googleCloud.gemini.apiKey &&
-    !!config.googleCloud.projectId
+    !!config.googleCloud.gemini.apiKey
   )
 }
 
 /**
- * Genera texto usando Gemini API
+ * Obtiene una instancia del modelo Gemini configurado
+ */
+function getGeminiModel(temperature: number = 0.7, maxTokens: number = 2048) {
+  const apiKey = config.googleCloud.gemini.apiKey || ''
+  const modelName = config.googleCloud.gemini.model // 'gemini-3-pro-preview' por defecto en config
+
+  const genAI = new GoogleGenerativeAI(apiKey)
+  return genAI.getGenerativeModel({
+    model: modelName,
+    generationConfig: {
+      temperature,
+      maxOutputTokens: maxTokens,
+      topP: 0.95,
+      topK: 40
+    }
+  })
+}
+
+/**
+ * Genera texto usando Gemini SDK
  */
 export async function generateText(
   request: GeminiRequest
@@ -48,51 +67,17 @@ export async function generateText(
   }
 
   try {
-    const apiKey = config.googleCloud.gemini.apiKey
-    const model = config.googleCloud.gemini.model
-
     // Construir prompt completo
-    const fullPrompt = request.context 
+    const fullPrompt = request.context
       ? `${request.context}\n\n${request.prompt}`
       : request.prompt
 
-    const requestBody = {
-      contents: [{
-        parts: [{
-          text: fullPrompt
-        }]
-      }],
-      generationConfig: {
-        temperature: request.temperature || 0.7,
-        maxOutputTokens: request.maxTokens || 2048,
-        topP: 0.95,
-        topK: 40
-      }
-    }
+    const model = getGeminiModel(request.temperature, request.maxTokens)
 
-    const response = await fetch(
-      `${GEMINI_API_URL}/models/${model}:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(requestBody)
-      }
-    )
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      return {
-        success: false,
-        error: `Gemini API error: ${response.status} - ${errorData.error?.message || response.statusText}`
-      }
-    }
-
-    const data = await response.json()
-
-    // Extraer texto generado
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text
+    // Generar contenido
+    const result = await model.generateContent(fullPrompt)
+    const response = await result.response
+    const text = response.text()
 
     if (!text) {
       return {
@@ -106,10 +91,10 @@ export async function generateText(
       text
     }
   } catch (error: any) {
-    console.error('Error al consultar Gemini API:', error)
+    console.error('Error al consultar Gemini SDK:', error)
     return {
       success: false,
-      error: error.message || 'Error desconocido al consultar Gemini API'
+      error: error.message || 'Error desconocido al consultar Gemini SDK'
     }
   }
 }
@@ -169,4 +154,5 @@ Si no tienes suficiente información, indícalo claramente.`
     temperature: 0.5
   })
 }
+
 
