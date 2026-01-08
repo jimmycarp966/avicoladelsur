@@ -484,7 +484,7 @@ export async function obtenerDetalleSesionAction(sesionId: string): Promise<{
  */
 export async function asignarClienteComprobanteAction(
     comprobanteId: string,
-    clienteId: string,
+    clienteId: string | null,
     acreditar: boolean = true
 ): Promise<{ success: boolean; error?: string }> {
     const supabase = await createClient()
@@ -510,8 +510,8 @@ export async function asignarClienteComprobanteAction(
             })
             .eq('id', comprobanteId)
 
-        // Acreditar si corresponde
-        if (acreditar && !comprobante.acreditado) {
+        // Acreditar si corresponde Y si hay cliente
+        if (clienteId && acreditar && !comprobante.acreditado) {
             const { acreditarPagosBatch } = await import('@/lib/conciliacion/acreditacion')
 
             await acreditarPagosBatch([{

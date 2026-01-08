@@ -104,28 +104,38 @@ function RevisarConciliacionPage() {
         setModalAbierto(true)
     }
 
-    const asignarCliente = async () => {
-        if (!comprobanteSeleccionado || !clienteIdInput) return
+    const procesarAsignacion = async (clienteId: string | null) => {
+        if (!comprobanteSeleccionado) return
 
         setProcesandoAsignacion(true)
         try {
             const result = await asignarClienteComprobanteAction(
                 comprobanteSeleccionado.id!,
-                clienteIdInput,
+                clienteId,
                 true
             )
 
             if (result.success) {
                 setModalAbierto(false)
-                cargarDatos() // Recargar datos
+                cargarDatos()
             } else {
                 alert(result.error)
             }
         } catch (err) {
-            alert('Error al asignar cliente')
+            alert('Error al procesar asignación')
         } finally {
             setProcesandoAsignacion(false)
         }
+    }
+
+    const asignarCliente = () => {
+        if (!clienteIdInput) return
+        procesarAsignacion(clienteIdInput)
+    }
+
+    const validarSinCliente = () => {
+        if (!confirm('¿Seguro que desea validar este comprobante sin asignarlo a un cliente? No se acreditará saldo en ninguna cuenta.')) return
+        procesarAsignacion(null)
     }
 
     const descartarComprobante = async (id: string) => {
@@ -369,20 +379,21 @@ function RevisarConciliacionPage() {
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex gap-2">
-                                                    {comp.estado_validacion === 'sin_cliente' && (
+                                                    {(comp.estado_validacion === 'sin_cliente' || comp.estado_validacion === 'pendiente') && (
                                                         <Button
                                                             size="sm"
                                                             variant="outline"
                                                             onClick={() => abrirModalAsignacion(comp)}
+                                                            className={comp.estado_validacion === 'pendiente' ? 'text-blue-600 hover:text-blue-700' : ''}
                                                         >
-                                                            Asignar Cliente
+                                                            {comp.estado_validacion === 'sin_cliente' ? 'Asignar Cliente' : 'Validar'}
                                                         </Button>
                                                     )}
                                                     {comp.estado_validacion !== 'validado' && !comp.acreditado && (
                                                         <Button
                                                             size="sm"
                                                             variant="ghost"
-                                                            className="text-red-600"
+                                                            className="text-red-600 hover:bg-red-50"
                                                             onClick={() => descartarComprobante(comp.id!)}
                                                         >
                                                             Descartar
@@ -421,6 +432,13 @@ function RevisarConciliacionPage() {
                                 <p><strong>Monto:</strong> {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(comprobanteSeleccionado.monto)}</p>
                                 <p><strong>DNI/CUIT:</strong> {comprobanteSeleccionado.dni_cuit || 'No detectado'}</p>
                                 <p><strong>Referencia:</strong> {comprobanteSeleccionado.referencia || 'Sin referencia'}</p>
+                                {comprobanteSeleccionado.etiquetas && comprobanteSeleccionado.etiquetas.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-2">
+                                        {comprobanteSeleccionado.etiquetas.map((t, i) => (
+                                            <Badge key={i} variant="secondary" className="text-xs">{t}</Badge>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
 
                             <div className="space-y-2">
@@ -437,23 +455,34 @@ function RevisarConciliacionPage() {
                         </div>
                     )}
 
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setModalAbierto(false)}>
-                            Cancelar
-                        </Button>
+                    <DialogFooter className="sm:justify-between flex-col sm:flex-row gap-2">
                         <Button
-                            onClick={asignarCliente}
-                            disabled={!clienteIdInput || procesandoAsignacion}
+                            type="button"
+                            variant="ghost"
+                            onClick={validarSinCliente}
+                            disabled={procesandoAsignacion}
+                            className="text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 sm:mr-auto w-full sm:w-auto"
                         >
-                            {procesandoAsignacion ? (
-                                <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Procesando...
-                                </>
-                            ) : (
-                                'Asignar y Acreditar'
-                            )}
+                            Validar sin Cliente
                         </Button>
+                        <div className="flex gap-2 w-full sm:w-auto justify-end">
+                            <Button variant="outline" onClick={() => setModalAbierto(false)}>
+                                Cancelar
+                            </Button>
+                            <Button
+                                onClick={asignarCliente}
+                                disabled={!clienteIdInput || procesandoAsignacion}
+                            >
+                                {procesandoAsignacion ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Procesando...
+                                    </>
+                                ) : (
+                                    'Asignar y Acreditar'
+                                )}
+                            </Button>
+                        </div>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
