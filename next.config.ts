@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   // Nota: Turbopack se habilita con --turbo flag, no en config
 
   // Configuración para Supabase
-  serverExternalPackages: ['@supabase/ssr'],
+  serverExternalPackages: ['@supabase/ssr', 'pdfkit'],
 
   // TEMPORAL: Deshabilitar TypeScript checking en build para evitar error interno de TS
   // con Zod v4 + @hookform/resolvers
@@ -27,9 +27,16 @@ const nextConfig: NextConfig = {
       '@radix-ui/react-tooltip',
       'date-fns',
       '@tanstack/react-table',
-      'sonner',
       'recharts',
     ],
+    serverActions: {
+      bodySizeLimit: '50mb',
+    },
+  },
+
+  // Configuración de Server Actions (Next 15/16)
+  serverActions: {
+    bodySizeLimit: '50mb',
   },
 
   // Headers de caché para assets estáticos

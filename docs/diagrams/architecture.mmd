@@ -21,6 +21,7 @@ graph TB
         TesoreriaActions["Tesorería Actions"]
         SucursalesActions["Sucursales Actions"]
         RRHHActions["RRHH Actions"]
+        ConciliacionActions["Conciliación Bancaria<br/>(Alias + IA)"]
     end
 
     subgraph ExternalAPIs["🌐 APIs Externas"]
@@ -46,7 +47,9 @@ graph TB
     AdminDashboard --> VentasActions
     AdminDashboard --> RepartoActions
     AdminDashboard --> TesoreriaActions
+    AdminDashboard --> TesoreriaActions
     AdminDashboard --> RRHHActions
+    AdminDashboard --> ConciliacionActions
 
     SucursalDashboard --> POSSucursal
     POSSucursal --> BarcodeScanner
@@ -60,6 +63,7 @@ graph TB
     ServerActions --> Storage
 
     AlmacenActions --> GoogleAI
+    ConciliacionActions --> GoogleAI
     VentasActions --> TwilioWhatsApp
     TesoreriaActions --> AFIPARCA
 
@@ -72,6 +76,6 @@ graph TB
     classDef external fill:#EC4899,stroke:#BE185D,color:white
     
     class WebApp,PWA,BarcodeScanner frontend
-    class AlmacenActions,VentasActions,RepartoActions,TesoreriaActions,SucursalesActions,RRHHActions backend
+    class AlmacenActions,VentasActions,RepartoActions,TesoreriaActions,SucursalesActions,RRHHActions,ConciliacionActions backend
     class Postgres,Auth,Storage,Realtime database
     class GoogleMaps,GoogleAI,TwilioWhatsApp,AFIPARCA external

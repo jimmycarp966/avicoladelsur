@@ -31,7 +31,8 @@ import {
     AlertTriangle,
     User,
     FileText,
-    Loader2
+    Loader2,
+    Info
 } from 'lucide-react'
 import {
     obtenerDetalleSesionAction,
@@ -263,6 +264,23 @@ function RevisarConciliacionPage() {
                     <CardTitle>Detalle de Comprobantes</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                    {/* Explicación Score */}
+                    <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 text-sm text-blue-800 mb-4">
+                        <div className="flex items-start gap-3">
+                            <Info className="h-5 w-5 mt-0.5 text-blue-600 flex-shrink-0" />
+                            <div>
+                                <h4 className="font-semibold mb-1">¿Cómo se calcula el Score de Confianza?</h4>
+                                <ul className="list-disc list-inside space-y-1 text-blue-700">
+                                    <li><strong>Referencia Exacta:</strong> Suma <strong>100 puntos</strong> (Match Infalible).</li>
+                                    <li><strong>Monto Exacto:</strong> Suma <strong>40 puntos</strong>.</li>
+                                    <li><strong>Identidad (DNI/Nombre):</strong> Suma <strong>40 puntos</strong> (Busca DNI o Nombre en descripción).</li>
+                                    <li><strong>Fecha:</strong> Suma <strong>20 puntos</strong> si es exacta.</li>
+                                    <li><strong>Umbral:</strong> Se requiere un score &ge; 80% para validación automática.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
                     <div className="flex gap-4 flex-wrap">
                         <div className="relative flex-1 min-w-[200px]">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />

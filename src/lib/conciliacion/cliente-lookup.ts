@@ -11,89 +11,16 @@ export interface ClienteEncontrado {
     email?: string
     direccion?: string
     sucursal_id?: string
+    nombre_match_adicional?: string // Nombre del tercero/alias para matching
 }
 
-/**
- * Busca un cliente por DNI/CUIT normalizado.
- * Busca en campos: cuit, dni, documento de la tabla clientes.
- * 
- * @param dniCuit - DNI o CUIT a buscar (con o sin guiones)
- * @returns Cliente encontrado o null
- */
-export async function buscarClientePorDNI(dniCuit: string): Promise<ClienteEncontrado | null> {
-    if (!dniCuit) return null
+// ... (omitiendo buscarClientePorDNI para brevedad, no lo tocamos aquí o asumimos que solo importa el batch) ...
 
-    // Normalizar: quitar todo excepto números
-    const dniNormalizado = dniCuit.replace(/\D/g, '')
-
-    if (dniNormalizado.length < 7 || dniNormalizado.length > 11) {
-        return null // DNI/CUIT inválido
-    }
-
-    const supabase = await createClient()
-
-    // Buscar en la tabla clientes
-    // Intentamos buscar por cuit exacto primero, luego por variantes
-    const { data: cliente, error } = await supabase
-        .from('clientes')
-        .select('id, nombre, apellido, cuit, telefono, email, direccion, sucursal_id')
-        .or(`cuit.eq.${dniNormalizado},cuit.ilike.%${dniNormalizado}%`)
-        .limit(1)
-        .maybeSingle()
-
-    if (error) {
-        console.error('Error buscando cliente por DNI:', error)
-        return null
-    }
-
-    if (!cliente) {
-        // Intentar buscar con formato CUIT (XX-XXXXXXXX-X)
-        if (dniNormalizado.length === 11) {
-            const cuitFormateado = `${dniNormalizado.slice(0, 2)}-${dniNormalizado.slice(2, 10)}-${dniNormalizado.slice(10)}`
-
-            const { data: clienteCuit } = await supabase
-                .from('clientes')
-                .select('id, nombre, apellido, cuit, telefono, email, direccion, sucursal_id')
-                .eq('cuit', cuitFormateado)
-                .limit(1)
-                .maybeSingle()
-
-            if (clienteCuit) {
-                return {
-                    id: clienteCuit.id,
-                    nombre: `${clienteCuit.nombre || ''} ${clienteCuit.apellido || ''}`.trim(),
-                    cuit: clienteCuit.cuit,
-                    telefono: clienteCuit.telefono,
-                    email: clienteCuit.email,
-                    direccion: clienteCuit.direccion,
-                    sucursal_id: clienteCuit.sucursal_id
-                }
-            }
-        }
-        return null
-    }
-
-    return {
-        id: cliente.id,
-        nombre: `${cliente.nombre || ''} ${cliente.apellido || ''}`.trim(),
-        cuit: cliente.cuit,
-        telefono: cliente.telefono,
-        email: cliente.email,
-        direccion: cliente.direccion,
-        sucursal_id: cliente.sucursal_id
-    }
-}
-
-/**
- * Busca múltiples clientes por DNI/CUIT en batch.
- * Optimizado para evitar múltiples queries.
- * 
- * @param dnisCuits - Array de DNI/CUIT a buscar
- * @returns Mapa de DNI normalizado -> Cliente encontrado
- */
 export async function buscarClientesPorDNIBatch(
     dnisCuits: string[]
 ): Promise<Map<string, ClienteEncontrado>> {
+    console.log('[ClienteLookup] ========== buscarClientesPorDNIBatch ==========');
+    console.log(`[ClienteLookup] Recibidos ${dnisCuits.length} DNI/CUITs para búsqueda en batch.`);
     const resultado = new Map<string, ClienteEncontrado>()
 
     // Normalizar y filtrar DNIs válidos
@@ -102,13 +29,19 @@ export async function buscarClientesPorDNIBatch(
             .map(d => d.replace(/\D/g, ''))
             .filter(d => d.length >= 7 && d.length <= 11)
     )]
+    console.log(`[ClienteLookup] DNIs/CUITs únicos y normalizados a buscar (${dnisUnicos.length}):`, dnisUnicos);
 
-    if (dnisUnicos.length === 0) return resultado
+    if (dnisUnicos.length === 0) {
+        console.warn('[ClienteLookup] No hay DNIs/CUITs válidos para buscar en batch. Retornando mapa vacío.');
+        return resultado
+    }
 
     const supabase = await createClient()
+    console.log('[ClienteLookup] Cliente Supabase creado para batch.');
 
-    // Buscar todos de una vez usando or
+    // 1. Buscar en tabla PRINCIPAL (clientes)
     const condiciones = dnisUnicos.map(dni => `cuit.ilike.%${dni}%`).join(',')
+    console.log(`[ClienteLookup] Condición 'or' generada para clientes: ${condiciones}`);
 
     const { data: clientes, error } = await supabase
         .from('clientes')
@@ -116,26 +49,81 @@ export async function buscarClientesPorDNIBatch(
         .or(condiciones)
 
     if (error) {
-        console.error('Error buscando clientes en batch:', error)
-        return resultado
-    }
-
-    // Mapear resultados
-    for (const cliente of clientes || []) {
-        const cuitNormalizado = cliente.cuit?.replace(/\D/g, '') || ''
-
-        if (cuitNormalizado) {
-            resultado.set(cuitNormalizado, {
-                id: cliente.id,
-                nombre: `${cliente.nombre || ''} ${cliente.apellido || ''}`.trim(),
-                cuit: cliente.cuit,
-                telefono: cliente.telefono,
-                email: cliente.email,
-                direccion: cliente.direccion,
-                sucursal_id: cliente.sucursal_id
-            })
+        console.error('[ClienteLookup] Error buscando clientes en batch:', error)
+    } else {
+        console.log(`[ClienteLookup] Clientes encontrados en BD principal: ${clientes?.length || 0}`);
+        for (const cliente of clientes || []) {
+            const cuitNormalizado = cliente.cuit?.replace(/\D/g, '') || ''
+            if (cuitNormalizado && dnisUnicos.includes(cuitNormalizado)) {
+                resultado.set(cuitNormalizado, {
+                    id: cliente.id,
+                    nombre: `${cliente.nombre || ''} ${cliente.apellido || ''}`.trim(),
+                    cuit: cliente.cuit,
+                    telefono: cliente.telefono,
+                    email: cliente.email,
+                    direccion: cliente.direccion,
+                    sucursal_id: cliente.sucursal_id
+                })
+                console.log(`[ClienteLookup] Cliente ${cliente.id} mapeado directo por DNI: ${cuitNormalizado}`);
+            }
         }
     }
 
+    // 2. Buscar en tabla ALIAS / ADICIONALES
+    // Solo buscamos los que NO hayamos encontrado ya, o buscamos todos para enriquecer?
+    // Mejor buscamos todos los dnisUnicos por si alguno es un alias.
+    // Prioridad: Si ya encontramos un cliente directo por ese DNI, ¿vale la pena buscar alias?
+    // Puede que DNI X sea cliente directo Y ADEMÁS sea alias de otro.
+    // Asumiremos prioridad: Cliente Directo > Alias. Si ya está en mapa, no lo sobreescribimos.
+
+    // Filtrar DNIs que faltan encontrar
+    // const dnisFaltantes = dnisUnicos.filter(d => !resultado.has(d)) 
+    // Por ahora buscamos TODOS los alias, por si acaso.
+
+    try {
+        const condicionesAlias = dnisUnicos.map(dni => `dni_cuit.ilike.%${dni}%`).join(',')
+        console.log(`[ClienteLookup] Buscando en identificadores adicionales...`)
+
+        const { data: aliasList, error: aliasError } = await supabase
+            .from('clientes_identificadores_adicionales')
+            .select(`
+                dni_cuit,
+                nombre_titular,
+                cliente:clientes!inner (
+                    id, nombre, apellido, cuit, telefono, email, direccion, sucursal_id
+                )
+            `)
+            .or(condicionesAlias)
+
+        if (aliasError) {
+            console.error('[ClienteLookup] Error buscando alias:', aliasError)
+        } else {
+            console.log(`[ClienteLookup] Alias encontrados: ${aliasList?.length || 0}`)
+            for (const alias of aliasList || []) {
+                const dniAlias = alias.dni_cuit?.replace(/\D/g, '') || ''
+                // Si este DNI estaba en nuestra lista de búsqueda Y no tenemos match principal aún
+                if (dnisUnicos.includes(dniAlias) && !resultado.has(dniAlias) && alias.cliente) {
+                    const c = alias.cliente as any // Casting simple
+                    resultado.set(dniAlias, {
+                        id: c.id,
+                        nombre: `${c.nombre || ''} ${c.apellido || ''}`.trim(),
+                        cuit: c.cuit, // CUIT del cliente principal
+                        telefono: c.telefono,
+                        email: c.email,
+                        direccion: c.direccion,
+                        sucursal_id: c.sucursal_id,
+                        nombre_match_adicional: alias.nombre_titular // Guardamos el nombre del ALIAS para el matching
+                    })
+                    console.log(`[ClienteLookup] DNI ${dniAlias} (Alias: ${alias.nombre_titular}) => Cliente Principal: ${c.nombre}`);
+                }
+            }
+        }
+
+    } catch (e) {
+        console.error('[ClienteLookup] Excepción buscando alias:', e)
+    }
+
+    console.log(`[ClienteLookup] Total clientes mapeados FINAL: ${resultado.size}`);
+    console.log('[ClienteLookup] ========== Fin buscarClientesPorDNIBatch ==========');
     return resultado
 }

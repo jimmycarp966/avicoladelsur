@@ -13,6 +13,14 @@ export const clienteSchema = z.object({
     .min(1, 'El nombre es requerido')
     .max(255, 'El nombre debe tener máximo 255 caracteres'),
 
+  cuit: z
+    .string()
+    .max(20, 'El CUIT/DNI debe tener máximo 20 caracteres')
+    .optional()
+    .refine((val) => !val || /^[0-9+\-\s]+$/.test(val), {
+      message: 'El CUIT/DNI solo puede contener números y guiones',
+    }),
+
   telefono: z
     .string()
     .max(20, 'El teléfono debe tener máximo 20 caracteres')
@@ -117,6 +125,14 @@ export const clienteSchema = z.object({
       (val) => !val || /^(\d{2}:\d{2}-\d{2}:\d{2})(,\d{2}:\d{2}-\d{2}:\d{2})*$/.test(val),
       { message: 'Formato inválido. Usar HH:mm-HH:mm' }
     ),
+
+  // Identificadores adicionales (DNIs de terceros, familiares, etc)
+  identificadores: z.array(z.object({
+    id: z.string().optional(),
+    dni_cuit: z.string().min(1, 'DNI de tercero requerido'), // Si agregan uno, que tenga dato
+    nombre_titular: z.string().min(1, 'Nombre de titular requerido'),
+    relacion: z.string().optional()
+  })).optional()
 })
 
 // Esquema para búsqueda y filtros de clientes

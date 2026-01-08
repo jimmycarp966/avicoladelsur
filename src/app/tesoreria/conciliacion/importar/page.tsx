@@ -34,7 +34,9 @@ export default function ImportarConciliacionPage() {
 
     // Dropzone para el PDF de sábana
     const onDropSabana = useCallback((acceptedFiles: File[]) => {
+        console.log('[DEBUG Conciliación] onDropSabana - Archivos recibidos:', acceptedFiles.map(f => ({ name: f.name, size: f.size, type: f.type })))
         if (acceptedFiles.length > 0) {
+            console.log('[DEBUG Conciliación] Sábana PDF seleccionada:', acceptedFiles[0].name, 'Tamaño:', (acceptedFiles[0].size / 1024).toFixed(2), 'KB')
             setSabanaPdf(acceptedFiles[0])
             setError(null)
         }
@@ -50,7 +52,12 @@ export default function ImportarConciliacionPage() {
 
     // Dropzone para comprobantes (imágenes)
     const onDropComprobantes = useCallback((acceptedFiles: File[]) => {
-        setComprobantes(prev => [...prev, ...acceptedFiles])
+        console.log('[DEBUG Conciliación] onDropComprobantes - Nuevos comprobantes:', acceptedFiles.map(f => ({ name: f.name, size: f.size, type: f.type })))
+        setComprobantes(prev => {
+            const nuevaLista = [...prev, ...acceptedFiles]
+            console.log('[DEBUG Conciliación] Total comprobantes ahora:', nuevaLista.length)
+            return nuevaLista
+        })
         setError(null)
     }, [])
 
@@ -69,7 +76,12 @@ export default function ImportarConciliacionPage() {
 
     // Procesar conciliación
     const procesarConciliacion = async () => {
+        console.log('[DEBUG Conciliación] ========== INICIO DE CONCILIACIÓN ==========')
+        console.log('[DEBUG Conciliación] Sábana PDF:', sabanaPdf ? { name: sabanaPdf.name, size: sabanaPdf.size, type: sabanaPdf.type } : null)
+        console.log('[DEBUG Conciliación] Comprobantes:', comprobantes.map(f => ({ name: f.name, size: f.size, type: f.type })))
+
         if (!sabanaPdf || comprobantes.length === 0) {
+            console.error('[DEBUG Conciliación] ERROR: Faltan archivos requeridos')
             setError('Debe subir el PDF de la sábana y al menos un comprobante')
             return
         }
@@ -78,50 +90,114 @@ export default function ImportarConciliacionPage() {
         setError(null)
         setProgreso(0)
 
+        const tiempoInicio = performance.now()
+        console.log('[DEBUG Conciliación] Tiempo inicio:', new Date().toISOString())
+
+        // Calcular tamaño total
+        const sizeSabana = sabanaPdf.size
+        const sizeComprobantes = comprobantes.reduce((acc, curr) => acc + curr.size, 0)
+        const totalSize = sizeSabana + sizeComprobantes
+        const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(2)
+
+        console.log(`[DEBUG Conciliación] Tamaño total payload: ${totalSizeMB} MB`)
+
+        if (totalSize > 45 * 1024 * 1024) { // 45MB límite seguridad
+            console.error('[DEBUG Conciliación] ERROR: El tamaño total excede el límite seguro (45MB).')
+            setError(`El tamaño total de los archivos (${totalSizeMB} MB) es demasiado grande. Intente subir menos comprobantes a la vez (máx 45MB).`)
+            setProcesando(false)
+            return
+        }
+
         try {
             // Preparar FormData
+            console.log('[DEBUG Conciliación] Paso 1: Preparando FormData...')
             const formData = new FormData()
             formData.append('sabana', sabanaPdf)
-            comprobantes.forEach(file => {
+            console.log('[DEBUG Conciliación] - Sábana agregada al FormData')
+
+            comprobantes.forEach((file, idx) => {
                 formData.append('comprobantes', file)
+                console.log(`[DEBUG Conciliación] - Comprobante ${idx + 1}/${comprobantes.length} agregado: ${file.name}`)
             })
+
+            const timeouts: NodeJS.Timeout[] = []
 
             // Simular progreso mientras procesa
             setEtapa('Extrayendo datos de la sábana bancaria...')
             setProgreso(10)
+            console.log('[DEBUG Conciliación] Paso 2: Iniciando llamada al servidor...')
 
             const intervalo = setInterval(() => {
                 setProgreso(prev => {
                     if (prev >= 90) {
-                        clearInterval(intervalo)
                         return 90
                     }
                     return prev + 5
                 })
             }, 1000)
 
-            setTimeout(() => setEtapa('Procesando comprobantes con IA...'), 3000)
-            setTimeout(() => setEtapa('Validando comprobantes contra sábana...'), 6000)
-            setTimeout(() => setEtapa('Buscando clientes por DNI...'), 9000)
-            setTimeout(() => setEtapa('Acreditando saldos...'), 12000)
+            timeouts.push(setTimeout(() => { setEtapa('Procesando comprobantes con IA...'); console.log('[DEBUG Conciliación] Etapa: Procesando comprobantes con IA') }, 3000))
+            timeouts.push(setTimeout(() => { setEtapa('Validando comprobantes contra sábana...'); console.log('[DEBUG Conciliación] Etapa: Validando comprobantes') }, 6000))
+            timeouts.push(setTimeout(() => { setEtapa('Buscando clientes por DNI...'); console.log('[DEBUG Conciliación] Etapa: Buscando clientes') }, 9000))
+            timeouts.push(setTimeout(() => { setEtapa('Acreditando saldos...'); console.log('[DEBUG Conciliación] Etapa: Acreditando saldos') }, 12000))
 
             // Ejecutar acción
-            const result = await procesarConciliacionCompletaAction(formData)
+            console.log('[DEBUG Conciliación] Llamando a procesarConciliacionCompletaAction...')
 
-            clearInterval(intervalo)
-            setProgreso(100)
-            setEtapa('¡Proceso completado!')
+            try {
+                const result = await procesarConciliacionCompletaAction(formData)
 
-            if (result.success && result.resumen) {
-                setResultado(result.resumen)
-            } else {
-                setError(result.error || 'Error desconocido')
+                // Limpiar timeouts si termina antes
+                timeouts.forEach(clearTimeout)
+                clearInterval(intervalo)
+
+                const tiempoFin = performance.now()
+                console.log('[DEBUG Conciliación] ========== RESPUESTA DEL SERVIDOR ==========')
+                console.log('[DEBUG Conciliación] Tiempo de ejecución:', ((tiempoFin - tiempoInicio) / 1000).toFixed(2), 'segundos')
+                console.log('[DEBUG Conciliación] Resultado success:', result.success)
+                console.log('[DEBUG Conciliación] Resultado error:', result.error)
+                console.log('[DEBUG Conciliación] Sesión ID:', result.sesionId)
+                console.log('[DEBUG Conciliación] Resumen completo:', JSON.stringify(result.resumen, null, 2))
+
+                setProgreso(100)
+                setEtapa('¡Proceso completado!')
+
+                if (result.success && result.resumen) {
+                    console.log('[DEBUG Conciliación] ✅ Conciliación exitosa')
+                    console.log('[DEBUG Conciliación] - Total comprobantes:', result.resumen.total_comprobantes)
+                    console.log('[DEBUG Conciliación] - Validados:', result.resumen.validados)
+                    console.log('[DEBUG Conciliación] - No encontrados:', result.resumen.no_encontrados)
+                    console.log('[DEBUG Conciliación] - Sin cliente:', result.resumen.sin_cliente)
+                    console.log('[DEBUG Conciliación] - Errores:', result.resumen.errores)
+                    console.log('[DEBUG Conciliación] - Monto acreditado:', result.resumen.monto_total_acreditado)
+                    console.log('[DEBUG Conciliación] - Detalles:', result.resumen.detalles)
+                    setResultado(result.resumen)
+                } else {
+                    console.error('[DEBUG Conciliación] ❌ Error en conciliación:', result.error)
+                    setError(result.error || 'Error desconocido')
+                }
+            } catch (actionError) {
+                // Capturar error específico de la acción si ocurre
+                throw actionError
+            } finally {
+                timeouts.forEach(clearTimeout)
+                clearInterval(intervalo)
             }
 
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Error al procesar la conciliación')
+            console.error('[DEBUG Conciliación] ❌ EXCEPCIÓN CAPTURADA:', err)
+            const mensaje = err instanceof Error ? err.message : 'Error al procesar la conciliación'
+
+            if (mensaje.includes('Failed to fetch')) {
+                const msgReinicio = 'Error de conexión (Payload Too Large). Por favor REINICIE EL SERVIDOR (npm run dev) para aplicar el nuevo límite de tamaño de 50MB.'
+                console.error('[DEBUG Conciliación] SUGERENCIA: ' + msgReinicio)
+                setError(msgReinicio)
+            } else {
+                setError(mensaje)
+            }
         } finally {
             setProcesando(false)
+            console.log('[DEBUG Conciliación] ========== FIN DE CONCILIACIÓN ==========')
         }
     }
 

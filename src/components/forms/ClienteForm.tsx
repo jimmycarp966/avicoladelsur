@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { useForm } from 'react-hook-form'
+import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Loader2, Save, X, Plus, Tag, Clock } from 'lucide-react'
+import { ArrowLeft, Loader2, Save, X, Plus, Tag, Clock, Users, Trash2 } from 'lucide-react'
 import { GoogleMapSelector } from '@/components/ui/google-map-selector'
 import Link from 'next/link'
 import { clienteSchema, type ClienteFormData } from '@/lib/schemas/clientes.schema'
@@ -31,6 +31,7 @@ interface ClienteFormProps {
   cliente?: {
     id: string
     codigo: string
+    cuit?: string
     nombre: string
     telefono?: string
     whatsapp?: string
@@ -48,7 +49,9 @@ interface ClienteFormProps {
     horario_jueves?: string
     horario_viernes?: string
     horario_sabado?: string
+    horario_sabado?: string
     horario_domingo?: string
+    identificadores?: Array<{ dni_cuit: string; nombre_titular: string; relacion?: string }>
   }
   zonas?: Array<{ id: string; nombre: string }>
   onSuccess?: () => void
@@ -75,11 +78,13 @@ export function ClienteForm({ cliente, zonas = [], onSuccess }: ClienteFormProps
     handleSubmit,
     watch,
     setValue,
+    control,
     formState: { errors },
   } = useForm<ClienteFormData>({
     resolver: zodResolver(clienteSchema),
     defaultValues: cliente ? {
       codigo: cliente.codigo || '',
+      cuit: cliente.cuit || '',
       nombre: cliente.nombre,
       telefono: cliente.telefono || '',
       whatsapp: cliente.whatsapp || '',
@@ -98,8 +103,10 @@ export function ClienteForm({ cliente, zonas = [], onSuccess }: ClienteFormProps
       horario_viernes: cliente.horario_viernes || '',
       horario_sabado: cliente.horario_sabado || '',
       horario_domingo: cliente.horario_domingo || '',
+      identificadores: cliente.identificadores || [],
     } : {
       codigo: '',
+      cuit: '',
       nombre: '',
       telefono: '',
       whatsapp: '',
@@ -121,6 +128,11 @@ export function ClienteForm({ cliente, zonas = [], onSuccess }: ClienteFormProps
 
   const activo = watch('activo')
   const tipoCliente = watch('tipo_cliente')
+
+  const { fields: camposIdentificadores, append: appendIdentificador, remove: removeIdentificador } = useFieldArray({
+    control,
+    name: "identificadores"
+  })
 
   // Atajos contextuales para campos del formulario
   // Nota: Los shortcuts sin modificadores están protegidos por useKeyboardShortcuts
@@ -274,6 +286,24 @@ export function ClienteForm({ cliente, zonas = [], onSuccess }: ClienteFormProps
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="cuit" className="flex items-center gap-2">
+              DNI / CUIT / CUIL
+            </Label>
+            <Input
+              id="cuit"
+              placeholder="Ej: 20-12345678-9"
+              {...register('cuit')}
+              disabled={isLoading}
+            />
+            {errors.cuit && (
+              <p className="text-sm text-destructive">{errors.cuit.message}</p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Clave de identificación tributaria o DNI del cliente
+            </p>
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="nombre" className="flex items-center gap-2">
               Nombre *
               <KeyboardHintCompact shortcut="N" />
@@ -399,6 +429,59 @@ export function ClienteForm({ cliente, zonas = [], onSuccess }: ClienteFormProps
               <p className="text-sm text-destructive">{errors.email.message}</p>
             )}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Identificadores Adicionales / Terceros */}
+      <Card className="border-l-[3px] border-l-purple-500">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-purple-600 flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Cuentas / Personas Asociadas
+              </CardTitle>
+              <CardDescription>
+                Registra otros titulares (DNIs) que pueden realizar pagos a nombre de este cliente (ej: Cónyuge, Socio).
+              </CardDescription>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={() => appendIdentificador({ dni_cuit: '', nombre_titular: '', relacion: '' })}>
+              <Plus className="h-4 w-4 mr-2" />
+              Agregar
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {camposIdentificadores.length === 0 && (
+            <p className="text-sm text-muted-foreground italic">No hay personas asociadas registradas.</p>
+          )}
+          {camposIdentificadores.map((field, index) => (
+            <div key={field.id} className="flex gap-4 items-start p-4 border rounded-lg bg-slate-50 relative">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 flex-1">
+                <div className="space-y-1">
+                  <Label className="text-xs">DNI / CUIT Titular</Label>
+                  <Input {...register(`identificadores.${index}.dni_cuit`)} placeholder="DNI del tercero" />
+                  {errors.identificadores?.[index]?.dni_cuit && (
+                    <p className="text-xs text-red-500">{errors.identificadores[index]?.dni_cuit?.message}</p>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Nombre Titular</Label>
+                  <Input {...register(`identificadores.${index}.nombre_titular`)} placeholder="Nombre completo" />
+                  {errors.identificadores?.[index]?.nombre_titular && (
+                    <p className="text-xs text-red-500">{errors.identificadores[index]?.nombre_titular?.message}</p>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Relación (Opcional)</Label>
+                  <Input {...register(`identificadores.${index}.relacion`)} placeholder="Ej: Esposa" />
+                </div>
+              </div>
+              <Button type="button" variant="ghost" size="icon" className="text-red-500 hover:text-red-700 hover:bg-red-50" onClick={() => removeIdentificador(index)}>
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
         </CardContent>
       </Card>
 

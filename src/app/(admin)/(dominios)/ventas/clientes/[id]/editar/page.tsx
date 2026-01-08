@@ -51,6 +51,16 @@ export default async function EditarClientePage({ params }: EditarClientePagePro
     tipo_cliente: clienteResult.data.tipo_cliente,
     limite_credito: clienteResult.data.limite_credito || 0,
     activo: clienteResult.data.activo,
+    // Campos nuevos y horarios
+    cuit: clienteResult.data.cuit,
+    identificadores: clienteResult.data.identificadores || [],
+    horario_lunes: clienteResult.data.horario_lunes,
+    horario_martes: clienteResult.data.horario_martes,
+    horario_miercoles: clienteResult.data.horario_miercoles,
+    horario_jueves: clienteResult.data.horario_jueves,
+    horario_viernes: clienteResult.data.horario_viernes,
+    horario_sabado: clienteResult.data.horario_sabado,
+    horario_domingo: clienteResult.data.horario_domingo,
   }
 
   return (

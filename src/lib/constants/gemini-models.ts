@@ -17,7 +17,7 @@ export const GEMINI_MODEL_FLASH = 'gemini-2.5-flash'
  * Ideal para: reportes inteligentes, análisis de documentos, predicciones complejas
  * Costo: Moderado (requiere plan pagado para alto volumen)
  */
-export const GEMINI_MODEL_PRO = 'gemini-3-pro'
+export const GEMINI_MODEL_PRO = 'gemini-2.5-pro'
 
 /**
  * Modelo por defecto para la mayoría de casos

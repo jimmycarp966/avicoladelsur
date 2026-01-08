@@ -31,7 +31,10 @@ export async function acreditarSaldoCliente(
     sesionConciliacionId: string,
     notas?: string
 ): Promise<ResultadoAcreditacion> {
+    console.log(`[acreditarSaldoCliente] Iniciando acreditación para cliente ${clienteId}, monto ${monto}, referencia ${referencia}`)
+
     if (monto <= 0) {
+        console.error(`[acreditarSaldoCliente] Error: Monto debe ser positivo para cliente ${clienteId}. Monto recibido: ${monto}`)
         return { success: false, error: 'El monto debe ser positivo' }
     }
 
@@ -40,6 +43,7 @@ export async function acreditarSaldoCliente(
 
     try {
         // 1. Obtener cuenta corriente del cliente
+        console.log(`[acreditarSaldoCliente] Buscando cuenta corriente para cliente ${clienteId}`)
         const { data: cuentaCliente, error: errorCuenta } = await supabase
             .from('cuentas_corrientes')
             .select('id, saldo, limite_credito')
@@ -47,15 +51,18 @@ export async function acreditarSaldoCliente(
             .maybeSingle()
 
         if (errorCuenta) {
-            console.error('Error obteniendo cuenta corriente:', errorCuenta)
+            console.error(`[acreditarSaldoCliente] Error obteniendo cuenta corriente para cliente ${clienteId}:`, errorCuenta)
             return { success: false, error: 'Error al obtener cuenta corriente del cliente' }
         }
 
         // Si no tiene cuenta corriente, intentar crearla
         let cuentaId = cuentaCliente?.id
         let saldoActual = cuentaCliente?.saldo || 0
+        console.log(`[acreditarSaldoCliente] Cuenta corriente encontrada: ${cuentaId || 'No existe, se creará'}, Saldo actual: ${saldoActual}`)
+
 
         if (!cuentaId) {
+            console.log(`[acreditarSaldoCliente] Creando nueva cuenta corriente para cliente ${clienteId}`)
             // Crear cuenta corriente para el cliente
             const { data: nuevaCuenta, error: errorNueva } = await supabase
                 .from('cuentas_corrientes')
@@ -68,15 +75,17 @@ export async function acreditarSaldoCliente(
                 .single()
 
             if (errorNueva) {
-                console.error('Error creando cuenta corriente:', errorNueva)
+                console.error(`[acreditarSaldoCliente] Error creando cuenta corriente para cliente ${clienteId}:`, errorNueva)
                 return { success: false, error: 'Error al crear cuenta corriente para el cliente' }
             }
 
             cuentaId = nuevaCuenta.id
+            console.log(`[acreditarSaldoCliente] Nueva cuenta corriente creada con ID: ${cuentaId}`)
         }
 
         // 2. Registrar movimiento en cuentas_movimientos (abono = reduce deuda)
         const descripcionMov = `Pago conciliado - ${referencia || 'Sin referencia'}`
+        console.log(`[acreditarSaldoCliente] Registrando movimiento de abono en cuenta ${cuentaId} por ${monto}`)
 
         const { data: movimiento, error: errorMov } = await supabase
             .from('cuentas_movimientos')
@@ -93,12 +102,15 @@ export async function acreditarSaldoCliente(
             .single()
 
         if (errorMov) {
-            console.error('Error registrando movimiento:', errorMov)
+            console.error(`[acreditarSaldoCliente] Error registrando movimiento para cuenta ${cuentaId}:`, errorMov)
             return { success: false, error: 'Error al registrar movimiento en cuenta corriente' }
         }
+        console.log(`[acreditarSaldoCliente] Movimiento registrado con ID: ${movimiento.id}`)
+
 
         // 3. Actualizar saldo de la cuenta corriente (reducir deuda)
         const nuevoSaldo = saldoActual - monto // Saldo negativo = a favor del cliente
+        console.log(`[acreditarSaldoCliente] Actualizando saldo de cuenta ${cuentaId}: ${saldoActual} -> ${nuevoSaldo}`)
 
         const { error: errorUpdate } = await supabase
             .from('cuentas_corrientes')
@@ -109,9 +121,13 @@ export async function acreditarSaldoCliente(
             .eq('id', cuentaId)
 
         if (errorUpdate) {
-            console.error('Error actualizando saldo:', errorUpdate)
+            console.error(`[acreditarSaldoCliente] Error actualizando saldo para cuenta ${cuentaId}:`, errorUpdate)
             // No fallar completamente, el movimiento ya se registró
+            // Considerar revertir el movimiento si esto es crítico
+        } else {
+            console.log(`[acreditarSaldoCliente] Saldo de cuenta ${cuentaId} actualizado a ${nuevoSaldo}`)
         }
+
 
         // 4. (Opcional) Registrar ingreso en caja central
         // Esto depende de si quieren que afecte la caja automáticamente
@@ -205,12 +221,17 @@ export async function acreditarPagosBatch(
     montoTotal: number
     errores: string[]
 }> {
+    console.log('[acreditarPagosBatch] ========== INICIO BATCH ==========')
+    console.log(`[acreditarPagosBatch] Procesando ${pagos.length} pagos para la sesión ${sesionConciliacionId}`)
+
     let exitosos = 0
     let fallidos = 0
     let montoTotal = 0
     const errores: string[] = []
 
-    for (const pago of pagos) {
+    for (const [index, pago] of pagos.entries()) {
+        console.log(`[acreditarPagosBatch] [${index + 1}/${pagos.length}] Procesando pago: Cliente=${pago.clienteId} Monto=$${pago.monto} Ref=${pago.referencia}`)
+
         const resultado = await acreditarSaldoCliente(
             pago.clienteId,
             pago.monto,
@@ -222,11 +243,17 @@ export async function acreditarPagosBatch(
         if (resultado.success) {
             exitosos++
             montoTotal += pago.monto
+            console.log(`[acreditarPagosBatch] [${index + 1}/${pagos.length}] ✅ Éxito. Nuevo saldo: ${resultado.nuevoSaldo}`)
         } else {
             fallidos++
             errores.push(`Cliente ${pago.clienteId}: ${resultado.error}`)
+            console.error(`[acreditarPagosBatch] [${index + 1}/${pagos.length}] ❌ Error: ${resultado.error}`)
         }
     }
+
+    console.log('[acreditarPagosBatch] ========== FIN BATCH ==========')
+    console.log(`[acreditarPagosBatch] Resumen: Exitosos=${exitosos}, Fallidos=${fallidos}, Total=$${montoTotal}`)
+    console.log(`[acreditarPagosBatch] Errores acumulados: ${errores.length}`)
 
     return { exitosos, fallidos, montoTotal, errores }
 }

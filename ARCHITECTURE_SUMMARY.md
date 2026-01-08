@@ -1,6 +1,6 @@
 # 🏗️ Arquitectura del Sistema - Avícola del Sur ERP
 
-**Cambio reciente:** Se agregaron controles de UI en "Destinos de Producción" para configurar productos como Desperdicio y Desperdicio Sólido, permitiendo diferenciar mermas en el cálculo de producción.
+**Cambio reciente:** Se implementó soporte integral para **Alias Bancarios / Identificadores Adicionales** en Clientes para conciliación bancaria inteligente. Permite asociar múltiples DNIs y nombres (ej: cónyuges) a un cliente. El motor de conciliación ahora busca por estos alias y usa sus nombres para el matching, resolviendo pagos de terceros automáticamente. También se agregó **Hard Delete** con limpieza de dependencias para clientes.
 
 
 ## 📋 TL;DR (Resumen Ejecutivo)

@@ -38,28 +38,44 @@ export async function procesarConciliacionCompletaAction(formData: FormData): Pr
     resumen?: ResumenConciliacion
     error?: string
 }> {
+    console.log('[Conciliación Server] ========== INICIO procesarConciliacionCompletaAction ==========')
+    console.log('[Conciliación Server] Timestamp:', new Date().toISOString())
+
     const supabase = await createClient()
 
     try {
         // 1. Obtener usuario actual
+        console.log('[Conciliación Server] Paso 1: Obteniendo usuario...')
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) {
+            console.error('[Conciliación Server] ERROR: Usuario no autenticado')
             return { success: false, error: 'Usuario no autenticado' }
         }
+        console.log('[Conciliación Server] Usuario autenticado:', user.id, user.email)
 
         // 2. Obtener archivos del FormData
+        console.log('[Conciliación Server] Paso 2: Obteniendo archivos del FormData...')
         const sabanaPdf = formData.get('sabana') as File | null
         const comprobantesFiles = formData.getAll('comprobantes') as File[]
 
+        console.log('[Conciliación Server] Sábana PDF:', sabanaPdf ? { name: sabanaPdf.name, size: sabanaPdf.size, type: sabanaPdf.type } : 'NULL')
+        console.log('[Conciliación Server] Comprobantes recibidos:', comprobantesFiles.length)
+        comprobantesFiles.forEach((f, i) => {
+            console.log(`[Conciliación Server]   Comprobante ${i + 1}: ${f.name}, ${f.size} bytes, ${f.type}`)
+        })
+
         if (!sabanaPdf) {
+            console.error('[Conciliación Server] ERROR: Falta el PDF de la sábana')
             return { success: false, error: 'Debe subir el PDF de la sábana bancaria' }
         }
 
         if (comprobantesFiles.length === 0) {
+            console.error('[Conciliación Server] ERROR: No hay comprobantes')
             return { success: false, error: 'Debe subir al menos un comprobante' }
         }
 
         // 3. Crear sesión de conciliación
+        console.log('[Conciliación Server] Paso 3: Creando sesión de conciliación en BD...')
         const { data: sesion, error: errorSesion } = await supabase
             .from('sesiones_conciliacion')
             .insert({
@@ -72,18 +88,32 @@ export async function procesarConciliacionCompletaAction(formData: FormData): Pr
             .single()
 
         if (errorSesion || !sesion) {
-            console.error('Error creando sesión:', errorSesion)
+            console.error('[Conciliación Server] ERROR creando sesión:', errorSesion)
             return { success: false, error: 'Error al crear sesión de conciliación' }
         }
+        console.log('[Conciliación Server] Sesión creada con ID:', sesion.id)
 
         const sesionId = sesion.id
 
         // 4. Parsear sábana bancaria (PDF)
-        console.log('[Conciliación] Parseando sábana bancaria...')
-        const movimientosSabana = await parsearSabanaBancaria(sabanaPdf)
-        console.log(`[Conciliación] ${movimientosSabana.length} movimientos extraídos de la sábana`)
+        console.log('[Conciliación Server] Paso 4: Parseando sábana bancaria con Gemini...')
+        console.log('[Conciliación Server] Archivo sábana:', sabanaPdf.name, 'Tamaño:', sabanaPdf.size)
+        const tiempoInicioParseoSabana = Date.now()
+        let movimientosSabana
+        try {
+            movimientosSabana = await parsearSabanaBancaria(sabanaPdf)
+            console.log(`[Conciliación Server] ✅ Sábana parseada en ${Date.now() - tiempoInicioParseoSabana}ms`)
+            console.log(`[Conciliación Server] ${movimientosSabana.length} movimientos extraídos de la sábana`)
+            movimientosSabana.forEach((m, i) => {
+                console.log(`[Conciliación Server]   Mov ${i + 1}: $${m.monto} - ${m.descripcion?.substring(0, 50)} - DNI: ${m.dni_cuit} - Ref: ${m.referencia}`)
+            })
+        } catch (errorParseo) {
+            console.error('[Conciliación Server] ❌ ERROR parseando sábana:', errorParseo)
+            throw new Error(`Error al parsear sábana: ${errorParseo instanceof Error ? errorParseo.message : 'Error desconocido'}`)
+        }
 
         // Guardar movimientos en BD
+        console.log('[Conciliación Server] Guardando movimientos en BD...')
         const movimientosParaDb = movimientosSabana.map(m => ({
             fecha: format(m.fecha, 'yyyy-MM-dd'),
             monto: m.monto,
@@ -94,10 +124,15 @@ export async function procesarConciliacionCompletaAction(formData: FormData): Pr
             estado_conciliacion: 'pendiente' as const
         }))
 
-        const { data: movimientosGuardados } = await supabase
+        const { data: movimientosGuardados, error: errorMovimientos } = await supabase
             .from('movimientos_bancarios')
             .insert(movimientosParaDb)
             .select('id, fecha, monto, referencia, dni_cuit, descripcion, estado_conciliacion')
+
+        if (errorMovimientos) {
+            console.error('[Conciliación Server] ERROR guardando movimientos:', errorMovimientos)
+        }
+        console.log('[Conciliación Server] Movimientos guardados:', movimientosGuardados?.length || 0)
 
         // Convertir a formato esperado
         const movimientosBd: MovimientoBancario[] = (movimientosGuardados || []).map(m => ({
@@ -106,34 +141,72 @@ export async function procesarConciliacionCompletaAction(formData: FormData): Pr
         }))
 
         // 5. Parsear comprobantes (imágenes) en lotes
-        console.log(`[Conciliación] Parseando ${comprobantesFiles.length} comprobantes...`)
-        const comprobantesParseados = await parsearComprobantesEnLote(comprobantesFiles)
-        console.log(`[Conciliación] ${comprobantesParseados.length} comprobantes procesados`)
+        console.log('[Conciliación Server] Paso 5: Parseando comprobantes con Gemini...')
+        console.log(`[Conciliación Server] ${comprobantesFiles.length} comprobantes a procesar`)
+        const tiempoInicioComprobantes = Date.now()
+        let comprobantesParseados
+        try {
+            comprobantesParseados = await parsearComprobantesEnLote(comprobantesFiles)
+            console.log(`[Conciliación Server] ✅ Comprobantes parseados en ${Date.now() - tiempoInicioComprobantes}ms`)
+            console.log(`[Conciliación Server] ${comprobantesParseados.length} comprobantes procesados`)
+            comprobantesParseados.forEach((c, i) => {
+                console.log(`[Conciliación Server]   Comp ${i + 1}: ${c.archivo} - $${c.datos.monto} - DNI: ${c.datos.dni_cuit} - Error: ${c.error || 'ninguno'}`)
+            })
+        } catch (errorComprobantes) {
+            console.error('[Conciliación Server] ❌ ERROR parseando comprobantes:', errorComprobantes)
+            throw new Error(`Error al parsear comprobantes: ${errorComprobantes instanceof Error ? errorComprobantes.message : 'Error desconocido'}`)
+        }
 
-        // 6. Validar comprobantes contra sábana
-        console.log('[Conciliación] Validando comprobantes contra sábana...')
-        const datosComprobantes: DatosComprobante[] = comprobantesParseados.map(c => c.datos)
-        const resultadosValidacion = validarComprobantesContraSabana(datosComprobantes, movimientosBd)
-
-        // 7. Buscar clientes por DNI (batch)
-        console.log('[Conciliación] Buscando clientes por DNI...')
-        const dnisCuits = datosComprobantes
-            .map(c => c.dni_cuit)
+        // 6. Buscar clientes por DNI (batch) - MOVIDO ANTES DE VALIDACIÓN PARA MATCHING INTELIGENTE
+        console.log('[Conciliación Server] Paso 6: Buscando clientes por DNI...')
+        const dnisCuits = comprobantesParseados
+            .map(c => c.datos.dni_cuit)
             .filter((d): d is string => !!d)
 
+        console.log('[Conciliación Server] DNIs/CUITs a buscar:', dnisCuits)
         const clientesMap = await buscarClientesPorDNIBatch(dnisCuits)
+        console.log('[Conciliación Server] Clientes encontrados:', clientesMap.size)
+        clientesMap.forEach((cliente, dni) => {
+            console.log(`[Conciliación Server]   ${dni} => ${cliente.nombre} (ID: ${cliente.id})`)
+        })
 
-        // Enriquecer resultados con clientes encontrados
+        // 7. Validar comprobantes contra sábana (ahora con nombres de clientes)
+        console.log('[Conciliación Server] Paso 7: Validando comprobantes contra sábana...')
+
+        // Preparar datos para el motor, enriquecidos con nombre de cliente
+        const datosComprobantes: DatosComprobante[] = comprobantesParseados.map(c => {
+            const datos = c.datos
+            const dniNormalizado = datos.dni_cuit?.replace(/\D/g, '') || ''
+            if (dniNormalizado && clientesMap.has(dniNormalizado)) {
+                const c = clientesMap.get(dniNormalizado)
+                datos.nombre_cliente_identificado = c?.nombre_match_adicional || c?.nombre
+            }
+            return datos
+        })
+
+        console.log('[Conciliación Server] Datos de comprobantes a validar:', datosComprobantes.length)
+        const resultadosValidacion = validarComprobantesContraSabana(datosComprobantes, movimientosBd)
+        console.log('[Conciliación Server] Resultados de validación:')
+        resultadosValidacion.forEach((r, i) => {
+            console.log(`[Conciliación Server]   Resultado ${i + 1}: Estado=${r.estado}, Score=${r.confianza_score}, Monto=$${r.comprobante.monto}, Match=${r.movimiento_match?.id || 'ninguno'}`)
+        })
+
+        // Enriquecer resultados finales con objetos cliente completos
+        console.log('[Conciliación Server] Enriqueciendo resultados con clientes...')
         for (const resultado of resultadosValidacion) {
             const dniNormalizado = resultado.comprobante.dni_cuit?.replace(/\D/g, '') || ''
             if (dniNormalizado && clientesMap.has(dniNormalizado)) {
                 resultado.cliente = clientesMap.get(dniNormalizado)
+                console.log(`[Conciliación Server]   DNI ${dniNormalizado} => Cliente asignado: ${resultado.cliente?.nombre}`)
             } else if (resultado.estado === 'validado' && !resultado.cliente) {
+                // Si se validó por Referencia o Monto pero no tenemos cliente en BD
                 resultado.estado = 'sin_cliente'
+                console.log(`[Conciliación Server]   Validado sin cliente en BD -> Estado: sin_cliente`)
             }
         }
 
         // 8. Guardar comprobantes en BD
+        console.log('[Conciliación Server] Paso 8: Guardando comprobantes en BD...')
         const comprobantesParaDb = resultadosValidacion.map((r, i) => ({
             sesion_id: sesionId,
             fecha: r.comprobante.fecha || format(new Date(), 'yyyy-MM-dd'),
@@ -149,14 +222,20 @@ export async function procesarConciliacionCompletaAction(formData: FormData): Pr
             acreditado: false,
             notas: comprobantesParseados[i].error || null
         }))
+        console.log('[Conciliación Server] Comprobantes a guardar:', comprobantesParaDb.length)
 
-        const { data: comprobantesGuardados } = await supabase
+        const { data: comprobantesGuardados, error: errorGuardarComp } = await supabase
             .from('comprobantes_conciliacion')
             .insert(comprobantesParaDb)
             .select('id, cliente_id, monto, referencia')
 
+        if (errorGuardarComp) {
+            console.error('[Conciliación Server] ERROR guardando comprobantes:', errorGuardarComp)
+        }
+        console.log('[Conciliación Server] Comprobantes guardados:', comprobantesGuardados?.length || 0)
+
         // 9. Acreditar saldos a clientes validados
-        console.log('[Conciliación] Acreditando saldos...')
+        console.log('[Conciliación Server] Paso 9: Acreditando saldos...')
         const pagosParaAcreditar = (comprobantesGuardados || [])
             .filter((c, i) =>
                 c.cliente_id &&
@@ -168,6 +247,10 @@ export async function procesarConciliacionCompletaAction(formData: FormData): Pr
                 referencia: c.referencia || '',
                 comprobanteId: c.id
             }))
+        console.log('[Conciliación Server] Pagos a acreditar:', pagosParaAcreditar.length)
+        pagosParaAcreditar.forEach((p, i) => {
+            console.log(`[Conciliación Server]   Pago ${i + 1}: Cliente=${p.clienteId}, Monto=$${p.monto}, Ref=${p.referencia}`)
+        })
 
         const resultadoAcreditacion = await acreditarPagosBatch(pagosParaAcreditar, sesionId)
 
@@ -191,6 +274,7 @@ export async function procesarConciliacionCompletaAction(formData: FormData): Pr
         }
 
         // 10. Calcular resumen
+        console.log('[Conciliación Server] Paso 10: Calculando resumen...')
         const resumen: ResumenConciliacion = {
             sesion_id: sesionId,
             total_comprobantes: resultadosValidacion.length,
@@ -201,48 +285,73 @@ export async function procesarConciliacionCompletaAction(formData: FormData): Pr
             monto_total_acreditado: resultadoAcreditacion.montoTotal,
             detalles: resultadosValidacion
         }
+        console.log('[Conciliación Server] Resumen calculado:')
+        console.log('[Conciliación Server]   - Total comprobantes:', resumen.total_comprobantes)
+        console.log('[Conciliación Server]   - Validados:', resumen.validados)
+        console.log('[Conciliación Server]   - No encontrados:', resumen.no_encontrados)
+        console.log('[Conciliación Server]   - Sin cliente:', resumen.sin_cliente)
+        console.log('[Conciliación Server]   - Errores:', resumen.errores)
+        console.log('[Conciliación Server]   - Monto acreditado:', resumen.monto_total_acreditado)
 
         // 11. Generar reporte PDF
-        console.log('[Conciliación] Generando reporte PDF...')
+        console.log('[Conciliación Server] Paso 11: Generando reporte PDF...')
         const { data: userData } = await supabase
             .from('usuarios')
             .select('nombre, email')
             .eq('id', user.id)
             .single()
 
-        const pdfBuffer = await generarReporteConciliacion({
-            sesionId,
-            fecha: new Date(),
-            usuarioNombre: userData?.nombre || userData?.email || user.email || 'Usuario',
-            sabanaArchivo: sabanaPdf.name,
-            resultados: resultadosValidacion,
-            resumen: {
-                totalComprobantes: resumen.total_comprobantes,
-                validados: resumen.validados,
-                noEncontrados: resumen.no_encontrados,
-                sinCliente: resumen.sin_cliente,
-                errores: resumen.errores,
-                montoTotalAcreditado: resumen.monto_total_acreditado
-            }
-        })
+        let pdfBuffer
+        try {
+            pdfBuffer = await generarReporteConciliacion({
+                sesionId,
+                fecha: new Date(),
+                usuarioNombre: userData?.nombre || userData?.email || user.email || 'Usuario',
+                sabanaArchivo: sabanaPdf.name,
+                resultados: resultadosValidacion,
+                resumen: {
+                    totalComprobantes: resumen.total_comprobantes,
+                    validados: resumen.validados,
+                    noEncontrados: resumen.no_encontrados,
+                    sinCliente: resumen.sin_cliente,
+                    errores: resumen.errores,
+                    montoTotalAcreditado: resumen.monto_total_acreditado
+                }
+            })
+            console.log('[Conciliación Server] ✅ Reporte PDF generado, tamaño:', pdfBuffer.length, 'bytes')
+        } catch (errorPdf) {
+            console.error('[Conciliación Server] ERROR generando PDF:', errorPdf)
+            // Continuamos sin PDF
+            pdfBuffer = null
+        }
 
         // Subir PDF a storage
-        const nombreReporte = `conciliacion_${sesionId.slice(0, 8)}_${format(new Date(), 'yyyyMMdd_HHmmss')}.pdf`
-        const { data: uploadData } = await supabase
-            .storage
-            .from('reportes')
-            .upload(`conciliacion/${nombreReporte}`, pdfBuffer, {
-                contentType: 'application/pdf'
-            })
+        let reporteUrl: string | undefined
+        if (pdfBuffer) {
+            console.log('[Conciliación Server] Subiendo PDF a Storage...')
+            const nombreReporte = `conciliacion_${sesionId.slice(0, 8)}_${format(new Date(), 'yyyyMMdd_HHmmss')}.pdf`
+            const { data: uploadData, error: errorUpload } = await supabase
+                .storage
+                .from('reportes')
+                .upload(`conciliacion/${nombreReporte}`, pdfBuffer, {
+                    contentType: 'application/pdf'
+                })
 
-        const reporteUrl = uploadData?.path
-            ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/reportes/${uploadData.path}`
-            : undefined
+            if (errorUpload) {
+                console.error('[Conciliación Server] ERROR subiendo PDF:', errorUpload)
+            } else {
+                reporteUrl = uploadData?.path
+                    ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/reportes/${uploadData.path}`
+                    : undefined
+                console.log('[Conciliación Server] ✅ PDF subido:', reporteUrl)
+            }
+        }
 
         resumen.reporte_url = reporteUrl
 
         // 12. Actualizar sesión como completada
-        await supabase
+        console.log('[Conciliación Server] Paso 12: Actualizando sesión como completada...')
+        const { error: errorActualizarSesion } = await supabase
             .from('sesiones_conciliacion')
             .update({
                 total_movimientos_sabana: movimientosSabana.length,
@@ -254,7 +363,11 @@ export async function procesarConciliacionCompletaAction(formData: FormData): Pr
             })
             .eq('id', sesionId)
 
-        console.log('[Conciliación] Sesión completada:', sesionId)
+        if (errorActualizarSesion) {
+            console.error('[Conciliación Server] ERROR actualizando sesión:', errorActualizarSesion)
+        }
+
+        console.log('[Conciliación Server] ✅ Sesión completada:', sesionId)
 
         revalidatePath('/tesoreria/conciliacion')
         revalidatePath('/tesoreria')
@@ -266,7 +379,8 @@ export async function procesarConciliacionCompletaAction(formData: FormData): Pr
         }
 
     } catch (error) {
-        console.error('[Conciliación] Error:', error)
+        console.error('[Conciliación Server] ❌ ERROR GENERAL:', error)
+        console.error('[Conciliación Server] Stack:', error instanceof Error ? error.stack : 'N/A')
         return {
             success: false,
             error: error instanceof Error ? error.message : 'Error desconocido en la conciliación'
@@ -340,7 +454,7 @@ export async function obtenerDetalleSesionAction(sesionId: string): Promise<{
             .from('comprobantes_conciliacion')
             .select(`
                 *,
-                cliente:clientes(id, nombre, apellido, cuit),
+                cliente:clientes(id, nombre, cuit),
                 movimiento_match:movimientos_bancarios(id, fecha, monto, referencia)
             `)
             .eq('sesion_id', sesionId)

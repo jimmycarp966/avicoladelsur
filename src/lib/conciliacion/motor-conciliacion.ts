@@ -14,19 +14,19 @@ import { TOLERANCIA_MONTO_PORCENTAJE } from './parsers'
 // ===========================================
 
 const REGLAS_PUNTAJE = {
-    MONTO_EXACTO: 50,           // Monto idéntico (diferencia < $1)
-    MONTO_APROXIMADO_2: 40,     // Diferencia <= 2%
-    MONTO_APROXIMADO_5: 30,     // Diferencia <= 5%
-    MONTO_APROXIMADO_10: 15,    // Diferencia <= 10%
-    DNI_EXACTO: 35,             // DNI/CUIT coincide exactamente
-    FECHA_MISMO_DIA: 15,        // Misma fecha
-    FECHA_CERCANA_3: 8,         // ±3 días
-    FECHA_CERCANA_7: 3,         // ±7 días
-    REFERENCIA_SIMILAR_80: 15,  // Referencia muy similar
-    REFERENCIA_SIMILAR_60: 8,   // Referencia similar
+    REFERENCIA_EXACTA: 100,      // Match PERFECTO (Prioridad Absoluta)
+    MONTO_EXACTO: 40,            // Bajamos peso (req match + nombre/dni/fecha)
+    MONTO_APROXIMADO_2: 20,      // Diferencia <= 2%
+    MONTO_APROXIMADO_5: 10,      // Diferencia <= 5%
+    DNI_EXACTO: 40,              // Identidad Fuerte
+    NOMBRE_EN_DESCRIPCION: 40,   // Nuevo: Nombre cliente en descripción movimiento
+    FECHA_MISMO_DIA: 20,         // Fecha exacta
+    FECHA_CERCANA_1: 10,         // ±1 día
+    FECHA_CERCANA_3: 5,          // ±3 días
+    REFERENCIA_SIMILAR_80: 15,   // Referencia similar (fuzzy)
 }
 
-export const UMBRAL_VALIDACION = 70 // Score mínimo para auto-validar
+export const UMBRAL_VALIDACION = 80 // Límite exigente para evitar falsos positivos
 
 // ===========================================
 // MOTOR DE VALIDACIÓN
@@ -40,6 +40,9 @@ export function validarComprobanteContraSabana(
     comprobante: DatosComprobante,
     movimientosSabana: MovimientoBancario[]
 ): ResultadoValidacion {
+    console.log('[Motor] ========== validarComprobanteContraSabana ==========')
+    console.log('[Motor] Comprobante:', { monto: comprobante.monto, dni: comprobante.dni_cuit, fecha: comprobante.fecha, ref: comprobante.referencia })
+
     if (!movimientosSabana.length) {
         return {
             comprobante,
@@ -62,6 +65,11 @@ export function validarComprobanteContraSabana(
     for (const movimiento of movimientosSabana) {
         const resultado = calcularScoreComprobante(comprobante, movimiento)
 
+        // Log solo de scores relevantes para no saturar
+        if (resultado.score > 20) {
+            console.log(`[Motor] Score vs mov ${movimiento.id?.substring(0, 8)} ($${movimiento.monto}): ${resultado.score} pts`)
+        }
+
         if (!mejorMatch || resultado.score > mejorMatch.score) {
             mejorMatch = {
                 movimiento,
@@ -76,8 +84,10 @@ export function validarComprobanteContraSabana(
     let estado: EstadoValidacion = 'no_encontrado'
     if (mejorMatch && mejorMatch.score >= UMBRAL_VALIDACION) {
         estado = 'validado'
+        console.log(`[Motor] ✅ VALIDADO con score ${mejorMatch.score} >= ${UMBRAL_VALIDACION}`)
     } else if (mejorMatch && mejorMatch.score >= 40) {
         estado = 'pendiente' // Requiere revisión manual
+        console.log(`[Motor] ⚠️ PENDIENTE con score ${mejorMatch.score}`)
     }
 
     return {
@@ -102,7 +112,21 @@ function calcularScoreComprobante(
     const etiquetas: string[] = []
     const detalles: Record<string, number> = {}
 
-    // 1. Regla de Monto (más importante)
+    // 0. Regla de ORO: Referencia Bancaria Exacta
+    // Normalizar referencias: quitar ceros a la izquierda, espacios, guiones
+    const cleanRefComp = comprobante.referencia?.toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^0+/, '') || ''
+    const cleanRefMov = movimiento.referencia?.toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^0+/, '') || ''
+
+    if (cleanRefComp.length > 4 && cleanRefMov.length > 4 && cleanRefComp === cleanRefMov) {
+        // Match casi seguro
+        score += REGLAS_PUNTAJE.REFERENCIA_EXACTA
+        detalles['referencia_exacta'] = REGLAS_PUNTAJE.REFERENCIA_EXACTA
+        etiquetas.push('✅ Referencia IDÉNTICA')
+        // Si la referencia es idéntica, retornamos score alto directo
+        return { score, etiquetas, detalles }
+    }
+
+    // 1. Regla de Monto
     const diffMonto = Math.abs(comprobante.monto - movimiento.monto)
     const porcDiff = movimiento.monto > 0
         ? Math.abs((diffMonto / movimiento.monto) * 100)
@@ -115,25 +139,38 @@ function calcularScoreComprobante(
     } else if (porcDiff <= TOLERANCIA_MONTO_PORCENTAJE) {
         score += REGLAS_PUNTAJE.MONTO_APROXIMADO_2
         detalles['monto_aprox_2'] = REGLAS_PUNTAJE.MONTO_APROXIMADO_2
-        etiquetas.push(`✅ Monto ≈ (diff ${porcDiff.toFixed(1)}%)`)
+        etiquetas.push(`✅ Monto ≈ (${porcDiff.toFixed(1)}%)`)
     } else if (porcDiff <= 5) {
         score += REGLAS_PUNTAJE.MONTO_APROXIMADO_5
         detalles['monto_aprox_5'] = REGLAS_PUNTAJE.MONTO_APROXIMADO_5
-        etiquetas.push(`⚠️ Monto aprox. (diff ${porcDiff.toFixed(1)}%)`)
-    } else if (porcDiff <= 10) {
-        score += REGLAS_PUNTAJE.MONTO_APROXIMADO_10
-        detalles['monto_aprox_10'] = REGLAS_PUNTAJE.MONTO_APROXIMADO_10
-        etiquetas.push(`⚠️ Monto diff (${porcDiff.toFixed(1)}%)`)
+        etiquetas.push(`⚠️ Monto dif. (${porcDiff.toFixed(1)}%)`)
     }
 
-    // 2. Regla de DNI/CUIT
+    // 2. Regla de Identidad Fuerte (DNI/CUIT)
     const cleanDniComp = comprobante.dni_cuit?.replace(/\D/g, '') || ''
     const cleanDniMov = movimiento.dni_cuit?.replace(/\D/g, '') || ''
 
-    if (cleanDniComp && cleanDniMov && cleanDniComp === cleanDniMov) {
+    if (cleanDniComp.length > 6 && cleanDniMov.length > 6 && cleanDniComp === cleanDniMov) {
         score += REGLAS_PUNTAJE.DNI_EXACTO
         detalles['dni_exacto'] = REGLAS_PUNTAJE.DNI_EXACTO
         etiquetas.push('✅ DNI/CUIT coincide')
+    } else if (comprobante.nombre_cliente_identificado && movimiento.descripcion) {
+        // 2b. Regla de Nombre en Descripción (Fuzzy Match)
+        // Buscar si el nombre del cliente aparece en la descripción del movimiento
+        const nombreCliente = comprobante.nombre_cliente_identificado.toUpperCase()
+        const descMov = movimiento.descripcion.toUpperCase()
+
+        // Estrategia simple: Tokenize y buscar coincidencia parcial
+        // Ejemplo: "Agustina Girard" vs "ING TRANSF:AGUSTINA GIRARD-"
+        const tokensNombre = nombreCliente.split(' ').filter(t => t.length > 2)
+        const tokensCoincidentes = tokensNombre.filter(token => descMov.includes(token))
+
+        // Si coinciden al menos 2 tokens importantes o el 100% si es nombre corto
+        if (tokensCoincidentes.length >= 2 || (tokensNombre.length === 1 && tokensCoincidentes.length === 1)) {
+            score += REGLAS_PUNTAJE.NOMBRE_EN_DESCRIPCION
+            detalles['nombre_match'] = REGLAS_PUNTAJE.NOMBRE_EN_DESCRIPCION
+            etiquetas.push('✅ Nombre coincide en descripción')
+        }
     }
 
     // 3. Regla de Fecha
@@ -152,35 +189,32 @@ function calcularScoreComprobante(
                 score += REGLAS_PUNTAJE.FECHA_MISMO_DIA
                 detalles['fecha_exacta'] = REGLAS_PUNTAJE.FECHA_MISMO_DIA
                 etiquetas.push('✅ Mismo día')
+            } else if (diffDias <= 1) {
+                score += REGLAS_PUNTAJE.FECHA_CERCANA_1
+                detalles['fecha_cercana_1'] = REGLAS_PUNTAJE.FECHA_CERCANA_1
+                etiquetas.push(`📅 ±1 día`)
             } else if (diffDias <= 3) {
                 score += REGLAS_PUNTAJE.FECHA_CERCANA_3
                 detalles['fecha_cercana_3'] = REGLAS_PUNTAJE.FECHA_CERCANA_3
                 etiquetas.push(`📅 ±${diffDias} días`)
-            } else if (diffDias <= 7) {
-                score += REGLAS_PUNTAJE.FECHA_CERCANA_7
-                detalles['fecha_cercana_7'] = REGLAS_PUNTAJE.FECHA_CERCANA_7
-                etiquetas.push(`📅 ±${diffDias} días`)
             }
         } catch {
-            // Ignorar errores de parseo de fecha
+            // Ignorar errores de fecha
         }
     }
 
-    // 4. Regla de Referencia/Descripción
-    const textoComp = ((comprobante.referencia || '') + ' ' + (comprobante.descripcion || '')).trim()
-    const textoMov = ((movimiento.referencia || '') + ' ' + (movimiento.descripcion || '')).trim()
+    // 4. Regla "Bonus" para referencias similares si no hubo match exacto
+    if (!detalles['referencia_exacta']) {
+        const textoComp = ((comprobante.referencia || '') + ' ' + (comprobante.descripcion || '')).trim()
+        const textoMov = ((movimiento.referencia || '') + ' ' + (movimiento.descripcion || '')).trim()
 
-    if (textoComp && textoMov) {
-        const similitud = calculateStringSimilarity(textoComp, textoMov)
-
-        if (similitud >= 0.8) {
-            score += REGLAS_PUNTAJE.REFERENCIA_SIMILAR_80
-            detalles['ref_similar_80'] = REGLAS_PUNTAJE.REFERENCIA_SIMILAR_80
-            etiquetas.push('✅ Referencia muy similar')
-        } else if (similitud >= 0.6) {
-            score += REGLAS_PUNTAJE.REFERENCIA_SIMILAR_60
-            detalles['ref_similar_60'] = REGLAS_PUNTAJE.REFERENCIA_SIMILAR_60
-            etiquetas.push('📝 Referencia similar')
+        if (textoComp.length > 5 && textoMov.length > 5) {
+            const similitud = calculateStringSimilarity(textoComp, textoMov)
+            if (similitud >= 0.85) {
+                score += REGLAS_PUNTAJE.REFERENCIA_SIMILAR_80
+                detalles['ref_similar'] = REGLAS_PUNTAJE.REFERENCIA_SIMILAR_80
+                etiquetas.push('📝 Referencia similar')
+            }
         }
     }
 
@@ -195,27 +229,50 @@ export function validarComprobantesContraSabana(
     comprobantes: DatosComprobante[],
     movimientosSabana: MovimientoBancario[]
 ): ResultadoValidacion[] {
+    console.log('[Motor] ========== validarComprobantesContraSabana ==========')
+    console.log('[Motor] Total comprobantes:', comprobantes.length)
+    console.log('[Motor] Total movimientos sábana:', movimientosSabana.length)
+
     const resultados: ResultadoValidacion[] = []
     const movimientosUsados = new Set<string>()
 
     // Ordenar comprobantes por monto (de mayor a menor) para priorizar
     const comprobantesOrdenados = [...comprobantes].sort((a, b) => b.monto - a.monto)
+    console.log('[Motor] Comprobantes ordenados por monto (mayor a menor)')
 
-    for (const comprobante of comprobantesOrdenados) {
+    for (let i = 0; i < comprobantesOrdenados.length; i++) {
+        const comprobante = comprobantesOrdenados[i]
+        console.log(`[Motor] === Procesando comprobante ${i + 1}/${comprobantesOrdenados.length}: $${comprobante.monto} ===`)
+
         // Filtrar movimientos que ya fueron usados
         const movimientosDisponibles = movimientosSabana.filter(
             m => !movimientosUsados.has(m.id!)
         )
+        console.log(`[Motor] Movimientos disponibles (no usados): ${movimientosDisponibles.length}`)
 
         const resultado = validarComprobanteContraSabana(comprobante, movimientosDisponibles)
 
         // Si se encontró match, marcar el movimiento como usado
         if (resultado.movimiento_match && resultado.estado === 'validado') {
             movimientosUsados.add(resultado.movimiento_match.id!)
+            console.log(`[Motor] Movimiento ${resultado.movimiento_match.id} marcado como usado`)
         }
 
         resultados.push(resultado)
     }
+
+    // Resumen final
+    const validados = resultados.filter(r => r.estado === 'validado').length
+    const pendientes = resultados.filter(r => r.estado === 'pendiente').length
+    const noEncontrados = resultados.filter(r => r.estado === 'no_encontrado').length
+    const sinCliente = resultados.filter(r => r.estado === 'sin_cliente').length
+
+    console.log('[Motor] ========== RESUMEN VALIDACIÓN ==========')
+    console.log(`[Motor] Validados: ${validados}`)
+    console.log(`[Motor] Pendientes: ${pendientes}`)
+    console.log(`[Motor] No encontrados: ${noEncontrados}`)
+    console.log(`[Motor] Sin cliente: ${sinCliente}`)
+    console.log(`[Motor] Movimientos usados: ${movimientosUsados.size}/${movimientosSabana.length}`)
 
     return resultados
 }

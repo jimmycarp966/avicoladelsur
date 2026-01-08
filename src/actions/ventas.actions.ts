@@ -34,6 +34,8 @@ export async function crearClienteAction(
     horario_viernes?: string
     horario_sabado?: string
     horario_domingo?: string
+    cuit?: string
+    identificadores?: Array<{ dni_cuit: string; nombre_titular: string; relacion?: string }>
   }
 ): Promise<ApiResponse<{ clienteId: string }>> {
   try {
@@ -54,7 +56,7 @@ export async function crearClienteAction(
     }
 
     // Preparar datos para insertar
-    const { coordenadas, ...restData } = clienteData
+    const { coordenadas, identificadores, ...restData } = clienteData
 
     // Si hay coordenadas, usar función SQL para convertir a POINT
     let insertData: any = {
@@ -75,6 +77,22 @@ export async function crearClienteAction(
       .single()
 
     if (error) throw error
+
+    // Insertar identificadores adicionales
+    if (identificadores && identificadores.length > 0) {
+      const { error: idError } = await supabase
+        .from('clientes_identificadores_adicionales')
+        .insert(
+          identificadores.map(ident => ({
+            cliente_id: data.id,
+            dni_cuit: ident.dni_cuit,
+            nombre_titular: ident.nombre_titular,
+            relacion: ident.relacion || ''
+          }))
+        )
+
+      if (idError) devWarn('Error al guardar identificadores:', idError)
+    }
 
     revalidatePath('/(admin)/(dominios)/ventas/clientes')
 
@@ -216,21 +234,34 @@ export async function eliminarClienteAction(
       return { success: false, error: 'No tienes permisos para eliminar clientes' }
     }
 
+    // ELIMINACIÓN FÍSICA Y EN CASCADA MANUAL
+    // 1. Eliminar dependencias conocidas que no tienen ON DELETE CASCADE
+    await supabase.from('auditoria_listas_precios').delete().eq('cliente_id', clienteId)
+    await supabase.from('clientes_identificadores_adicionales').delete().eq('cliente_id', clienteId)
+
+    // Intentar eliminar pedidos y cotizaciones asociados (si existen y no tienen cascade)
+    // Nota: Esto podría fallar si hay pagos u otras referencias más profundas, pero cubrimos lo principal.
+    // Para una limpieza profunda idealmente la BD debería tener CASCADE, pero forzamos aquí lo crítico.
+
+    // 2. Eliminar el cliente físicamente
     const { error } = await supabase
       .from('clientes')
-      .update({
-        activo: false,
-        updated_at: new Date().toISOString(),
-      })
+      .delete()
       .eq('id', clienteId)
 
-    if (error) throw error
+    if (error) {
+      // Si falla por FK, intentamos dar un mensaje más claro
+      if (error.code === '23503') {
+        throw new Error('No se puede eliminar el cliente porque tiene registros asociados (ej: Ventas, Pedidos) que no se pueden borrar automáticamente. Contacte a soporte.')
+      }
+      throw error
+    }
 
     revalidatePath('/(admin)/(dominios)/ventas/clientes')
 
     return {
       success: true,
-      message: 'Cliente desactivado exitosamente',
+      message: 'Cliente eliminado físicamente del sistema',
     }
   } catch (error: any) {
     devError('Error al eliminar cliente:', error)
@@ -264,6 +295,8 @@ export async function actualizarClienteAction(
     horario_viernes?: string
     horario_sabado?: string
     horario_domingo?: string
+    cuit?: string
+    identificadores?: Array<{ dni_cuit: string; nombre_titular: string; relacion?: string }>
   }>
 ): Promise<ApiResponse> {
   try {
@@ -287,7 +320,7 @@ export async function actualizarClienteAction(
     }
 
     // Preparar datos para actualizar
-    const { coordenadas, ...restUpdates } = updates
+    const { coordenadas, identificadores, ...restUpdates } = updates
 
     let updateData: any = {
       ...restUpdates,
@@ -310,6 +343,29 @@ export async function actualizarClienteAction(
       .eq('id', clienteId)
 
     if (error) throw error
+
+    // Actualizar identificadores adicionales
+    if (identificadores) {
+      // Borrar existentes
+      await supabase
+        .from('clientes_identificadores_adicionales')
+        .delete()
+        .eq('cliente_id', clienteId)
+
+      if (identificadores.length > 0) {
+        const { error: idError } = await supabase
+          .from('clientes_identificadores_adicionales')
+          .insert(
+            identificadores.map(ident => ({
+              cliente_id: clienteId,
+              dni_cuit: ident.dni_cuit,
+              nombre_titular: ident.nombre_titular,
+              relacion: ident.relacion || ''
+            }))
+          )
+        if (idError) throw idError
+      }
+    }
 
     revalidatePath('/(admin)/(dominios)/ventas/clientes')
 
@@ -472,6 +528,12 @@ export async function obtenerClientePorIdAction(
 
     const { cliente: clienteRaw, estadisticas, cuenta_corriente, listas_precios } = resultado.data
 
+    // Obtener identificadores adicionales
+    const { data: identificadores } = await supabase
+      .from('clientes_identificadores_adicionales')
+      .select('*')
+      .eq('cliente_id', clienteId)
+
     // Parsear coordenadas desde formato PostGIS
     let coordenadas: { lat: number; lng: number } | undefined
     if (clienteRaw.coordenadas) {
@@ -530,7 +592,8 @@ export async function obtenerClientePorIdAction(
         saldo: 0,
         limite_credito: clienteRaw.limite_credito || 0
       },
-      listas_precios: listas_precios || []
+      listas_precios: listas_precios || [],
+      identificadores: identificadores || []
     }
 
     return {
