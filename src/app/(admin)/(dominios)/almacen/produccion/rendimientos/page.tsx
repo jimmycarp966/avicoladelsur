@@ -103,8 +103,8 @@ export default function RendimientosPage() {
 
     // Filtrar rendimientos
     const rendimientosFiltrados = rendimientos.filter(r => {
-        if (filtroDestino && r.destino_id !== filtroDestino) return false
-        if (filtroProveedor && r.proveedor !== filtroProveedor) return false
+        if (filtroDestino && filtroDestino !== 'todos' && r.destino_id !== filtroDestino) return false
+        if (filtroProveedor && filtroProveedor !== 'todos' && r.proveedor !== filtroProveedor) return false
         return true
     })
 
@@ -310,7 +310,7 @@ export default function RendimientosPage() {
                                     <SelectValue placeholder="Todos" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">Todos</SelectItem>
+                                    <SelectItem value="todos">Todos</SelectItem>
                                     {destinos.map(d => (
                                         <SelectItem key={d.id} value={d.id}>
                                             {d.nombre}
@@ -326,7 +326,7 @@ export default function RendimientosPage() {
                                     <SelectValue placeholder="Todos" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">Todos</SelectItem>
+                                    <SelectItem value="todos">Todos</SelectItem>
                                     {proveedores.map(p => (
                                         <SelectItem key={p} value={p}>
                                             {p}
