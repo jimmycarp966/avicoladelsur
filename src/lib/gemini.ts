@@ -27,7 +27,7 @@ export interface DatosPesaje {
  */
 export async function analizarPesoConIA(datos: DatosPesaje): Promise<AnalisisPesoAnomalo> {
     try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
 
         const prompt = `Eres un asistente experto en control de calidad para una avícola. 
 Analiza si hay un posible ERROR DE DIGITACIÓN en el siguiente pesaje:
