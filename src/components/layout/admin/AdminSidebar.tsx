@@ -106,6 +106,7 @@ const navigation = [
       { name: 'Cajas', href: '/tesoreria/cajas' },
       { name: 'Movimientos', href: '/tesoreria/movimientos' },
       { name: 'Validar rutas', href: '/tesoreria/validar-rutas' },
+      { name: 'Conciliación', href: '/tesoreria/conciliacion' },
       { name: 'Cuentas Corrientes', href: '/tesoreria/cuentas-corrientes' },
       { name: 'Cierres de Caja', href: '/tesoreria/cierre-caja' },
       { name: 'Tesoro', href: '/tesoreria/tesoro' },
