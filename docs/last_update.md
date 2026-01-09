@@ -41,4 +41,5 @@ Ruta: `docs/diagrams/architecture.mmd`
 - [x] ARCHITECTURE_SUMMARY.md actualizado (sección Cambio Reciente)
 - [x] docs/CHANGELOG.md con nueva línea
 - [x] docs/last_update.md con evidencia
-- [ ] Commit y push pendientes
+- [x] Commit y push realizados (9fed346)
+

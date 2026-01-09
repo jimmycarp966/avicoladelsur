@@ -192,14 +192,26 @@ function NavigationItem({ item, pathname, user, onClose, badges }: NavigationIte
   const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
   const canAccess = hasAccess(user, item.roles)
   const badgeCount = item.badge ? badges[item.badge] || 0 : 0
+  const hasChildren = item.children && item.children.length > 0
 
   if (!canAccess) return null
+
+  // Solo cerrar menú si NO tiene hijos (es enlace final)
+  const handleMainClick = (e: React.MouseEvent) => {
+    if (hasChildren) {
+      // Si tiene hijos, solo navegar pero no cerrar el menú móvil
+      // El submenú se mostrará automáticamente por isActive
+      return
+    }
+    // Si no tiene hijos, cerrar el menú
+    onClose?.()
+  }
 
   return (
     <div>
       <Link
         href={item.href}
-        onClick={onClose}
+        onClick={handleMainClick}
         className={cn(
           'group relative flex items-center rounded-lg px-4 py-3 text-sm font-medium transition-all duration-200',
           isActive
@@ -258,6 +270,7 @@ function NavigationItem({ item, pathname, user, onClose, badges }: NavigationIte
     </div>
   )
 }
+
 
 export function AdminSidebar({ onClose, user }: AdminSidebarProps) {
   const pathname = usePathname()

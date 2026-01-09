@@ -10,6 +10,18 @@ export interface GoogleDirectionsRequest {
   destination: { lat: number; lng: number }
   waypoints: Array<{ lat: number; lng: number }>
   optimize?: boolean
+  alternatives?: boolean  // Obtener rutas alternativas (solo sin waypoints)
+}
+
+/**
+ * Ruta alternativa devuelta por Google Directions
+ */
+export interface RutaAlternativa {
+  polyline: string
+  distancia: number     // metros
+  duracion: number      // segundos
+  resumen: string       // "via Ruta 9" o "via Av. Libertad"
+  esPreferida?: boolean // Pre-seleccionada según preferencias del usuario
 }
 
 export interface GoogleDirectionsResponse {
@@ -18,6 +30,7 @@ export interface GoogleDirectionsResponse {
   polyline?: string
   distance?: number // en metros
   duration?: number // en segundos
+  rutasAlternativas?: RutaAlternativa[]  // Alternativas cuando alternatives=true
   error?: string
 }
 
@@ -59,6 +72,11 @@ function buildDirectionsUrl(request: GoogleDirectionsRequest): string {
   params.append('language', 'es')
   params.append('region', 'ar')
   params.append('units', 'metric')
+
+  // Alternativas (solo funciona sin waypoints)
+  if (request.alternatives && request.waypoints.length === 0) {
+    params.append('alternatives', 'true')
+  }
 
   return `${GOOGLE_DIRECTIONS_API_URL}?${params.toString()}`
 }
@@ -139,12 +157,32 @@ function parseGoogleResponse(data: any): GoogleDirectionsResponse {
 
   console.log('[Google Directions] Orden final de paradas:', orderedStops.length, 'puntos')
 
+  // Extraer rutas alternativas si hay más de una ruta
+  const rutasAlternativas: RutaAlternativa[] = data.routes.map((r: any, index: number) => {
+    const dist = r.legs.reduce((sum: number, leg: any) => sum + leg.distance.value, 0)
+    const dur = r.legs.reduce((sum: number, leg: any) => sum + leg.duration.value, 0)
+
+    // Obtener resumen (via "Ruta 9", etc.)
+    const resumen = r.summary || `Ruta ${index + 1}`
+
+    return {
+      polyline: r.overview_polyline?.points || '',
+      distancia: dist,
+      duracion: dur,
+      resumen,
+      esPreferida: index === 0  // La primera es la preferida por Google
+    }
+  })
+
+  console.log('[Google Directions] Rutas alternativas encontradas:', rutasAlternativas.length)
+
   return {
     success: true,
     orderedStops,
     polyline,
     distance,
-    duration
+    duration,
+    rutasAlternativas: rutasAlternativas.length > 1 ? rutasAlternativas : undefined
   }
 }
 

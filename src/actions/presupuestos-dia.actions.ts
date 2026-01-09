@@ -6,7 +6,13 @@ export { esVentaMayorista }
 
 // Helper para determinar si un item es pesable
 export function esItemPesable(item: any, esVentaMayorista: boolean = false): boolean {
-  // Si es venta mayorista, NO es pesable (productos vienen en caja cerrada)
+  // 1. Si el producto requiere pesaje explícitamente (nueva configuración), SIEMPRE es pesable
+  // Esto sobre-escribe la lógica de mayorista
+  if (item.producto?.requiere_pesaje === true) {
+    return true
+  }
+
+  // 2. Si es venta mayorista, NO es pesable (productos vienen en caja cerrada)
   if (esVentaMayorista) {
     return false
   }
@@ -61,7 +67,7 @@ export async function obtenerPresupuestosDiaAction(fecha: string, zonaId?: strin
       cantidad_reservada,
       pesable,
       peso_final,
-      producto:productos(nombre, codigo, categoria, venta_mayor_habilitada, unidad_medida, kg_por_unidad_mayor, unidad_mayor_nombre),
+      producto:productos(nombre, codigo, categoria, venta_mayor_habilitada, unidad_medida, kg_por_unidad_mayor, unidad_mayor_nombre, requiere_pesaje),
       lista_precio:listas_precios(tipo)
     )
   `

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Scale, CheckCircle, AlertTriangle } from 'lucide-react'
+import { Scale, CheckCircle, AlertTriangle, TrendingUp } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -10,6 +10,12 @@ import { Button } from '@/components/ui/button'
 import { ScanButton } from '@/components/barcode/BarcodeScanner'
 import { parseBarcodeEAN13 } from '@/lib/barcode-parser'
 import { toast } from 'sonner'
+import {
+  registrarPesajeHistorialAction,
+  analizarPesoConHistorialAction,
+  obtenerEstadisticasProductoAction,
+  type ProductoEstadisticas
+} from '@/actions/pesajes.actions'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -71,6 +77,21 @@ export function PesajeItemCard({
     confianza: number
     usandoIA: boolean
   } | null>(null)
+  const [estadisticasProducto, setEstadisticasProducto] = useState<ProductoEstadisticas | null>(null)
+
+  // Cargar estadísticas del producto al montar
+  useEffect(() => {
+    const cargarEstadisticas = async () => {
+      if (item.producto?.codigo) {
+        // Buscar producto_id por código (en producción usarías el ID real)
+        const result = await obtenerEstadisticasProductoAction(item.id)
+        if (result.success && result.data) {
+          setEstadisticasProducto(result.data)
+        }
+      }
+    }
+    cargarEstadisticas()
+  }, [item.id, item.producto?.codigo])
 
   // Usar precio_unit_est (precio de lista) > precio_venta del producto como fallback
   const precioUnitario = item.precio_unit_est ?? item.producto?.precio_venta ?? 0
@@ -149,9 +170,22 @@ export function PesajeItemCard({
     }
 
     if (pesoIngresado > pesoSolicitadoKg * 2 && pesoIngresado > 5) {
+      const excesoPct = ((pesoIngresado / pesoSolicitadoKg) - 1) * 100
       return {
         esAnomalo: true,
-        razon: `El peso ingresado es significativamente mayor al solicitado (${((pesoIngresado / pesoSolicitadoKg) * 100).toFixed(0)}%)`,
+        razon: `Pesaste ${excesoPct.toFixed(0)}% más de lo solicitado`,
+        sugerencia: null,
+        confianza: 70,
+        usandoIA: false
+      }
+    }
+
+    // Detectar peso significativamente menor (menos del 50% del solicitado)
+    if (pesoIngresado < pesoSolicitadoKg * 0.5 && pesoSolicitadoKg > 1) {
+      const faltantePct = (1 - (pesoIngresado / pesoSolicitadoKg)) * 100
+      return {
+        esAnomalo: true,
+        razon: `Pesaste ${faltantePct.toFixed(0)}% menos de lo solicitado`,
         sugerencia: null,
         confianza: 70,
         usandoIA: false
@@ -226,9 +260,39 @@ export function PesajeItemCard({
   // Confirmar aplicación de peso a pesar de la anomalía
   const confirmarPesoAnomalo = async () => {
     if (anomalyInfo) {
+      // Registrar en historial con feedback: usuario aceptó anomalía
+      await registrarPesajeHistorialAction(
+        item.id, // producto_id (usarías el ID real del producto)
+        anomalyInfo.pesoSolicitado,
+        anomalyInfo.pesoIngresado,
+        true, // fue anomalía
+        true, // usuario aceptó
+        anomalyInfo.razon
+      )
+
       await onAplicarPeso(anomalyInfo.pesoIngresado)
       setShowAnomalyDialog(false)
       setAnomalyInfo(null)
+      toast.success('Pesaje registrado en historial para aprendizaje')
+    }
+  }
+
+  // Rechazar peso anómalo
+  const rechazarPesoAnomalo = async () => {
+    if (anomalyInfo) {
+      // Registrar en historial con feedback: usuario rechazó
+      await registrarPesajeHistorialAction(
+        item.id,
+        anomalyInfo.pesoSolicitado,
+        anomalyInfo.pesoIngresado,
+        true, // fue anomalía
+        false, // usuario rechazó
+        anomalyInfo.razon
+      )
+
+      setShowAnomalyDialog(false)
+      setAnomalyInfo(null)
+      setPesoInput('')
     }
   }
 
@@ -499,14 +563,16 @@ export function PesajeItemCard({
                   <hr className="border-orange-200" />
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Diferencia:</span>
-                    <span className="font-bold text-red-600">
+                    <span className={`font-bold ${anomalyInfo && anomalyInfo.pesoIngresado >= anomalyInfo.pesoSolicitado ? 'text-orange-600' : 'text-blue-600'}`}>
+                      {anomalyInfo && (anomalyInfo.pesoIngresado - anomalyInfo.pesoSolicitado) >= 0 ? '+' : ''}
                       {anomalyInfo && ((anomalyInfo.pesoIngresado - anomalyInfo.pesoSolicitado)).toFixed(2)} kg
-                      ({anomalyInfo && ((anomalyInfo.pesoIngresado / anomalyInfo.pesoSolicitado) * 100).toFixed(0)}%)
+                      ({anomalyInfo && (anomalyInfo.pesoIngresado - anomalyInfo.pesoSolicitado) >= 0 ? '+' : ''}
+                      {anomalyInfo && (((anomalyInfo.pesoIngresado / anomalyInfo.pesoSolicitado) - 1) * 100).toFixed(0)}%)
                     </span>
                   </div>
                   {anomalyInfo?.confianza && (
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Confianza del análisis:</span>
+                      <span className="text-muted-foreground">Certeza:</span>
                       <span className={`font-bold ${anomalyInfo.confianza >= 80 ? 'text-red-600' : 'text-yellow-600'}`}>
                         {anomalyInfo.confianza}%
                       </span>
@@ -520,10 +586,7 @@ export function PesajeItemCard({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => {
-              setShowAnomalyDialog(false)
-              setAnomalyInfo(null)
-            }}>
+            <AlertDialogCancel onClick={rechazarPesoAnomalo}>
               Cancelar y Corregir
             </AlertDialogCancel>
             <AlertDialogAction

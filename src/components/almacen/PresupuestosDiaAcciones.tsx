@@ -155,6 +155,7 @@ export function PresupuestosDiaAcciones({
       if (onSuccess) {
         onSuccess()
       } else {
+        router.push('/almacen/presupuestos-dia')
         router.refresh()
       }
     } catch (error: any) {

@@ -27,7 +27,7 @@ import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
 import { iniciarRutaAction } from '@/actions/reparto.actions'
 import GpsTracker from '@/components/reparto/GpsTracker'
-import NavigationView from '@/components/reparto/NavigationView'
+import NavigationInteractivo from '@/components/reparto/NavigationInteractivo'
 import { ChecklistInicioForm } from './checklist-inicio-form'
 import { useLocationTracker } from '@/hooks/useLocationTracker'
 
@@ -717,14 +717,15 @@ export function RutaMapaContent({ ruta }: RutaMapaContentProps) {
                 }}
             />
 
-            {/* NavigationView - Navegación paso a paso con voz */}
+            {/* NavigationInteractivo - Navegación paso a paso con selección de rutas */}
             {showNavigation && (
-                <NavigationView
+                <NavigationInteractivo
                     rutaId={ruta.id}
                     stops={deliveryStops}
                     onClose={handleCloseNavigation}
                     onDeliveryComplete={handleDeliveryComplete}
                     initialPosition={userLocation}
+                    repartidorId={ruta.repartidor_id}
                 />
             )}
         </div>

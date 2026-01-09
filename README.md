@@ -1,38 +1,39 @@
-# 🚀 Avícola del Sur ERP - Sistema Completo
+# 🚀 Avícola del Sur ERP - Sistema Integral de Gestión
 
-**ERP modular completo** con aplicación web administrativa, PWA móvil para repartidores con GPS tracking, planificación semanal de rutas, optimización automática con Google Directions + fallback local, y bot de WhatsApp automatizado para toma de pedidos.
+**Versión:** Enero 2026
+**Estado:** ✅ PRODUCCIÓN
 
-## ✨ Características Principales
+**Plataforma unificada** de gestión avícola que integra WMS (Almacén), TMS (Reparto), CRM (Ventas) y ERP (Finanzas/RRHH). Potenciada por **Google Gemini AI** para decisiones inteligentes en tiempo real.
 
-- 🗓️ **Planificación Semanal**: Rutas fijas por zona/día/turno con vehículos asignados
-- 📱 **PWA Móvil**: App nativa-like para repartidores con GPS tracking en tiempo real
-- 🔊 **Navegación con Voz**: Instrucciones turn-by-turn con voz en español usando Web Speech API
-- 🤖 **Bot WhatsApp**: Toma automática de pedidos con validación de stock
-- 🗺️ **Optimización de Rutas**: Google Directions API + fallback local (Nearest Neighbor + 2-opt)
-- 📍 **GPS Tracking**: Seguimiento en tiempo real con alertas de desvío
-- ⚖️ **FIFO Automático**: Gestión inteligente de stock por lotes
-- 💰 **Tesorería Completa**: Cuentas corrientes, cajas, cierres automáticos
-- 📊 **Reportes Avanzados**: CSV/PDF con business intelligence
-- 🔐 **RLS Completo**: Seguridad por roles (admin, vendedor, repartidor, almacenista)
-- 💵 **Sistema de Listas de Precios**: Listas por tipo de cliente (minorista, mayorista, distribuidor) con margen de ganancia automático
-- 🧭 **Navegación Inteligente**: Sidebar organizado por dominios funcionales con submenús jerárquicos y navegación intuitiva
-- ⚡ **Optimizaciones de Rendimiento**: Caché inteligente, revalidación estratégica, queries optimizadas, índices de BD
-- 🎯 **Pedidos Agrupados**: Sistema único donde pedidos agrupan múltiples entregas por turno/zona/fecha
-- 🏢 **Control de Sucursales**: Modelo completo de control mayorista/minorista con auditoría de precios, conteos físicos de stock y detección automática de desvíos
-- 🔄 **Redirección Automática**: Usuarios con sucursal asignada son redirigidos automáticamente al dashboard de su sucursal al iniciar sesión
-- 🤖 **Inteligencia Artificial (Gemini)**: 7 funcionalidades IA implementadas:
-  - Detección de peso anómalo en pesaje
-  - Clasificación automática de gastos
-  - Predicción de clientes en riesgo de abandono
-  - Predicción de stock y demanda
-  - Validación de cobros y detección de fraudes
-  - Auditoría automática de cobros (pg_cron cada 4h)
-  - Bot WhatsApp inteligente con interpretación de lenguaje natural
-- 🔔 **Centro de Notificaciones**: Sistema centralizado con:
-  - Filtros por tipo y estado
-  - Configuración por categoría
-  - Push notifications del navegador
-  - Widgets de IA en Dashboard
+## ✨ Pilares del Sistema (Auditoría Enero 2026)
+
+### 🧠 Inteligencia Artificial Aplicada (Gemini)
+- **Validación de Peso**: Gemini 2.5 Flash detecta errores de tipeo en balanzas en tiempo real.
+- **Conciliación Bancaria**: Gemini 3.0 Pro analiza extractos bancarios y sugiere matchings contables complejos.
+- **Chatbot de Ventas**: Intérprete de lenguaje natural para toma de pedidos vía WhatsApp.
+- **Optimización Logística**: Algoritmos híbridos (Google Optimization + Heurística local) para reparto eficiente.
+
+### 🚛 Logística Avanzada (TMS)
+- **Navegación Interactiva**: App de repartidor con selección de rutas alternativas en tiempo real (Google Directions).
+- **Decisión Inteligente**: Priorización automática de próximo cliente basada en horario de cierre y distancia.
+- **PWA Offline-First**: Tracking GPS continuo, firma digital y cobros sin conexión.
+- **Voz Sintética**: Instrucciones de navegación "Turn-by-turn" integradas en la app.
+
+### 🏭 Producción Científica (WMS)
+- **Desposte Controlado**: Comparativa tiempo real de Rendimiento Teórico vs Real.
+- **Gestión de Mermas**: Diferenciación precisa entre Merma de Proceso (líquida) y Desperdicio Sólido.
+- **Trazabilidad Total**: Seguimiento de lote desde materia prima hasta producto terminado (FIFO).
+- **Inventario Distribuido**: Gestión multi-sucursal con transferencias y alertas de stock bajo.
+
+### 💰 Finanzas y Control
+- **Conciliación Automatizada**: Motor de ingesta de extractos bancarios con matching inteligente.
+- **Tesorería Blindada**: Arqueos de caja ciegos y validación cruzada de rendiciones de choferes.
+- **Gestión de Crédito**: Cuentas corrientes con límites automáticos y cálculo de moras.
+
+### 🏢 Gestión Multi-Sucursal
+- **Auditoría de Precios**: Control estricto de listas Mayorista vs Minorista para evitar fraudes.
+- **Conteos Cíclicos**: Sistema de inventario físico semanal con tolerancias configurables.
+
 
 ## 🚀 Inicio Rápido
 
