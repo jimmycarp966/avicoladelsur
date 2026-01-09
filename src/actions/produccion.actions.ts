@@ -822,3 +822,223 @@ export async function obtenerLotesDisponiblesAction(
         return { success: false, message: 'Error al obtener lotes' }
     }
 }
+
+// ===========================================
+// ESTADÍSTICAS Y REPORTES
+// ===========================================
+
+interface EstadisticasProduccion {
+    resumen: {
+        totalOrdenes: number
+        ordenesCompletadas: number
+        ordenesPendientes: number
+        ordenesCanceladas: number
+    }
+    metricas: {
+        pesoTotalEntrada: number
+        pesoTotalSalida: number
+        mermaTotal: number
+        mermaPorcentaje: number
+        desperdicioSolido: number
+        eficienciaPorcentaje: number
+    }
+    tendencias: {
+        fecha: string
+        ordenes: number
+        mermaKg: number
+        mermaPct: number
+        desperdicioKg: number
+    }[]
+    productosMasProducidos: {
+        productoId: string
+        nombre: string
+        pesoTotal: number
+        ordenesCount: number
+    }[]
+    comparacionRendimiento: {
+        destinoId: string
+        destinoNombre: string
+        pesoEntrada: number
+        pesoSalida: number
+        mermaPct: number
+        eficienciaPct: number
+    }[]
+}
+
+/**
+ * Obtener estadísticas de producción para reportes
+ */
+export async function obtenerEstadisticasProduccionAction(
+    filtros?: {
+        fechaDesde?: string
+        fechaHasta?: string
+        destinoId?: string
+    }
+): Promise<FormResponse<EstadisticasProduccion>> {
+    try {
+        const supabase = await createClient()
+
+        // Query base para órdenes
+        let ordenesQuery = supabase
+            .from('ordenes_produccion')
+            .select('*')
+
+        if (filtros?.fechaDesde) {
+            ordenesQuery = ordenesQuery.gte('fecha_produccion', filtros.fechaDesde)
+        }
+        if (filtros?.fechaHasta) {
+            ordenesQuery = ordenesQuery.lte('fecha_produccion', filtros.fechaHasta)
+        }
+
+        const { data: ordenes, error: errorOrdenes } = await ordenesQuery
+
+        if (errorOrdenes) {
+            return { success: false, message: errorOrdenes.message }
+        }
+
+        // Calcular resumen
+        const resumen = {
+            totalOrdenes: ordenes?.length || 0,
+            ordenesCompletadas: ordenes?.filter(o => o.estado === 'completada').length || 0,
+            ordenesPendientes: ordenes?.filter(o => o.estado === 'en_proceso').length || 0,
+            ordenesCanceladas: ordenes?.filter(o => o.estado === 'cancelada').length || 0
+        }
+
+        // Calcular métricas de órdenes completadas
+        const ordenesCompletadas = ordenes?.filter(o => o.estado === 'completada') || []
+        const pesoTotalEntrada = ordenesCompletadas.reduce((sum, o) => sum + (o.peso_total_entrada || 0), 0)
+        const pesoTotalSalida = ordenesCompletadas.reduce((sum, o) => sum + (o.peso_total_salida || 0), 0)
+        const mermaTotal = ordenesCompletadas.reduce((sum, o) => sum + (o.merma_kg || 0), 0)
+        const desperdicioSolido = ordenesCompletadas.reduce((sum, o) => sum + (o.desperdicio_kg || 0), 0)
+        const mermaPorcentaje = pesoTotalEntrada > 0 ? (mermaTotal / pesoTotalEntrada) * 100 : 0
+        const eficienciaPorcentaje = pesoTotalEntrada > 0 ? (pesoTotalSalida / pesoTotalEntrada) * 100 : 0
+
+        const metricas = {
+            pesoTotalEntrada,
+            pesoTotalSalida,
+            mermaTotal,
+            mermaPorcentaje,
+            desperdicioSolido,
+            eficienciaPorcentaje
+        }
+
+        // Tendencias por día
+        const tendenciasPorDia = ordenesCompletadas.reduce((acc, orden) => {
+            const fecha = orden.fecha_produccion?.split('T')[0] || 'Sin fecha'
+            if (!acc[fecha]) {
+                acc[fecha] = { ordenes: 0, mermaKg: 0, desperdicioKg: 0, pesoEntrada: 0 }
+            }
+            acc[fecha].ordenes++
+            acc[fecha].mermaKg += orden.merma_kg || 0
+            acc[fecha].desperdicioKg += orden.desperdicio_kg || 0
+            acc[fecha].pesoEntrada += orden.peso_total_entrada || 0
+            return acc
+        }, {} as Record<string, { ordenes: number; mermaKg: number; desperdicioKg: number; pesoEntrada: number }>)
+
+        const tendencias = Object.entries(tendenciasPorDia)
+            .map(([fecha, data]) => ({
+                fecha,
+                ordenes: data.ordenes,
+                mermaKg: data.mermaKg,
+                mermaPct: data.pesoEntrada > 0 ? (data.mermaKg / data.pesoEntrada) * 100 : 0,
+                desperdicioKg: data.desperdicioKg
+            }))
+            .sort((a, b) => a.fecha.localeCompare(b.fecha))
+            .slice(-30) // Últimos 30 días
+
+        // Obtener entradas para productos más producidos
+        const ordenIds = ordenesCompletadas.map(o => o.id)
+        let productosMasProducidos: EstadisticasProduccion['productosMasProducidos'] = []
+
+        if (ordenIds.length > 0) {
+            const { data: entradas } = await supabase
+                .from('orden_produccion_entradas')
+                .select(`
+                    peso_kg,
+                    producto:productos(id, nombre)
+                `)
+                .in('orden_id', ordenIds)
+                .eq('es_desperdicio_solido', false)
+
+            if (entradas) {
+                const porProducto = entradas.reduce((acc, e) => {
+                    const prodId = (e.producto as any)?.id
+                    if (!prodId) return acc
+                    if (!acc[prodId]) {
+                        acc[prodId] = {
+                            nombre: (e.producto as any)?.nombre || 'Desconocido',
+                            pesoTotal: 0,
+                            ordenesCount: new Set()
+                        }
+                    }
+                    acc[prodId].pesoTotal += e.peso_kg || 0
+                    acc[prodId].ordenesCount.add(e.orden_id)
+                    return acc
+                }, {} as Record<string, { nombre: string; pesoTotal: number; ordenesCount: Set<string> }>)
+
+                productosMasProducidos = Object.entries(porProducto)
+                    .map(([id, data]) => ({
+                        productoId: id,
+                        nombre: data.nombre,
+                        pesoTotal: data.pesoTotal,
+                        ordenesCount: data.ordenesCount.size
+                    }))
+                    .sort((a, b) => b.pesoTotal - a.pesoTotal)
+                    .slice(0, 10)
+            }
+        }
+
+        // Comparación por destino
+        const { data: destinos } = await supabase
+            .from('destinos_produccion')
+            .select('id, nombre')
+            .eq('activo', true)
+
+        let comparacionRendimiento: EstadisticasProduccion['comparacionRendimiento'] = []
+
+        if (destinos && ordenIds.length > 0) {
+            const { data: entradasDestino } = await supabase
+                .from('orden_produccion_entradas')
+                .select('destino_id, peso_kg, es_desperdicio_solido')
+                .in('orden_id', ordenIds)
+
+            if (entradasDestino) {
+                const porDestino = destinos.map(dest => {
+                    const entradasDest = entradasDestino.filter(e => e.destino_id === dest.id)
+                    const pesoProductos = entradasDest
+                        .filter(e => !e.es_desperdicio_solido)
+                        .reduce((sum, e) => sum + (e.peso_kg || 0), 0)
+                    const pesoDesperdicios = entradasDest
+                        .filter(e => e.es_desperdicio_solido)
+                        .reduce((sum, e) => sum + (e.peso_kg || 0), 0)
+                    const pesoTotal = pesoProductos + pesoDesperdicios
+
+                    return {
+                        destinoId: dest.id,
+                        destinoNombre: dest.nombre,
+                        pesoEntrada: pesoTotal,
+                        pesoSalida: pesoProductos,
+                        mermaPct: pesoTotal > 0 ? (pesoDesperdicios / pesoTotal) * 100 : 0,
+                        eficienciaPct: pesoTotal > 0 ? (pesoProductos / pesoTotal) * 100 : 0
+                    }
+                }).filter(d => d.pesoEntrada > 0)
+
+                comparacionRendimiento = porDestino
+            }
+        }
+
+        return {
+            success: true,
+            data: {
+                resumen,
+                metricas,
+                tendencias,
+                productosMasProducidos,
+                comparacionRendimiento
+            }
+        }
+    } catch (error) {
+        console.error('Error en obtenerEstadisticasProduccionAction:', error)
+        return { success: false, message: 'Error al obtener estadísticas de producción' }
+    }
+}

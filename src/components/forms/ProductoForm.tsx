@@ -35,6 +35,7 @@ interface ProductoFormProps {
     venta_mayor_habilitada?: boolean
     unidad_mayor_nombre?: string
     kg_por_unidad_mayor?: number
+    requiere_pesaje?: boolean
   }
   onSuccess?: () => void
 }
@@ -67,6 +68,7 @@ export function ProductoForm({ producto, onSuccess }: ProductoFormProps) {
       venta_mayor_habilitada: producto.venta_mayor_habilitada || false,
       unidad_mayor_nombre: producto.unidad_mayor_nombre || 'caja',
       kg_por_unidad_mayor: producto.kg_por_unidad_mayor || 20,
+      requiere_pesaje: producto.requiere_pesaje || false,
     } : {
       codigo: '',
       nombre: '',
@@ -80,6 +82,7 @@ export function ProductoForm({ producto, onSuccess }: ProductoFormProps) {
       venta_mayor_habilitada: false,
       unidad_mayor_nombre: 'caja',
       kg_por_unidad_mayor: 20,
+      requiere_pesaje: false,
     },
   })
 
@@ -330,6 +333,21 @@ export function ProductoForm({ producto, onSuccess }: ProductoFormProps) {
               <Label htmlFor="activo">Producto activo</Label>
             </div>
           </div>
+
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="requiere_pesaje"
+              checked={watch('requiere_pesaje')}
+              onCheckedChange={(checked) => setValue('requiere_pesaje', checked)}
+              disabled={isLoading}
+            />
+            <div className="space-y-1">
+              <Label htmlFor="requiere_pesaje">Requiere pesaje obligatorio</Label>
+              <p className="text-xs text-muted-foreground">
+                Si se activa, se solicitará el peso del producto incluso si es venta mayorista
+              </p>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -429,6 +447,6 @@ export function ProductoForm({ producto, onSuccess }: ProductoFormProps) {
           )}
         </Button>
       </div>
-    </form>
+    </form >
   )
 }

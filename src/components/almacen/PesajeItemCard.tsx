@@ -284,6 +284,23 @@ export function PesajeItemCard({
       error: parsed.error
     })
 
+    // Validar que el código PLU coincida con el producto del item actual
+    const codigoProducto = item.producto?.codigo
+    if (parsed.plu && codigoProducto) {
+      // Normalizar códigos para comparación (quitar ceros iniciales si es necesario)
+      const pluNormalizado = parsed.plu.replace(/^0+/, '')
+      const codigoNormalizado = codigoProducto.replace(/^0+/, '')
+
+      if (!pluNormalizado.includes(codigoNormalizado) && !codigoNormalizado.includes(pluNormalizado)) {
+        console.log('[PesajeItemCard] ⚠️ PLU no coincide con producto:', { plu: parsed.plu, codigo: codigoProducto })
+        toast.warning(
+          `El código escaneado (${parsed.plu}) no parece corresponder al producto "${item.producto?.nombre}" (${codigoProducto}). Verifica que estás escaneando la etiqueta correcta.`,
+          { duration: 5000 }
+        )
+        // Continuar igualmente pero con advertencia
+      }
+    }
+
     if (parsed.isWeightCode && parsed.weight) {
       console.log('[PesajeItemCard] ✅ Peso detectado:', parsed.weight.toFixed(3), 'kg')
       setPesoInput(parsed.weight.toFixed(3))
@@ -295,7 +312,8 @@ export function PesajeItemCard({
       console.log('[PesajeItemCard] ❌ Código no válido:', parsed.error)
       toast.error('Código no válido: ' + (parsed.error || 'formato desconocido'))
     }
-  }, [])
+  }, [item.producto?.codigo, item.producto?.nombre])
+
 
   return (
     <>

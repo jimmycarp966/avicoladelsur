@@ -3,13 +3,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { PedidosTable } from '@/components/tables/PedidosTable'
+import { PedidosAgrupados } from '@/components/tables/PedidosAgrupados'
 import { useNotificationStore } from '@/store/notificationStore'
 import { obtenerPedidosAction } from '@/actions/ventas.actions'
 import { asignarPedidoARutaDesdeAlmacen, generarRutaDiariaAutomaticaAction } from '@/actions/reparto.actions'
 import { PedidosFiltros } from './pedidos-filtros'
 import { GenerarRutaModal } from '@/components/reparto/GenerarRutaModal'
 import { Button } from '@/components/ui/button'
-import { Truck, Loader2 } from 'lucide-react'
+import { Truck, Loader2, LayoutList, Table as TableIcon } from 'lucide-react'
 import type { Pedido } from '@/types/domain.types'
 import { getTodayArgentina } from '@/lib/utils'
 
@@ -21,6 +22,7 @@ export function PedidosTableWrapper() {
   const [loading, setLoading] = useState(true)
   const [showModalManual, setShowModalManual] = useState(false)
   const [isGenerandoAutomatica, setIsGenerandoAutomatica] = useState(false)
+  const [viewMode, setViewMode] = useState<'table' | 'grouped'>('grouped')
   const isMountedRef = useRef(true)
 
   // Obtener filtros de la URL
@@ -30,7 +32,7 @@ export function PedidosTableWrapper() {
   // Cargar pedidos desde la base de datos
   const loadPedidos = useCallback(async () => {
     if (!isMountedRef.current) return
-    
+
     try {
       setLoading(true)
       const filtros: any = {
@@ -41,7 +43,7 @@ export function PedidosTableWrapper() {
       }
       const result = await obtenerPedidosAction(filtros)
       if (!isMountedRef.current) return
-      
+
       if (result.success && result.data) {
         setPedidos(result.data as Pedido[])
       } else {
@@ -181,8 +183,42 @@ export function PedidosTableWrapper() {
 
   return (
     <div className="space-y-4">
-      <PedidosFiltros />
-      
+      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+        <PedidosFiltros />
+
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center border rounded-md p-1 bg-muted/20 mr-2">
+            <Button
+              variant={viewMode === 'table' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('table')}
+              className="h-8 w-8 p-0"
+              title="Vista de tabla"
+            >
+              <TableIcon className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'grouped' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('grouped')}
+              className="h-8 w-8 p-0"
+              title="Vista agrupada por cliente"
+            >
+              <LayoutList className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <Button
+            onClick={() => setShowModalManual(true)}
+            variant="outline"
+            className="flex-1 sm:flex-none"
+          >
+            <Truck className="mr-2 h-4 w-4" />
+            Generar Ruta
+          </Button>
+        </div>
+      </div>
+
       {/* Botones de acción para generar rutas */}
       {puedeGenerarRuta && (
         <div className="flex items-center gap-2 p-4 rounded-lg border bg-primary/5">
@@ -210,26 +246,29 @@ export function PedidosTableWrapper() {
                 </>
               )}
             </Button>
-            <Button
-              onClick={() => setShowModalManual(true)}
-              variant="outline"
-            >
-              <Truck className="mr-2 h-4 w-4" />
-              Selección Manual
-            </Button>
           </div>
         </div>
       )}
 
-      <PedidosTable
-        data={pedidos}
-        onView={handleView}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        onDeliver={handleDeliver}
-        onPrint={handlePrint}
-        onRoute={handleRoute}
-      />
+      {viewMode === 'grouped' ? (
+        <PedidosAgrupados
+          data={pedidos}
+          onView={handleView}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          onDeliver={handleDeliver}
+        />
+      ) : (
+        <PedidosTable
+          data={pedidos}
+          onView={handleView}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          onDeliver={handleDeliver}
+          onPrint={handlePrint}
+          onRoute={handleRoute}
+        />
+      )}
 
       <GenerarRutaModal
         open={showModalManual}
@@ -242,3 +281,4 @@ export function PedidosTableWrapper() {
     </div>
   )
 }
+

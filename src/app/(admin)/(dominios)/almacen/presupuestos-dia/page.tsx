@@ -19,6 +19,7 @@ import { obtenerTransferenciasDiaAction } from '@/actions/sucursales-transferenc
 import { PresupuestosDiaRealtime } from '@/components/almacen/PresupuestosDiaRealtime'
 import { obtenerPresupuestosDiaAction, esItemPesable, calcularKgItem } from '@/actions/presupuestos-dia.actions'
 import { esVentaMayorista } from '@/lib/utils'
+import { PrintPreparacionParcial } from '@/components/almacen/PrintPreparacionParcial'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 60 // Revalida cada 60 segundos
@@ -325,13 +326,18 @@ async function PresupuestosDiaContent({
       {/* Lista de preparación consolidada */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5" />
-            Lista de preparación del día
-          </CardTitle>
-          <CardDescription>
-            Consolidado de productos por zona y turno considerando los filtros seleccionados
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Lista de preparación del día
+              </CardTitle>
+              <CardDescription>
+                Consolidado de productos por zona y turno considerando los filtros seleccionados
+              </CardDescription>
+            </div>
+            <PrintPreparacionParcial listaPreparacion={listaPreparacion} fecha={fecha} />
+          </div>
         </CardHeader>
         <CardContent className="space-y-6">
           {listaPreparacion.length === 0 && (

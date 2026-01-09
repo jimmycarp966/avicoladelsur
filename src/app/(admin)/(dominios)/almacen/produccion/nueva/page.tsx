@@ -324,6 +324,28 @@ export default function NuevaOrdenProduccionPage() {
     const mermaLiquidaKg = pesoTotalSalida - pesoTotalEntrada
     const mermaLiquidaPorcentaje = pesoTotalSalida > 0 ? (mermaLiquidaKg / pesoTotalSalida) * 100 : 0
 
+    // Validación: Verificar si todos los destinos tienen productos cargados
+    const validarDestinosCompletos = useCallback(() => {
+        const destinosSinProductos: string[] = []
+
+        for (const destinoId of activeDestinoIds) {
+            const entradasDestino = entradas.filter(e => e.destino_id === destinoId)
+            if (entradasDestino.length === 0) {
+                const destino = destinos.find(d => d.id === destinoId)
+                destinosSinProductos.push(destino?.nombre || destinoId)
+            }
+        }
+
+        return {
+            esValido: destinosSinProductos.length === 0,
+            destinosSinProductos
+        }
+    }, [activeDestinoIds, entradas, destinos])
+
+    // Calcular si la orden está lista para finalizar
+    const { esValido: ordenCompleta, destinosSinProductos } = validarDestinosCompletos()
+
+
     // Crear orden al avanzar del paso 1 al 2
     const handleIniciarOrden = async () => {
         setLoading(true)
@@ -969,14 +991,32 @@ export default function NuevaOrdenProduccionPage() {
                             {currentDestinationIndex > 0 ? 'Destino Anterior' : 'Volver a Stock'}
                         </Button>
 
-                        <div className="flex gap-2">
+                        <div className="flex flex-col gap-2 items-end">
+                            {/* Alerta si hay destinos sin productos */}
+                            {!ordenCompleta && (
+                                <div className="flex items-center gap-2 text-yellow-600 text-sm bg-yellow-50 px-3 py-1.5 rounded-md">
+                                    <AlertCircle className="h-4 w-4" />
+                                    <span>Faltan productos en: {destinosSinProductos.join(', ')}</span>
+                                </div>
+                            )}
+
                             {currentDestinationIndex < activeDestinoIds.length - 1 ? (
                                 <Button onClick={() => setCurrentDestinationIndex(prev => prev + 1)}>
                                     Siguiente Destino
                                     <ArrowRight className="ml-2 h-4 w-4" />
                                 </Button>
                             ) : (
-                                <Button onClick={() => setStep(4)} className="bg-green-600 hover:bg-green-700">
+                                <Button
+                                    onClick={() => {
+                                        if (!ordenCompleta) {
+                                            toast.error(`Debes cargar productos en todos los destinos: ${destinosSinProductos.join(', ')}`)
+                                            return
+                                        }
+                                        setStep(4)
+                                    }}
+                                    className={ordenCompleta ? "bg-green-600 hover:bg-green-700" : "bg-gray-400 cursor-not-allowed"}
+                                    disabled={!ordenCompleta}
+                                >
                                     Finalizar Producción
                                     <Check className="ml-2 h-4 w-4" />
                                 </Button>
@@ -985,6 +1025,7 @@ export default function NuevaOrdenProduccionPage() {
                     </CardFooter>
                 </Card>
             )}
+
 
             {/* PASO 4: Resumen y completar */}
             {step === 4 && (

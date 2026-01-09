@@ -1,8 +1,38 @@
 # Changelog - Avícola del Sur ERP
 
 
+## 2026-01-09 — Antigravity
+**Feat: Reportes de Producción Inteligentes + Validaciones ERP**
+
+Implementación de reportes de producción con análisis inteligente y múltiples validaciones en el módulo ERP:
+
+1. **Reportes de Producción** (`/reportes/produccion`):
+   - Nueva función `obtenerEstadisticasProduccionAction` con métricas de merma, eficiencia y desperdicios
+   - Dashboard KPIs: Órdenes completadas, Eficiencia %, Merma Líquida, Desperdicio Sólido
+   - Tendencias visuales (últimos 14 días), Top 10 productos y rendimiento por destino
+   - Alertas inteligentes automáticas (merma >15% o eficiencia <80%)
+
+2. **Validación Producción Paso 3**: Función `validarDestinosCompletos()` bloquea finalización si hay destinos sin productos
+
+3. **Impresión Parcial Lista Preparación**: Componente `PrintPreparacionParcial` para imprimir productos pendientes de pesaje
+
+4. **Validación Barcode Pesajes**: Handler `handleScan` valida coincidencia PLU vs código producto
+
+5. **Campo requiere_pesaje**: Nuevo campo en schema de productos para forzar pesaje incluso en mayorista
+
+**Archivos principales:**
+- `src/app/(admin)/(dominios)/reportes/produccion/page.tsx` (NUEVO)
+- `src/app/(admin)/(dominios)/reportes/produccion/produccion-reporte-content.tsx` (NUEVO)
+- `src/actions/produccion.actions.ts`
+- `src/components/almacen/PrintPreparacionParcial.tsx` (NUEVO)
+- `src/components/almacen/PesajeItemCard.tsx`
+- `src/app/(admin)/(dominios)/almacen/produccion/nueva/page.tsx`
+
+---
+
 ## 2026-01-08 — Antigravity
 **Fix: RLS en Rutas de Reparto y Coordenadas PostGIS**
+
 
 Se corrigió un error que impedía crear rutas de reparto desde la interfaz de usuario:
 - **RLS `rutas_reparto`**: Agregadas políticas `SELECT`, `INSERT`, `UPDATE` y `DELETE` para usuarios autenticados.

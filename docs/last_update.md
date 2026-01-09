@@ -1,38 +1,44 @@
-# Última Actualización - Avícola del Sur ERP
+# Última Actualización del Sistema
 
-**Fecha:** 2026-01-08 20:05 (GMT-3)
+**Fecha:** 2026-01-09 16:58:31 -03:00  
+**Autor:** Antigravity Agent
 
-## Cambios Detectados
+---
 
-Los cambios fueron aplicados directamente en la base de datos Supabase (no hay commits de código):
+## Archivos Modificados
 
-### Scripts SQL Ejecutados:
+| Archivo | Tipo |
+|---------|------|
+| `src/actions/produccion.actions.ts` | Modificado |
+| `src/app/(admin)/(dominios)/reportes/produccion/page.tsx` | **NUEVO** |
+| `src/app/(admin)/(dominios)/reportes/produccion/produccion-reporte-content.tsx` | **NUEVO** |
+| `src/components/almacen/PrintPreparacionParcial.tsx` | **NUEVO** |
+| `src/components/almacen/PesajeItemCard.tsx` | Modificado |
+| `src/app/(admin)/(dominios)/almacen/produccion/nueva/page.tsx` | Modificado |
+| `src/app/(admin)/(dominios)/almacen/presupuestos-dia/page.tsx` | Modificado |
+| `src/app/(admin)/(dominios)/almacen/pedidos/pedidos-table-wrapper.tsx` | Modificado |
+| `src/components/forms/ProductoForm.tsx` | Modificado |
+| `src/lib/schemas/productos.schema.ts` | Modificado |
 
-1. **Políticas RLS - `rutas_reparto`**
-   - `rutas_reparto_select_authenticated` (SELECT)
-   - `rutas_reparto_update_authenticated` (UPDATE)
-   - La política INSERT ya existía
+---
 
-2. **Políticas RLS - `detalles_ruta`**
-   - `detalles_ruta_select_authenticated` (SELECT)
-   - `detalles_ruta_insert_authenticated` (INSERT)
-   - `detalles_ruta_update_authenticated` (UPDATE)
-   - `detalles_ruta_delete_authenticated` (DELETE)
+## Resumen Técnico
 
-3. **Función RPC - `fn_get_cliente_con_coordenadas`**
-   - Corregida para usar `ST_Y()` y `ST_X()` de PostGIS
-   - Antes fallaba tratando `geometry` como `JSONB`
+Se implementaron reportes de producción inteligentes con métricas de merma, eficiencia, desperdicios sólidos y tendencias. Validaciones adicionales en producción (paso 3), impresión parcial de lista de preparación, y validación de código de barras en pesajes.
 
-## Resumen
+**Impacto:** Nuevas funcionalidades frontend y server actions. Sin cambios breaking en el esquema de base de datos.
 
-Se corrigieron políticas RLS en tablas `rutas_reparto` y `detalles_ruta` que bloqueaban la creación de rutas desde la UI. Se actualizó la función RPC `fn_get_cliente_con_coordenadas` para extraer correctamente coordenadas desde tipo PostGIS geometry. Ahora la optimización de rutas con Google Directions funciona correctamente.
+---
 
-## Archivos de Documentación Modificados
+## Diagrama Actualizado
 
-- `ARCHITECTURE_SUMMARY.md` - Sección "Cambio reciente" actualizada
-- `docs/CHANGELOG.md` - Nueva entrada agregada
-- `docs/last_update.md` - Este archivo
+Ruta: `docs/diagrams/architecture.mmd`
 
-## Diagrama
+---
 
-No se requiere actualización del diagrama (cambios solo en BD/RLS).
+## Checklist
+
+- [x] ARCHITECTURE_SUMMARY.md actualizado (sección Cambio Reciente)
+- [x] docs/CHANGELOG.md con nueva línea
+- [x] docs/last_update.md con evidencia
+- [ ] Commit y push pendientes

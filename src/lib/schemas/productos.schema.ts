@@ -48,6 +48,10 @@ export const productoSchema = z.object({
   activo: z
     .boolean(),
 
+  requiere_pesaje: z
+    .boolean()
+    .default(false),
+
   // Configuración de venta por mayor
   venta_mayor_habilitada: z
     .boolean()
