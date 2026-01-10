@@ -47,6 +47,7 @@ export default async function EditarClientePage({ params }: EditarClientePagePro
     email: clienteResult.data.email,
     direccion: clienteResult.data.direccion,
     zona_entrega: clienteResult.data.zona_entrega,
+    zona_id: clienteResult.data.zona_id,
     coordenadas: clienteResult.data.coordenadas,
     tipo_cliente: clienteResult.data.tipo_cliente,
     limite_credito: clienteResult.data.limite_credito || 0,

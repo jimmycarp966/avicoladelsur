@@ -14,7 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label'
 import { Loader2, Save, Plus, Trash2, Search, X } from 'lucide-react'
 import { crearPresupuestoAction } from '@/actions/presupuestos.actions'
-import { obtenerTodasListasActivasAction, obtenerPrecioProductoAction } from '@/actions/listas-precios.actions'
+import { obtenerTodasListasActivasAction, obtenerPrecioProductoAction, obtenerListasClienteAction } from '@/actions/listas-precios.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 import { formatCurrency } from '@/lib/utils'
 import { useDebounce } from '@/lib/hooks/useDebounce'
@@ -326,6 +326,44 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
       }
     }
   }, [])
+
+  // Cargar listas del cliente cuando se selecciona uno
+  useEffect(() => {
+    const cargarListasCliente = async () => {
+      if (!watchedCliente) return
+
+      try {
+        const result = await obtenerListasClienteAction(watchedCliente)
+        if (result.success && result.data && result.data.length > 0) {
+          // Ordenar por prioridad (menor número = mayor prioridad)
+          const listasOrdenadas = result.data.sort((a: any, b: any) => (a.prioridad || 999) - (b.prioridad || 999))
+
+          // Seleccionar la primera (mayor prioridad)
+          const listaPrincipal = listasOrdenadas[0]
+          if (listaPrincipal && listaPrincipal.lista_precio_id) {
+            setValue('lista_precio_id', listaPrincipal.lista_precio_id, {
+              shouldValidate: true,
+              shouldDirty: true
+            })
+            showToast('info', `Lista de precios "${listaPrincipal.lista_precio?.nombre}" seleccionada automáticamente`)
+          }
+        } else {
+          // Fallback: Si no tiene lista asignada, intentar poner "Lista Mayorista" por defecto si existe e todasListas
+          const listaMayorista = todasListas.find(l => l.nombre.toLowerCase().includes('mayorista'))
+          if (listaMayorista) {
+            setValue('lista_precio_id', listaMayorista.id, {
+              shouldValidate: true,
+              shouldDirty: true
+            })
+          }
+        }
+      } catch (error) {
+        console.error('Error cargando listas del cliente:', error)
+      }
+    }
+
+    cargarListasCliente()
+  }, [watchedCliente, setValue, showToast, todasListas])
 
   // Actualizar precios cuando cambia la lista global o lista por producto
   const watchedListaPrecioGlobal = useWatch({ control, name: 'lista_precio_id' })

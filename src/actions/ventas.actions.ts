@@ -23,6 +23,7 @@ export async function crearClienteAction(
     email?: string
     direccion?: string
     zona_entrega?: string
+    zona_id?: string | null
     coordenadas?: { lat: number; lng: number }
     tipo_cliente?: string
     limite_credito?: number
@@ -283,6 +284,7 @@ export async function actualizarClienteAction(
     email?: string
     direccion?: string
     zona_entrega?: string
+    zona_id?: string | null
     coordenadas?: { lat: number; lng: number }
     tipo_cliente?: string
     limite_credito?: number

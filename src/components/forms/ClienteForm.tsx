@@ -38,6 +38,7 @@ interface ClienteFormProps {
     email?: string
     direccion?: string
     zona_entrega?: string
+    zona_id?: string
     coordenadas?: { lat: number; lng: number }
     tipo_cliente: string
     limite_credito: number
@@ -91,6 +92,7 @@ export function ClienteForm({ cliente, zonas = [], onSuccess }: ClienteFormProps
       email: cliente.email || '',
       direccion: cliente.direccion || '',
       zona_entrega: cliente.zona_entrega || '',
+      zona_id: cliente.zona_id || null, // Priorizar el ID si existe
       coordenadas: cliente.coordenadas,
       tipo_cliente: cliente.tipo_cliente as 'minorista' | 'mayorista' | 'distribuidor',
       limite_credito: cliente.limite_credito,
@@ -113,6 +115,8 @@ export function ClienteForm({ cliente, zonas = [], onSuccess }: ClienteFormProps
       email: '',
       direccion: '',
       zona_entrega: '',
+      zona_id: null,
+      coordenadas: null,
       tipo_cliente: 'minorista' as const,
       limite_credito: 0,
       activo: true,
@@ -145,7 +149,7 @@ export function ClienteForm({ cliente, zonas = [], onSuccess }: ClienteFormProps
       { key: 'w', fieldId: 'whatsapp', description: 'WhatsApp' },
       { key: 'e', fieldId: 'email', description: 'Email' },
       { key: 'd', fieldId: 'direccion', description: 'Dirección' },
-      { key: 'z', fieldId: 'zona_entrega', description: 'Zona de Entrega' },
+      { key: 'z', fieldId: 'zona_id', description: 'Zona de Entrega' },
     ],
   })
 
@@ -499,21 +503,35 @@ export function ClienteForm({ cliente, zonas = [], onSuccess }: ClienteFormProps
               Zona de Entrega
               <KeyboardHintCompact shortcut="Z" />
             </Label>
-            <Select value={watch('zona_entrega') || 'none'} onValueChange={(value) => setValue('zona_entrega', value === 'none' ? '' : value)}>
+            <Select
+              value={watch('zona_id') || 'none'}
+              onValueChange={(value) => {
+                const newValue = value === 'none' ? null : value
+                setValue('zona_id', newValue)
+
+                // Actualizar valor legacy de texto para compatibilidad
+                if (newValue) {
+                  const zonaNombre = zonas.find(z => z.id === newValue)?.nombre
+                  if (zonaNombre) setValue('zona_entrega', zonaNombre)
+                } else {
+                  setValue('zona_entrega', '')
+                }
+              }}
+            >
               <SelectTrigger disabled={isLoading}>
                 <SelectValue placeholder="Seleccionar zona..." />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Sin zona asignada</SelectItem>
                 {zonas.map((zona) => (
-                  <SelectItem key={zona.id} value={zona.nombre}>
+                  <SelectItem key={zona.id} value={zona.id}>
                     {zona.nombre}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {errors.zona_entrega && (
-              <p className="text-sm text-destructive">{errors.zona_entrega.message}</p>
+            {errors.zona_id && (
+              <p className="text-sm text-destructive">{errors.zona_id.message}</p>
             )}
             <p className="text-xs text-muted-foreground">
               Selecciona la zona de entrega del cliente para optimización de rutas

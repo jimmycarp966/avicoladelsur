@@ -258,4 +258,13 @@ Endpoints que operan sin interfaz gráfica:
 5. **Campo requiere_pesaje**:
    - Nuevo campo en schema de productos para forzar pesaje incluso en mayorista
 
-**Impacto:** Sin migraciones de esquema, solo nuevas funcionalidades frontend y acciones server.
+6. **Mapeo de Zonas (Migración 2026-01-09)**:
+   - Nueva columna `zona_id` (FK) en tabla clientes.
+   - Script masivo ejecutado para vincular ~600 clientes con sus zonas geográficas.
+   - Formulario de Cliente actualizado para selección estructurada.
+
+7. **Migración y Automatización de Listas de Precios (Migración 2026-01-09)**:
+   - Asignación masiva de "Lista Mayorista" a todos los clientes activos (~200).
+   - Actualización de `PresupuestoForm` para detectar y seleccionar automáticamente la lista de precios asignada al cliente.
+
+**Impacto:** Migración de esquema (ADD COLUMN zona_id) y migración de datos masiva aplicada. Automatización de flujo de ventas.

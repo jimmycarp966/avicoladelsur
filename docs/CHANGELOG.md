@@ -2,6 +2,21 @@
 
 
 ## 2026-01-09 — Antigravity
+**Feat: Migración y Automatización de Listas de Precios**
+
+Se completó la migración masiva y automatización de listas de precios para mejorar el flujo de ventas:
+- **Migración de Datos**: Todos los clientes activos ahora tienen asignada la "Lista Mayorista" por defecto (si no tenían otra).
+- **Automatización UI**: El formulario de "Nuevo Presupuesto" detecta y preselecciona automáticamente la lista de precios asignada al cliente (priorizando la más importante).
+- **Fallback Automático**: Si un cliente no tiene lista, se intenta asignar "Mayorista" automáticamente.
+
+**Archivos modificados:**
+- `src/app/(admin)/(dominios)/ventas/presupuestos/nuevo/presupuesto-form.tsx`
+- `src/actions/listas-precios.actions.ts`
+- `scripts/migrate-clientes-mayorista.ts` (Scripts)
+
+---
+
+## 2026-01-09 — Antigravity
 **Feat: Reportes de Producción Inteligentes + Validaciones ERP**
 
 Implementación de reportes de producción con análisis inteligente y múltiples validaciones en el módulo ERP:

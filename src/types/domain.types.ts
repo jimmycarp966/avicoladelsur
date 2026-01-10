@@ -47,6 +47,7 @@ export interface Cliente extends BaseEntity {
   direccion?: string
   localidad_id?: string
   zona_entrega?: string
+  zona_id?: string
   coordenadas?: {
     lat: number
     lng: number

@@ -1,81 +1,15 @@
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#4F46E5', 'primaryTextColor': '#fff', 'primaryBorderColor': '#3730A3', 'lineColor': '#6366F1', 'secondaryColor': '#F59E0B', 'tertiaryColor': '#10B981'}}}%%
-
-graph TB
-    subgraph Cliente["🖥️ Cliente (Browser/PWA)"]
-        WebApp["Next.js 15<br/>React 19"]
-        PWA["PWA Repartidor"]
-        BarcodeScanner["📷 BarcodeScanner<br/>@zxing/library"]
-    end
-
-    subgraph Frontend["🎨 Frontend Components"]
-        AdminDashboard["Admin Dashboard"]
-        SucursalDashboard["Sucursal Dashboard"]
-        POSSucursal["POS Sucursal"]
-        ReptoTracker["GPS Tracker"]
-    end
-
-    subgraph ServerActions["⚡ Server Actions"]
-        AlmacenActions["Almacen Actions"]
-        VentasActions["Ventas Actions"]
-        RepartoActions["Reparto Actions"]
-        TesoreriaActions["Tesorería Actions"]
-        SucursalesActions["Sucursales Actions"]
-        RRHHActions["RRHH Actions"]
-        ConciliacionActions["Conciliación Bancaria<br/>(Alias + IA)"]
-    end
-
-    subgraph ExternalAPIs["🌐 APIs Externas"]
-        GoogleMaps["Google Maps API"]
-        GoogleAI["Google Gemini AI"]
-        TwilioWhatsApp["Twilio WhatsApp"]
-        AFIPARCA["AFIP/ARCA"]
-    end
-
-    subgraph Supabase["🗄️ Supabase"]
-        Postgres["PostgreSQL<br/>(RLS + RPCs)"]
-        Auth["Supabase Auth"]
-        Storage["Storage<br/>(Archivos, Firmas)"]
-        Realtime["Realtime<br/>(Suscripciones)"]
-    end
-
-    %% Conexiones
-    WebApp --> AdminDashboard
-    WebApp --> SucursalDashboard
-    PWA --> ReptoTracker
-
-    AdminDashboard --> AlmacenActions
-    AdminDashboard --> VentasActions
-    AdminDashboard --> RepartoActions
-    AdminDashboard --> TesoreriaActions
-    AdminDashboard --> TesoreriaActions
-    AdminDashboard --> RRHHActions
-    AdminDashboard --> ConciliacionActions
-
-    SucursalDashboard --> POSSucursal
-    POSSucursal --> BarcodeScanner
-    POSSucursal --> SucursalesActions
-
-    ReptoTracker --> RepartoActions
-    ReptoTracker --> GoogleMaps
-
-    ServerActions --> Postgres
-    ServerActions --> Auth
-    ServerActions --> Storage
-
-    AlmacenActions --> GoogleAI
-    ConciliacionActions --> GoogleAI
-    VentasActions --> TwilioWhatsApp
-    TesoreriaActions --> AFIPARCA
-
-    Realtime --> WebApp
-    Realtime --> PWA
-
-    classDef frontend fill:#4F46E5,stroke:#3730A3,color:white
-    classDef backend fill:#10B981,stroke:#059669,color:white
-    classDef database fill:#F59E0B,stroke:#D97706,color:white
-    classDef external fill:#EC4899,stroke:#BE185D,color:white
+graph LR
+    User(Usuario) --> web[Next.js App]
+    web --> API[Server Actions]
+    API --> DB[(Supabase PostgreSQL)]
     
-    class WebApp,PWA,BarcodeScanner frontend
-    class AlmacenActions,VentasActions,RepartoActions,TesoreriaActions,SucursalesActions,RRHHActions,ConciliacionActions backend
-    class Postgres,Auth,Storage,Realtime database
-    class GoogleMaps,GoogleAI,TwilioWhatsApp,AFIPARCA external
+    subgraph Ventas
+        ClienteForm --> API
+        PresupuestoForm --> API
+    end
+    
+    subgraph Lógica de Negocio
+        API --> ListasPrecios[Listas de Precios]
+        API --> Clientes[Gestión Clientes]
+        ListasPrecios -.-> Clientes
+    end

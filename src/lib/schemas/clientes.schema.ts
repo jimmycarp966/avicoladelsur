@@ -56,6 +56,12 @@ export const clienteSchema = z.object({
     .optional()
     .or(z.literal('')),
 
+  zona_id: z
+    .string()
+    .uuid('ID de zona inválido')
+    .optional()
+    .nullable(),
+
   coordenadas: z
     .object({
       lat: z.number().min(-90).max(90),
@@ -139,6 +145,7 @@ export const clienteSchema = z.object({
 export const clientesFilterSchema = z.object({
   search: z.string().optional(),
   zona_entrega: z.string().optional(),
+  zona_id: z.string().uuid().optional(),
   tipo_cliente: z.enum(['minorista', 'mayorista', 'distribuidor']).optional(),
   activo: z.boolean().optional(),
   page: z.number().int().min(1).default(1),
