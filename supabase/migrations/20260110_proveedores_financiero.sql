@@ -5,6 +5,37 @@
 -- =====================================================
 
 -- =====================================================
+-- 0. FIX PRETREATMENT: Restaurar tablas de Gastos faltantes
+-- Se detectó que la tabla 'gastos' no existe, necesaria para el paso 3.
+-- =====================================================
+CREATE TABLE IF NOT EXISTS gastos_categorias (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nombre VARCHAR(120) UNIQUE NOT NULL,
+  descripcion TEXT,
+  color VARCHAR(16),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS gastos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sucursal_id UUID,
+  categoria_id UUID REFERENCES gastos_categorias(id),
+  monto NUMERIC(14,2) NOT NULL CHECK (monto >= 0),
+  comprobante_url TEXT,
+  descripcion TEXT,
+  fecha DATE NOT NULL DEFAULT CURRENT_DATE,
+  creado_por UUID REFERENCES auth.users(id), -- Simplificado a auth.users para consistencia con nuevas tablas
+  afecta_caja BOOLEAN NOT NULL DEFAULT false,
+  caja_id UUID REFERENCES tesoreria_cajas(id),
+  caja_movimiento_id UUID REFERENCES tesoreria_movimientos(id),
+  metodo_pago VARCHAR(50) DEFAULT 'efectivo',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_gastos_categoria ON gastos(categoria_id);
+CREATE INDEX IF NOT EXISTS idx_gastos_fecha ON gastos(fecha);
+
+-- =====================================================
 -- 1. TABLA: proveedores_facturas
 -- Registra facturas/comprobantes recibidos de proveedores
 -- =====================================================
