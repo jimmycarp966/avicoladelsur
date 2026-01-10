@@ -236,22 +236,14 @@ Endpoints que operan sin interfaz gráfica:
 
 ---
 
-## 📝 Cambio Reciente (2026-01-10)
+## 📝 Cambio Reciente (2026-01-10 - Hotfix)
 
-**Implementaciones realizadas:**
+**Fix Crítico de Base de Datos y Tesorería:**
 
-1. **Gestión Financiera de Proveedores** (Completo):
-   - **DB**: Nuevas tablas `proveedores_facturas` y `proveedores_pagos`.
-   - **Funcionalidad**: Carga de facturas, pagos (parciales/totales), anulación y estados de cuenta.
-   - **Vinculación**: Gastos generales ahora pueden asignarse a proveedores.
+1.  **Restauración de Esquema**: Se detectó y corrigió la ausencia de tablas `gastos` y `gastos_categorias`. La migración `20260110` ahora incluye la recreación automática de estas tablas para asegurar consistencia.
+2.  **Proveedores (Completo)**: Implementación de `proveedores_facturas` y `proveedores_pagos`, permitiendo gestión de deuda y pagos.
+3.  **Integración**: Vinculación exitosa entre Gastos y Proveedores.
+4.  **Dashboard**: KPIs financieros y alertas operativas en Tesorería.
 
-2. **Dashboard de Tesorería Integrado**:
-   - Nuevos KPIs: Saldo Tesoro, Deuda Total Proveedores, Clientes Morosos.
-   - **Alertas Financieras**: Sección dedicada para facturas vencidas y carteras en rojo.
-
-3. **Control de Retiros en Tránsito**:
-   - Monitoreo de dinero enviado por sucursales pendiente de validación.
-   - Semáforo de antigüedad (>24hs alerta).
-
-**Impacto:** Migración SQL (`20260110_proveedores_financiero.sql`). Modelo de datos de tesorería unificado.
+**Impacto:** Migración SQL correigda (`20260110_proveedores_financiero.sql`). Sistema estable.
 
