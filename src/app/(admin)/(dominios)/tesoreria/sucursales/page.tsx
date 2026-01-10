@@ -14,10 +14,16 @@ import {
   BarChart3,
   Download,
   ArrowUpCircle,
-  ArrowDownCircle
+  ArrowDownCircle,
+  Truck,
+  AlertTriangle,
+  Clock
 } from 'lucide-react'
 import { obtenerSucursalesAction } from '@/actions/sucursales.actions'
+import { obtenerRetirosEnTransitoAction } from '@/actions/tesoreria.actions'
 import { format } from 'date-fns'
+import { formatCurrency } from '@/lib/utils'
+
 
 interface FiltrosTesoreria {
   sucursalId?: string
@@ -143,9 +149,15 @@ export default async function TesoreriaSucursalesPage({
     fechaHasta: searchParams.hasta || format(new Date(), 'yyyy-MM-dd')
   }
 
-  const reportesData = await getReportesTesoreriaSucursales(filtros)
-  const sucursalesResult = await obtenerSucursalesAction()
+  const [reportesData, sucursalesResult, retirosEnTransitoResult] = await Promise.all([
+    getReportesTesoreriaSucursales(filtros),
+    obtenerSucursalesAction(),
+    obtenerRetirosEnTransitoAction()
+  ])
+
   const sucursales = sucursalesResult.success ? sucursalesResult.data || [] : []
+  const retirosEnTransito = retirosEnTransitoResult.success ? retirosEnTransitoResult.data || [] : []
+  const resumenRetiros = retirosEnTransitoResult.success ? retirosEnTransitoResult.resumen : null
 
   return (
     <div className="space-y-6">
@@ -161,6 +173,78 @@ export default async function TesoreriaSucursalesPage({
           </p>
         </div>
       </div>
+
+      {/* Retiros en Tránsito */}
+      {retirosEnTransito.length > 0 && (
+        <Card className={resumenRetiros?.con_alerta > 0 ? 'border-amber-200 bg-amber-50' : 'border-blue-200 bg-blue-50'}>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                <Truck className="h-5 w-5 text-blue-600" />
+                Retiros en Tránsito
+                <Badge variant="default">{retirosEnTransito.length}</Badge>
+              </CardTitle>
+              <div className="text-right">
+                <span className="text-2xl font-bold text-blue-600">
+                  {formatCurrency(resumenRetiros?.monto_total || 0)}
+                </span>
+                <p className="text-xs text-muted-foreground">pendiente de validar</p>
+              </div>
+            </div>
+            {resumenRetiros?.con_alerta > 0 && (
+              <div className="flex items-center gap-2 mt-2 text-amber-700 bg-amber-100 px-3 py-1.5 rounded-md">
+                <AlertTriangle className="h-4 w-4" />
+                <span className="text-sm font-medium">
+                  {resumenRetiros?.con_alerta} retiro(s) con más de 24 horas sin validar
+                </span>
+              </div>
+            )}
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 max-h-[200px] overflow-y-auto">
+              {retirosEnTransito.map((retiro: any) => (
+                <div
+                  key={retiro.id}
+                  className={`flex items-center justify-between p-3 rounded-lg border ${retiro.es_antiguo ? 'bg-amber-100 border-amber-300' : 'bg-white'
+                    }`}
+                >
+                  <div className="flex items-center gap-3">
+                    {retiro.es_antiguo && <AlertTriangle className="h-4 w-4 text-amber-600" />}
+                    <div>
+                      <p className="font-medium text-sm">
+                        {retiro.ruta?.sucursal?.nombre || 'Sucursal desconocida'}
+                        {retiro.ruta?.chofer && (
+                          <span className="text-muted-foreground ml-2">
+                            - {retiro.ruta.chofer.nombre} {retiro.ruta.chofer.apellido}
+                          </span>
+                        )}
+                      </p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        <span>{retiro.horas_pendiente}h pendiente</span>
+                        <Badge variant="outline" className="text-xs">
+                          {retiro.metodo_pago || 'efectivo'}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                  <span className="font-bold text-green-600">
+                    {formatCurrency(retiro.monto)}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 flex justify-end">
+              <Button asChild size="sm" variant="outline">
+                <a href="/tesoreria/validar-rutas">
+                  Ir a Validar Rutas →
+                </a>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
 
       {/* Filtros */}
       <Card>
@@ -352,8 +436,8 @@ function ReportesTesoreriaConsolidados({ data, fechaDesde, fechaHasta }: { data:
                     </p>
                   </div>
                   <div>
-                      <Button variant="outline" size="sm" asChild>
-                        <a href={`/tesoreria/sucursales?sucursal=${sucursal.id}&desde=${fechaDesde}&hasta=${fechaHasta}`}>
+                    <Button variant="outline" size="sm" asChild>
+                      <a href={`/tesoreria/sucursales?sucursal=${sucursal.id}&desde=${fechaDesde}&hasta=${fechaHasta}`}>
                         Ver Detalle
                       </a>
                     </Button>

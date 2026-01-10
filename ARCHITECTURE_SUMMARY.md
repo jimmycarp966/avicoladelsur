@@ -236,27 +236,22 @@ Endpoints que operan sin interfaz gráfica:
 
 ---
 
-## 📝 Cambio Reciente (2026-01-09)
+## 📝 Cambio Reciente (2026-01-10)
 
 **Implementaciones realizadas:**
 
-1. **Módulo de Proveedores** (`/tesoreria/proveedores`):
-   - Nueva tabla `proveedores` con RLS para gestión de proveedores.
-   - CRUD completo: `proveedores.actions.ts` con listar, crear, actualizar, desactivar/reactivar.
-   - UI: Página con estadísticas, tabla filtrable y dialog de nuevo proveedor.
-   - Navegación agregada al sidebar de Tesorería.
+1. **Gestión Financiera de Proveedores** (Completo):
+   - **DB**: Nuevas tablas `proveedores_facturas` y `proveedores_pagos`.
+   - **Funcionalidad**: Carga de facturas, pagos (parciales/totales), anulación y estados de cuenta.
+   - **Vinculación**: Gastos generales ahora pueden asignarse a proveedores.
 
-2. **Retiros de Sucursales** (`rutas_retiros`):
-   - Nueva tabla para tracking de efectivo transportado por choferes.
-   - Action `registrarRetiroSucursalAction`: Egreso inmediato en caja sucursal.
-   - Action `validarRetiroAction`: Ingreso en Casa Central al validar ruta.
-   - Dialog `NuevoRetiroDialog` en `/tesoreria/sucursales`.
+2. **Dashboard de Tesorería Integrado**:
+   - Nuevos KPIs: Saldo Tesoro, Deuda Total Proveedores, Clientes Morosos.
+   - **Alertas Financieras**: Sección dedicada para facturas vencidas y carteras en rojo.
 
-3. **Gestión de Moratoria - Cuentas Corrientes**:
-   - Nueva tabla `clientes_recordatorios` para bitácora de cobranza.
-   - Action `obtenerClientesMorososAction` con clasificación semáforo (verde/amarillo/rojo).
-   - Actions para crear/listar/actualizar recordatorios.
-   - Dialog `RecordatoriosDialog` integrado en tabla de cuentas corrientes.
+3. **Control de Retiros en Tránsito**:
+   - Monitoreo de dinero enviado por sucursales pendiente de validación.
+   - Semáforo de antigüedad (>24hs alerta).
 
-**Impacto:** Tres nuevas tablas PostgreSQL con RLS. Flujo completo de retiros sucursal→chofer→casa central. Sistema de alertas de moratoria para gestión proactiva de cobranza.
+**Impacto:** Migración SQL (`20260110_proveedores_financiero.sql`). Modelo de datos de tesorería unificado.
 

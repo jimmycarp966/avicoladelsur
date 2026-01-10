@@ -8,6 +8,14 @@ graph LR
         PresupuestoForm --> API
     end
     
+    subgraph Tesoreria
+        Proveedores --> API
+        Facturas --> API
+        Pagos --> API
+        Retiros --> API
+        API --> Cajas[Movimientos Caja]
+    end
+    
     subgraph Lógica de Negocio
         API --> ListasPrecios[Listas de Precios]
         API --> Clientes[Gestión Clientes]

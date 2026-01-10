@@ -1,6 +1,32 @@
 # Changelog - Avícola del Sur ERP
 
 
+## 2026-01-10 — Antigravity
+**Feat: Finalización Módulo Tesorería (Proveedores, KPIs, Retiros)**
+
+Se completó integralmente el módulo de Tesorería con enfoque en la gestión financiera de proveedores y control de flujos de efectivo:
+
+1. **Gestión Financiera de Proveedores**:
+   - Backend: Nuevas tablas `proveedores_facturas` y `proveedores_pagos`.
+   - UI: Tablas de deuda, registro de facturas y pagos (parciales/totales).
+   - Vinculación: Opción para asociar gastos generales a proveedores específicos.
+
+2. **Dashboard Ejecutivo Enriquecido**:
+   - Nuevos KPIs: "Tesoro Total", "Deuda Proveedores", "Clientes Morosos".
+   - Panel de Alertas Financieras para gestión proactiva.
+
+3. **Control de Retiros en Tránsito**:
+   - Tracking de remesas desde sucursal pendientes de validación.
+   - Alertas visuales para retiros demorados (>24hs).
+
+**Archivos modificados:**
+- `src/app/(admin)/(dominios)/tesoreria/**/*`
+- `src/actions/tesoreria.actions.ts`
+- `src/components/forms/GastoForm.tsx`
+- `supabase/migrations/20260110_proveedores_financiero.sql`
+
+---
+
 ## 2026-01-09 — Antigravity
 **Feat: Mejoras Integrales Módulo Tesorería**
 

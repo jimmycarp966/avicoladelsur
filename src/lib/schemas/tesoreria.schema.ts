@@ -20,6 +20,7 @@ export const movimientoCajaSchema = z.object({
 export const registrarGastoSchema = z.object({
   sucursal_id: z.string().uuid().optional(),
   categoria_id: z.string().uuid('ID de categoría inválido').optional(),
+  proveedor_id: z.string().uuid('ID de proveedor inválido').optional(), // Nuevo: vincular con proveedor
   monto: z.number().min(0.01, 'El monto debe ser mayor a 0'),
   descripcion: z.string().max(500).optional(),
   fecha: z
@@ -31,6 +32,7 @@ export const registrarGastoSchema = z.object({
   caja_id: z.string().uuid().optional(),
   metodo_pago: z.enum(['efectivo', 'transferencia', 'qr', 'tarjeta_debito', 'tarjeta_credito']).default('efectivo'),
 })
+
 
 export const registrarPagoPedidoSchema = z.object({
   pedido_id: z.string().uuid('ID de pedido inválido'),

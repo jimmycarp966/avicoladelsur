@@ -1,12 +1,13 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { MoreHorizontal, Phone, Mail, Search, Building2, CheckCircle, XCircle } from 'lucide-react'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
+import { MoreHorizontal, Phone, Mail, Search, Building2, CheckCircle, XCircle, Eye } from 'lucide-react'
 import { desactivarProveedorAction, reactivarProveedorAction } from '@/actions/proveedores.actions'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
@@ -97,7 +98,12 @@ export function ProveedoresTable({ proveedores }: ProveedoresTableProps) {
                                 <TableRow key={proveedor.id} className={!proveedor.activo ? 'opacity-60' : ''}>
                                     <TableCell>
                                         <div>
-                                            <div className="font-medium">{proveedor.nombre}</div>
+                                            <Link
+                                                href={`/tesoreria/proveedores/${proveedor.id}`}
+                                                className="font-medium text-blue-600 hover:underline"
+                                            >
+                                                {proveedor.nombre}
+                                            </Link>
                                             {proveedor.direccion && (
                                                 <div className="text-sm text-muted-foreground">{proveedor.direccion}</div>
                                             )}
@@ -151,6 +157,13 @@ export function ProveedoresTable({ proveedores }: ProveedoresTableProps) {
                                                 </Button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
+                                                <DropdownMenuItem asChild>
+                                                    <Link href={`/tesoreria/proveedores/${proveedor.id}`}>
+                                                        <Eye className="h-4 w-4 mr-2" />
+                                                        Ver detalle
+                                                    </Link>
+                                                </DropdownMenuItem>
+                                                <DropdownMenuSeparator />
                                                 <DropdownMenuItem
                                                     onClick={() => handleToggleActivo(proveedor.id, proveedor.activo)}
                                                 >

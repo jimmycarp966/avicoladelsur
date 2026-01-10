@@ -1583,3 +1583,81 @@ export async function obtenerClientesMorososAction() {
     return { success: false, error: error.message || 'Error al obtener clientes morosos' }
   }
 }
+
+// ==================== RETIROS EN TRÁNSITO ====================
+
+/**
+ * Obtener retiros de sucursales en tránsito (pendientes de validación)
+ * Incluye alertas para retiros que llevan más de 24 horas sin validar
+ */
+export async function obtenerRetirosEnTransitoAction() {
+  try {
+    const supabase = await createClient()
+
+    // Buscar rutas que tengan retiros pendientes de validación
+    // Una ruta tiene retiros en tránsito cuando: validado_ruta = true pero validado_caja = false
+    const { data: retiros, error } = await supabase
+      .from('rutas_retiros')
+      .select(`
+        id,
+        monto,
+        metodo_pago,
+        descripcion,
+        validado_ruta,
+        validado_caja,
+        created_at,
+        ruta:rutas_reparto(
+          id,
+          fecha,
+          sucursal:sucursales(nombre),
+          chofer:empleados(nombre, apellido)
+        )
+      `)
+      .eq('validado_ruta', true)
+      .eq('validado_caja', false)
+      .order('created_at', { ascending: true })
+
+    if (error) throw error
+
+    const now = new Date()
+    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+
+    // Procesar y agregar alertas
+    const retirosConAlerta = (retiros || []).map((retiro: any) => {
+      const createdAt = new Date(retiro.created_at)
+      const esAntiguo = createdAt < oneDayAgo
+      const horasDesdeCreacion = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60))
+
+      return {
+        ...retiro,
+        es_antiguo: esAntiguo,
+        horas_pendiente: horasDesdeCreacion,
+        alerta: esAntiguo ? 'Más de 24 horas sin validar' : null
+      }
+    })
+
+    // Calcular totales por método de pago
+    const totalesPorMetodo: Record<string, number> = {}
+    let montoTotal = 0
+
+    retirosConAlerta.forEach((retiro: any) => {
+      const metodo = retiro.metodo_pago || 'efectivo'
+      totalesPorMetodo[metodo] = (totalesPorMetodo[metodo] || 0) + Number(retiro.monto)
+      montoTotal += Number(retiro.monto)
+    })
+
+    return {
+      success: true,
+      data: retirosConAlerta,
+      resumen: {
+        cantidad: retirosConAlerta.length,
+        monto_total: montoTotal,
+        por_metodo: totalesPorMetodo,
+        con_alerta: retirosConAlerta.filter((r: any) => r.es_antiguo).length
+      }
+    }
+  } catch (error: any) {
+    devError('Error en obtenerRetirosEnTransitoAction:', error)
+    return { success: false, error: error.message || 'Error al obtener retiros en tránsito' }
+  }
+}

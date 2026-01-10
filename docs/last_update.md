@@ -1,18 +1,20 @@
-# Última Actualización
+# Última Actualización del Sistema
 
-**Fecha:** 2026-01-09
-**Autor:** Antigravity
+**Fecha:** 2026-01-10 03:30
+**Autor:** Daniel (AI Assistant)
 
 ## Resumen del Cambio
-Se implementó la **Migración y Automatización de Listas de Precios**:
-1.  **Migración BD**: Asignación masiva de "Lista Mayorista" a todos los clientes.
-2.  **Mejora UI**: Selección automática de lista de precios en formulario de presupuestos.
+Se completó el módulo de Tesorería con Gestión Financiera de Proveedores (Facturas/Pagos), Vinculación de Gastos, Dashboard Ejecutivo con KPIs y Alertas, y Control de Retiros en Tránsito.
 
-## Archivos Modificados
-- `src/app/(admin)/(dominios)/ventas/presupuestos/nuevo/presupuesto-form.tsx`
-- `src/actions/listas-precios.actions.ts`
-- `ARCHITECTURE_SUMMARY.md`
-- `docs/CHANGELOG.md`
+## Archivos Impactados
+- `src/actions/proveedores.actions.ts` (Nueva lógica financiera)
+- `src/actions/tesoreria.actions.ts` (KPIs, Retiros)
+- `src/app/(admin)/(dominios)/tesoreria/page.tsx` (Dashboard)
+- `src/app/(admin)/(dominios)/tesoreria/proveedores/proveedores-table.tsx` (UI)
+- `src/app/(admin)/(dominios)/tesoreria/sucursales/page.tsx` (Retiros)
+- `src/components/forms/GastoForm.tsx` (Selector proveedor)
+- `src/lib/schemas/tesoreria.schema.ts` (Schema)
+- `supabase/migrations/20260110_proveedores_financiero.sql` (DB)
 
-## Diagrama de Arquitectura
-`docs/diagrams/architecture.mmd` (Sin cambios estructurales mayores, solo lógica de negocio).
+## Diagrama de Arquitectura Actualizado
+`docs/diagrams/architecture.mmd`

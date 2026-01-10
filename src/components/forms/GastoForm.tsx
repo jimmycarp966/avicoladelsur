@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useCallback } from 'react'
+import { useState, useTransition, useCallback, useEffect } from 'react'
 import { useForm, type Resolver, type SubmitHandler } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { registrarGastoSchema, type RegistrarGastoFormData } from '@/lib/schemas/tesoreria.schema'
@@ -11,8 +11,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useNotificationStore } from '@/store/notificationStore'
-import { Loader2, Save, Upload, X, Sparkles } from 'lucide-react'
+import { Loader2, Save, Upload, X, Sparkles, Building2 } from 'lucide-react'
 import { uploadFileToStorage } from '@/lib/supabase/storage'
+import { listarProveedoresAction } from '@/actions/proveedores.actions'
+
+interface Proveedor {
+  id: string
+  nombre: string
+}
 
 interface GastoFormProps {
   categorias: Array<{ id: string; nombre: string }>
@@ -33,6 +39,21 @@ export function GastoForm({ categorias, cajas }: GastoFormProps) {
   const [uploadingFile, setUploadingFile] = useState(false)
   const [sugerenciaIA, setSugerenciaIA] = useState<SugerenciaIA | null>(null)
   const [cargandoSugerencia, setCargandoSugerencia] = useState(false)
+  const [proveedores, setProveedores] = useState<Proveedor[]>([])
+  const [cargandoProveedores, setCargandoProveedores] = useState(false)
+
+  // Cargar proveedores al montar
+  useEffect(() => {
+    async function loadProveedores() {
+      setCargandoProveedores(true)
+      const result = await listarProveedoresAction(true)
+      if (result.success) {
+        setProveedores(result.data || [])
+      }
+      setCargandoProveedores(false)
+    }
+    loadProveedores()
+  }, [])
 
   const form = useForm<RegistrarGastoFormData>({
     resolver: zodResolver(registrarGastoSchema) as Resolver<RegistrarGastoFormData>,
@@ -185,6 +206,33 @@ export function GastoForm({ categorias, cajas }: GastoFormProps) {
                 <p className="text-sm text-destructive">{form.formState.errors.fecha.message}</p>
               )}
             </div>
+          </div>
+
+          {/* Selector de Proveedor (opcional) */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium flex items-center gap-1">
+              <Building2 className="h-3 w-3" />
+              Proveedor (opcional)
+            </label>
+            <Select
+              onValueChange={(value) => form.setValue('proveedor_id', value === 'none' ? undefined : value)}
+              value={form.watch('proveedor_id') || 'none'}
+            >
+              <SelectTrigger disabled={isPending || cargandoProveedores}>
+                <SelectValue placeholder="Sin proveedor" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Sin proveedor</SelectItem>
+                {proveedores.map((proveedor) => (
+                  <SelectItem key={proveedor.id} value={proveedor.id}>
+                    {proveedor.nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Vincular este gasto a un proveedor para mejor seguimiento
+            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
