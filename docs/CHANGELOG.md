@@ -1,6 +1,18 @@
 # Changelog - Avícola del Sur ERP
 
 
+## 2026-01-10 (Hotfix) — Antigravity
+**Fix: Restauración de Tablas de Gastos y Migración**
+
+Se corrigió una inconsistencia crítica en la base de datos donde las tablas `gastos` habían desaparecido. La migración de proveedores se ajustó para:
+- Recrear `gastos` y `gastos_categorias` si no existen.
+- Aplicar correctamente la columna `proveedor_id`.
+
+**Archivos modificados:**
+- `supabase/migrations/20260110_proveedores_financiero.sql`
+
+---
+
 ## 2026-01-10 — Antigravity
 **Feat: Finalización Módulo Tesorería (Proveedores, KPIs, Retiros)**
 
