@@ -1187,3 +1187,399 @@ export async function obtenerRutasPendientesValidacionAction() {
     return { success: false, error: error.message || 'Error al obtener rutas pendientes' }
   }
 }
+
+// ==================== RETIROS DE SUCURSALES ====================
+
+// Registrar retiro de sucursal (entrega de efectivo a chofer)
+export async function registrarRetiroSucursalAction(formData: FormData) {
+  try {
+    const supabase = await createClient()
+
+    // Obtener usuario actual
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, error: 'Usuario no autenticado' }
+    }
+
+    // Parsear datos
+    const monto = parseFloat(formData.get('monto') as string)
+    const sucursal_id = formData.get('sucursal_id') as string
+    const ruta_id = formData.get('ruta_id') as string | null
+    const vehiculo_id = formData.get('vehiculo_id') as string | null
+    const chofer_nombre = formData.get('chofer_nombre') as string
+    const descripcion = formData.get('descripcion') as string || null
+
+    if (!monto || monto <= 0) {
+      return { success: false, error: 'Monto inválido' }
+    }
+    if (!sucursal_id) {
+      return { success: false, error: 'Sucursal requerida' }
+    }
+    if (!chofer_nombre) {
+      return { success: false, error: 'Nombre del chofer requerido' }
+    }
+
+    // Obtener caja de la sucursal
+    const { data: cajaSucursal, error: cajaError } = await supabase
+      .from('tesoreria_cajas')
+      .select('id, saldo_actual, nombre')
+      .eq('sucursal_id', sucursal_id)
+      .single()
+
+    if (cajaError || !cajaSucursal) {
+      return { success: false, error: 'No se encontró caja para esta sucursal' }
+    }
+
+    // Verificar saldo suficiente
+    if (cajaSucursal.saldo_actual < monto) {
+      return { success: false, error: `Saldo insuficiente en caja. Disponible: $${cajaSucursal.saldo_actual.toLocaleString()}` }
+    }
+
+    // Crear movimiento de egreso en la caja de la sucursal
+    const { data: movimientoEgreso, error: movError } = await supabase
+      .from('tesoreria_movimientos')
+      .insert({
+        caja_id: cajaSucursal.id,
+        tipo: 'egreso',
+        monto: monto,
+        descripcion: `Retiro para Casa Central - Chofer: ${chofer_nombre}`,
+        origen_tipo: 'retiro_sucursal',
+        metodo_pago: 'efectivo',
+        user_id: user.id,
+      })
+      .select()
+      .single()
+
+    if (movError) throw movError
+
+    // Actualizar saldo de caja
+    const { error: updateCajaError } = await supabase
+      .from('tesoreria_cajas')
+      .update({
+        saldo_actual: cajaSucursal.saldo_actual - monto,
+        updated_at: getNowArgentina().toISOString(),
+      })
+      .eq('id', cajaSucursal.id)
+
+    if (updateCajaError) throw updateCajaError
+
+    // Crear registro de retiro
+    const { data: retiro, error: retiroError } = await supabase
+      .from('rutas_retiros')
+      .insert({
+        ruta_id: ruta_id || null,
+        sucursal_id,
+        vehiculo_id: vehiculo_id || null,
+        monto,
+        chofer_nombre,
+        descripcion,
+        estado: 'pendiente',
+        movimiento_egreso_id: movimientoEgreso.id,
+        created_by: user.id,
+      })
+      .select()
+      .single()
+
+    if (retiroError) throw retiroError
+
+    revalidatePath('/(admin)/(dominios)/tesoreria/sucursales')
+    revalidatePath('/(admin)/(dominios)/tesoreria/validar-rutas')
+    revalidatePath('/sucursal/dashboard')
+
+    return {
+      success: true,
+      data: retiro,
+      message: `Retiro de $${monto.toLocaleString()} registrado. El dinero será acreditado en Casa Central al validar la ruta.`,
+    }
+  } catch (error: any) {
+    devError('Error en registrarRetiroSucursalAction:', error)
+    return { success: false, error: error.message || 'Error al registrar retiro' }
+  }
+}
+
+// Obtener retiros pendientes por ruta
+export async function obtenerRetirosPendientesRutaAction(rutaId: string) {
+  try {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+      .from('rutas_retiros')
+      .select(`
+        *,
+        sucursal:sucursales(id, nombre),
+        vehiculo:vehiculos(id, patente)
+      `)
+      .eq('ruta_id', rutaId)
+      .eq('estado', 'pendiente')
+
+    if (error) throw error
+
+    return { success: true, data: data || [] }
+  } catch (error: any) {
+    devError('Error en obtenerRetirosPendientesRutaAction:', error)
+    return { success: false, error: error.message || 'Error al obtener retiros' }
+  }
+}
+
+// Obtener todos los retiros pendientes (para validación)
+export async function obtenerTodosRetirosPendientesAction() {
+  try {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+      .from('rutas_retiros')
+      .select(`
+        *,
+        sucursal:sucursales(id, nombre),
+        vehiculo:vehiculos(id, patente, marca, modelo),
+        ruta:rutas_reparto(id, numero_ruta, estado)
+      `)
+      .eq('estado', 'pendiente')
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+
+    return { success: true, data: data || [] }
+  } catch (error: any) {
+    devError('Error en obtenerTodosRetirosPendientesAction:', error)
+    return { success: false, error: error.message || 'Error al obtener retiros pendientes' }
+  }
+}
+
+// Validar retiro (acreditar en caja central)
+export async function validarRetiroAction(retiroId: string, cajaDestinoId: string) {
+  try {
+    const supabase = await createClient()
+
+    // Obtener usuario actual
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, error: 'Usuario no autenticado' }
+    }
+
+    // Obtener retiro
+    const { data: retiro, error: retiroError } = await supabase
+      .from('rutas_retiros')
+      .select('*, sucursal:sucursales(nombre)')
+      .eq('id', retiroId)
+      .single()
+
+    if (retiroError || !retiro) {
+      return { success: false, error: 'Retiro no encontrado' }
+    }
+
+    if (retiro.estado === 'validado') {
+      return { success: false, error: 'Este retiro ya fue validado' }
+    }
+
+    // Crear movimiento de ingreso en caja destino (Casa Central)
+    const { data: movimientoIngreso, error: movError } = await supabase
+      .from('tesoreria_movimientos')
+      .insert({
+        caja_id: cajaDestinoId,
+        tipo: 'ingreso',
+        monto: retiro.monto,
+        descripcion: `Retiro recibido de ${retiro.sucursal?.nombre || 'Sucursal'} - Chofer: ${retiro.chofer_nombre}`,
+        origen_tipo: 'retiro_sucursal_validado',
+        origen_id: retiroId,
+        metodo_pago: 'efectivo',
+        user_id: user.id,
+      })
+      .select()
+      .single()
+
+    if (movError) throw movError
+
+    // Actualizar saldo de caja destino
+    await supabase.rpc('fn_actualizar_saldo_caja', {
+      p_caja_id: cajaDestinoId,
+      p_monto: retiro.monto,
+    })
+
+    // Marcar retiro como validado
+    const { error: updateError } = await supabase
+      .from('rutas_retiros')
+      .update({
+        estado: 'validado',
+        movimiento_ingreso_id: movimientoIngreso.id,
+        validado_por: user.id,
+        validado_at: getNowArgentina().toISOString(),
+      })
+      .eq('id', retiroId)
+
+    if (updateError) throw updateError
+
+    revalidatePath('/(admin)/(dominios)/tesoreria/validar-rutas')
+    revalidatePath('/(admin)/(dominios)/tesoreria')
+
+    return {
+      success: true,
+      message: `Retiro de $${retiro.monto.toLocaleString()} validado y acreditado en caja.`,
+    }
+  } catch (error: any) {
+    devError('Error en validarRetiroAction:', error)
+    return { success: false, error: error.message || 'Error al validar retiro' }
+  }
+}
+
+// ==================== RECORDATORIOS DE COBRANZA ====================
+
+// Listar recordatorios de un cliente
+export async function listarRecordatoriosClienteAction(clienteId: string) {
+  try {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+      .from('clientes_recordatorios')
+      .select(`
+        *,
+        creador:usuarios!clientes_recordatorios_created_by_fkey(nombre, apellido)
+      `)
+      .eq('cliente_id', clienteId)
+      .order('fecha', { ascending: false })
+
+    if (error) throw error
+
+    return { success: true, data: data || [] }
+  } catch (error: any) {
+    devError('Error en listarRecordatoriosClienteAction:', error)
+    return { success: false, error: error.message || 'Error al listar recordatorios' }
+  }
+}
+
+// Crear recordatorio de cobranza
+export async function crearRecordatorioAction(formData: FormData) {
+  try {
+    const supabase = await createClient()
+
+    // Obtener usuario actual
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return { success: false, error: 'Usuario no autenticado' }
+    }
+
+    const cliente_id = formData.get('cliente_id') as string
+    const nota = formData.get('nota') as string
+    const tipo = formData.get('tipo') as string || 'llamada'
+    const fecha_proximo_contacto = formData.get('fecha_proximo_contacto') as string || null
+    const resultado = formData.get('resultado') as string || null
+
+    if (!cliente_id) {
+      return { success: false, error: 'Cliente requerido' }
+    }
+    if (!nota) {
+      return { success: false, error: 'Nota requerida' }
+    }
+
+    const { data: recordatorio, error } = await supabase
+      .from('clientes_recordatorios')
+      .insert({
+        cliente_id,
+        nota,
+        tipo,
+        fecha: getTodayArgentina(),
+        fecha_proximo_contacto: fecha_proximo_contacto || null,
+        resultado,
+        estado: 'pendiente',
+        created_by: user.id,
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+
+    revalidatePath('/(admin)/(dominios)/tesoreria/cuentas-corrientes')
+
+    return {
+      success: true,
+      data: recordatorio,
+      message: 'Recordatorio creado exitosamente',
+    }
+  } catch (error: any) {
+    devError('Error en crearRecordatorioAction:', error)
+    return { success: false, error: error.message || 'Error al crear recordatorio' }
+  }
+}
+
+// Actualizar estado de recordatorio
+export async function actualizarRecordatorioAction(id: string, estado: string, resultado?: string) {
+  try {
+    const supabase = await createClient()
+
+    const { error } = await supabase
+      .from('clientes_recordatorios')
+      .update({
+        estado,
+        resultado: resultado || null,
+        updated_at: getNowArgentina().toISOString(),
+      })
+      .eq('id', id)
+
+    if (error) throw error
+
+    revalidatePath('/(admin)/(dominios)/tesoreria/cuentas-corrientes')
+
+    return { success: true, message: 'Recordatorio actualizado' }
+  } catch (error: any) {
+    devError('Error en actualizarRecordatorioAction:', error)
+    return { success: false, error: error.message || 'Error al actualizar recordatorio' }
+  }
+}
+
+// Obtener clientes con alertas de moratoria
+export async function obtenerClientesMorososAction() {
+  try {
+    const supabase = await createClient()
+
+    // Obtener cuentas corrientes con saldo > 0
+    const { data: cuentas, error } = await supabase
+      .from('cuentas_corrientes')
+      .select(`
+        id,
+        saldo,
+        limite_credito,
+        updated_at,
+        cliente:clientes(id, nombre, telefono, email, bloqueado_por_deuda)
+      `)
+      .gt('saldo', 0)
+      .order('saldo', { ascending: false })
+
+    if (error) throw error
+
+    // Clasificar por nivel de alerta
+    const ahora = new Date()
+    const clientesClasificados = (cuentas || []).map((cuenta: any) => {
+      const ultimaActualizacion = new Date(cuenta.updated_at)
+      const diasSinMovimiento = Math.floor((ahora.getTime() - ultimaActualizacion.getTime()) / (1000 * 60 * 60 * 24))
+      const excedeCredito = cuenta.saldo > (cuenta.limite_credito || 0)
+
+      let nivel: 'verde' | 'amarillo' | 'rojo' = 'verde'
+      if (excedeCredito || diasSinMovimiento > 30) {
+        nivel = 'rojo'
+      } else if (diasSinMovimiento > 15) {
+        nivel = 'amarillo'
+      }
+
+      return {
+        ...cuenta,
+        dias_sin_movimiento: diasSinMovimiento,
+        excede_credito: excedeCredito,
+        nivel_alerta: nivel,
+      }
+    })
+
+    return {
+      success: true,
+      data: clientesClasificados,
+      resumen: {
+        total: clientesClasificados.length,
+        rojos: clientesClasificados.filter((c: any) => c.nivel_alerta === 'rojo').length,
+        amarillos: clientesClasificados.filter((c: any) => c.nivel_alerta === 'amarillo').length,
+        verdes: clientesClasificados.filter((c: any) => c.nivel_alerta === 'verde').length,
+      },
+    }
+  } catch (error: any) {
+    devError('Error en obtenerClientesMorososAction:', error)
+    return { success: false, error: error.message || 'Error al obtener clientes morosos' }
+  }
+}

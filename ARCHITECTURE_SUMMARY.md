@@ -240,31 +240,23 @@ Endpoints que operan sin interfaz gráfica:
 
 **Implementaciones realizadas:**
 
-1. **Reportes de Producción Inteligentes** (`/reportes/produccion`):
-   - Nueva función `obtenerEstadisticasProduccionAction` con métricas de merma, eficiencia y desperdicios
-   - Dashboard con KPIs: Órdenes, Eficiencia %, Merma Líquida, Desperdicio Sólido
-   - Tendencias visuales, Top 10 productos y rendimiento por destino
-   - Alertas inteligentes (merma >15% o eficiencia <80%)
+1. **Módulo de Proveedores** (`/tesoreria/proveedores`):
+   - Nueva tabla `proveedores` con RLS para gestión de proveedores.
+   - CRUD completo: `proveedores.actions.ts` con listar, crear, actualizar, desactivar/reactivar.
+   - UI: Página con estadísticas, tabla filtrable y dialog de nuevo proveedor.
+   - Navegación agregada al sidebar de Tesorería.
 
-2. **Validación Producción Paso 3**:
-   - Función `validarDestinosCompletos()` bloquea finalización si hay destinos sin productos
+2. **Retiros de Sucursales** (`rutas_retiros`):
+   - Nueva tabla para tracking de efectivo transportado por choferes.
+   - Action `registrarRetiroSucursalAction`: Egreso inmediato en caja sucursal.
+   - Action `validarRetiroAction`: Ingreso en Casa Central al validar ruta.
+   - Dialog `NuevoRetiroDialog` en `/tesoreria/sucursales`.
 
-3. **Impresión Parcial Lista Preparación**:
-   - Componente `PrintPreparacionParcial` para imprimir solo productos pendientes de pesaje
+3. **Gestión de Moratoria - Cuentas Corrientes**:
+   - Nueva tabla `clientes_recordatorios` para bitácora de cobranza.
+   - Action `obtenerClientesMorososAction` con clasificación semáforo (verde/amarillo/rojo).
+   - Actions para crear/listar/actualizar recordatorios.
+   - Dialog `RecordatoriosDialog` integrado en tabla de cuentas corrientes.
 
-4. **Validación Barcode en Pesajes**:
-   - Handler `handleScan` valida coincidencia PLU vs código producto
+**Impacto:** Tres nuevas tablas PostgreSQL con RLS. Flujo completo de retiros sucursal→chofer→casa central. Sistema de alertas de moratoria para gestión proactiva de cobranza.
 
-5. **Campo requiere_pesaje**:
-   - Nuevo campo en schema de productos para forzar pesaje incluso en mayorista
-
-6. **Mapeo de Zonas (Migración 2026-01-09)**:
-   - Nueva columna `zona_id` (FK) en tabla clientes.
-   - Script masivo ejecutado para vincular ~600 clientes con sus zonas geográficas.
-   - Formulario de Cliente actualizado para selección estructurada.
-
-7. **Migración y Automatización de Listas de Precios (Migración 2026-01-09)**:
-   - Asignación masiva de "Lista Mayorista" a todos los clientes activos (~200).
-   - Actualización de `PresupuestoForm` para detectar y seleccionar automáticamente la lista de precios asignada al cliente.
-
-**Impacto:** Migración de esquema (ADD COLUMN zona_id) y migración de datos masiva aplicada. Automatización de flujo de ventas.

@@ -2,6 +2,39 @@
 
 
 ## 2026-01-09 — Antigravity
+**Feat: Mejoras Integrales Módulo Tesorería**
+
+Se implementaron tres nuevos submódulos para completar la gestión financiera:
+
+1. **Módulo de Proveedores** (`/tesoreria/proveedores`):
+   - Nueva tabla `proveedores` con RLS y CRUD completo.
+   - UI con página, tabla filtrable y dialog de creación.
+   - Enlace agregado en sidebar de Tesorería.
+
+2. **Retiros de Sucursales** (`rutas_retiros`):
+   - Tabla para tracking de efectivo transportado por choferes.
+   - Flujo: Egreso inmediato en sucursal → Ingreso en Casa Central al validar ruta.
+   - Dialog `NuevoRetiroDialog` en Tesorería por Sucursal.
+
+3. **Gestión de Moratoria** (`clientes_recordatorios`):
+   - Bitácora de gestión de cobranza con historial de contactos.
+   - Clasificación semáforo (verde/amarillo/rojo) de clientes morosos.
+   - Dialog `RecordatoriosDialog` integrado en Cuentas Corrientes.
+
+**Archivos nuevos:**
+- `src/actions/proveedores.actions.ts`
+- `src/app/(admin)/(dominios)/tesoreria/proveedores/*`
+- `src/app/(admin)/(dominios)/tesoreria/sucursales/nuevo-retiro-dialog.tsx`
+- `src/app/(admin)/(dominios)/tesoreria/cuentas-corrientes/recordatorios-dialog.tsx`
+
+**Migraciones aplicadas:**
+- `add_proveedores_table`
+- `add_rutas_retiros_table`
+- `add_clientes_recordatorios_table`
+
+---
+
+## 2026-01-09 — Antigravity
 **Feat: Migración y Automatización de Listas de Precios**
 
 Se completó la migración masiva y automatización de listas de precios para mejorar el flujo de ventas:

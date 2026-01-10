@@ -5,9 +5,10 @@ import { ColumnDef } from '@tanstack/react-table'
 import { DataTable, SortableHeader } from '@/components/ui/data-table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Eye, Phone, MessageCircle, AlertTriangle, Clock, Wallet, CheckCircle2 } from 'lucide-react'
+import { Eye, Phone, MessageCircle, AlertTriangle, Clock, Wallet, CheckCircle2, AlertCircle } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import Link from 'next/link'
+import { RecordatoriosDialog } from './recordatorios-dialog'
 
 interface ClienteCuenta {
     cliente_id: string
@@ -166,6 +167,10 @@ export function CuentasCorrientesTable({ clientes }: CuentasTableProps) {
                 const cliente = row.original
                 return (
                     <div className="flex items-center gap-1">
+                        <RecordatoriosDialog
+                            clienteId={cliente.cliente_id}
+                            clienteNombre={cliente.cliente_nombre}
+                        />
                         <Button variant="outline" size="sm" asChild>
                             <Link href={`/ventas/clientes/${cliente.cliente_id}/cuenta-corriente`}>
                                 <Eye className="h-4 w-4 mr-1" />
