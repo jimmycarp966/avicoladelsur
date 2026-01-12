@@ -45,6 +45,16 @@ interface Entrega {
   monto_cobrado: number
   referencia_pago: string | null
   observaciones: string | null
+  items: EntregaItem[]
+}
+
+interface EntregaItem {
+  producto_nombre: string
+  cantidad: number
+  peso: number | null
+  precio_unitario: number
+  subtotal: number
+  codigo: string
 }
 
 interface Resumen {
@@ -279,8 +289,41 @@ export function EntregasPedido({ pedidoId }: EntregasPedidoProps) {
                   </CollapsibleTrigger>
 
                   <CollapsibleContent>
-                    <div className="border-t px-4 py-3 bg-muted/30 space-y-3">
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div className="border-t px-4 py-3 bg-muted/30 space-y-4">
+                      {/* Tabla de Items */}
+                      {entrega.items && entrega.items.length > 0 && (
+                        <div className="bg-white rounded-md border text-sm overflow-hidden">
+                          <table className="w-full">
+                            <thead className="bg-muted text-muted-foreground text-xs">
+                              <tr>
+                                <th className="px-3 py-2 text-left font-medium">Producto</th>
+                                <th className="px-3 py-2 text-center font-medium">Cant.</th>
+                                <th className="px-3 py-2 text-right font-medium">Peso</th>
+                                <th className="px-3 py-2 text-right font-medium">Total</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                              {entrega.items.map((item, idx) => (
+                                <tr key={idx}>
+                                  <td className="px-3 py-2">
+                                    <p className="font-medium">{item.producto_nombre}</p>
+                                    <p className="text-[10px] text-muted-foreground">{item.codigo}</p>
+                                  </td>
+                                  <td className="px-3 py-2 text-center">{item.cantidad}</td>
+                                  <td className="px-3 py-2 text-right">
+                                    {(item.peso || item.cantidad || 0).toFixed(2)}
+                                  </td>
+                                  <td className="px-3 py-2 text-right font-medium">
+                                    {formatCurrency(item.subtotal)}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mt-2">
                         <div>
                           <p className="text-xs text-muted-foreground">Teléfono</p>
                           <p>{entrega.cliente_telefono || '-'}</p>

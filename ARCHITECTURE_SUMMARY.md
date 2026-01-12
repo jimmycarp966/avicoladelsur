@@ -324,6 +324,9 @@ Endpoints que operan sin interfaz gráfica:
 - **Unificación de Zonas**: Implementación de auto-selección de `zona_id` en presupuestos basada en la configuración del cliente.
 - **Migración de Precios**: Ejecución de migración SQL masiva para asignar lista **MAYORISTA** a todos los clientes (204 procesados).
 - **UX**: Auto-aplicación automática de Lista de Precios y Zona al seleccionar cliente en `presupuesto-form.tsx`.
+### 2026-01-12 - Mejoras UX Pedidos
+- **Detalle de Entregas**: Visualización de items dentro de la tarjeta expandible de entrega (nuevo campo JSONB en RPC `fn_obtener_entregas_pedido`).
+- **Agrupación de Productos**: Resumen consolidado del pedido agrupando por producto (suma de pesos y subtotales) para mayor claridad.
 - **Fix dependencias**: Solucionado error de compilación por `leaflet` y limpieza de `next.config.ts`.
 
 ### 2026-01-11 - Robustez en Conciliación

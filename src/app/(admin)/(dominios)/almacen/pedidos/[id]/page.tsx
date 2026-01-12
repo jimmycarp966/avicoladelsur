@@ -301,20 +301,42 @@ export default async function PedidoDetallePage({ params }: PedidoDetallePagePro
               </TableRow>
             </TableHeader>
             <TableBody>
-              {(pedido.detalles_pedido ?? []).map((item: any) => (
-                <TableRow key={item.id}>
-                  <TableCell>
-                    <p className="font-medium">{item.productos?.nombre || 'Producto'}</p>
-                    <p className="text-xs text-muted-foreground">Código: {item.productos?.codigo || '-'}</p>
-                  </TableCell>
-                  <TableCell className="text-center">{item.cantidad}</TableCell>
-                  <TableCell className="text-center font-medium text-blue-600">
-                    {(item.peso_final ?? item.cantidad ?? 0).toFixed(2)}
-                  </TableCell>
-                  <TableCell className="text-right">{formatCurrency(item.precio_unitario)}</TableCell>
-                  <TableCell className="text-right font-semibold">{formatCurrency(item.subtotal)}</TableCell>
-                </TableRow>
-              ))}
+              {Object.values(
+                (pedido.detalles_pedido ?? []).reduce((acc: any, item: any) => {
+                  const key = item.producto_id;
+                  if (!acc[key]) {
+                    acc[key] = {
+                      ...item,
+                      cantidad: 0,
+                      peso_final: 0,
+                      subtotal: 0
+                    };
+                  }
+                  acc[key].cantidad += Number(item.cantidad || 0);
+                  acc[key].peso_final += Number(item.peso_final || item.cantidad || 0);
+                  acc[key].subtotal += Number(item.subtotal || 0);
+                  return acc;
+                }, {})
+              ).map((item: any) => {
+                const precioPromedio = item.peso_final > 0
+                  ? item.subtotal / item.peso_final
+                  : item.precio_unitario;
+
+                return (
+                  <TableRow key={item.id || item.producto_id}>
+                    <TableCell>
+                      <p className="font-medium">{item.productos?.nombre || 'Producto'}</p>
+                      <p className="text-xs text-muted-foreground">Código: {item.productos?.codigo || '-'}</p>
+                    </TableCell>
+                    <TableCell className="text-center">{item.cantidad}</TableCell>
+                    <TableCell className="text-center font-medium text-blue-600">
+                      {item.peso_final.toFixed(2)}
+                    </TableCell>
+                    <TableCell className="text-right">{formatCurrency(precioPromedio)}</TableCell>
+                    <TableCell className="text-right font-semibold">{formatCurrency(item.subtotal)}</TableCell>
+                  </TableRow>
+                )
+              })}
               {/* Fila de totales */}
               <TableRow className="bg-muted/50 font-semibold">
                 <TableCell colSpan={2} className="text-right">Total:</TableCell>
