@@ -316,6 +316,7 @@ Endpoints que operan sin interfaz gráfica:
 
 ### 2026-01-12 - Lógica de Pesables y Venta
 - **Pesables Mayoristas**: Refactorización de lógica SQL/Action para permitir productos pesables en listas mayoristas si tienen `requiere_pesaje=true`.
+- **UI de Preparación**: Corrección de validación en botones de "Comenzar Pesaje" y "Pasar a Pedido" para respetar estrictamente `requiere_pesaje`.
 - **Unificación de Zonas**: Implementación de auto-selección de `zona_id` en presupuestos basada en la configuración del cliente.
 - **Migración de Precios**: Ejecución de migración SQL masiva para asignar lista **MAYORISTA** a todos los clientes (204 procesados).
 - **UX**: Auto-aplicación automática de Lista de Precios y Zona al seleccionar cliente en `presupuesto-form.tsx`.

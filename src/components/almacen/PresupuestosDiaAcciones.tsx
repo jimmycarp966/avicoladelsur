@@ -7,6 +7,7 @@ import { ShoppingCart, Loader2, AlertTriangle, Info } from 'lucide-react'
 import { confirmarPresupuestoAction, confirmarPresupuestosAgrupadosAction } from '@/actions/presupuestos.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 import { esVentaMayorista } from '@/lib/utils'
+import { esItemPesable } from '@/actions/presupuestos-dia.actions'
 import {
   Dialog,
   DialogContent,
@@ -53,28 +54,10 @@ export function PresupuestosDiaAcciones({
   const [isLoading, setIsLoading] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
 
-  // Helper para determinar si un item es pesable
-  const esItemPesable = (presupuesto: Presupuesto, item: any): boolean => {
-    // Si es venta mayorista, NO es pesable (productos vienen en caja cerrada)
-    if (esVentaMayorista(presupuesto, item)) {
-      return false
-    }
-
-    if (item.pesable === true) {
-      return true
-    }
-    const categoria = item.producto?.categoria
-    if (categoria) {
-      const categoriaUpper = categoria.toUpperCase().trim()
-      return categoriaUpper === 'BALANZA'
-    }
-    return false
-  }
-
   // Verificar si hay items pesables sin pesar
   const tieneItemsSinPesar = (presupuesto: Presupuesto) => {
     return presupuesto.items?.some(
-      (item) => esItemPesable(presupuesto, item) && !item.peso_final
+      (item) => esItemPesable(item, esVentaMayorista(presupuesto, item)) && !item.peso_final
     )
   }
 
@@ -265,27 +248,9 @@ export function PresupuestoIndividualAccion({
   const [isLoading, setIsLoading] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
 
-  // Helper para determinar si un item es pesable (incluyendo verificación mayorista)
-  const esItemPesableItem = (item: any): boolean => {
-    // Si es venta mayorista, NO es pesable (productos vienen en caja cerrada)
-    if (esVentaMayorista(presupuesto, item)) {
-      return false
-    }
-
-    if (item.pesable === true) {
-      return true
-    }
-    const categoria = item.producto?.categoria
-    if (categoria) {
-      const categoriaUpper = categoria.toUpperCase().trim()
-      return categoriaUpper === 'BALANZA'
-    }
-    return false
-  }
-
   const tieneItemsSinPesarIndividual = () => {
     return presupuesto.items?.some(
-      (item) => esItemPesableItem(item) && !item.peso_final
+      (item) => esItemPesable(item, esVentaMayorista(presupuesto, item)) && !item.peso_final
     ) || false
   }
 
@@ -421,4 +386,3 @@ export function PresupuestoIndividualAccion({
     </>
   )
 }
-

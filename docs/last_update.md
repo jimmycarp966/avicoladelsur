@@ -1,22 +1,17 @@
-# Evidencia de Actualización
-**Fecha:** 12 de Enero de 2026, 14:55 (Local)
+# Última Actualización del Sistema
+
+**Fecha:** 2026-01-12 15:30:00 (Aprox)
 **Autor:** Antigravity
 
-## Cambios Detectados
-- **Lógica de Formulario**: Simplificación de `presupuesto-form.tsx` para auto-selección de cliente.
-- **Base de Datos**: Migración masiva de 204 clientes a la lista de precios MAYORISTA.
-- **Documentación**: Actualización de `ARCHITECTURE.MD`, `ARCHITECTURE_SUMMARY.md` y `CHANGELOG.md`.
-
-## Resumen Técnico
-Se ajustó el dominio de Ventas para automatizar la selección de Zona y Lista de Precios, impacto: Migración de datos exitosa para unificar todos los clientes bajo la lista MAYORISTA.
+## Resumen del Cambio
+Se ajustó la lógica de productos pesables (Frontend/Backend/SQL) para respetar el flag `requiere_pesaje` en ventas mayoristas, corrigiendo validaciones en UI de preparación. Backfill de datos aplicado.
 
 ## Archivos Afectados
-- `src/app/(admin)/(dominios)/ventas/presupuestos/nuevo/presupuesto-form.tsx`
-- `supabase/migrations/20260112_unificar_listas_mayorista.sql`
-- `ARCHITECTURE_SUMMARY.md`
-- `ARCHITECTURE.MD`
-- `docs/CHANGELOG.md`
-- `docs/diagrams/architecture.mmd`
+- src/actions/almacen.actions.ts
+- src/actions/presupuestos-dia.actions.ts
+- src/components/almacen/PresupuestosDiaAcciones.tsx
+- src/app/(admin)/(dominios)/almacen/presupuesto/[id]/pesaje/page.tsx
+- supabase/migrations/20260112_fix_logica_pesable_con_requiere_pesaje.sql
 
-## Diagrama
-- `docs/diagrams/architecture.mmd`
+## Diagrama de Arquitectura
+No hubo cambios estructurales mayores, solo lógica de negocio y validación.

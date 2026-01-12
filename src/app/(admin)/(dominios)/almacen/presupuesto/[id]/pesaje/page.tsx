@@ -7,6 +7,7 @@ import { obtenerPresupuestoAction } from '@/actions/presupuestos.actions'
 import { PesajeSkeleton } from './pesaje-skeleton'
 import { PesajeForm } from '@/components/almacen/PesajeForm'
 import { esVentaMayorista } from '@/lib/utils'
+import { esItemPesable } from '@/actions/presupuestos-dia.actions'
 
 interface PesajePageProps {
   params: Promise<{
@@ -23,28 +24,13 @@ async function PesajeContent({ presupuestoId }: { presupuestoId: string }) {
 
   const presupuesto = result.data
 
-  // Helper para determinar si un item es pesable
-  function esItemPesable(item: any): boolean {
-    // Si es venta mayorista, NO es pesable (productos vienen en caja cerrada)
-    if (esVentaMayorista(presupuesto, item)) {
-      return false
-    }
-    
-    // Primero verificar el campo pesable del item
-    if (item.pesable === true) {
-      return true
-    }
-    // Si no está marcado como pesable, verificar la categoría del producto
-    // Esto es un respaldo por si el campo 'pesable' no se setea correctamente al crear el presupuesto
-    return (
-      item.producto?.categoria &&
-      typeof item.producto.categoria === 'string' &&
-      item.producto.categoria.toUpperCase().trim() === 'BALANZA'
-    )
-  }
-
-  // Filtrar solo items pesables
-  const itemsPesables = presupuesto.items?.filter((item: any) => esItemPesable(item)) || []
+  // Filtrar solo items pesables usando la lógica centralizada
+  const itemsPesables = presupuesto.items?.filter((item: any) => {
+    // Calculamos si este item específico es venta mayorista
+    const isMayorista = esVentaMayorista(presupuesto, item)
+    // Usamos la función compartida que ahora respeta item.producto.requiere_pesaje
+    return esItemPesable(item, isMayorista)
+  }) || []
 
   if (itemsPesables.length === 0) {
     return (

@@ -7,9 +7,15 @@ Se implementaron mejoras críticas en la lógica de ventas y reparto para simpli
 - **Auto-selección Inteligente**: El formulario de "Nuevo Presupuesto" ahora auto-aplica la zona (`zona_id`) y la lista de precios configurada en el cliente al seleccionarlo.
 - **Unificación de Zonas**: Se simplificó la lógica en `presupuesto-form.tsx` para usar estrictamente la relación de base de datos, eliminando fallbacks de texto legacy.
 - **Migración Masiva de Datos**: Ejecución de script SQL para asignar la lista **MAYORISTA** a todos los clientes activos (204 procesados), desactivando listas secundarias para estandarizar la operación.
+- **UI de Preparación**: Corrección de lógica en botones `PresupuestosDiaAcciones.tsx` para validar pesajes pendientes usando la lógica unificada (`esItemPesable`).
 - **Arquitectura**: Actualización de diagramas y documentos de arquitectura para reflejar la nueva lógica de auto-aplicación.
 
 **Archivos modificados:**
+- `src/actions/almacen.actions.ts`
+- `src/actions/presupuestos-dia.actions.ts`
+- `src/app/(admin)/(dominios)/almacen/presupuesto/[id]/pesaje/page.tsx`
+- `src/components/almacen/PresupuestosDiaAcciones.tsx`
+- `supabase/migrations/20260112_fix_logica_pesable_con_requiere_pesaje.sql` (NUEVO)
 - `src/app/(admin)/(dominios)/ventas/presupuestos/nuevo/presupuesto-form.tsx`
 - `supabase/migrations/20260112_unificar_listas_mayorista.sql` (NUEVO)
 - `ARCHITECTURE_SUMMARY.md`
