@@ -356,12 +356,13 @@ export function PesajeItemCard({
       const codigoNormalizado = codigoProducto.replace(/^0+/, '')
 
       if (!pluNormalizado.includes(codigoNormalizado) && !codigoNormalizado.includes(pluNormalizado)) {
-        console.log('[PesajeItemCard] ⚠️ PLU no coincide con producto:', { plu: parsed.plu, codigo: codigoProducto })
-        toast.warning(
-          `El código escaneado (${parsed.plu}) no parece corresponder al producto "${item.producto?.nombre}" (${codigoProducto}). Verifica que estás escaneando la etiqueta correcta.`,
+        console.log('[PesajeItemCard] ❌ PLU no coincide con producto:', { plu: parsed.plu, codigo: codigoProducto })
+        toast.error(
+          `El código escaneado (${parsed.plu}) NO corresponde al producto "${item.producto?.nombre}" (código: ${codigoProducto}). Escanea la etiqueta correcta.`,
           { duration: 5000 }
         )
-        // Continuar igualmente pero con advertencia
+        // NO continuar - el código no coincide, rechazar el escaneo
+        return
       }
     }
 
