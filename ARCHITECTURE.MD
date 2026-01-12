@@ -5,10 +5,10 @@
 **Sistema ERP Completo y Funcional** diseñado para eliminar silos de información entre Almacén, Ventas, Reparto y Tesorería, creando una única fuente de la verdad en Supabase con planificación semanal de rutas, GPS tracking en tiempo real y optimización automática.
 
 ### 🎯 Estado Actual (Enero 2026) - PRODUCCIÓN ✅
-- **Inteligencia Artificial**: Integración profunda de Google Gemini (2.5 Flash y 3.0 Pro) para conciliación bancaria, validación de stock y chatbots.
-- **Logística Autónoma**: Reparto con navegación interactiva, selección de rutas (Google Directions alternatives) y priorización inteligente de clientes.
+- **Inteligencia Artificial**: Integración profunda de Google Gemini (2.5 Flash y 3.0 Pro) para conciliación bancaria, validación de stock y chatbots. Implementación de **Auto-selección inteligente** de zonas y precios en presupuestos.
+- **Logística Autónoma**: Reparto con navegación interactiva, selección de rutas (Google Directions alternatives) y unificación estricta de zonas mediante `zona_id`.
 - **Producción Científica**: Módulo de desposte con control de rendimientos esperados, mermas líquidas/sólidas y trazabilidad total.
-- **Tesorería Blindada**: Motor de conciliación automática que cruza extractos bancarios vs movimientos de sistema con IA.
+- **Tesorería Blindada**: Motor de conciliación automática que cruza extractos bancarios vs movimientos de sistema con IA (Gemini 3.0 Pro) y acreditación atómica mediante RPC SQL para evitar desincronización de saldos.
 - **Planificación Semanal**: Rutas fijas por zona/día/turno con vehículos asignados (Fiorino 600kg, Hilux 1500kg, F-4000 4000kg)
 - **Flujo Automático**: Presupuesto → Turno Auto → Asignación Ruta → Almacén → Optimización → Reparto GPS → Cobro
 - **GPS Tracking**: PWA con ubicación cada 5s + alertas de desvío (>200m) y cliente saltado (<100m)
@@ -124,11 +124,10 @@ Actualiza rutas_planificadas → Monitor actualizado automáticamente
 ### Flujo G: Cobros y Conciliación (Automático) ✅ COMPLETO
 
 ```
-Entrega PWA → Cobro registrado → cuentas_movimientos + tesoreria_movimientos
-    ↓
-Referencia PAY-XXXXXX → GET /api/tesoreria/movimientos-tiempo-real
-    ↓
-Conciliación automática → Reportes CSV/PDF → Cierres de caja
+1. **Ingesta**: Admin sube PDF/Excel banco. Parser robusto segmenta líneas y normaliza montos regionales ($ 14.000,00).
+2. **Matching IA**: Gemini matchea con `movimientos_caja` y `cobros`.
+3. **Acreditación**: RPC SQL `fn_acreditar_saldo_cliente_v2` impacta CC y Caja en una sola transacción.
+4. **Resumen**: Reportes CSV/PDF automáticos y cierres de caja vinculados.
 ```
 
 ### Flujo H: Venta en Sucursal con Control de Precios ✅ NUEVO
@@ -251,13 +250,10 @@ Para optimizar la logística y la facturación, el sistema implementa un modelo 
 - **Referencias de Pago**: Generación automática de códigos de referencia para pagos diferidos
 - **Instrucciones para Repartidores**: Mensajes automáticos con monto y referencia de pago
 - **Sistema de Listas de Precios**: 
-  - Listas base (MINORISTA, MAYORISTA, DISTRIBUIDOR) con asignación automática por tipo_cliente
-  - Cada cliente puede tener hasta 2 listas activas (1 automática + 1 manual)
-  - Margen de ganancia configurable por lista para cálculo automático desde precio_costo
-  - Precios manuales por producto en cada lista
-  - Selección de lista en presupuestos por vendedor
-  - Integración con bot WhatsApp (usa primera lista del cliente automáticamente)
-  - Herencia de lista en pedidos desde presupuestos
+  - Listas base (MINORISTA, MAYORISTA, DISTRIBUIDOR).
+  - **Unificación Mayorista (2026-01-12)**: Migración masiva para que todos los clientes operen por defecto con lista Mayorista para simplificar la toma de pedidos.
+  - Auto-selección automática de lista y zona en presupuestos al elegir el cliente.
+  - Integración con bot WhatsApp y herencia en pedidos.
 
 ### 3️⃣ Dominio: Reparto (TMS - Transportation Management System) ✅ COMPLETO
 

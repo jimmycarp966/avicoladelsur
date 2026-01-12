@@ -1,7 +1,22 @@
 # Changelog - Avícola del Sur ERP
 
+## 2026-01-12 — Antigravity
+**Feat: Unificación de Zonas y Migración a Lista Mayorista**
 
-## 2026-01-10 (Hotfix) — Antigravity
+Se implementaron mejoras críticas en la lógica de ventas y reparto para simplificar la toma de pedidos y garantizar consistencia en las zonas:
+- **Auto-selección Inteligente**: El formulario de "Nuevo Presupuesto" ahora auto-aplica la zona (`zona_id`) y la lista de precios configurada en el cliente al seleccionarlo.
+- **Unificación de Zonas**: Se simplificó la lógica en `presupuesto-form.tsx` para usar estrictamente la relación de base de datos, eliminando fallbacks de texto legacy.
+- **Migración Masiva de Datos**: Ejecución de script SQL para asignar la lista **MAYORISTA** a todos los clientes activos (204 procesados), desactivando listas secundarias para estandarizar la operación.
+- **Arquitectura**: Actualización de diagramas y documentos de arquitectura para reflejar la nueva lógica de auto-aplicación.
+
+**Archivos modificados:**
+- `src/app/(admin)/(dominios)/ventas/presupuestos/nuevo/presupuesto-form.tsx`
+- `supabase/migrations/20260112_unificar_listas_mayorista.sql` (NUEVO)
+- `ARCHITECTURE_SUMMARY.md`
+- `ARCHITECTURE.MD`
+- `docs/diagrams/architecture.mmd` (NUEVO)
+
+---
 **Fix: Restauración de Tablas de Gastos y Migración**
 
 Se corrigió una inconsistencia crítica en la base de datos donde las tablas `gastos` habían desaparecido. La migración de proveedores se ajustó para:

@@ -1,7 +1,28 @@
 # 🏗️ Arquitectura del Sistema - Avícola del Sur ERP
 
-**Última Actualización:** Enero 2026
+**Última Actualización:** Enero 2026  
 **Estado:** ✅ PRODUCCIÓN
+
+## 📚 Índice Rápido
+
+| Sección | Descripción |
+|---------|-------------|
+| [TL;DR](#-tldr-resumen-ejecutivo) | Resumen ejecutivo del sistema |
+| [Stack](#️-stack-tecnológico) | Tecnologías utilizadas |
+| [Módulos](#-módulos-principales-mapa-técnico) | §1-§6 Reparto, Tesorería, Almacén, Ventas, RRHH, Sucursales |
+| [Servicios IA](#-servicios-de-ia--google-cloud) | Gemini, Maps, Predictions |
+| [Patrones](#️-patrones-de-arquitectura-de-software) | Arquitectura Server-Authoritative |
+| [Server Actions](#-server-actions-referencia-completa) | 32 actions organizados por módulo |
+| [Estructura](#-estructura-de-directorios-auditada) | Organización de carpetas |
+| [Navegación](#-mapa-de-navegación-del-sistema-menú-oficial) | Menú del sidebar |
+| [Flujos](#-flujos-críticos) | Happy paths principales |
+| [Seguridad](#-seguridad-y-infraestructura-invisible-middleware) | RBAC y middleware |
+| [API](#-api--webhooks-headless) | Endpoints públicos |
+| [Esquema DB](#-esquema-de-datos-crítico-entidades-core) | Tablas y enums |
+| [Componentes UI](#-catálogo-de-componentes-ui-building-blocks) | Building blocks reutilizables |
+| [Cambios](#-cambios-recientes-últimos-5) | Historial reciente |
+
+---
 
 ## 📋 TL;DR (Resumen Ejecutivo)
 
@@ -17,11 +38,11 @@ Sistema ERP modular completo para Avícola del Sur que unifica **Almacén (WMS)*
 
 ## 🛠️ Stack Tecnológico
 
-- **Framework**: Next.js 15 (App Router, Server Actions)
-- **Frontend**: React 19 + TypeScript + Tailwind CSS + shadcn/ui
+- **Framework**: Next.js 16 (App Router, Server Actions)
+- **Frontend**: React 19 + TypeScript + Tailwind CSS v4 + shadcn/ui
 - **Base de Datos**: Supabase (Postgres 15+) + RLS + Realtime
 - **IA Core**: Google Gemini 2.5 Flash (alta velocidad) y 3.0 Pro (razonamiento complejo)
-- **Mapas**: Google Maps JS API + Directions API + Places API
+- **Mapas**: Google Maps JS API (TMS/Navegación) + Leaflet (Reportes Heatmap)
 - **Infraestructura**: Vercel (Frontend/Edge) + Supabase (Backend/Storage)
 - **Protocolo IA**: Model Context Protocol (MCP) para integración de herramientas externas
 
@@ -39,13 +60,17 @@ Sistema ERP modular completo para Avícola del Sur que unifica **Almacén (WMS)*
   - Priorización inteligente de clientes (`next-client-selector.ts`).
 
 ### 2. 💰 Tesorería & Conciliación IA
-*Scope: Flujo de dinero, cajas, bancos y cuentas corrientes.*
-- **Backend Logic**: `conciliacion.actions.ts` (Ingesta), `tesoreria.actions.ts` (Movimientos).
+*Scope: Flujo de dinero, cajas, bancos, proveedores y cuentas corrientes.*
+- **Backend Logic**: `tesoreria.actions.ts`, `conciliacion.actions.ts`, `gastos.actions.ts`, `proveedores.actions.ts`.
 - **AI Core**: `gemini-matcher.ts` (Gemini 3.0 Pro para matching difuso de transacciones).
-- **Data Models**: `tesoreria_cajas`, `movimientos_caja`, `conciliacion_bancaria_items`, `cuentas_corrientes`.
+- **Data Models**: `tesoreria_cajas`, `movimientos_caja`, `conciliacion_bancaria_items`, `cuentas_corrientes`, `gastos`, `gastos_categorias`, `proveedores`, `proveedores_facturas`, `proveedores_pagos`.
 - **Features 2.0**:
-  - Conciliación PDF->BD automática.
+  - Conciliación PDF->BD automática con parser robusto (locales regionales).
   - Validación de rendiciones de ruta (Cruce Cobros vs Remesa).
+  - **Acreditación Atómica**: Uso de RPC SQL para sincronizar CC y Caja sin condiciones de carrera.
+  - **Gestión de Proveedores**: Facturas, pagos y deuda.
+  - **Dashboard KPIs**: Tesoro Total, Deuda Proveedores, Clientes Morosos.
+  - **Retiros en Tránsito**: Tracking de remesas desde sucursales.
 
 ### 3. 🏭 Almacén & Producción
 *Scope: Inventario, manufactura (desposte) y recepción.*
@@ -70,6 +95,16 @@ Sistema ERP modular completo para Avícola del Sur que unifica **Almacén (WMS)*
 - **Features 2.0**:
   - Cálculo de nómina automático basado en presentismo.
   - Adelantos con límite automático según sueldo básico.
+
+### 6. 🏪 Sucursales & POS
+*Scope: Gestión de puntos de venta distribuidos.*
+- **Backend Logic**: `sucursales.actions.ts`, `pos-sucursal.actions.ts`, `ventas-sucursal.actions.ts`, `sucursales-transferencias.actions.ts`.
+- **Data Models**: `sucursales`, `sucursales_stock`, `sucursales_ventas`, `transferencias_sucursales`.
+- **Features 2.0**:
+  - POS táctil para venta directa.
+  - Transferencias de stock inter-sucursales.
+  - Dashboard local para encargados.
+  - Conteos de inventario con validación.
 
 ---
 
@@ -103,7 +138,47 @@ El sistema sigue una arquitectura **Server-Authoritative** estricta para garanti
 
 ---
 
-## 📁 Estructura de Directorios Auditada
+## 🔧 Server Actions (Referencia Completa)
+
+*Todos los actions están en `src/actions/`. Usar como backend-for-frontend.*
+
+### Por Módulo
+
+| Módulo | Action | Propósito |
+|--------|--------|-----------|
+| **Auth** | `auth.actions.ts` | Login, logout, gestión de sesión |
+| **Dashboard** | `dashboard.actions.ts` | KPIs, métricas, alertas |
+| **Almacén** | `almacen.actions.ts` | Stock, lotes, movimientos FIFO |
+| | `produccion.actions.ts` | Órdenes de desposte, entradas/salidas |
+| | `destinos-produccion.actions.ts` | Configuración de destinos |
+| | `rendimientos.actions.ts` | Rendimientos esperados vs reales |
+| | `pesajes.actions.ts` | Validación de pesos, aprendizaje |
+| | `presupuestos-dia.actions.ts` | Cola de preparación diaria |
+| **Ventas** | `ventas.actions.ts` | Clientes, facturas, pedidos |
+| | `presupuestos.actions.ts` | Cotizaciones, conversión a pedido |
+| | `listas-precios.actions.ts` | Listas dinámicas, auditoría |
+| | `entregas.actions.ts` | Gestión de entregas individuales |
+| **Reparto** | `reparto.actions.ts` | Rutas, asignaciones, tracking |
+| | `plan-rutas.actions.ts` | Planificación semanal |
+| **Tesorería** | `tesoreria.actions.ts` | Cajas, movimientos, cierres |
+| | `conciliacion.actions.ts` | Ingesta bancaria, matching IA |
+| | `gastos.actions.ts` | Registro de gastos |
+| | `proveedores.actions.ts` | Facturas, pagos, deuda |
+| **Sucursales** | `sucursales.actions.ts` | CRUD sucursales |
+| | `pos-sucursal.actions.ts` | Punto de venta táctil |
+| | `ventas-sucursal.actions.ts` | Ventas locales |
+| | `sucursales-transferencias.actions.ts` | Transferencias inter-sucursales |
+| **RRHH** | `rrhh.actions.ts` | Empleados, asistencia, liquidaciones |
+| **Reportes** | `reportes.actions.ts` | Reportes generales |
+| | `reportes-almacen.actions.ts` | Reportes de stock |
+| | `reportes-clientes.actions.ts` | Análisis de clientes |
+| | `reportes-empleados.actions.ts` | Métricas RRHH |
+| | `reportes-pedidos.actions.ts` | Análisis de ventas |
+| | `reportes-reparto.actions.ts` | Eficiencia de entregas |
+| | `reportes-stock.actions.ts` | Inventario y rotación |
+| | `reportes-tesoreria.actions.ts` | Flujo de caja |
+
+---
 
 ```
 src/
@@ -169,9 +244,9 @@ Jerarquía completa de opciones disponibles en el Sidebar Administrativo (`Admin
 
 ### 2. Conciliación Bancaria
 1. **Ingesta**: Admin sube PDF del banco.
-2. **Parseo**: Sistema extrae líneas.
+2. **Parseo**: Sistema extrae líneas con parser robusto a formatos regionales (puntos/comas).
 3. **Matching IA**: Gemini compara con `movimientos_caja` y `cobros`.
-4. **Acreditación**: Admin confirma matches → Saldos conciliados.
+4. **Acreditación**: Admin confirma matches → Acreditación atómica vía RPC SQL (`fn_acreditar_saldo_cliente_v2`).
 
 ---
 
@@ -233,17 +308,41 @@ Endpoints que operan sin interfaz gráfica:
 | **`<SignaturePad />`** | `components/shared/SignaturePad` | (Verificar path) Captura de firma digital para entregas. |
 | **`<PrintPreparacionParcial />`** | `components/almacen/PrintPreparacionParcial.tsx` | Impresión parcial de lista de preparación (productos pendientes de pesaje). |
 | **`<PedidosPreparadosView />`** | `components/almacen/PedidosPreparadosView.tsx` | Vista agrupada de pedidos terminados por zona/cliente. |
+| **`<HeatmapMap />`** | `components/reportes/charts/HeatmapMap.tsx` | Mapa de calor interactivo basado en Leaflet para visualización de densidad de datos (ventas/empleados). |
 
 ---
 
-## 📝 Cambio Reciente (2026-01-10 - Hotfix)
+## 📝 Cambios Recientes (Últimos 5)
 
-**Fix Crítico de Base de Datos y Tesorería:**
+### 2026-01-12 - Lógica de Venta y Unificación de Zonas
+- **Unificación de Zonas**: Implementación de auto-selección de `zona_id` en presupuestos basada en la configuración del cliente.
+- **Migración de Precios**: Ejecución de migración SQL masiva para asignar lista **MAYORISTA** a todos los clientes (204 procesados).
+- **UX**: Auto-aplicación automática de Lista de Precios y Zona al seleccionar cliente en `presupuesto-form.tsx`.
+- **Fix dependencias**: Solucionado error de compilación por `leaflet` y limpieza de `next.config.ts`.
 
-1.  **Restauración de Esquema**: Se detectó y corrigió la ausencia de tablas `gastos` y `gastos_categorias`. La migración `20260110` ahora incluye la recreación automática de estas tablas para asegurar consistencia.
-2.  **Proveedores (Completo)**: Implementación de `proveedores_facturas` y `proveedores_pagos`, permitiendo gestión de deuda y pagos.
-3.  **Integración**: Vinculación exitosa entre Gastos y Proveedores.
-4.  **Dashboard**: KPIs financieros y alertas operativas en Tesorería.
+### 2026-01-11 - Robustez en Conciliación
+- Parser de montos mejorado para manejar formatos regionales ($ 14.000,00)
+- Corrección de desincronización de índices en motor de conciliación
+- Implementación de acreditación atómica (CC + Caja) vía RPC SQL
 
-**Impacto:** Migración SQL correigda (`20260110_proveedores_financiero.sql`). Sistema estable.
+### 2026-01-10 - Auditoría de Reglas
+- Fusión de metodologías de trabajo: §7 Debugging con hipótesis, §8 Plan de respuesta
+- Actualización de workflows `/start`, `/end`, `/remember`, `/actualizar`
 
+### 2026-01-10 - Hotfix Base de Datos
+- Restauración de tablas `gastos` y `gastos_categorias`
+- Implementación completa de Proveedores (facturas, pagos, deuda)
+- KPIs financieros y alertas en Dashboard Tesorería
+
+### 2026-01-09 - Mejoras Tesorería
+- Módulo de Proveedores con CRUD completo
+- Retiros de Sucursales con tracking
+- Gestión de Moratoria y recordatorios de cobranza
+
+### 2026-01-09 - Listas de Precios
+- Migración masiva "Lista Mayorista" a todos los clientes
+- Auto-selección de lista en formulario de presupuestos
+
+### 2026-01-08 - Fix RLS y Coordenadas
+- Políticas RLS para `rutas_reparto` y `detalles_ruta`
+- Corrección de extracción PostGIS (`ST_X`, `ST_Y`)

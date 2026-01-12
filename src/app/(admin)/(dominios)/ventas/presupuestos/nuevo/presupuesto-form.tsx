@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label'
 import { Loader2, Save, Plus, Trash2, Search, X } from 'lucide-react'
 import { crearPresupuestoAction } from '@/actions/presupuestos.actions'
 import { obtenerTodasListasActivasAction, obtenerPrecioProductoAction, obtenerListasClienteAction } from '@/actions/listas-precios.actions'
+import { obtenerClientePorIdAction } from '@/actions/ventas.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 import { formatCurrency } from '@/lib/utils'
 import { useDebounce } from '@/lib/hooks/useDebounce'
@@ -42,7 +43,7 @@ const crearPresupuestoSchema = z.object({
 type CrearPresupuestoFormData = z.infer<typeof crearPresupuestoSchema>
 
 interface PresupuestoFormProps {
-  clientes: Array<{ id: string; nombre: string; codigo?: string; telefono?: string; zona_entrega?: string }>
+  clientes: Array<{ id: string; nombre: string; codigo?: string; telefono?: string; zona_entrega?: string; zona_id?: string; localidad?: { zona_id: string } }>
   productos: Array<{
     id: string;
     codigo: string;
@@ -87,6 +88,7 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
     resolver: zodResolver(crearPresupuestoSchema),
     mode: 'onChange', // Actualizar en tiempo real cuando cambian los valores
     defaultValues: {
+      zona_id: '', // Inicializar como string vacío para evitar warning uncontrolled/controlled
       fecha_entrega_estimada: new Date().toISOString().split('T')[0], // Fecha de hoy por defecto
       observaciones: '',
       tipo_venta: 'reparto',
@@ -327,43 +329,43 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
     }
   }, [])
 
-  // Cargar listas del cliente cuando se selecciona uno
+  // Efecto para cargar y aplicar automáticamente zona y lista de precios del cliente
   useEffect(() => {
-    const cargarListasCliente = async () => {
-      if (!watchedCliente) return
+    if (!watchedCliente) return
 
+    const cargarDatosCliente = async () => {
       try {
-        const result = await obtenerListasClienteAction(watchedCliente)
-        if (result.success && result.data && result.data.length > 0) {
-          // Ordenar por prioridad (menor número = mayor prioridad)
-          const listasOrdenadas = result.data.sort((a: any, b: any) => (a.prioridad || 999) - (b.prioridad || 999))
+        const result = await obtenerClientePorIdAction(watchedCliente)
+        if (!result.success || !result.data) return
 
-          // Seleccionar la primera (mayor prioridad)
+        const { zona_id, listas_precios } = result.data
+
+        // 1. Auto-aplicar Zona del cliente
+        if (zona_id && zonas.some(z => z.id === zona_id)) {
+          setValue('zona_id', zona_id, { shouldValidate: true, shouldDirty: true })
+        }
+
+        // 2. Auto-aplicar Lista de Precios del cliente
+        if (todasListas.length > 0 && listas_precios && listas_precios.length > 0) {
+          const listasOrdenadas = [...listas_precios].sort((a: any, b: any) => (a.prioridad || 999) - (b.prioridad || 999))
           const listaPrincipal = listasOrdenadas[0]
-          if (listaPrincipal && listaPrincipal.lista_precio_id) {
-            setValue('lista_precio_id', listaPrincipal.lista_precio_id, {
-              shouldValidate: true,
-              shouldDirty: true
-            })
-            showToast('info', `Lista de precios "${listaPrincipal.lista_precio?.nombre}" seleccionada automáticamente`)
-          }
-        } else {
-          // Fallback: Si no tiene lista asignada, intentar poner "Lista Mayorista" por defecto si existe e todasListas
-          const listaMayorista = todasListas.find(l => l.nombre.toLowerCase().includes('mayorista'))
-          if (listaMayorista) {
-            setValue('lista_precio_id', listaMayorista.id, {
-              shouldValidate: true,
-              shouldDirty: true
-            })
+          const listaId = listaPrincipal.lista_precio?.id || listaPrincipal.lista_precio_id
+
+          if (listaId && todasListas.some(l => l.id === listaId)) {
+            setValue('lista_precio_id', listaId, { shouldValidate: true, shouldDirty: true })
+            const listaEncontrada = todasListas.find(l => l.id === listaId)
+            if (listaEncontrada) {
+              showToast('info', `Lista "${listaEncontrada.nombre}" aplicada`)
+            }
           }
         }
       } catch (error) {
-        console.error('Error cargando listas del cliente:', error)
+        console.error('Error cargando datos del cliente:', error)
       }
     }
 
-    cargarListasCliente()
-  }, [watchedCliente, setValue, showToast, todasListas])
+    cargarDatosCliente()
+  }, [watchedCliente, setValue, showToast, todasListas, zonas])
 
   // Actualizar precios cuando cambia la lista global o lista por producto
   const watchedListaPrecioGlobal = useWatch({ control, name: 'lista_precio_id' })
@@ -1080,9 +1082,10 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
                   <KeyboardHintCompact shortcut="Z" />
                 </Label>
                 <Select
+                  key={watchedCliente} // Forzar re-render al cambiar cliente
                   value={watch('zona_id') || ''}
                   onValueChange={(value) => {
-                    setValue('zona_id', value)
+                    setValue('zona_id', value, { shouldValidate: true, shouldDirty: true })
                     // Avanzar a fecha después de seleccionar zona
                     setTimeout(() => {
                       const fechaInput = document.getElementById('fecha_entrega_estimada')

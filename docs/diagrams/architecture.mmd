@@ -1,23 +1,10 @@
-graph LR
-    User(Usuario) --> web[Next.js App]
-    web --> API[Server Actions]
-    API --> DB[(Supabase PostgreSQL)]
+graph TD
+    UI[Presupuesto Form] --> |Select Client| SA[obtenerClientePorIdAction]
+    SA --> |Return| CD[Client Data: Zona + Listas]
+    CD --> |Auto-Apply| UI
+    UI --> |Submit| CP[crearPedidoAction]
+    DB[(Supabase)] <--> SA
+    DB <--> CP
     
-    subgraph Ventas
-        ClienteForm --> API
-        PresupuestoForm --> API
-    end
-    
-    subgraph Tesoreria
-        Proveedores --> API
-        Facturas --> API
-        Pagos --> API
-        Retiros --> API
-        API --> Cajas[Movimientos Caja]
-    end
-    
-    subgraph Lógica de Negocio
-        API --> ListasPrecios[Listas de Precios]
-        API --> Clientes[Gestión Clientes]
-        ListasPrecios -.-> Clientes
-    end
+    Mig[Migration SQL] --> |Mass Update| DB
+    Mig --> |Set All Active to| ML[MAYORISTA Price List]

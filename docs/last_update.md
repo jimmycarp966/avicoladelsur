@@ -1,16 +1,22 @@
-# Última Actualización del Sistema
+# Evidencia de Actualización
+**Fecha:** 12 de Enero de 2026, 14:55 (Local)
+**Autor:** Antigravity
 
-**Fecha:** 2026-01-10 01:06
-**Autor:** Antigravity (AI Agent)
+## Cambios Detectados
+- **Lógica de Formulario**: Simplificación de `presupuesto-form.tsx` para auto-selección de cliente.
+- **Base de Datos**: Migración masiva de 204 clientes a la lista de precios MAYORISTA.
+- **Documentación**: Actualización de `ARCHITECTURE.MD`, `ARCHITECTURE_SUMMARY.md` y `CHANGELOG.md`.
 
-## Resumen del Cambio
-**Hotfix de Base de Datos:** Se corrigió el script de migración `20260110_proveedores_financiero.sql` para manejar la restauración automática de las tablas `gastos` y `gastos_categorias` que faltaban en el esquema de producción, asegurando que la nueva funcionalidad de proveedores pueda desplegarse sin errores.
+## Resumen Técnico
+Se ajustó el dominio de Ventas para automatizar la selección de Zona y Lista de Precios, impacto: Migración de datos exitosa para unificar todos los clientes bajo la lista MAYORISTA.
 
 ## Archivos Afectados
-- `supabase/migrations/20260110_proveedores_financiero.sql`
+- `src/app/(admin)/(dominios)/ventas/presupuestos/nuevo/presupuesto-form.tsx`
+- `supabase/migrations/20260112_unificar_listas_mayorista.sql`
 - `ARCHITECTURE_SUMMARY.md`
+- `ARCHITECTURE.MD`
 - `docs/CHANGELOG.md`
+- `docs/diagrams/architecture.mmd`
 
-## Estado del Sistema
-- **Compilación:** Exitosa (previamente verificada).
-- **Base de Datos:** Consistente. Tablas restauradas y migración aplicada.
+## Diagrama
+- `docs/diagrams/architecture.mmd`
