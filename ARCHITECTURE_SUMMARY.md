@@ -314,6 +314,11 @@ Endpoints que operan sin interfaz gráfica:
 
 ## 📝 Cambios Recientes (Últimos 5)
 
+### 2026-01-12 - Fix Conversión Mayorista Pesable (Hotfix)
+- **Corrección Lógica**: Se ajustó `fn_convertir_presupuesto_a_pedido` para que los items mayoristas pesables (ej: Suprema) respeten el `peso_final` real de balanza en lugar de forzar una conversión estándar por bulto (1 caja = 10kg).
+- **Data Integrity**: Script de corrección para pedidos afectados.
+
+
 ### 2026-01-12 - Fix Pesaje Mayorista
 - **Cálculo de Precios**: Corregido bug donde el precio por unidad mayor se multiplicaba por kg totales en lugar de por unidades (bolsas).
 - **UI Dinámica**: Etiqueta "Precio por KG" ahora cambia a "Precio por [Unidad]" según el producto.

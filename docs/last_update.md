@@ -1,17 +1,17 @@
 # Última Actualización del Sistema
 
-**Fecha:** 2026-01-12 15:30:00 (Aprox)
+**Fecha:** 2026-01-12 (Hotfix)
 **Autor:** Antigravity
 
-## Resumen del Cambio
-Se ajustó la lógica de productos pesables (Frontend/Backend/SQL) para respetar el flag `requiere_pesaje` en ventas mayoristas, corrigiendo validaciones en UI de preparación. Backfill de datos aplicado.
+## Resumen Técnico
+Se ajustó `fn_convertir_presupuesto_a_pedido` para corregir la conversión de items mayoristas pesables (evitando la sobrescritura del peso real por bultos estándar) y se mejoró `fn_obtener_pedido_completo` para una correcta visualización del resumen de pedido.
 
-## Archivos Afectados
-- src/actions/almacen.actions.ts
-- src/actions/presupuestos-dia.actions.ts
-- src/components/almacen/PresupuestosDiaAcciones.tsx
-- src/app/(admin)/(dominios)/almacen/presupuesto/[id]/pesaje/page.tsx
-- supabase/migrations/20260112_fix_logica_pesable_con_requiere_pesaje.sql
+**Impacto:**
+- **Corrección Crítica**: Los pedidos mayoristas ahora reflejan el peso exacto cobrado.
+- **DB Schema**: Nuevas funciones SQL (migraciones).
 
-## Diagrama de Arquitectura
-No hubo cambios estructurales mayores, solo lógica de negocio y validación.
+## Archivos Modificados
+- `supabase/migrations/20260112_fix_conversion_mayorista_pesable.sql`
+- `supabase/migrations/20260112_fix_obtener_pedido_completo_v2.sql`
+- `ARCHITECTURE_SUMMARY.md`
+- `docs/CHANGELOG.md`

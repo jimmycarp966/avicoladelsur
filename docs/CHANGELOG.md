@@ -1,6 +1,21 @@
 # Changelog - Avícola del Sur ERP
 
 ## 2026-01-12 — Antigravity
+**Fix: Conversión de Pedidos Mayoristas Pesables**
+
+Se corrigió un error crítico en la conversión de presupuestos a pedidos donde los productos pesables vendidos a clientes mayoristas ignoraban el peso real de balanza y aplicaban incorrectamente una conversión fija por bulto (ej. 1 caja = 10kg).
+
+- **Lógica corregida**: `fn_convertir_presupuesto_a_pedido` ahora prioriza `peso_final` si el item es pesable, incluso para clientes mayoristas.
+- **Visualización mejorada**: `fn_obtener_pedido_completo` actualizado para agrupar correctamente productos y mostrar pesos reales en el resumen del pedido.
+- **Corrección de datos**: Se ejecutó un script para corregir los pedidos afectados por este error.
+
+**Archivos modificados:**
+- `supabase/migrations/20260112_fix_conversion_mayorista_pesable.sql` (NUEVO - Hotfix)
+- `supabase/migrations/20260112_fix_obtener_pedido_completo_v2.sql` (NUEVO - Fix Agrupación)
+- `src/app/(admin)/(dominios)/almacen/pedidos/[id]/page.tsx` (Lógica de agrupación visual)
+
+---
+
 **Feat: Unificación de Zonas y Migración a Lista Mayorista**
 
 Se implementaron mejoras críticas en la lógica de ventas y reparto para simplificar la toma de pedidos y garantizar consistencia en las zonas:
