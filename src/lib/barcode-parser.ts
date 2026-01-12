@@ -115,14 +115,17 @@ export function parseBarcodeEAN13(code: string): BarcodeResult {
   const weightGrams = parseInt(weightRaw, 10)
   const weight = weightGrams / 1000  // Convertir a kg
 
-  console.log('[barcode-parser] Código parseado:', {
-    rawCode,
-    pluRaw,
-    plu,
-    flag,
-    weightRaw,
-    weight: weight.toFixed(3) + ' kg'
-  })
+  // Log solo en desarrollo para debugging
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[barcode-parser] Código parseado:', {
+      rawCode,
+      pluRaw,
+      plu,
+      flag,
+      weightRaw,
+      weight: weight.toFixed(3) + ' kg'
+    })
+  }
 
   return {
     isValid: true,

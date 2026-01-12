@@ -336,45 +336,34 @@ export function PesajeItemCard({
     }
   }, [item.id])
 
-  // Manejar escaneo de código de barras
+  // Manejar escaneo de código de barras (optimizado para velocidad)
   const handleScan = useCallback((code: string) => {
-    console.log('[PesajeItemCard] 📷 Código recibido del escáner:', code)
     const parsed = parseBarcodeEAN13(code)
-    console.log('[PesajeItemCard] 🔍 Resultado del parser:', {
-      isValid: parsed.isValid,
-      isWeightCode: parsed.isWeightCode,
-      plu: parsed.plu,
-      weight: parsed.weight,
-      error: parsed.error
-    })
 
     // Validar que el código PLU coincida con el producto del item actual
     const codigoProducto = item.producto?.codigo
     if (parsed.plu && codigoProducto) {
-      // Normalizar códigos para comparación (quitar ceros iniciales si es necesario)
-      const pluNormalizado = parsed.plu.replace(/^0+/, '')
-      const codigoNormalizado = codigoProducto.replace(/^0+/, '')
+      // Normalizar códigos para comparación rápida (quitar ceros iniciales)
+      const pluNormalizado = parsed.plu.replace(/^0+/, '') || '0'
+      const codigoNormalizado = codigoProducto.replace(/^0+/, '') || '0'
 
       if (!pluNormalizado.includes(codigoNormalizado) && !codigoNormalizado.includes(pluNormalizado)) {
-        console.log('[PesajeItemCard] ❌ PLU no coincide con producto:', { plu: parsed.plu, codigo: codigoProducto })
         toast.error(
           `El código escaneado (${parsed.plu}) NO corresponde al producto "${item.producto?.nombre}" (código: ${codigoProducto}). Escanea la etiqueta correcta.`,
           { duration: 5000 }
         )
-        // NO continuar - el código no coincide, rechazar el escaneo
         return
       }
     }
 
+    // Aplicar peso inmediatamente si el código es válido
     if (parsed.isWeightCode && parsed.weight) {
-      console.log('[PesajeItemCard] ✅ Peso detectado:', parsed.weight.toFixed(3), 'kg')
-      setPesoInput(parsed.weight.toFixed(3))
-      toast.success(`Peso escaneado: ${parsed.weight.toFixed(3)} kg`)
+      const peso = parsed.weight.toFixed(3)
+      setPesoInput(peso)
+      toast.success(`Peso escaneado: ${peso} kg`)
     } else if (parsed.plu) {
-      console.log('[PesajeItemCard] ⚠️ Código sin peso:', parsed.plu)
       toast.info(`Código PLU: ${parsed.plu} (sin peso embebido)`)
     } else {
-      console.log('[PesajeItemCard] ❌ Código no válido:', parsed.error)
       toast.error('Código no válido: ' + (parsed.error || 'formato desconocido'))
     }
   }, [item.producto?.codigo, item.producto?.nombre])
