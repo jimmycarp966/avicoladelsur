@@ -637,6 +637,7 @@ export async function crearProductoAction(
         venta_mayor_habilitada: data.venta_mayor_habilitada ?? false,
         unidad_mayor_nombre: data.unidad_mayor_nombre || 'caja',
         kg_por_unidad_mayor: data.kg_por_unidad_mayor || 20,
+        requiere_pesaje: data.requiere_pesaje ?? false,
       })
       .select()
       .single()
@@ -711,6 +712,7 @@ export async function actualizarProductoAction(
         venta_mayor_habilitada: data.venta_mayor_habilitada ?? false,
         unidad_mayor_nombre: data.unidad_mayor_nombre || 'caja',
         kg_por_unidad_mayor: data.kg_por_unidad_mayor || 20,
+        requiere_pesaje: data.requiere_pesaje ?? false,
         updated_at: getNowArgentina().toISOString(),
       })
       .eq('id', productoId)
