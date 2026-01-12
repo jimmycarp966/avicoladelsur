@@ -314,6 +314,10 @@ Endpoints que operan sin interfaz gráfica:
 
 ## 📝 Cambios Recientes (Últimos 5)
 
+### 2026-01-12 - Fix Pesaje Mayorista
+- **Cálculo de Precios**: Corregido bug donde el precio por unidad mayor se multiplicaba por kg totales en lugar de por unidades (bolsas).
+- **UI Dinámica**: Etiqueta "Precio por KG" ahora cambia a "Precio por [Unidad]" según el producto.
+
 ### 2026-01-12 - Lógica de Pesables y Venta
 - **Pesables Mayoristas**: Refactorización de lógica SQL/Action para permitir productos pesables en listas mayoristas si tienen `requiere_pesaje=true`.
 - **UI de Preparación**: Corrección de validación en botones de "Comenzar Pesaje" y "Pasar a Pedido" para respetar estrictamente `requiere_pesaje`.

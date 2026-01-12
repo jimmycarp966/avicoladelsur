@@ -65,6 +65,7 @@ supabase/
 | 2026-01-11 | Acreditación: Siempre vía `fn_acreditar_saldo_cliente_v2` (atómica) |
 | 2026-01-11 | Indexación: No usar índices de array para vincular datos de Gemini; usar `archivo_origen` |
 | 2026-01-12 | Dependencias: `leaflet` y `react-leaflet` requeridos para Heatmaps; `next.config.ts` no acepta `serverActions` en root |
+| 2026-01-12 | Precios Pesaje: Para mayoristas, el subtotal debe ser `(peso / kg_unidad_mayor) * precio_unidad`, no `peso * precio`. |
 
 ---
 
