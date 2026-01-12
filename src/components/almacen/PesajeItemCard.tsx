@@ -301,6 +301,13 @@ export function PesajeItemCard({
     if (!pesoInput || pesoInput.trim() === '') return null
     const peso = parseFloat(pesoInput)
     if (isNaN(peso) || peso <= 0) return null
+
+    // Para mayoristas: calcular cuántas unidades mayores (bolsas) representa el peso
+    if (esMayorista && kgPorUnidadMayor && kgPorUnidadMayor > 0) {
+      const cantidadUnidades = peso / kgPorUnidadMayor
+      return cantidadUnidades * precioUnitario
+    }
+
     return peso * precioUnitario
   }
 
@@ -430,7 +437,11 @@ export function PesajeItemCard({
                 />
               </div>
               <div>
-                <Label>Precio por KG</Label>
+                <Label>
+                  {esMayorista && unidadMayorNombre
+                    ? `Precio por ${unidadMayorNombre}`
+                    : 'Precio por KG'}
+                </Label>
                 <div className="p-3 bg-gray-50 rounded-md text-lg font-mono">
                   ${precioUnitario.toFixed(2)}
                 </div>
