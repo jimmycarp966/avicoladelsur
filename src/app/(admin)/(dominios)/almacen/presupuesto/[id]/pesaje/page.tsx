@@ -7,7 +7,7 @@ import { obtenerPresupuestoAction } from '@/actions/presupuestos.actions'
 import { PesajeSkeleton } from './pesaje-skeleton'
 import { PesajeForm } from '@/components/almacen/PesajeForm'
 import { esVentaMayorista } from '@/lib/utils'
-import { esItemPesable } from '@/actions/presupuestos-dia.actions'
+import { esItemPesable } from '@/lib/utils/pesaje'
 
 interface PesajePageProps {
   params: Promise<{

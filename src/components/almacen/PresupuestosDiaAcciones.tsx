@@ -7,7 +7,7 @@ import { ShoppingCart, Loader2, AlertTriangle, Info } from 'lucide-react'
 import { confirmarPresupuestoAction, confirmarPresupuestosAgrupadosAction } from '@/actions/presupuestos.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 import { esVentaMayorista } from '@/lib/utils'
-import { esItemPesable } from '@/actions/presupuestos-dia.actions'
+import { esItemPesable } from '@/lib/utils/pesaje'
 import {
   Dialog,
   DialogContent,
