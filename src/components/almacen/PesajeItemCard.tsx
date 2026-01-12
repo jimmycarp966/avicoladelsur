@@ -112,13 +112,17 @@ export function PesajeItemCard({
     confianza: number
     usandoIA: boolean
   }> => {
-    // Timeout de 8 segundos para evitar bloqueos infinitos
+    // Timeout de 15 segundos para dar más margen en dev/producción lenta
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 8000)
+    const timeoutId = setTimeout(() => {
+      console.warn('[PESAJE] Timeout de 15s alcanzado para Gemini. Abortando...')
+      controller.abort()
+    }, 15000)
 
     try {
-      console.log(`[PESAJE] Analizando peso: ${pesoIngresado}kg para ${item.producto?.nombre} (solicitado: ${pesoSolicitadoKg}kg)`)
+      console.log(`[PESAJE] Iniciando análisis para ${item.producto?.nombre}: ${pesoIngresado}kg (solicitado: ${pesoSolicitadoKg}kg)`)
 
+      const startTime = Date.now()
       const response = await fetch('/api/almacen/analizar-peso', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -131,14 +135,15 @@ export function PesajeItemCard({
         signal: controller.signal
       })
 
+      const duration = Date.now() - startTime
       clearTimeout(timeoutId)
 
       if (!response.ok) {
-        throw new Error(`Error en API: ${response.status} ${response.statusText}`)
+        throw new Error(`API respondió con status ${response.status}: ${response.statusText}`)
       }
 
       const data = await response.json()
-      console.log('[PESAJE] Resultado análisis:', data)
+      console.log(`[PESAJE] Análisis completado en ${duration}ms:`, data)
 
       return {
         esAnomalo: data.esAnomalo,
@@ -152,10 +157,9 @@ export function PesajeItemCard({
       const isTimeout = error instanceof Error && error.name === 'AbortError'
 
       console.error(isTimeout
-        ? '[PesajeItemCard] Tiempo de espera agotado para Gemini, usando fallback'
-        : '[PesajeItemCard] Error con Gemini, usando fallback:', error)
+        ? '[PESAJE] Error: Tiempo de espera agotado. Usando lógica local de emergencia.'
+        : '[PESAJE] Error en API Análisis. Usando lógica local de emergencia:', error)
 
-      // Fallback a lógica local
       return detectarAnomaliaLocal(pesoIngresado)
     }
   }
@@ -185,28 +189,33 @@ export function PesajeItemCard({
       }
     }
 
-    if (pesoIngresado > pesoSolicitadoKg * 2 && pesoIngresado > 5) {
+    // Detectar exceso significativo (más del 25% de exceso)
+    if (pesoIngresado > pesoSolicitadoKg * 1.25 && pesoIngresado > 2) {
       const excesoPct = ((pesoIngresado / pesoSolicitadoKg) - 1) * 100
+      console.log(`[PESAJE-LOCAL] Anomalía detectada: Exceso de ${excesoPct.toFixed(0)}%`)
       return {
         esAnomalo: true,
-        razon: `Pesaste ${excesoPct.toFixed(0)}% más de lo solicitado`,
+        razon: `El peso ingresado (${pesoIngresado}kg) excede significativamente lo solicitado (${pesoSolicitadoKg}kg).`,
         sugerencia: null,
-        confianza: 70,
+        confianza: 75,
         usandoIA: false
       }
     }
 
-    // Detectar peso significativamente menor (menos del 50% del solicitado)
-    if (pesoIngresado < pesoSolicitadoKg * 0.5 && pesoSolicitadoKg > 1) {
+    // Detectar faltante significativo (menos del 75% del solicitado)
+    if (pesoIngresado < pesoSolicitadoKg * 0.75 && pesoSolicitadoKg > 1) {
       const faltantePct = (1 - (pesoIngresado / pesoSolicitadoKg)) * 100
+      console.log(`[PESAJE-LOCAL] Anomalía detectada: Faltante de ${faltantePct.toFixed(0)}%`)
       return {
         esAnomalo: true,
-        razon: `Pesaste ${faltantePct.toFixed(0)}% menos de lo solicitado`,
+        razon: `El peso ingresado (${pesoIngresado}kg) es mucho menor a lo solicitado (${pesoSolicitadoKg}kg).`,
         sugerencia: null,
-        confianza: 70,
+        confianza: 75,
         usandoIA: false
       }
     }
+
+    console.log('[PESAJE-LOCAL] Peso validado como CORRECTO por lógica local.')
 
     return {
       esAnomalo: false,
@@ -228,6 +237,7 @@ export function PesajeItemCard({
       const resultado = await analizarPesoConGemini(peso)
 
       if (resultado.esAnomalo) {
+        console.log('[PESAJE] Anomalía confirmada. Mostrando diálogo de confirmación.')
         setAnomalyInfo({
           pesoIngresado: peso,
           pesoSolicitado: pesoSolicitadoKg,
@@ -238,8 +248,12 @@ export function PesajeItemCard({
         })
         setShowAnomalyDialog(true)
       } else {
+        console.log('[PESAJE] Peso validado. Procediendo a guardar...')
         await onAplicarPeso(peso)
       }
+    } catch (e) {
+      console.error('[PESAJE] Error crítico en handleAplicarPesoConValidacion:', e)
+      toast.error('Error al intentar aplicar el peso. Revisa la consola.')
     } finally {
       setIsAnalyzing(false)
     }

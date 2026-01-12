@@ -13,6 +13,8 @@ export async function POST(request: NextRequest) {
             )
         }
 
+        console.log(`[API analizar-peso] Iniciando análisis para: ${body.productoNombre} (Ingresado: ${body.pesoIngresado}, Solicitado: ${body.pesoSolicitado})`)
+
         // Analizar con Gemini AI
         const resultado = await analizarPesoConIA({
             productoNombre: body.productoNombre,
@@ -20,6 +22,8 @@ export async function POST(request: NextRequest) {
             pesoIngresado: body.pesoIngresado,
             unidad: body.unidad || 'kg'
         })
+
+        console.log(`[API analizar-peso] Resultado para ${body.productoNombre}:`, resultado)
 
         return NextResponse.json({
             success: true,
