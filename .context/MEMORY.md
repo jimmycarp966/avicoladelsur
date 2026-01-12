@@ -4,6 +4,13 @@ Este documento registra la evolución del sistema, decisiones críticas y leccio
 
 ## 📅 Enero 2026
 
+### Sesión: Fix Conversión Mayorista Pesable (Hotfix)
+- **Fecha**: 2026-01-12
+- **Problema**: Items pesables para clientes mayoristas aplicaban incorrectamente conversión por bulto (1 caja = 10kg) ignorando el peso real de balanza.
+- **Solución**: Se ajustó `fn_convertir_presupuesto_a_pedido` para priorizar siempre `peso_final` si el item es pesable, independientemente de la lista de precios.
+- **Aprendizaje**: La lógica de "Venta Mayorista" no debe anular la propiedad física de "Pesable". El peso real tiene prelación sobre la conversión teórica.
+
+
 ### Sesión: Implementación Athena Framework
 - **Fecha**: 2026-01-08
 - **Decisión**: Se adoptó la estructura de Athena (`.framework`, `.context`, `.agent`) para mejorar la persistencia del contexto del agente.

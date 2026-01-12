@@ -55,6 +55,10 @@ interface PresupuestoFormProps {
     venta_mayor_habilitada?: boolean;
     unidad_mayor_nombre?: string;
     kg_por_unidad_mayor?: number;
+    // Campos de stock
+    stock_real?: number;
+    stock_reservado?: number;
+    stock_disponible?: number;
   }>
   zonas: Array<{ id: string; nombre: string }>
 }

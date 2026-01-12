@@ -22,6 +22,9 @@ interface ProductoItemRowProps {
     unidad_mayor_nombre?: string;
     kg_por_unidad_mayor?: number;
     unidad_medida: string;
+    stock_real?: number;
+    stock_reservado?: number;
+    stock_disponible?: number;
   }>
   productoSearch: string
   onProductoSearchChange: (value: string) => void
@@ -305,6 +308,11 @@ const ProductoItemRow = memo(function ProductoItemRow({
                       {listaFinal.map((producto) => (
                         <SelectItem key={producto.id} value={producto.id}>
                           {producto.codigo} - {producto.nombre} ({formatCurrency(producto.precio_venta)})
+                          {(producto.stock_real !== undefined || producto.stock_reservado !== undefined) && (
+                            <span className="ml-2 text-xs text-muted-foreground">
+                              [Stock: {producto.stock_real?.toFixed(1) || 0} | Prev: {producto.stock_reservado?.toFixed(1) || 0}]
+                            </span>
+                          )}
                         </SelectItem>
                       ))}
                       {filteredProductos.length >= MAX_RESULTS && productoSearch && (

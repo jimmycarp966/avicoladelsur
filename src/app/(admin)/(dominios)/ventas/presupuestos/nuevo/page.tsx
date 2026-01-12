@@ -22,12 +22,9 @@ async function NuevoPresupuestoContent() {
     .eq('activo', true)
     .order('nombre')
 
-  // Obtener productos
+  // Obtener productos con stock
   const { data: productos } = await supabase
-    .from('productos')
-    .select('id, codigo, nombre, precio_venta, unidad_medida, categoria, venta_mayor_habilitada, unidad_mayor_nombre, kg_por_unidad_mayor')
-    .eq('activo', true)
-    .order('nombre')
+    .rpc('fn_obtener_productos_con_stock_detalle')
 
   // Obtener zonas
   const { data: zonas } = await supabase
