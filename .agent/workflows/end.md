@@ -1,3 +1,6 @@
+---
+description: Cierra la sesión, guarda aprendizajes y actualiza documentación
+---
 # 🏁 Workflow: End Session (/end)
 
 Este flujo asegura que todo el progreso y conocimiento generado se guarde correctamente.

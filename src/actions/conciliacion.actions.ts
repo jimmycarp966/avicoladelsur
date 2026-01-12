@@ -205,24 +205,36 @@ export async function procesarConciliacionCompletaAction(formData: FormData): Pr
             }
         }
 
+        // Crear un mapa de errores por nombre de archivo para evitar desincronización de índices
+        const erroresPorArchivo = new Map<string, string>()
+        comprobantesParseados.forEach(c => {
+            if (c.error) {
+                erroresPorArchivo.set(c.archivo, c.error)
+            }
+        })
+
         // 8. Guardar comprobantes en BD
         console.log('[Conciliación Server] Paso 8: Guardando comprobantes en BD...')
-        const comprobantesParaDb = resultadosValidacion.map((r, i) => ({
-            sesion_id: sesionId,
-            fecha: r.comprobante.fecha || format(new Date(), 'yyyy-MM-dd'),
-            monto: r.comprobante.monto,
-            dni_cuit: r.comprobante.dni_cuit,
-            referencia: r.comprobante.referencia,
-            descripcion: r.comprobante.descripcion,
-            estado_validacion: r.estado,
-            cliente_id: r.cliente?.id || null,
-            movimiento_match_id: r.movimiento_match?.id || null,
-            confianza_score: r.confianza_score / 100,
-            origen: 'manual' as const,
-            acreditado: false,
-            notas: comprobantesParseados[i].error || null,
-            etiquetas: r.etiquetas || []
-        }))
+        const comprobantesParaDb = resultadosValidacion.map((r) => {
+            const errorParseo = r.comprobante.archivo_origen ? erroresPorArchivo.get(r.comprobante.archivo_origen) : null
+
+            return {
+                sesion_id: sesionId,
+                fecha: r.comprobante.fecha || format(new Date(), 'yyyy-MM-dd'),
+                monto: r.comprobante.monto,
+                dni_cuit: r.comprobante.dni_cuit,
+                referencia: r.comprobante.referencia,
+                descripcion: r.comprobante.descripcion,
+                estado_validacion: r.estado,
+                cliente_id: r.cliente?.id || null,
+                movimiento_match_id: r.movimiento_match?.id || null,
+                confianza_score: r.confianza_score / 100,
+                origen: 'manual' as const,
+                acreditado: false,
+                notas: errorParseo || r.error || null,
+                etiquetas: r.etiquetas || []
+            }
+        })
         console.log('[Conciliación Server] Comprobantes a guardar:', comprobantesParaDb.length)
 
         const { data: comprobantesGuardados, error: errorGuardarComp } = await supabase
@@ -237,17 +249,27 @@ export async function procesarConciliacionCompletaAction(formData: FormData): Pr
 
         // 9. Acreditar saldos a clientes validados
         console.log('[Conciliación Server] Paso 9: Acreditando saldos...')
+        // Usamos comprobantesParaDb porque Supabase no garantiza el orden de retorno
         const pagosParaAcreditar = (comprobantesGuardados || [])
-            .filter((c, i) =>
-                c.cliente_id &&
-                resultadosValidacion[i]?.estado === 'validado'
-            )
-            .map(c => ({
-                clienteId: c.cliente_id!,
-                monto: c.monto,
-                referencia: c.referencia || '',
-                comprobanteId: c.id
-            }))
+            .map(c => {
+                // Buscamos el resultado original por monto y referencia para confirmar que se puede acreditar
+                const res = resultadosValidacion.find(r =>
+                    r.comprobante.monto === c.monto &&
+                    r.comprobante.referencia === c.referencia &&
+                    r.cliente?.id === c.cliente_id
+                )
+
+                if (c.cliente_id && res?.estado === 'validado') {
+                    return {
+                        clienteId: c.cliente_id!,
+                        monto: c.monto,
+                        referencia: c.referencia || '',
+                        comprobanteId: c.id
+                    }
+                }
+                return null
+            })
+            .filter((p): p is NonNullable<typeof p> => p !== null)
         console.log('[Conciliación Server] Pagos a acreditar:', pagosParaAcreditar.length)
         pagosParaAcreditar.forEach((p, i) => {
             console.log(`[Conciliación Server]   Pago ${i + 1}: Cliente=${p.clienteId}, Monto=$${p.monto}, Ref=${p.referencia}`)
@@ -283,7 +305,7 @@ export async function procesarConciliacionCompletaAction(formData: FormData): Pr
             no_encontrados: resultadosValidacion.filter(r => r.estado === 'no_encontrado').length,
             sin_cliente: resultadosValidacion.filter(r => r.estado === 'sin_cliente').length,
             errores: resultadosValidacion.filter(r => r.estado === 'error').length,
-            monto_total_acreditado: resultadoAcreditacion.montoTotal,
+            monto_total_acreditado: resultadoAcreditacion.montoTotal || 0,
             detalles: resultadosValidacion
         }
         console.log('[Conciliación Server] Resumen calculado:')

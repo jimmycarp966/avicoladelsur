@@ -9,6 +9,52 @@ import { GEMINI_MODEL_PRO, GEMINI_MODEL_FLASH } from "@/lib/constants/gemini-mod
 const apiKey = config.googleCloud.gemini.apiKey || process.env.GOOGLE_GEMINI_API_KEY
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null
 
+/**
+ * Limpia un string de monto para convertirlo a número de forma robusta.
+ * Maneja formatos: "14.000,00", "14,000.00", "14000.00", "$14.000"
+ */
+function limpiarMonto(montoStr: string | number): number {
+    if (typeof montoStr === 'number') return montoStr;
+    if (!montoStr) return 0;
+
+    // Eliminar símbolos de moneda y espacios
+    let limpio = montoStr.replace(/[$€\s]/g, '');
+
+    // Caso común en Argentina: 14.000,50 (Punto para miles, coma para decimales)
+    // Si tiene coma y punto, y la coma está al final (decimal)
+    if (limpio.includes(',') && limpio.includes('.')) {
+        const posComa = limpio.lastIndexOf(',');
+        const posPunto = limpio.lastIndexOf('.');
+        if (posComa > posPunto) {
+            // Estilo ES/AR: 1.000,00 -> 1000.00
+            limpio = limpio.replace(/\./g, '').replace(',', '.');
+        } else {
+            // Estilo EN/US: 1,000.00 -> 1000.00
+            limpio = limpio.replace(/,/g, '');
+        }
+    } else if (limpio.includes(',')) {
+        // Solo tiene coma: si hay exactamente 3 dígitos después, es probable que sea miles (ej: 14,000)
+        // en lugar de decimal (ej: 14,00). 
+        const parts = limpio.split(',');
+        const lastPart = parts[parts.length - 1];
+        if (lastPart.length === 3) {
+            limpio = limpio.replace(/,/g, '');
+        } else {
+            limpio = limpio.replace(',', '.');
+        }
+    } else if (limpio.includes('.')) {
+        // Solo tiene punto: igual que la coma, si hay 3 dígitos es miles.
+        const parts = limpio.split('.');
+        const lastPart = parts[parts.length - 1];
+        if (lastPart.length === 3) {
+            limpio = limpio.replace(/\./g, '');
+        }
+    }
+
+    const resultado = parseFloat(limpio);
+    return isNaN(resultado) ? 0 : resultado;
+}
+
 // ... (resto del código)
 
 // Modelo PRO para análisis profundo de documentos (PDFs, imágenes complejas)
@@ -98,7 +144,7 @@ export async function parsearSabanaBancaria(file: File): Promise<MovimientoBanca
 
         const movimientos = data.map((d: Record<string, unknown>) => ({
             fecha: new Date(d.fecha as string),
-            monto: typeof d.monto === 'number' ? d.monto : parseFloat(String(d.monto)),
+            monto: limpiarMonto(d.monto as string | number),
             referencia: d.referencia as string || '',
             dni_cuit: d.dni_cuit ? String(d.dni_cuit).replace(/\D/g, '') : '',
             descripcion: d.descripcion as string || ''
@@ -197,12 +243,13 @@ export async function parsearComprobante(file: File): Promise<DatosComprobante> 
         const data = JSON.parse(text)
         const comprobante = {
             fecha: data.fecha || undefined,
-            monto: typeof data.monto === 'number' ? data.monto : parseFloat(String(data.monto)) || 0,
+            monto: limpiarMonto(data.monto),
             dni_cuit: data.dni_cuit ? String(data.dni_cuit).replace(/\D/g, '') : undefined,
             referencia: data.referencia || undefined,
             descripcion: data.descripcion || undefined,
             confianza_extraccion: data.confianza_extraccion || 0.5,
-            campos_detectados: data.campos_detectados || []
+            campos_detectados: data.campos_detectados || [],
+            archivo_origen: file.name
         }
         console.log('[Parsers] Comprobante parseado:', JSON.stringify(comprobante))
         return comprobante
@@ -240,7 +287,7 @@ export async function parsearComprobantesEnLote(
             } catch (e) {
                 console.error(`[Parsers] ❌ ${file.name}:`, e)
                 return {
-                    datos: { monto: 0 } as DatosComprobante,
+                    datos: { monto: 0, archivo_origen: file.name } as DatosComprobante,
                     archivo: file.name,
                     error: e instanceof Error ? e.message : 'Error desconocido'
                 }
@@ -309,9 +356,9 @@ async function parsearCSV(file: File): Promise<MovimientoBancarioInput[]> {
         trim: true
     })
 
-    return records.map((row: Record<string, unknown>) => ({
+    return (records as any[]).map((row: any) => ({
         fecha: new Date(String(row.fecha || row.Fecha || row.Date)),
-        monto: parseFloat(String(row.monto || row.Monto || row.Amount || row.Importe)),
+        monto: limpiarMonto(row.monto || row.Monto || row.Amount || row.Importe),
         referencia: String(row.referencia || row.Referencia || row.Ref || ''),
         dni_cuit: String(row.dni || row.cuit || row.dni_cuit || ''),
         descripcion: String(row.descripcion || row.Descripcion || row.Concepto || '')

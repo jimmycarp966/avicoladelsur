@@ -18,7 +18,7 @@ async function NuevoPresupuestoContent() {
   // Obtener clientes
   const { data: clientes } = await supabase
     .from('clientes')
-    .select('id, nombre, telefono, zona_entrega, codigo')
+    .select('id, nombre, telefono, zona_entrega, zona_id, codigo, localidad:localidades(zona_id)')
     .eq('activo', true)
     .order('nombre')
 

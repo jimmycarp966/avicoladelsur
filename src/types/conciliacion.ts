@@ -84,6 +84,7 @@ export interface DatosComprobante {
   // Metadatos de extracción
   confianza_extraccion?: number
   campos_detectados?: string[]
+  archivo_origen?: string
   // Datos enriquecidos post-lookup para matching inteligente
   nombre_cliente_identificado?: string
 }

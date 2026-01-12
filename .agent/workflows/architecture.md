@@ -1,3 +1,6 @@
+---
+description: Lee todo para entender el sistema
+---
 # 🏗️ Workflow: Entender Arquitectura (/architecture)
 
 Este flujo proporciona una inmersión profunda en la estructura técnica del proyecto.

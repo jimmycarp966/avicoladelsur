@@ -26,7 +26,7 @@
 - **Inventario Distribuido**: Gestión multi-sucursal con transferencias y alertas de stock bajo.
 
 ### 💰 Finanzas y Control
-- **Conciliación Automatizada**: Motor de ingesta de extractos bancarios con matching inteligente.
+- **Conciliación Automatizada**: Motor de ingesta de extractos bancarios con matching inteligente y parser robusto multiformato.
 - **Tesorería Blindada**: Arqueos de caja ciegos y validación cruzada de rendiciones de choferes.
 - **Gestión de Crédito**: Cuentas corrientes con límites automáticos y cálculo de moras.
 
@@ -85,7 +85,7 @@
 - **Base de Datos**: Supabase (PostgreSQL) con **118+ migraciones** y funciones RPC optimizadas.
 - **Backend**: Next.js Server Actions (seguridad y performance).
 - **Frontend**: React 19, Tailwind CSS, Shadcn UI.
-- **Mapas**: Google Maps JavaScript API + Directions API.
+- **Mapas**: Google Maps JavaScript API (TMS) + Leaflet (Reportes Heatmap)
 - **Bot**: Integración nativa con Twilio/WhatsApp (sin servicios externos).
 - **Reportes**: Generación de PDF y Excel en servidor.
 - **Estado**: Zustand (solo estado global: sesión, notificaciones)

@@ -34,11 +34,6 @@ const nextConfig: NextConfig = {
     },
   },
 
-  // Configuración de Server Actions (Next 15/16)
-  serverActions: {
-    bodySizeLimit: '50mb',
-  },
-
   // Headers de caché para assets estáticos
   async headers() {
     return [

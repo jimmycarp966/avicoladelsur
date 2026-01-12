@@ -598,6 +598,26 @@ export async function obtenerClientePorIdAction(
       identificadores: identificadores || []
     }
 
+    // FIX: Si no hay zona_id pero hay localidad_id, obtener la zona de la localidad
+    // Esto es necesario porque el RPC devuelve el objeto raw sin joins
+    if (!clienteData.zona_id && clienteData.localidad_id) {
+      const { data: localidad } = await supabase
+        .from('localidades')
+        .select('zona_id')
+        .eq('id', clienteData.localidad_id)
+        .single()
+      
+      if (localidad && localidad.zona_id) {
+        clienteData.zona_id = localidad.zona_id
+        // También inyectar el objeto localidad por si el frontend lo busca ahí
+        if (!clienteData.localidad) {
+          clienteData.localidad = { zona_id: localidad.zona_id }
+        } else {
+          clienteData.localidad.zona_id = localidad.zona_id
+        }
+      }
+    }
+
     return {
       success: true,
       data: clienteData

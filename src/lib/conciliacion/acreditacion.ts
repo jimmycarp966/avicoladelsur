@@ -31,7 +31,7 @@ export async function acreditarSaldoCliente(
     sesionConciliacionId: string,
     notas?: string
 ): Promise<ResultadoAcreditacion> {
-    console.log(`[acreditarSaldoCliente] Iniciando acreditación para cliente ${clienteId}, monto ${monto}, referencia ${referencia}`)
+    console.log(`[acreditarSaldoCliente] Iniciando acreditación atómica para cliente ${clienteId}, monto ${monto}, referencia ${referencia}`)
 
     if (monto <= 0) {
         console.error(`[acreditarSaldoCliente] Error: Monto debe ser positivo para cliente ${clienteId}. Monto recibido: ${monto}`)
@@ -39,104 +39,35 @@ export async function acreditarSaldoCliente(
     }
 
     const supabase = await createClient()
-    const fechaHoy = format(new Date(), 'yyyy-MM-dd', { locale: es })
 
     try {
-        // 1. Obtener cuenta corriente del cliente
-        console.log(`[acreditarSaldoCliente] Buscando cuenta corriente para cliente ${clienteId}`)
-        const { data: cuentaCliente, error: errorCuenta } = await supabase
-            .from('cuentas_corrientes')
-            .select('id, saldo, limite_credito')
-            .eq('cliente_id', clienteId)
-            .maybeSingle()
+        // Llamada a la función RPC atómica que maneja CC y Caja
+        const { data, error } = await supabase.rpc('fn_acreditar_saldo_cliente_v2', {
+            p_cliente_id: clienteId,
+            p_monto: monto,
+            p_referencia: referencia,
+            p_sesion_id: sesionConciliacionId,
+            p_notas: notas
+        })
 
-        if (errorCuenta) {
-            console.error(`[acreditarSaldoCliente] Error obteniendo cuenta corriente para cliente ${clienteId}:`, errorCuenta)
-            return { success: false, error: 'Error al obtener cuenta corriente del cliente' }
+        if (error) {
+            console.error(`[acreditarSaldoCliente] Error RPC:`, error)
+            return { success: false, error: error.message }
         }
 
-        // Si no tiene cuenta corriente, intentar crearla
-        let cuentaId = cuentaCliente?.id
-        let saldoActual = cuentaCliente?.saldo || 0
-        console.log(`[acreditarSaldoCliente] Cuenta corriente encontrada: ${cuentaId || 'No existe, se creará'}, Saldo actual: ${saldoActual}`)
+        const result = data as { success: boolean, movimiento_id?: string, nuevo_saldo?: number, error?: string }
 
-
-        if (!cuentaId) {
-            console.log(`[acreditarSaldoCliente] Creando nueva cuenta corriente para cliente ${clienteId}`)
-            // Crear cuenta corriente para el cliente
-            const { data: nuevaCuenta, error: errorNueva } = await supabase
-                .from('cuentas_corrientes')
-                .insert({
-                    cliente_id: clienteId,
-                    saldo: 0,
-                    limite_credito: 0
-                })
-                .select('id')
-                .single()
-
-            if (errorNueva) {
-                console.error(`[acreditarSaldoCliente] Error creando cuenta corriente para cliente ${clienteId}:`, errorNueva)
-                return { success: false, error: 'Error al crear cuenta corriente para el cliente' }
-            }
-
-            cuentaId = nuevaCuenta.id
-            console.log(`[acreditarSaldoCliente] Nueva cuenta corriente creada con ID: ${cuentaId}`)
+        if (!result.success) {
+            console.error(`[acreditarSaldoCliente] Error en función SQL:`, result.error)
+            return { success: false, error: result.error }
         }
 
-        // 2. Registrar movimiento en cuentas_movimientos (abono = reduce deuda)
-        const descripcionMov = `Pago conciliado - ${referencia || 'Sin referencia'}`
-        console.log(`[acreditarSaldoCliente] Registrando movimiento de abono en cuenta ${cuentaId} por ${monto}`)
-
-        const { data: movimiento, error: errorMov } = await supabase
-            .from('cuentas_movimientos')
-            .insert({
-                cuenta_corriente_id: cuentaId,
-                tipo: 'abono', // Abono = pago del cliente
-                monto: monto,
-                fecha: fechaHoy,
-                descripcion: descripcionMov,
-                referencia: `CONC-${sesionConciliacionId.slice(0, 8)}`,
-                notas: notas || `Acreditado automáticamente por conciliación bancaria`
-            })
-            .select('id')
-            .single()
-
-        if (errorMov) {
-            console.error(`[acreditarSaldoCliente] Error registrando movimiento para cuenta ${cuentaId}:`, errorMov)
-            return { success: false, error: 'Error al registrar movimiento en cuenta corriente' }
-        }
-        console.log(`[acreditarSaldoCliente] Movimiento registrado con ID: ${movimiento.id}`)
-
-
-        // 3. Actualizar saldo de la cuenta corriente (reducir deuda)
-        const nuevoSaldo = saldoActual - monto // Saldo negativo = a favor del cliente
-        console.log(`[acreditarSaldoCliente] Actualizando saldo de cuenta ${cuentaId}: ${saldoActual} -> ${nuevoSaldo}`)
-
-        const { error: errorUpdate } = await supabase
-            .from('cuentas_corrientes')
-            .update({
-                saldo: nuevoSaldo,
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', cuentaId)
-
-        if (errorUpdate) {
-            console.error(`[acreditarSaldoCliente] Error actualizando saldo para cuenta ${cuentaId}:`, errorUpdate)
-            // No fallar completamente, el movimiento ya se registró
-            // Considerar revertir el movimiento si esto es crítico
-        } else {
-            console.log(`[acreditarSaldoCliente] Saldo de cuenta ${cuentaId} actualizado a ${nuevoSaldo}`)
-        }
-
-
-        // 4. (Opcional) Registrar ingreso en caja central
-        // Esto depende de si quieren que afecte la caja automáticamente
-        await registrarIngresoCaja(monto, clienteId, referencia, sesionConciliacionId)
+        console.log(`[acreditarSaldoCliente] ✅ Acreditación exitosa. Movimiento: ${result.movimiento_id}, Nuevo Saldo: ${result.nuevo_saldo}`)
 
         return {
             success: true,
-            movimientoId: movimiento.id,
-            nuevoSaldo
+            movimientoId: result.movimiento_id,
+            nuevoSaldo: result.nuevo_saldo
         }
 
     } catch (error) {

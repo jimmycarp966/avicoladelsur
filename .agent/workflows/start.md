@@ -1,3 +1,6 @@
+---
+description: Inicializa el contexto del agente para trabajar en Avícola del Sur
+---
 # 🚀 Workflow: Start Session (/start)
 
 Este flujo inicializa el contexto de la IA para trabajar en Avícola del Sur.
