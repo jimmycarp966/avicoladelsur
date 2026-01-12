@@ -112,7 +112,13 @@ export function PesajeItemCard({
     confianza: number
     usandoIA: boolean
   }> => {
+    // Timeout de 8 segundos para evitar bloqueos infinitos
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 8000)
+
     try {
+      console.log(`[PESAJE] Analizando peso: ${pesoIngresado}kg para ${item.producto?.nombre} (solicitado: ${pesoSolicitadoKg}kg)`)
+
       const response = await fetch('/api/almacen/analizar-peso', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -121,14 +127,18 @@ export function PesajeItemCard({
           pesoSolicitado: pesoSolicitadoKg,
           pesoIngresado: pesoIngresado,
           unidad: 'kg'
-        })
+        }),
+        signal: controller.signal
       })
 
+      clearTimeout(timeoutId)
+
       if (!response.ok) {
-        throw new Error('Error en API')
+        throw new Error(`Error en API: ${response.status} ${response.statusText}`)
       }
 
       const data = await response.json()
+      console.log('[PESAJE] Resultado análisis:', data)
 
       return {
         esAnomalo: data.esAnomalo,
@@ -138,7 +148,13 @@ export function PesajeItemCard({
         usandoIA: true
       }
     } catch (error) {
-      console.error('[PesajeItemCard] Error con Gemini, usando fallback:', error)
+      clearTimeout(timeoutId)
+      const isTimeout = error instanceof Error && error.name === 'AbortError'
+
+      console.error(isTimeout
+        ? '[PesajeItemCard] Tiempo de espera agotado para Gemini, usando fallback'
+        : '[PesajeItemCard] Error con Gemini, usando fallback:', error)
+
       // Fallback a lógica local
       return detectarAnomaliaLocal(pesoIngresado)
     }
@@ -229,33 +245,6 @@ export function PesajeItemCard({
     }
   }
 
-  // Handler para verificar anomalía al perder foco (onBlur)
-  const handleBlur = async () => {
-    const peso = parseFloat(pesoInput)
-    if (isNaN(peso) || peso <= 0) return
-
-    // Evitar re-analizar si ya se mostró diálogo o si el peso no cambió significativamente
-    // (Podríamos agregar más lógica aquí para no spammear)
-
-    setIsAnalyzing(true)
-    try {
-      const resultado = await analizarPesoConGemini(peso)
-
-      if (resultado.esAnomalo) {
-        setAnomalyInfo({
-          pesoIngresado: peso,
-          pesoSolicitado: pesoSolicitadoKg,
-          razon: resultado.razon,
-          sugerencia: resultado.sugerencia,
-          confianza: resultado.confianza,
-          usandoIA: resultado.usandoIA
-        })
-        setShowAnomalyDialog(true)
-      }
-    } finally {
-      setIsAnalyzing(false)
-    }
-  }
 
   // Confirmar aplicación de peso a pesar de la anomalía
   const confirmarPesoAnomalo = async () => {
@@ -431,7 +420,6 @@ export function PesajeItemCard({
                   placeholder="0.00"
                   value={pesoInput}
                   onChange={(e) => setPesoInput(e.target.value)}
-                  onBlur={handleBlur}
                   className="text-lg"
                   disabled={estaActualizando}
                 />

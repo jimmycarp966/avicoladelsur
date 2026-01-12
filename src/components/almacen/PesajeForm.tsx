@@ -76,19 +76,21 @@ export function PesajeForm({ presupuesto, itemsPesables, presupuestoId }: Pesaje
 
   // Helper para determinar si un item es pesable
   function esItemPesable(item: ItemPesable): boolean {
-    // Si es venta mayorista, NO es pesable (productos vienen en caja cerrada)
-    if (esVentaMayorista(item)) {
+    // Si es venta mayorista, usualmente NO es pesable (productos vienen en caja cerrada)
+    // EXCEPTO si es específicamente de categoría BALANZA
+    const esBalanza = item.producto?.categoria &&
+      typeof item.producto.categoria === 'string' &&
+      item.producto.categoria.toUpperCase().trim() === 'BALANZA'
+
+    if (esVentaMayorista(item) && !esBalanza) {
       return false
     }
 
-    if (item.pesable === true) {
+    if (item.pesable === true || esBalanza) {
       return true
     }
-    return Boolean(
-      item.producto?.categoria &&
-      typeof item.producto.categoria === 'string' &&
-      item.producto.categoria.toUpperCase().trim() === 'BALANZA'
-    )
+
+    return false
   }
 
   const itemsCompletados = itemsPesables.filter((item) => item.peso_final)
