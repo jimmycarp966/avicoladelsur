@@ -314,6 +314,11 @@ Endpoints que operan sin interfaz gráfica:
 
 ## 📝 Cambios Recientes (Últimos 5)
 
+### 2026-01-12 - Indicadores de Stock en Presupuestos
+- **Nueva Funcionalidad**: Se agregaron indicadores visuales de "Stock Real" y "Stock Preventivo" (Reservado) en el desplegable de selección de productos.
+- **Backend**: Implementada función RPC `fn_obtener_productos_con_stock_detalle` para cálculo eficiente de stock disponible vs real en una sola consulta.
+- **UX**: Mejora en la toma de decisiones del vendedor al visualizar disponibilidad real.
+
 ### 2026-01-12 - Fix Conversión Mayorista Pesable (Hotfix)
 - **Corrección Lógica**: Se ajustó `fn_convertir_presupuesto_a_pedido` para que los items mayoristas pesables (ej: Suprema) respeten el `peso_final` real de balanza en lugar de forzar una conversión estándar por bulto (1 caja = 10kg).
 - **Data Integrity**: Script de corrección para pedidos afectados.

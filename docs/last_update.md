@@ -1,17 +1,13 @@
-# Última Actualización del Sistema
+# Última Actualización de Documentación
 
-**Fecha:** 2026-01-12 (Hotfix)
-**Autor:** Antigravity
+**Fecha**: 2026-01-12 18:55
+**Archivos modificados detectados**:
+- src/app/(admin)/(dominios)/ventas/presupuestos/nuevo/page.tsx
+- src/app/(admin)/(dominios)/ventas/presupuestos/nuevo/presupuesto-form.tsx
+- src/app/(admin)/(dominios)/ventas/presupuestos/nuevo/producto-item-row.tsx
+- supabase/migrations/20260113_get_products_with_stock_details.sql
 
-## Resumen Técnico
-Se ajustó `fn_convertir_presupuesto_a_pedido` para corregir la conversión de items mayoristas pesables (evitando la sobrescritura del peso real por bultos estándar) y se mejoró `fn_obtener_pedido_completo` para una correcta visualización del resumen de pedido.
+**Resumen Técnico**:
+Se implementó `fn_obtener_productos_con_stock_detalle` y se actualizó el formulario de presupuestos para mostrar Stock Real y Preventivo en el selector de productos, mejorando la visibilidad del inventario para vendedores. Impacto: DB Schema (nueva función), Frontend.
 
-**Impacto:**
-- **Corrección Crítica**: Los pedidos mayoristas ahora reflejan el peso exacto cobrado.
-- **DB Schema**: Nuevas funciones SQL (migraciones).
-
-## Archivos Modificados
-- `supabase/migrations/20260112_fix_conversion_mayorista_pesable.sql`
-- `supabase/migrations/20260112_fix_obtener_pedido_completo_v2.sql`
-- `ARCHITECTURE_SUMMARY.md`
-- `docs/CHANGELOG.md`
+**Diagrama**: No se requieren cambios en el diagrama de arquitectura para esta funcionalidad de UI/DB interna.

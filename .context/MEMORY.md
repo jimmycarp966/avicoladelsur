@@ -11,7 +11,13 @@ Este documento registra la evolución del sistema, decisiones críticas y leccio
 - **Aprendizaje**: La lógica de "Venta Mayorista" no debe anular la propiedad física de "Pesable". El peso real tiene prelación sobre la conversión teórica.
 
 
-### Sesión: Implementación Athena Framework
+### Sesión: Indicadores de Stock y Lógica Preventiva
+- **Fecha**: 2026-01-12
+- **Necesidad**: Vendedores necesitaban diferenciar entre stock físico total y stock disponible (descontando reservas de presupuestos).
+- **Implementación**: Se creó `fn_obtener_productos_con_stock_detalle` para exponer `stock_real` (lotes) y `stock_reservado` (presupuestos activos).
+- **Aprendizaje**: El "Stock Preventivo" es efímero; vive en `stock_reservations` hasta que el presupuesto se convierte en pedido, momento en el cual se descuenta permanentemente de `lotes`.
+
+### Sesión: Fix Conversión Mayorista Pesable (Hotfix)
 - **Fecha**: 2026-01-08
 - **Decisión**: Se adoptó la estructura de Athena (`.framework`, `.context`, `.agent`) para mejorar la persistencia del contexto del agente.
 - **Resultado**: Estructura base creada. Flujos `/start` y `/end` definidos.
