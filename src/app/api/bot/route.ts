@@ -196,7 +196,7 @@ async function getCuentaCorriente(clienteId: string) {
 // ===========================================
 
 interface RegistroClienteEstado {
-  estado: 'esperando_nombre' | 'esperando_direccion' | 'esperando_localidad'
+  estado: 'esperando_nombre' | 'esperando_direccion' | 'esperando_zona'
   nombre?: string
   apellido?: string
   direccion?: string
@@ -238,14 +238,18 @@ function limpiarEstadosExpirados() {
   }
 }
 
-// Función auxiliar para obtener localidades activas
-async function obtenerLocalidadesActivas() {
+// Función auxiliar para obtener zonas activas
+async function obtenerZonasActivas() {
   const supabase = await createClient()
 
-  const { data, error } = await supabase.rpc('fn_obtener_localidades_activas')
+  const { data, error } = await supabase
+    .from('zonas')
+    .select('id, nombre')
+    .eq('activo', true)
+    .order('nombre', { ascending: true })
 
   if (error) {
-    console.error('Error obteniendo localidades:', error)
+    console.error('Error obteniendo zonas:', error)
     return []
   }
 
@@ -312,43 +316,43 @@ Ejemplo: *Av. Corrientes 1234*`
       }
 
       estado.direccion = mensaje.trim()
-      estado.estado = 'esperando_localidad'
+      estado.estado = 'esperando_zona'
       estado.timestamp = Date.now()
 
-      // Obtener localidades
-      const localidades = await obtenerLocalidadesActivas()
+      // Obtener zonas
+      const zonas = await obtenerZonasActivas()
 
-      if (localidades.length === 0) {
+      if (zonas.length === 0) {
         registroClientesPendientes.delete(phoneNumber)
-        return '❌ No hay localidades disponibles en este momento. Por favor contacta con ventas.'
+        return '❌ No hay zonas disponibles en este momento. Por favor contacta con ventas.'
       }
 
-      // Guardar localidades en el estado para validación posterior
-      ; (estado as any).localidades = localidades
+      // Guardar zonas en el estado para validación posterior
+      ; (estado as any).zonas = zonas
 
-      let mensajeLocalidades = `✅ Dirección registrada: *${estado.direccion}*
+      let mensajeZonas = `✅ Dirección registrada: *${estado.direccion}*
 
 📝 *Paso 3 de 3*
-Selecciona tu *localidad* (responde con el número):
+Selecciona tu *zona* (responde con el número):
 
 `
-      localidades.forEach((loc: any, index: number) => {
-        mensajeLocalidades += `${index + 1}. ${loc.nombre} - Zona ${loc.zona_nombre}\n`
+      zonas.forEach((zona: any, index: number) => {
+        mensajeZonas += `${index + 1}. ${zona.nombre}\n`
       })
-      mensajeLocalidades += `\nResponde con el número de tu localidad.`
+      mensajeZonas += `\nResponde con el número de tu zona.`
 
-      return mensajeLocalidades
+      return mensajeZonas
     }
 
-    case 'esperando_localidad': {
+    case 'esperando_zona': {
       const numero = parseInt(mensaje.trim())
-      const localidades = (estado as any).localidades || []
+      const zonas = (estado as any).zonas || []
 
-      if (isNaN(numero) || numero < 1 || numero > localidades.length) {
-        return `❌ Número inválido. Por favor responde con un número entre 1 y ${localidades.length}.`
+      if (isNaN(numero) || numero < 1 || numero > zonas.length) {
+        return `❌ Número inválido. Por favor responde con un número entre 1 y ${zonas.length}.`
       }
 
-      const localidadSeleccionada = localidades[numero - 1]
+      const zonaSeleccionada = zonas[numero - 1]
 
       // Crear cliente
       const resultado = await crearClienteDesdeBotAction({
@@ -356,7 +360,7 @@ Selecciona tu *localidad* (responde con el número):
         apellido: estado.apellido,
         whatsapp: phoneNumber,
         direccion: estado.direccion!,
-        localidad_id: localidadSeleccionada.id
+        zona_id: zonaSeleccionada.id
       })
 
       if (!resultado.success || !resultado.data) {

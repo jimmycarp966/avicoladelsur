@@ -119,24 +119,24 @@ export async function crearClienteDesdeBotAction(
     telefono?: string
     whatsapp: string
     direccion: string
-    localidad_id: string
+    zona_id: string
   }
 ): Promise<ApiResponse<{ clienteId: string; cliente: any }>> {
   try {
     const supabase = await createClient()
 
-    // Validar que la localidad existe y está activa
-    const { data: localidad, error: localidadError } = await supabase
-      .from('localidades')
-      .select('id, nombre, zona_id')
-      .eq('id', clienteData.localidad_id)
+    // Validar que la zona existe y está activa
+    const { data: zona, error: zonaError } = await supabase
+      .from('zonas')
+      .select('id, nombre')
+      .eq('id', clienteData.zona_id)
       .eq('activo', true)
       .single()
 
-    if (localidadError || !localidad) {
+    if (zonaError || !zona) {
       return {
         success: false,
-        error: 'Localidad no válida o no encontrada',
+        error: 'Zona no válida o no encontrada',
       }
     }
 
@@ -169,7 +169,6 @@ export async function crearClienteDesdeBotAction(
       contador++
     }
 
-    // Obtener zona_id de la localidad
     const { data: cliente, error } = await supabase
       .from('clientes')
       .insert({
@@ -178,7 +177,7 @@ export async function crearClienteDesdeBotAction(
         telefono: clienteData.telefono || clienteData.whatsapp,
         whatsapp: clienteData.whatsapp,
         direccion: clienteData.direccion,
-        localidad_id: clienteData.localidad_id,
+        zona_entrega: zona.nombre,
         tipo_cliente: 'minorista',
         limite_credito: 0,
         activo: true,
