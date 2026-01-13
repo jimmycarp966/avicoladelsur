@@ -420,7 +420,10 @@ Sistema completo de presupuestos que transforma el proceso operativo:
 **Flujo**: `Bot/Vendedor → Presupuesto (Auto: Turno + Fecha + Estado) → Almacén (Pesaje) → Pedido → Reparto → Tesorería`
 
 ### Características Principales
-- 🤖 **Bot Actualizado**: Crea presupuestos en lugar de pedidos directos
+- 🤖 **Bot WhatsApp con Vertex AI**: Gemini 1.5 Flash para conversaciones naturales 24/7
+  - 5 tools: crear-presupuesto, consultar-stock, consultar-estado, consultar-saldo, crear-reclamo
+  - Memory Bank con customer context persistente (productos_frecuentes, preferencias)
+  - Creación de presupuestos vía RPC sin validación de usuario (bypass)
 - 📋 **Números Únicos**: PRES-YYYYMMDD-XXXX con links de seguimiento
 - ⏰ **Asignación Automática de Turno**: Al crear presupuesto, se asigna turno según horario:
   - Antes de 5:00 AM → Turno mañana del mismo día

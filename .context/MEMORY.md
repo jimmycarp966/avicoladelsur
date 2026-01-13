@@ -4,6 +4,15 @@ Este documento registra la evolución del sistema, decisiones críticas y leccio
 
 ## 📅 Enero 2026
 
+### Sesión: Vertex AI Agent Builder Integration
+- **Fecha**: 2026-01-13
+- **Implementación**: Bot WhatsApp con Gemini 1.5 Flash para conversaciones naturales 24/7
+- **Tools**: 5 tools implementadas (crear-presupuesto, consultar-stock, consultar-estado, consultar-saldo, crear-reclamo)
+- **Memory Bank**: `bot_sessions.customer_context` persistente (productos_frecuentes, preferencias, metadata)
+- **Autenticación**: `GOOGLE_CLOUD_CREDENTIALS_BASE64` en Vercel (service account key en base64)
+- **Bypass**: Creación de presupuestos vía RPC `fn_crear_presupuesto_desde_bot` sin validación de usuario
+- **Aprendizaje**: Para bots sin usuario autenticado, usar `createAdminClient()` y llamar directamente a RPCs que ya manejan lógica de negocio
+
 ### Sesión: Fix Conversión Mayorista Pesable (Hotfix)
 - **Fecha**: 2026-01-12
 - **Problema**: Items pesables para clientes mayoristas aplicaban incorrectamente conversión por bulto (1 caja = 10kg) ignorando el peso real de balanza.

@@ -323,6 +323,13 @@ Endpoints que operan sin interfaz gráfica:
 
 > Histórico completo disponible en [ARCHITECTURE.md#📝-cambios-recientes](./ARCHITECTURE.md#📝-cambios-recientes).
 
+### 2026-01-13 · Vertex AI Agent Builder Integration
+- Bot WhatsApp con Gemini 1.5 Flash para conversaciones naturales 24/7
+- 5 tools: crear-presupuesto, consultar-stock, consultar-estado, consultar-saldo, crear-reclamo
+- Memory Bank con customer context persistente (productos_frecuentes, preferencias)
+- Creación de presupuestos vía RPC sin validación de usuario (bypass)
+- Script de prueba `test-bot-webhook.ts` para testing local
+
 ### 2026-01-12 · Indicadores de Stock en Presupuestos
 - Indicadores visuales de Stock Real/Preventivo en selección de productos.
 - Nueva RPC `fn_obtener_productos_con_stock_detalle` para cálculo unificado.
