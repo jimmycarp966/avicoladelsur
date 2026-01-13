@@ -390,6 +390,11 @@ export async function sendWhatsAppMessage(
  * Verifica si WhatsApp Meta está configurado y disponible
  */
 export function isWhatsAppMetaAvailable(): boolean {
+  const provider = process.env.WHATSAPP_PROVIDER
+  if (provider === 'twilio') {
+    return false
+  }
+
   const config = getMetaConfig()
   return config !== null && config.enableButtons !== false
 }

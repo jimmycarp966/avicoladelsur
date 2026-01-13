@@ -145,7 +145,11 @@ Responde SOLO con el nombre de la intención (ej: "pedido", "consulta_stock", et
 
             if (result.success) {
               return {
-                text: `¡Perfecto! Creé tu presupuesto ${result.numero_presupuesto} por un total de $${result.total_estimado}. Te confirmo los detalles en breve.`,
+                text: `¡Perfecto! Creé tu presupuesto ${result.numero_presupuesto} por un total de $${result.total_estimado}.
+
+¿Para cuándo lo querés (hoy/mañana) y en qué turno (mañana/tarde)?
+
+Si querés, te sugiero 1 opción para aprovechar el envío.`,
                 context: { presupuesto_id: result.presupuesto_id }
               }
             } else {
@@ -167,7 +171,7 @@ Responde SOLO con el nombre de la intención (ej: "pedido", "consulta_stock", et
             .map(p => `- ${p.nombre}: ${p.stock_disponible} ${p.unidad_medida}`)
             .join('\n')
           return {
-            text: `Tenemos disponibles:\n${productosList}`
+            text: `Tenemos disponibles:\n${productosList}\n\n¿Querés que te arme un presupuesto con algo de esto?`
           }
         }
         break

@@ -4,6 +4,14 @@ Este documento registra la evolución del sistema, decisiones críticas y leccio
 
 ## 📅 Enero 2026
 
+### Sesión: Twilio-only + Unificación de Zonas + Bot Vertex-first
+- **Fecha**: 2026-01-13
+- **Zonas**: Unificación en Supabase de "Valles" → "Tafi del valle" (actualización de FKs y eliminación de duplicado)
+- **WhatsApp**: Modo Twilio-only por `WHATSAPP_PROVIDER=twilio` (Meta opcional)
+- **Notificaciones**: Envío por Twilio REST cuando el provider es Twilio
+- **Bot**: Webhook `/api/bot` prioriza Vertex AI (incluye saludos/ayuda), con venta consultiva no invasiva en prompt
+- **Pruebas**: `npm run build` + `npm run dev` + `npm run test:bot:webhook`
+
 ### Sesión: Vertex AI Agent Builder Integration
 - **Fecha**: 2026-01-13
 - **Implementación**: Bot WhatsApp con Gemini 1.5 Flash para conversaciones naturales 24/7

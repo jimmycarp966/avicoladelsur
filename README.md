@@ -100,6 +100,7 @@
 | `npm run typecheck` | Revisión estricta TS |
 | `npm run verificar-bot` | Diagnóstico de bot WhatsApp |
 | `npm run test:sucursales` | Suite rápida de POS sucursales |
+| `npm run test:bot:webhook` | Simula mensajes Twilio hacia `/api/bot` (prueba rápida del bot) |
 | `npm run supabase:migrate` | Aplica migraciones locales |
 | `./scripts/demo-presupuestos.sh` | Flujo Presupuesto→Pedido |
 | `./scripts/demo-rutas.sh` | Demostración optimización TMS |
@@ -114,7 +115,7 @@
 - **Backend**: Next.js Server Actions (seguridad y performance).
 - **Frontend**: React 19, Tailwind CSS, Shadcn UI.
 - **Mapas**: Google Maps JavaScript API (TMS) + Leaflet (Reportes Heatmap)
-- **Bot**: Integración nativa con WhatsApp (Meta) con fallback a Twilio.
+- **Bot**: WhatsApp por **Twilio** (Twilio-only por `WHATSAPP_PROVIDER=twilio`; integración Meta opcional)
 - **Reportes**: Generación de PDF y Excel en servidor.
 - **Estado**: Zustand (solo estado global: sesión, notificaciones)
 - **Formularios**: React Hook Form + Zod validation
@@ -127,7 +128,7 @@
 - **App Admin**: Backoffice (`src/app/(admin)`), con layout + sidebar.
 - **App Repartidor**: PWA móvil (`src/app/(repartidor)`), tracking GPS y entregas.
 - **App Sucursal**: POS y panel local (`src/app/sucursal`).
-- **Bot Vendedor**: Endpoint principal (`POST /api/bot`) + webhook Meta (`/api/webhooks/whatsapp-meta`).
+- **Bot Vendedor**: Endpoint principal (`POST /api/bot`) + webhook Meta (`/api/webhooks/whatsapp-meta`, opcional).
 
 ### Dominios de Negocio (Organización Funcional)
 1. **Almacén (WMS)**: Control de stock, lotes, picking, transferencias entre sucursales
@@ -273,7 +274,8 @@ scripts/                         # Scripts de automatización
 - **Nueva tabla**: `plan_rutas_semanal` con zona/día/turno/vehículo/capacidad
 - **Vehículos base**: Fiorino (600kg), Hilux (1500kg), F-4000 (4000kg) precargados
 - **UI completa**: `/reparto/planificacion` para crear/editar/eliminar planes semanales
-- **Asignación automática**: Pedidos se asignan a rutas planificadas según zona/turno/día
+- **Planificación operativa**: Se usa para planificar y visualizar asignaciones (zona/día/turno) en el módulo de Reparto
+- **Asignación de pedidos a ruta**: En el flujo de Almacén, se realiza por `zona_id + fecha + turno` vía RPC `fn_asignar_pedido_a_ruta` (no depende estrictamente del plan semanal)
 - **Validación capacidad**: Peso final ≤ capacidad del vehículo planificada
 
 ### 🤖 **Bot WhatsApp Automatizado**
@@ -732,7 +734,7 @@ Sistema mejorado con validaciones críticas y automatizaciones para mayor confia
   - `cancelado`: Notificación de cancelación con motivo
 - **Integración**: Automática en `crearPresupuestoAction()` y `confirmarPresupuestoAction()`
 - **Historial**: Nueva tabla `notificaciones_clientes` para auditoría completa
-- **Pendiente**: Integración final con Twilio WhatsApp API
+- **Proveedor**: Envío por Twilio (Twilio-only) o Meta según `WHATSAPP_PROVIDER`
 
 #### 6. ✅ Cálculo de Tiempos de Entrega
 - **Función**: `calcularTiempoEntrega(zonaId, turno, fechaEntrega)`
@@ -1445,7 +1447,8 @@ SUPABASE_SERVICE_ROLE_KEY=your-prod-service-key
 # Twilio (Bot de WhatsApp)
 TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 TWILIO_AUTH_TOKEN=your-twilio-auth-token
-TWILIO_WHATSAPP_NUMBER=+14155238886
+TWILIO_WHATSAPP_NUMBER=whatsapp:+14155238886
+WHATSAPP_PROVIDER=twilio
 BOTPRESS_WEBHOOK_TOKEN=your-random-secure-token
 
 # Google Maps (Rutas Optimizadas - Opcional)

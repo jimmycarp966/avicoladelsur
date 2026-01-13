@@ -323,6 +323,11 @@ Endpoints que operan sin interfaz gráfica:
 
 > Histórico completo disponible en [ARCHITECTURE.md#📝-cambios-recientes](./ARCHITECTURE.md#📝-cambios-recientes).
 
+### 2026-01-13 · Twilio-only + Unificación de Zonas + Bot Vertex-first
+- Unificación de zonas duplicadas ("Valles" → "Tafi del valle") en Supabase (actualizando FKs)
+- WhatsApp configurado para operar Twilio-only por `WHATSAPP_PROVIDER=twilio` (sin botones/listas de Meta)
+- Webhook `/api/bot` prioriza Vertex AI (incluye saludos/ayuda) y aplica venta consultiva no invasiva
+
 ### 2026-01-13 · Vertex AI Agent Builder Integration
 - Bot WhatsApp con Gemini 1.5 Flash para conversaciones naturales 24/7
 - 5 tools: crear-presupuesto, consultar-stock, consultar-estado, consultar-saldo, crear-reclamo
@@ -341,11 +346,3 @@ Endpoints que operan sin interfaz gráfica:
 ### 2026-01-12 · Fix Pesaje Mayorista
 - Corrección del cálculo de precios por unidad mayor vs kg totales.
 - Etiquetas dinámicas en UI según unidad configurada.
-
-### 2026-01-12 · Lógica de Pesables y Venta
-- Refactor SQL/Actions para `requiere_pesaje=true` en listas mayoristas.
-- Auto-selección de `zona_id` y listas al elegir cliente + migración masiva MAYORISTA.
-
-### 2026-01-12 · Mejoras UX Pedidos
-- Entregas muestran items agregados (JSONB en `fn_obtener_entregas_pedido`).
-- Resumen consolidado por producto + fix dependencias `leaflet`.

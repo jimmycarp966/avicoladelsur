@@ -57,12 +57,11 @@ supabase/
 
 | Fecha | Lección |
 |-------|---------|
+| 2026-01-13 | WhatsApp Twilio-only: setear `WHATSAPP_PROVIDER=twilio`; `isWhatsAppMetaAvailable()` debe respetarlo (no habilitar botones Meta) |
+| 2026-01-13 | Unificación de zonas: "Valles" fue migrada a "Tafi del valle" (actualizando FKs). Usar zonas como dominio (no `localidades`) |
 | 2026-01-13 | Vertex AI Bot: Llamar directamente a RPC `fn_crear_presupuesto_desde_bot` con `createAdminClient()` bypass validación de usuario |
 | 2026-01-13 | Vertex AI: Usar `GOOGLE_CLOUD_CREDENTIALS_BASE64` en Vercel (service account key en base64) |
 | 2026-01-13 | Vertex AI: Memory Bank en `bot_sessions.customer_context` (productos_frecuentes, preferencias, metadata) |
-| 2026-01-10 | Tabla `gastos` y `gastos_categorias` recreadas por hotfix |
-| 2026-01-08 | Coordenadas de clientes: usar `ST_X()` y `ST_Y()` de PostGIS |
-| 2026-01-08 | Campo correcto: `precio_lista_id` (no `lista_precio_id`) |
 | 2026-01-08 | RLS en `rutas_reparto` y `detalles_ruta` requiere política para inserts |
 | 2026-01-11 | Montos Conciliación: Usar `limpiarMonto()` para parsear strings monetarios |
 | 2026-01-11 | Acreditación: Siempre vía `fn_acreditar_saldo_cliente_v2` (atómica) |

@@ -1032,6 +1032,42 @@ async function handleTwilioWebhook(formData: FormData) {
   try {
     const bodyLower = body.toLowerCase()
 
+    function mapMessageForVertex(raw: string): string {
+      const v = (raw || '').trim()
+      if (!v) return v
+
+      // Compatibilidad con el viejo menú numérico
+      if (v === '1' || v.toLowerCase() === 'opcion 1') return 'Quiero ver productos disponibles'
+      if (v === '2' || v.toLowerCase() === 'opcion 2') return 'Quiero hacer un pedido / presupuesto'
+      if (v === '3' || v.toLowerCase() === 'opcion 3') return 'Quiero ver el estado de mis pedidos'
+      if (v === '4' || v.toLowerCase() === 'opcion 4') return 'Quiero hacer un reclamo'
+      if (v === '5' || v.toLowerCase() === 'opcion 5') return 'Quiero consultar mi saldo'
+
+      // Compatibilidad con IDs de botones (por si quedaran conversaciones viejas)
+      if (v === 'btn_menu') return 'menu'
+      if (v === 'btn_productos') return 'productos'
+      if (v === 'btn_presupuesto') return 'presupuesto'
+      if (v === 'btn_estado') return 'estado'
+
+      return v
+    }
+
+    const pending = pendingConfirmations.get(phoneNumber)
+    const isPendingConfirmationReply = Boolean(
+      pending &&
+        (
+          bodyLower === 'si' ||
+          bodyLower === 'sí' ||
+          bodyLower === 'confirmar' ||
+          bodyLower === 'confirmo' ||
+          bodyLower === 'no' ||
+          bodyLower === 'cancelar' ||
+          bodyLower === 'cancel'
+        )
+    )
+
+    let vertexHandled = false
+
     // Verificar si hay un registro en proceso (antes de cualquier otro comando)
     const registroEnProceso = registroClientesPendientes.get(phoneNumber)
     if (registroEnProceso) {
@@ -1089,20 +1125,21 @@ async function handleTwilioWebhook(formData: FormData) {
       }
     }
 
-    // Intentar usar Vertex AI Agent con tools PRIMERO (antes de comandos específicos)
-    // Solo si no es un comando explícito de menú o cancelación
-    const cliente = await findClienteByPhone(phoneNumber)
+    // Intentar usar Vertex AI Agent con tools PRIMERO (antes de comandos hardcodeados)
+    // Excepciones: flujos stateful (registro/reclamo ya manejados arriba) y confirmaciones pendientes
     const clienteId = cliente?.id
 
-    if (!bodyLower.includes('hola') && !bodyLower.includes('ayuda') && !bodyLower.includes('menu') &&
-        !bodyLower.includes('inicio') && !bodyLower.includes('cancelar') &&
-        !body.startsWith('prod_') && !body.startsWith('pedido_') &&
-        body !== '1' && body !== '2' && body !== '3' && body !== '4' && body !== '5' &&
-        !bodyLower.startsWith('opcion ') && !body.startsWith('btn_')) {
+    const shouldSkipVertex =
+      isPendingConfirmationReply ||
+      body.startsWith('prod_') ||
+      body.startsWith('pedido_')
 
+    if (!shouldSkipVertex) {
       try {
-        const vertexResponse = await processMessageWithTools(phoneNumber, body, clienteId)
+        const vertexInput = mapMessageForVertex(body)
+        const vertexResponse = await processMessageWithTools(phoneNumber, vertexInput, clienteId)
         responseMessage = vertexResponse.text || '[Vertex AI devolvió respuesta vacía]'
+        vertexHandled = true
       } catch (vertexError) {
         console.error('[Vertex AI] Error, usando fallback:', vertexError)
 
@@ -1182,13 +1219,28 @@ Ejemplo: *POLLO001 5*`
           // Respuesta de la IA para otros casos
           else if (respuestaSugerida) {
             responseMessage = respuestaSugerida
+
+            const isGreetingOrHelp =
+              bodyLower.includes('hola') ||
+              bodyLower.includes('ayuda') ||
+              bodyLower.includes('menu') ||
+              bodyLower.includes('inicio') ||
+              body === 'btn_menu'
+
+            // Si la IA ya respondió a un saludo/ayuda, no pisar con menú hardcodeado
+            if (isGreetingOrHelp) {
+              vertexHandled = true
+            }
           }
         }
       }
     }
 
+    if (vertexHandled) {
+      // Respuesta ya resuelta por Vertex, no ejecutar menú/flows hardcodeados
+    }
     // Comando: Hola / Ayuda
-    if (bodyLower.includes('hola') || bodyLower.includes('ayuda') || bodyLower.includes('menu') || bodyLower.includes('inicio') || body === 'btn_menu') {
+    else if (bodyLower.includes('hola') || bodyLower.includes('ayuda') || bodyLower.includes('menu') || bodyLower.includes('inicio') || body === 'btn_menu') {
       const saludo = nombreCliente ? `¡Hola ${nombreCliente}! 👋` : '¡Hola! 👋'
       const menuText = `${saludo} ¿En qué puedo ayudarte hoy?
 

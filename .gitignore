@@ -40,6 +40,9 @@ google-cloud-service-account.json
 !tsconfig.json
 !public/manifest.json
 
+# Base64 credential artifacts
+*.base64
+
 # vercel
 .vercel
 
