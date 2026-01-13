@@ -4,6 +4,27 @@ Este documento registra la evolución del sistema, decisiones críticas y leccio
 
 ## 📅 Enero 2026
 
+### Sesión: Flujo Cierre de Caja + Retiros Automáticos de Sucursales
+- **Fecha**: 2026-01-13
+- **Implementación**: Sistema de cierre de caja con arqueo detallado de billetes argentinos (100, 200, 500, 1000, 2000, 10000, 20000)
+- **Retiros Automáticos**: Cuando saldo_final > 50,000 ARS, se crea automáticamente un retiro en `rutas_retiros` para que el repartidor de la zona lo recoja
+- **Tablas**: `rutas_retiros` (retiros pendientes de validación), `arqueo_billetes` (detalle de billetes por cierre)
+- **Dashboard Repartidor**: `/repartidor/dashboard` muestra retiros y transferencias por zona asignada
+- **Validar Rutas**: Tesorería ve retiros con detalle de arqueo (esperado, real, diferencia, desglose de billetes)
+- **Zonas**: 3 sucursales → Monteros, 2 sucursales → Simoca
+- **MCP Supabase**: Uso de MCP para aplicar migraciones y scripts sin afectar producción
+- **Corrección Crítica**: El repartidor NO tiene `zona_id` en su perfil; las zonas se obtienen de las rutas asignadas hoy (no del usuario)
+- **Archivos**: `supabase/migrations/20260113_flujo_cierre_caja_retiros.sql`, `src/components/sucursales/ArqueoBilletesForm.tsx`, `src/actions/tesoreria.actions.ts` (cerrarCierreCajaAction), `src/app/(repartidor)/dashboard/page.tsx`
+- **Aprendizaje**: Para testing de DB sin afectar producción, usar consultas SELECT de verificación antes de modificar datos; MCP de Supabase permite aplicar migraciones de forma controlada; verificar el flujo real de datos antes de diseñar dashboards (repartidor obtiene zona de rutas, no de su perfil)
+
+### Sesión: Merma Líquida Proporcional + Optimización Cajones
+- **Fecha**: 2026-01-13
+- **Merma Líquida Proporcional**: `fn_completar_orden_produccion` ahora distribuye merma líquida entre productos generados usando `merma_real_kg` (factor = merma_total / peso_productos, excluye desperdicio sólido)
+- **Cajones en Producción**: UI autocalcula peso de salidas cuando el producto tiene `venta_mayor_habilitada = true`, usando `kg_por_unidad_mayor` (default 20 kg) y muestra badge + toggle para edición manual
+- **Activación Automática**: Migración activa `venta_mayor_habilitada`, `unidad_mayor_nombre='caja'`, `kg_por_unidad_mayor=20` para productos con "cajón/cajon/CAJ" en nombre/categoría/código
+- **Archivos**: `supabase/migrations/20260113_merma_liquida_proporcional.sql`, `src/app/(admin)/(dominios)/almacen/produccion/nueva/page.tsx`
+- **Aprendizaje**: Reutilizar campos existentes (`kg_por_unidad_mayor`) en lugar de crear nuevos; autocalcular con toggle manual mejora UX sin perder flexibilidad
+
 ### Sesión: Twilio-only + Unificación de Zonas + Bot Vertex-first
 - **Fecha**: 2026-01-13
 - **Zonas**: Unificación en Supabase de "Valles" → "Tafi del valle" (actualización de FKs y eliminación de duplicado)

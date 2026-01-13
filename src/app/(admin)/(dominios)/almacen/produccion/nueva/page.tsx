@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
+import { Switch } from '@/components/ui/switch'
 import {
     Select,
     SelectContent,
@@ -105,6 +106,7 @@ export default function NuevaOrdenProduccionPage() {
     const [pesoSalida, setPesoSalida] = useState('')
     const [busquedaSalida, setBusquedaSalida] = useState('') // Filtro de búsqueda
     const [destinoSalidaId, setDestinoSalidaId] = useState('') // Destino para este producto
+    const [pesoSalidaManual, setPesoSalidaManual] = useState(false)
 
     // Campos temporales para agregar ENTRADA (producto que entra al stock)
     const [productoEntradaId, setProductoEntradaId] = useState('')
@@ -180,6 +182,18 @@ export default function NuevaOrdenProduccionPage() {
         }
         cargarLotes()
     }, [productoSalidaId])
+
+    // Autocalcular peso para cajones (venta mayor) si no está habilitado el modo manual
+    useEffect(() => {
+        if (pesoSalidaManual) return
+        const producto = productos.find(p => p.id === productoSalidaId)
+        if (!producto?.venta_mayor_habilitada) return
+        const kgUnidad = (producto as any).kg_por_unidad_mayor ?? 20
+        const cantidad = parseFloat(cantidadSalida)
+        const qty = isNaN(cantidad) || cantidad <= 0 ? 1 : cantidad
+        const pesoAuto = qty * kgUnidad
+        setPesoSalida(pesoAuto.toFixed(3))
+    }, [productoSalidaId, cantidadSalida, pesoSalidaManual, productos])
 
 
 
@@ -684,6 +698,7 @@ export default function NuevaOrdenProduccionPage() {
                                 <Select value={productoSalidaId} onValueChange={(val) => {
                                     setProductoSalidaId(val)
                                     setBusquedaSalida('') // Limpiar búsqueda al seleccionar
+                                    setPesoSalidaManual(false)
                                 }}>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Seleccionar producto..." />
@@ -757,7 +772,25 @@ export default function NuevaOrdenProduccionPage() {
                                     placeholder="Ej: 200"
                                     value={pesoSalida}
                                     onChange={(e) => setPesoSalida(e.target.value)}
+                                    disabled={!pesoSalidaManual && productos.find(p => p.id === productoSalidaId)?.venta_mayor_habilitada === true}
                                 />
+                                <div className="mt-1 flex flex-col gap-1 text-xs text-muted-foreground">
+                                    {productos.find(p => p.id === productoSalidaId)?.venta_mayor_habilitada && (
+                                        <div className="flex items-center gap-2">
+                                            <Badge variant="outline">
+                                                1 {(productos.find(p => p.id === productoSalidaId)?.unidad_mayor_nombre || 'caja')} = {(productos.find(p => p.id === productoSalidaId) as any)?.kg_por_unidad_mayor ?? 20} kg
+                                            </Badge>
+                                            <span>Auto: {pesoSalida || '0'} kg</span>
+                                        </div>
+                                    )}
+                                    <div className="flex items-center gap-2">
+                                        <span>Editar peso manualmente</span>
+                                        <Switch
+                                            checked={pesoSalidaManual}
+                                            onCheckedChange={(checked) => setPesoSalidaManual(checked)}
+                                        />
+                                    </div>
+                                </div>
                             </div>
 
                             {/* Selector de destino para esta salida */}

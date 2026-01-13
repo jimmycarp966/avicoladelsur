@@ -12,10 +12,12 @@ import { toast } from 'sonner'
 interface ValidarRutasRealtimeProps {
     rutasIniciales: any[]
     cajas: any[]
+    retirosIniciales?: any[]
 }
 
-export function ValidarRutasRealtime({ rutasIniciales, cajas }: ValidarRutasRealtimeProps) {
+export function ValidarRutasRealtime({ rutasIniciales, cajas, retirosIniciales = [] }: ValidarRutasRealtimeProps) {
     const [rutas, setRutas] = useState(rutasIniciales)
+    const [retiros, setRetiros] = useState(retirosIniciales)
     const [isConnected, setIsConnected] = useState(false)
     const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
     const supabase = createClient()
@@ -358,6 +360,164 @@ export function ValidarRutasRealtime({ rutasIniciales, cajas }: ValidarRutasReal
 
                                     {/* Formulario de validación */}
                                     <ValidarRutaForm ruta={ruta} cajas={cajas || []} />
+                                </CardContent>
+                            </Card>
+                        )
+                    })}
+                </div>
+            )}
+
+            {/* Separador entre rutas y retiros */}
+            {rutas.length > 0 && retiros.length > 0 && (
+                <Separator className="my-6" />
+            )}
+
+            {/* Retiros de sucursales pendientes */}
+            {retiros.length > 0 && (
+                <div className="space-y-4">
+                    <h2 className="text-2xl font-bold flex items-center gap-2">
+                        <DollarSign className="h-6 w-6 text-green-600" />
+                        Retiros de Sucursales Pendientes
+                    </h2>
+                    <p className="text-muted-foreground">
+                        Dinero de sucursales que debe ser validado y acreditado en caja central
+                    </p>
+
+                    {retiros.map((retiro: any) => {
+                        const formatearMoneda = (monto: number) => {
+                            return new Intl.NumberFormat('es-AR', {
+                                style: 'currency',
+                                currency: 'ARS',
+                                minimumFractionDigits: 2
+                            }).format(monto)
+                        }
+
+                        const formatearFecha = (fecha: string) => {
+                            return new Date(fecha).toLocaleDateString('es-AR', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            })
+                        }
+
+                        return (
+                            <Card key={retiro.id} className="border-l-4 border-l-green-500">
+                                <CardHeader>
+                                    <div className="flex items-start justify-between">
+                                        <div>
+                                            <CardTitle className="flex items-center gap-2">
+                                                <DollarSign className="h-5 w-5 text-green-600" />
+                                                Retiro de {retiro.sucursal?.nombre}
+                                            </CardTitle>
+                                            <CardDescription className="mt-2">
+                                                <div className="flex flex-wrap gap-4 text-sm">
+                                                    <span>
+                                                        Fecha: {formatearFecha(retiro.created_at)}
+                                                    </span>
+                                                    {retiro.vehiculo && (
+                                                        <span>
+                                                            Vehículo: {retiro.vehiculo?.patente}
+                                                        </span>
+                                                    )}
+                                                    {retiro.chofer_nombre && (
+                                                        <span>
+                                                            Chofer: {retiro.chofer_nombre}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </CardDescription>
+                                        </div>
+                                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                            Pendiente
+                                        </Badge>
+                                    </div>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    {/* Monto del retiro */}
+                                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                                        <div className="flex items-center justify-between">
+                                            <h4 className="font-semibold text-green-900 flex items-center gap-2">
+                                                <DollarSign className="h-4 w-4" />
+                                                Monto del Retiro
+                                            </h4>
+                                            <span className="text-2xl font-bold text-green-900">
+                                                {formatearMoneda(retiro.monto)}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Detalle de arqueo si existe */}
+                                    {retiro.arqueo && (
+                                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                            <h4 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                                                <CheckCircle2 className="h-4 w-4" />
+                                                Detalle de Arqueo
+                                            </h4>
+                                            <div className="grid grid-cols-3 gap-2 mb-3">
+                                                <div className="p-2 bg-white rounded">
+                                                    <p className="text-xs text-muted-foreground">Esperado</p>
+                                                    <p className="font-semibold text-blue-900">{formatearMoneda(retiro.arqueo.esperado)}</p>
+                                                </div>
+                                                <div className="p-2 bg-white rounded">
+                                                    <p className="text-xs text-muted-foreground">Real</p>
+                                                    <p className="font-semibold text-blue-900">{formatearMoneda(retiro.arqueo.real)}</p>
+                                                </div>
+                                                <div className={`p-2 rounded ${
+                                                    retiro.arqueo.diferencia > 0 ? 'bg-green-100' :
+                                                    retiro.arqueo.diferencia < 0 ? 'bg-red-100' :
+                                                    'bg-white'
+                                                }`}>
+                                                    <p className="text-xs text-muted-foreground">Diferencia</p>
+                                                    <p className={`font-semibold ${
+                                                        retiro.arqueo.diferencia > 0 ? 'text-green-900' :
+                                                        retiro.arqueo.diferencia < 0 ? 'text-red-900' :
+                                                        'text-blue-900'
+                                                    }`}>
+                                                        {retiro.arqueo.diferencia > 0 ? '+' : ''}{formatearMoneda(retiro.arqueo.diferencia)}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {/* Desglose de billetes */}
+                                            {retiro.arqueo.billetes && retiro.arqueo.billetes.length > 0 && (
+                                                <div className="mt-3">
+                                                    <p className="text-sm font-medium mb-2">Desglose de billetes:</p>
+                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                                        {retiro.arqueo.billetes.map((billete: any, idx: number) => (
+                                                            <div key={idx} className="p-2 bg-white rounded text-sm">
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-muted-foreground">
+                                                                        ${billete.denominacion.toLocaleString('es-AR')}
+                                                                    </span>
+                                                                    <span className="font-medium">x{billete.cantidad}</span>
+                                                                </div>
+                                                                <div className="text-right font-semibold text-blue-900">
+                                                                    {formatearMoneda(billete.subtotal)}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Observaciones */}
+                                            {retiro.arqueo.observaciones && (
+                                                <div className="mt-3 p-2 bg-white rounded">
+                                                    <p className="text-sm font-medium mb-1">Observaciones:</p>
+                                                    <p className="text-sm text-muted-foreground">{retiro.arqueo.observaciones}</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Descripción del retiro */}
+                                    {retiro.descripcion && (
+                                        <div className="text-sm text-muted-foreground">
+                                            <span className="font-medium">Descripción:</span> {retiro.descripcion}
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
                         )

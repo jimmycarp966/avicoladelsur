@@ -10,6 +10,13 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Loader2, Lock, Calculator, Wallet } from 'lucide-react'
 import { cerrarCierreCajaAction } from '@/actions/tesoreria.actions'
 import { toast } from 'sonner'
+import { ArqueoBilletesForm } from './ArqueoBilletesForm'
+
+interface Billete {
+  denominacion: number
+  cantidad: number
+  subtotal: number
+}
 
 interface CerrarCajaDialogProps {
   open: boolean
@@ -44,6 +51,12 @@ export function CerrarCajaDialog({
   const [retiroTesoro, setRetiroTesoro] = useState('0')
   const [saldoFinal, setSaldoFinal] = useState('0')
 
+  // Arqueo de billetes
+  const [billetes, setBilletes] = useState<Billete[]>([])
+  const [arqueoReal, setArqueoReal] = useState(0)
+  const [arqueoDiferencia, setArqueoDiferencia] = useState(0)
+  const [arqueoObservaciones, setArqueoObservaciones] = useState('')
+
   // Calcular totales automáticamente
   const totalArqueo = parseFloat(arqueoEfectivo || '0') + 
                       parseFloat(arqueoTransferencia || '0') + 
@@ -52,6 +65,13 @@ export function CerrarCajaDialog({
   
   const saldoFinalCalculado = saldoInicial + totalIngresos - totalEgresos - parseFloat(retiroTesoro || '0')
   const diferencia = parseFloat(saldoFinal || '0') - saldoFinalCalculado
+
+  const handleArqueoChange = (nuevosBilletes: Billete[], total: number, diff: number, obs: string) => {
+    setBilletes(nuevosBilletes)
+    setArqueoReal(total)
+    setArqueoDiferencia(diff)
+    setArqueoObservaciones(obs)
+  }
 
   useEffect(() => {
     if (open) {
@@ -62,6 +82,10 @@ export function CerrarCajaDialog({
       setArqueoQr('0')
       setRetiroTesoro('0')
       setSaldoFinal(saldoFinalCalculado.toFixed(2))
+      setBilletes([])
+      setArqueoReal(0)
+      setArqueoDiferencia(0)
+      setArqueoObservaciones('')
       setError(null)
     }
   }, [open, saldoFinalCalculado])
@@ -69,6 +93,13 @@ export function CerrarCajaDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+
+    // Validar que si hay diferencia en el arqueo, haya observaciones
+    if (arqueoDiferencia !== 0 && !arqueoObservaciones.trim()) {
+      setError('Las observaciones son obligatorias cuando hay diferencia en el arqueo')
+      toast.error('Las observaciones son obligatorias cuando hay diferencia en el arqueo')
+      return
+    }
 
     startTransition(async () => {
       try {
@@ -84,6 +115,10 @@ export function CerrarCajaDialog({
         formData.append('arqueo_transferencia', arqueoTransferencia || '0')
         formData.append('arqueo_tarjeta', arqueoTarjeta || '0')
         formData.append('arqueo_qr', arqueoQr || '0')
+        formData.append('arqueo_billetes', JSON.stringify(billetes))
+        formData.append('arqueo_real', arqueoReal.toString())
+        formData.append('arqueo_diferencia', arqueoDiferencia.toString())
+        formData.append('arqueo_observaciones', arqueoObservaciones)
 
         const result = await cerrarCierreCajaAction(formData)
 
@@ -105,14 +140,14 @@ export function CerrarCajaDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Lock className="h-5 w-5" />
             Cerrar Caja
           </DialogTitle>
           <DialogDescription>
-            Registra el arqueo por métodos de pago y cierra la caja
+            Registra el arqueo por métodos de pago, arqueo de billetes y cierra la caja
           </DialogDescription>
         </DialogHeader>
 
@@ -215,6 +250,13 @@ export function CerrarCajaDialog({
               </CardContent>
             </Card>
           </div>
+
+          {/* Arqueo de billetes */}
+          <ArqueoBilletesForm
+            montoEsperado={parseFloat(saldoFinal || '0')}
+            onArqueoChange={handleArqueoChange}
+            disabled={isPending}
+          />
 
           {/* Retiro al tesoro y saldo final */}
           <div className="grid gap-4 md:grid-cols-2">

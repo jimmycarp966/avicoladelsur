@@ -323,6 +323,19 @@ Endpoints que operan sin interfaz gráfica:
 
 > Histórico completo disponible en [ARCHITECTURE.md#📝-cambios-recientes](./ARCHITECTURE.md#📝-cambios-recientes).
 
+### 2026-01-13 · Flujo Cierre de Caja + Retiros Automáticos de Sucursales
+- Sistema de cierre de caja con arqueo detallado de billetes argentinos (100, 200, 500, 1000, 2000, 10000, 20000)
+- Retiros automáticos cuando saldo_final > 50,000 ARS (monto fijo por sucursal)
+- Tablas: `rutas_retiros` (retiros pendientes de validación), `arqueo_billetes` (detalle de billetes)
+- Dashboard de repartidor `/repartidor/dashboard` con retiros y transferencias por zona
+- Validar Rutas muestra retiros con detalle de arqueo para tesorería
+- Zonas asignadas: 3 sucursales → Monteros, 2 sucursales → Simoca
+
+### 2026-01-13 · Merma Líquida Proporcional + Optimización Cajones
+- `fn_completar_orden_produccion` distribuye merma líquida proporcionalmente entre productos generados (`merma_real_kg`)
+- UI de producción autocalcula peso de cajones usando `kg_por_unidad_mayor` (20 kg por caja)
+- Activación automática de `venta_mayor_habilitada` para productos tipo "cajón" (migración)
+
 ### 2026-01-13 · Twilio-only + Unificación de Zonas + Bot Vertex-first
 - Unificación de zonas duplicadas ("Valles" → "Tafi del valle") en Supabase (actualizando FKs)
 - WhatsApp configurado para operar Twilio-only por `WHATSAPP_PROVIDER=twilio` (sin botones/listas de Meta)
@@ -342,7 +355,3 @@ Endpoints que operan sin interfaz gráfica:
 ### 2026-01-12 · Fix Conversión Mayorista Pesable
 - `fn_convertir_presupuesto_a_pedido` respeta `peso_final` real en mayoristas pesables.
 - Script de saneamiento ejecutado sobre pedidos afectados.
-
-### 2026-01-12 · Fix Pesaje Mayorista
-- Corrección del cálculo de precios por unidad mayor vs kg totales.
-- Etiquetas dinámicas en UI según unidad configurada.

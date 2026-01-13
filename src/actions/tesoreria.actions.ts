@@ -301,6 +301,12 @@ export async function cerrarCierreCajaAction(formData: FormData) {
       arqueo_qr: parseFloat(rawData.arqueo_qr as string) || 0,
     })
 
+    // Parsear datos de arqueo de billetes
+    const arqueoBilletes = JSON.parse(rawData.arqueo_billetes as string || '[]')
+    const arqueoReal = parseFloat(rawData.arqueo_real as string) || 0
+    const arqueoDiferencia = parseFloat(rawData.arqueo_diferencia as string) || 0
+    const arqueoObservaciones = rawData.arqueo_observaciones as string || null
+
     // Obtener cierre
     const { data: cierre, error: cierreError } = await supabase
       .from('cierres_caja')
@@ -316,7 +322,21 @@ export async function cerrarCierreCajaAction(formData: FormData) {
       return { success: false, error: 'El cierre ya está cerrado' }
     }
 
-    // Actualizar cierre
+    // Obtener caja y sucursal
+    const { data: caja, error: cajaError } = await supabase
+      .from('tesoreria_cajas')
+      .select('*, sucursal:sucursales(*)')
+      .eq('id', cierre.caja_id)
+      .single()
+
+    if (cajaError || !caja) {
+      return { success: false, error: 'Caja no encontrada' }
+    }
+
+    // Calcular monto de retiro (saldo_final - 50,000)
+    const montoRetiro = data.saldo_final - 50000
+
+    // Actualizar cierre con datos de arqueo
     const { error: updateError } = await supabase
       .from('cierres_caja')
       .update({
@@ -330,6 +350,10 @@ export async function cerrarCierreCajaAction(formData: FormData) {
         arqueo_transferencia: data.arqueo_transferencia,
         arqueo_tarjeta: data.arqueo_tarjeta,
         arqueo_qr: data.arqueo_qr,
+        arqueo_esperado: data.saldo_final,
+        arqueo_real: arqueoReal,
+        arqueo_diferencia: arqueoDiferencia,
+        arqueo_observaciones: arqueoObservaciones,
         estado: 'cerrado',
         updated_at: getNowArgentina().toISOString(),
       })
@@ -337,12 +361,63 @@ export async function cerrarCierreCajaAction(formData: FormData) {
 
     if (updateError) throw updateError
 
-    // Si hay retiro al tesoro, registrar en tesoro
+    // Guardar detalle de arqueo de billetes
+    if (arqueoBilletes.length > 0) {
+      const billetesToInsert = arqueoBilletes
+        .filter((b: any) => b.cantidad > 0)
+        .map((b: any) => ({
+          cierre_caja_id: data.cierre_id,
+          denominacion: b.denominacion,
+          cantidad: b.cantidad,
+        }))
+
+      if (billetesToInsert.length > 0) {
+        await supabase
+          .from('arqueo_billetes')
+          .insert(billetesToInsert)
+      }
+    }
+
+    // Crear retiro automático si el monto es positivo
+    if (montoRetiro > 0 && caja.sucursal) {
+      // Crear movimiento de egreso en caja de sucursal
+      const { data: movimientoEgreso, error: movError } = await supabase
+        .from('tesoreria_movimientos')
+        .insert({
+          caja_id: caja.id,
+          tipo: 'egreso',
+          monto: montoRetiro,
+          descripcion: `Retiro para Casa Central - Cierre de caja ${cierre.fecha}`,
+          origen_tipo: 'retiro_sucursal',
+          metodo_pago: 'efectivo',
+          user_id: user.id,
+        })
+        .select()
+        .single()
+
+      if (movError) throw movError
+
+      // Crear registro de retiro
+      const { error: retiroError } = await supabase
+        .from('rutas_retiros')
+        .insert({
+          sucursal_id: caja.sucursal_id,
+          monto: montoRetiro,
+          descripcion: `Retiro automático desde cierre de caja ${cierre.fecha}`,
+          estado: 'pendiente',
+          movimiento_egreso_id: movimientoEgreso.id,
+          created_by: user.id,
+        })
+
+      if (retiroError) throw retiroError
+    }
+
+    // Si hay retiro al tesoro, registrar en tesoro (se mantiene para compatibilidad)
     if (data.retiro_tesoro > 0) {
       await supabase
         .from('tesoro')
         .insert({
-          tipo: 'efectivo', // Por defecto, se puede ajustar
+          tipo: 'efectivo',
           monto: data.retiro_tesoro,
           descripcion: `Retiro desde cierre de caja ${cierre.fecha}`,
           origen_tipo: 'cierre_caja',
@@ -352,10 +427,12 @@ export async function cerrarCierreCajaAction(formData: FormData) {
 
     revalidatePath('/(admin)/(dominios)/tesoreria/cierre-caja')
     revalidatePath('/(admin)/(dominios)/tesoreria/tesoro')
+    revalidatePath('/(admin)/(dominios)/tesoreria/validar-rutas')
+    revalidatePath('/sucursal/tesoreria')
 
     return {
       success: true,
-      message: 'Cierre de caja cerrado exitosamente',
+      message: 'Cierre de caja cerrado exitosamente' + (montoRetiro > 0 ? `. Retiro de $${montoRetiro.toLocaleString()} creado.` : ''),
     }
   } catch (error: any) {
     devError('Error en cerrarCierreCajaAction:', error)
@@ -1343,6 +1420,100 @@ export async function obtenerTodosRetirosPendientesAction() {
   } catch (error: any) {
     devError('Error en obtenerTodosRetirosPendientesAction:', error)
     return { success: false, error: error.message || 'Error al obtener retiros pendientes' }
+  }
+}
+
+// Obtener retiros pendientes por zona con detalle de arqueo
+export async function obtenerRetirosPendientesPorZonaAction(zonaId: string) {
+  try {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+      .from('rutas_retiros')
+      .select(`
+        *,
+        sucursal:sucursales(id, nombre, zona_id),
+        vehiculo:vehiculos(id, patente, marca, modelo),
+        movimiento_egreso:tesoreria_movimientos(id, descripcion, created_at)
+      `)
+      .eq('estado', 'pendiente')
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+
+    // Filtrar por zona
+    const retirosFiltrados = data?.filter((retiro: any) => 
+      retiro.sucursal?.zona_id === zonaId
+    ) || []
+
+    // Para cada retiro, obtener el arqueo de billetes si existe
+    const retirosConArqueo = await Promise.all(
+      retirosFiltrados.map(async (retiro: any) => {
+        // Obtener el cierre de caja asociado al movimiento de egreso
+        const { data: cierre } = await supabase
+          .from('cierres_caja')
+          .select('id, arqueo_esperado, arqueo_real, arqueo_diferencia, arqueo_observaciones')
+          .eq('fecha', new Date(retiro.movimiento_egreso?.created_at).toISOString().split('T')[0])
+          .maybeSingle()
+
+        // Obtener detalle de billetes del arqueo
+        const { data: billetes } = await supabase
+          .from('arqueo_billetes')
+          .select('*')
+          .eq('cierre_caja_id', cierre?.id)
+          .order('denominacion', { ascending: false })
+
+        return {
+          ...retiro,
+          arqueo: cierre ? {
+            esperado: cierre.arqueo_esperado,
+            real: cierre.arqueo_real,
+            diferencia: cierre.arqueo_diferencia,
+            observaciones: cierre.arqueo_observaciones,
+            billetes: billetes || []
+          } : null
+        }
+      })
+    )
+
+    return { success: true, data: retirosConArqueo }
+  } catch (error: any) {
+    devError('Error en obtenerRetirosPendientesPorZonaAction:', error)
+    return { success: false, error: error.message || 'Error al obtener retiros por zona' }
+  }
+}
+
+// Obtener transferencias pendientes por zona
+export async function obtenerTransferenciasPendientesPorZonaAction(zonaId: string) {
+  try {
+    const supabase = await createClient()
+
+    // Obtener transferencias donde origen o destino esté en la zona
+    const { data, error } = await supabase
+      .from('transferencias_stock')
+      .select(`
+        *,
+        sucursal_origen:sucursales(id, nombre, zona_id),
+        sucursal_destino:sucursales(id, nombre, zona_id),
+        solicitado_por:usuarios(id, nombre, email),
+        aprobado_por:usuarios(id, nombre, email),
+        recibido_por:usuarios(id, nombre, email)
+      `)
+      .in('estado', ['pendiente', 'en_transito'])
+      .order('fecha_solicitud', { ascending: false })
+
+    if (error) throw error
+
+    // Filtrar por zona (origen o destino)
+    const transferenciasFiltradas = data?.filter((transferencia: any) =>
+      transferencia.sucursal_origen?.zona_id === zonaId ||
+      transferencia.sucursal_destino?.zona_id === zonaId
+    ) || []
+
+    return { success: true, data: transferenciasFiltradas }
+  } catch (error: any) {
+    devError('Error en obtenerTransferenciasPendientesPorZonaAction:', error)
+    return { success: false, error: error.message || 'Error al obtener transferencias por zona' }
   }
 }
 

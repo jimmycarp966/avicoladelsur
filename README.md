@@ -134,7 +134,7 @@
 1. **Almacén (WMS)**: Control de stock, lotes, picking, transferencias entre sucursales
 2. **Ventas (CRM)**: Clientes, pedidos, cotizaciones, reclamos, listas de precios
 3. **Reparto (TMS)**: Vehículos, rutas, entregas, GPS tracking
-4. **Tesorería**: Gestión de cajas, movimientos, validación de cobros, cierres
+4. **Tesorería**: Gestión de cajas, movimientos, validación de cobros, cierres, retiros automáticos de sucursales
 5. **Sucursales**: Gestión multi-sucursal, inventario distribuido, alertas centralizadas
 6. **Control de Sucursales**: Auditoría de precios mayorista/minorista, conteos físicos de stock, detección de desvíos
 7. **RRHH**: Gestión completa de empleados, asistencia, liquidaciones, adelantos

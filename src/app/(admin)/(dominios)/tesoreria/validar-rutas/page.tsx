@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { obtenerRutasPendientesValidacionAction, listarCajasAction } from '@/actions/tesoreria.actions'
+import { obtenerRutasPendientesValidacionAction, listarCajasAction, obtenerTodosRetirosPendientesAction } from '@/actions/tesoreria.actions'
 import { Button } from '@/components/ui/button'
 import { ValidarRutasRealtime } from './validar-rutas-realtime'
 import Link from 'next/link'
@@ -24,12 +24,14 @@ export default async function ValidarRutasPage() {
     return <div className="p-6">No tienes permisos para validar rutas</div>
   }
 
-  const [rutasResult, cajas] = await Promise.all([
+  const [rutasResult, cajas, retirosResult] = await Promise.all([
     obtenerRutasPendientesValidacionAction(),
     listarCajasAction(),
+    obtenerTodosRetirosPendientesAction()
   ])
 
   const rutas = rutasResult.success ? (rutasResult.data || []) : []
+  const retiros = retirosResult.success ? (retirosResult.data || []) : []
 
   return (
     <div className="space-y-6 p-6">
@@ -37,7 +39,7 @@ export default async function ValidarRutasPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Validar Rutas Completadas</h1>
           <p className="text-muted-foreground mt-1">
-            Verifica y valida la recaudación de las rutas completadas por los repartidores
+            Verifica y valida la recaudación de las rutas completadas por los repartidores, incluyendo retiros de sucursales
           </p>
         </div>
         <Button asChild variant="outline">
@@ -46,7 +48,7 @@ export default async function ValidarRutasPage() {
       </div>
 
       {/* Componente con Realtime */}
-      <ValidarRutasRealtime rutasIniciales={rutas} cajas={cajas || []} />
+      <ValidarRutasRealtime rutasIniciales={rutas} cajas={cajas || []} retirosIniciales={retiros} />
     </div>
   )
 }
