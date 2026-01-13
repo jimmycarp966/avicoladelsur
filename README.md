@@ -1,9 +1,22 @@
 # 🚀 Avícola del Sur ERP - Sistema Integral de Gestión
 
-**Versión:** Enero 2026
-**Estado:** ✅ PRODUCCIÓN
+**Versión:** Enero 2026  
+**Estado:** ✅ PRODUCCIÓN  
+**Docs relacionadas:** [Architecture Summary](./ARCHITECTURE_SUMMARY.md) · [Architecture Deep-Dive](./ARCHITECTURE.md) · [Supabase Setup](./SUPABASE_SETUP.md)
 
-**Plataforma unificada** de gestión avícola que integra WMS (Almacén), TMS (Reparto), CRM (Ventas) y ERP (Finanzas/RRHH). Potenciada por **Google Gemini AI** para decisiones inteligentes en tiempo real.
+**Plataforma unificada** de gestión avícola que integra WMS (Almacén), TMS (Reparto), CRM (Ventas) y ERP (Finanzas/RRHH). Potenciada por **Google Gemini AI** para decisiones inteligentes en tiempo real dentro de una arquitectura **server-authoritative** sobre Supabase.
+
+---
+
+## 🔗 Navegación Rápida
+
+| Sección | Contenido |
+| --- | --- |
+| [Pilares del Sistema](#-pilares-del-sistema-auditoría-enero-2026) | Diferenciales funcionales e IA |
+| [Inicio Rápido](#-inicio-rápido) | Onboarding completo (prerrequisitos + setup + scripts) |
+| [Arquitectura](#-arquitectura-del-sistema) | Stack, módulos y dominios |
+| [Características del Sistema](#-características-del-sistema---completo) | Roadmap de features clave |
+| [Troubleshooting](#-troubleshooting-rápido) | Errores comunes y soluciones |
 
 ## ✨ Pilares del Sistema (Auditoría Enero 2026)
 
@@ -37,56 +50,71 @@
 
 ## 🚀 Inicio Rápido
 
-### Prerrequisitos
+### 1. Prerrequisitos (Auditoría DevOps)
 
-- Node.js 18+
-- npm o yarn
-- Cuenta de Supabase ✅
-- Cuenta de Twilio (para el bot de WhatsApp) ✅
-- ngrok (para exponer servidor local durante desarrollo)
-- Cuenta de Botpress (opcional - solo si necesitas NLU avanzado)
+| Categoría | Requisito |
+| --- | --- |
+| Runtime | Node.js 22.x, npm 10+, PNPM opcional (bloqueado en `packageManager`) |
+| Backend | Proyecto Supabase 15+ con Auth, Storage, Realtime, pg_cron habilitado |
+| Integraciones | WhatsApp Business API (Meta) o Twilio, Google Cloud (Maps, Directions, Places, Gemini, Predictions), cuenta ngrok |
+| Herramientas | Git, Supabase CLI (`npm i -g supabase`), psql, jq |
+| Opcional | Botpress (NLU avanzada) |
 
-### Instalación
+### 2. Instalación y Setup
 
 1. **Clonar el repositorio**
    ```bash
    git clone <repository-url>
    cd avicola-del-sur
    ```
-
 2. **Instalar dependencias**
    ```bash
    npm install
    ```
-
 3. **Configurar Supabase**
-   Sigue la guía completa en `SUPABASE_SETUP.md` para configurar la base de datos.
-
-4. **Configurar variables de entorno**
+   - Crear proyecto y ejecutar migraciones siguiendo [SUPABASE_SETUP.md](./SUPABASE_SETUP.md).
+   - Aplicar seeds opcionales (`supabase/seed/*.sql`) para demo de rutas, vehículos y listas de precios.
+   - Verificar funciones críticas (`fn_convertir_presupuesto_a_pedido`, `fn_asignar_pedido_a_ruta`).
+4. **Variables de entorno**
    ```bash
    cp env.example .env.local
    ```
-
-   Completa `.env.local` con tus credenciales de Supabase.
-
-5. **Ejecutar el proyecto**
+   Completar con claves Supabase (`NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`), Google (`GOOGLE_AI_API_KEY`, `GOOGLE_MAPS_API_KEY`, `GOOGLE_PLACES_API_KEY`), IA (`GEMINI_MODEL_FLASH`, `GEMINI_MODEL_PRO` si se sobreescribe) y WhatsApp (`WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_BUSINESS_TOKEN` o `TWILIO_*`). Añadir `NGROK_AUTH_TOKEN` para exponer webhooks locales.
+5. **Sincronizar assets IA (opcional)**
+   ```bash
+   npm run ia:sync
+   ```
+6. **Ejecutar el proyecto**
    ```bash
    npm run dev
    ```
+   Abrir [http://localhost:3000](http://localhost:3000) y verificar acceso a `/dashboard`.
 
-   Abrir [http://localhost:3000](http://localhost:3000)
+### 3. Scripts Clave
+
+| Script | Uso |
+| --- | --- |
+| `npm run dev` | Next.js + Server Actions |
+| `npm run build && npm start` | Build/preview producción |
+| `npm run lint` | ESLint + TS |
+| `npm run typecheck` | Revisión estricta TS |
+| `npm run verificar-bot` | Diagnóstico de bot WhatsApp |
+| `npm run test:sucursales` | Suite rápida de POS sucursales |
+| `npm run supabase:migrate` | Aplica migraciones locales |
+| `./scripts/demo-presupuestos.sh` | Flujo Presupuesto→Pedido |
+| `./scripts/demo-rutas.sh` | Demostración optimización TMS |
 
 ## 🏗️ Arquitectura del Sistema
 
 ### Stack Tecnológico
-- **Framework**: Next.js 15 (App Router, Server Components)
+- **Framework**: Next.js 16 (App Router, Server Actions)
 - **Frontend**: React 19 + TypeScript + Tailwind CSS + shadcn/ui
 - **Backend**: Server Actions + Supabase (Postgres + Auth + Storage + Realtime)
 - **Base de Datos**: Supabase (PostgreSQL) con **118+ migraciones** y funciones RPC optimizadas.
 - **Backend**: Next.js Server Actions (seguridad y performance).
 - **Frontend**: React 19, Tailwind CSS, Shadcn UI.
 - **Mapas**: Google Maps JavaScript API (TMS) + Leaflet (Reportes Heatmap)
-- **Bot**: Integración nativa con Twilio/WhatsApp (sin servicios externos).
+- **Bot**: Integración nativa con WhatsApp (Meta) con fallback a Twilio.
 - **Reportes**: Generación de PDF y Excel en servidor.
 - **Estado**: Zustand (solo estado global: sesión, notificaciones)
 - **Formularios**: React Hook Form + Zod validation
@@ -96,9 +124,10 @@
 - **Optimización**: Google Directions API + fallback local
 
 ### Estructura Modular
-- **App Admin**: Dashboard administrativo (`/(admin)`)
-- **App Repartidor**: PWA móvil (`/(repartidor)`)
-- **Bot Vendedor**: API webhook (`/api/bot`)
+- **App Admin**: Backoffice (`src/app/(admin)`), con layout + sidebar.
+- **App Repartidor**: PWA móvil (`src/app/(repartidor)`), tracking GPS y entregas.
+- **App Sucursal**: POS y panel local (`src/app/sucursal`).
+- **Bot Vendedor**: Endpoint principal (`POST /api/bot`) + webhook Meta (`/api/webhooks/whatsapp-meta`).
 
 ### Dominios de Negocio (Organización Funcional)
 1. **Almacén (WMS)**: Control de stock, lotes, picking, transferencias entre sucursales
@@ -375,8 +404,11 @@ npm run start
 # Linting
 npm run lint
 
-# Verificar configuración del bot
-node scripts/verificar-bot.js
+# Verificar datos/configuración del bot
+npm run verificar-bot
+
+# Tests puntuales
+npm run test:sucursales
 ```
 
 ## 🎯 Flujo de Presupuestos - COMPLETO
@@ -1502,7 +1534,7 @@ BOTPRESS_WEBHOOK_URL=https://your-botpress-webhook
 
 ### **Correcciones Técnicas Implementadas (03/12/2025)**
 - ✅ **Políticas RLS Simplificadas**: Resueltos errores de permisos en consultas de listas de precios
-- ✅ **Compatibilidad Next.js 15**: Actualizadas páginas dinámicas para usar `await params`
+- ✅ **Compatibilidad Next.js**: Actualizadas páginas dinámicas para usar `await params`
 - ✅ **Validación de UUID**: Agregada validación robusta de IDs antes de consultas
 - ✅ **Manejo de Errores Mejorado**: Logging detallado para diagnóstico de problemas
 

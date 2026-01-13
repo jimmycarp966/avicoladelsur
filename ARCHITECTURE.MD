@@ -1,8 +1,10 @@
 # Arquitectura del Sistema de Gestión Integral - Avícola del Sur
 
+**Docs relacionadas:** [README](./README.md) · [Architecture Summary](./ARCHITECTURE_SUMMARY.md) · [Supabase Setup](./SUPABASE_SETUP.md)
+
 ## 📋 Información General
 
-**Sistema ERP Completo y Funcional** diseñado para eliminar silos de información entre Almacén, Ventas, Reparto y Tesorería, creando una única fuente de la verdad en Supabase con planificación semanal de rutas, GPS tracking en tiempo real y optimización automática.
+**Sistema ERP Completo y Funcional** diseñado para eliminar silos de información entre Almacén, Ventas, Reparto y Tesorería, creando una única fuente de la verdad en Supabase con planificación semanal de rutas, GPS tracking en tiempo real y optimización automática. Para una introducción operativa rápida revisa el [README](./README.md); este documento es el deep-dive técnico.
 
 ### 🎯 Estado Actual (Enero 2026) - PRODUCCIÓN ✅
 - **Inteligencia Artificial**: Integración profunda de Google Gemini (2.5 Flash y 3.0 Pro) para conciliación bancaria, validación de stock y chatbots. Implementación de **Auto-selección inteligente** de zonas y precios en presupuestos.
@@ -37,7 +39,7 @@
 
 | Componente | Tecnología | Propósito |
 |------------|------------|----------|
-| **Framework** | Next.js 15 (App Router) | Server Components, Server Actions, ISR |
+| **Framework** | Next.js 16 (App Router) | Server Components, Server Actions, ISR |
 | **Frontend** | React 19 + TypeScript | Interfaz moderna, tipada y performante |
 | **Estado Global** | Zustand | Sesión usuario, notificaciones, estado mínimo |
 | **UI/UX** | Tailwind CSS + shadcn/ui | Diseño profesional basado en colores de marca |
@@ -45,9 +47,9 @@
 | **Tablas/Listas** | TanStack Table | Paginación, filtros, sorting avanzado |
 | **Backend Web** | Server Actions (Next.js) | Lógica de negocio segura server-side |
 | **Base de Datos** | Supabase (Postgres 15) | Auth, Storage, Realtime, RLS |
-| **Canal de Chat** | Twilio WhatsApp API | Comunicación bidireccional con clientes |
+| **Canal de Chat** | WhatsApp Business API (Meta) + Twilio (fallback) | Comunicación bidireccional con clientes |
 | **Motor de Chatbot** | **Implementación Directa** | Procesamiento de comandos en Next.js |
-| **Backend Bot** | Next.js API Route | Endpoint `/api/bot/` con lógica completa |
+| **Backend Bot** | Next.js API Route | Endpoint principal `POST /api/bot` (y webhook Meta: `/api/webhooks/whatsapp-meta`) |
 | **GPS Tracking** | Navigator API + Polling | Ubicación cada 5s con alertas automáticas |
 | **Mapas** | Google Maps JavaScript API | Visualización GPS, rutas optimizadas y monitor en tiempo real |
 | **Optimización Rutas** | Google Directions API | Rutas profesionales con fallback local |
@@ -72,7 +74,7 @@ Respuesta {success: true} → revalidatePath() → Notificación → UI actualiz
 ### Flujo B: Bot WhatsApp (Cliente → Presupuesto) ✅ COMPLETO
 
 ```
-Cliente (WhatsApp) → Twilio → POST /api/bot → Procesamiento comando
+Cliente (WhatsApp) → Meta Webhook (`/api/webhooks/whatsapp-meta`) → POST /api/bot → Procesamiento comando
     ↓
 Validación stock (FIFO) → Server Action → fn_crear_presupuesto_desde_bot()
     ↓
@@ -2951,7 +2953,7 @@ import Link from 'next/link'
 - ⚖️ **FIFO Automático**: Gestión inteligente de lotes por vencimiento
 
 **Arquitectura Técnica**:
-- **Framework**: Next.js 15 (App Router, Server Components)
+- **Framework**: Next.js 16 (App Router, Server Actions)
 - **Backend**: Server Actions + Supabase (Postgres + RLS)
 - **Frontend**: React 19 + TypeScript + shadcn/ui
 - **GPS**: Navigator API + polling 5s (repartidor) + polling optimizado adaptativo 10-60s (monitor) + Google Maps JavaScript API
@@ -3025,7 +3027,7 @@ Conciliación automática → Reportes CSV/PDF
 
 - ✅ **Correcciones técnicas implementadas (03/12/2025)**
   - Políticas RLS simplificadas para resolver errores de permisos
-  - Compatibilidad Next.js 15: páginas dinámicas con `await params`
+  - Compatibilidad Next.js: páginas dinámicas con `await params`
   - Validación de UUID robusta antes de consultas a BD
   - Manejo de errores mejorado con logging detallado
   - Campo `codigo` agregado a consultas de clientes para búsqueda por código

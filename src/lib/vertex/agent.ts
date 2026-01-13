@@ -1,0 +1,371 @@
+/**
+ * Vertex AI Agent para Bot WhatsApp
+ * Orquesta conversaciones con Gemini y tools
+ */
+
+import { VertexAI } from '@google-cloud/vertexai'
+import { getOrCreateSession, updateSession } from './session-manager'
+import { crearPresupuestoTool } from './tools/crear-presupuesto'
+import { consultarStockTool } from './tools/consultar-stock'
+import { consultarEstadoTool } from './tools/consultar-estado'
+import { consultarSaldoTool } from './tools/consultar-saldo'
+import { crearReclamoTool } from './tools/crear-reclamo'
+import { SYSTEM_PROMPT } from './prompts/system-prompt'
+import { createAdminClient } from '@/lib/supabase/server'
+import { ensureGoogleApplicationCredentials } from './ensure-google-credentials'
+
+// Configuración de Vertex AI
+ensureGoogleApplicationCredentials()
+const vertexAI = new VertexAI({
+  project: process.env.GOOGLE_CLOUD_PROJECT_ID || 'gen-lang-client-0184145853',
+  location: 'us-central1',
+})
+
+// Modelo Gemini a usar
+const MODEL_NAME = 'gemini-1.5-flash-001'
+
+export interface AgentResponse {
+  text: string
+  toolCalls?: Array<{
+    name: string
+    parameters: any
+  }>
+  context?: Record<string, any>
+}
+
+function extractTextFromResponse(resp: any): string {
+  return (
+    resp?.candidates?.[0]?.content?.parts
+      ?.map((p: any) => p?.text)
+      ?.filter(Boolean)
+      ?.join('') ||
+    ''
+  )
+}
+
+/**
+ * Procesa un mensaje del usuario y genera una respuesta
+ */
+export async function processMessage(
+  phoneNumber: string,
+  message: string
+): Promise<AgentResponse> {
+  try {
+    // Obtener o crear sesión
+    const session = await getOrCreateSession(phoneNumber)
+
+    // Construir historial de conversación
+    const history = session.history.map((msg) => ({
+      role: msg.role === 'user' ? 'user' : 'model',
+      parts: [{ text: msg.content }]
+    }))
+
+    // Crear modelo con system prompt
+    const model = vertexAI.getGenerativeModel({
+      model: MODEL_NAME,
+      systemInstruction: SYSTEM_PROMPT
+    })
+
+    // Generar respuesta
+    const chat = model.startChat({ history })
+    const result = await chat.sendMessage(message)
+    const response = result.response
+    const text = extractTextFromResponse(response)
+
+    // Actualizar sesión
+    await updateSession(session.sessionId, {
+      role: 'user',
+      content: message
+    })
+
+    await updateSession(session.sessionId, {
+      role: 'assistant',
+      content: text
+    })
+
+    return {
+      text,
+      context: session.customerContext
+    }
+  } catch (error) {
+    console.error('[Vertex AI Agent] Error:', error)
+    throw error
+  }
+}
+
+/**
+ * Procesa mensaje con detección de intent y ejecución de tools
+ */
+export async function processMessageWithTools(
+  phoneNumber: string,
+  message: string,
+  clienteId?: string
+): Promise<AgentResponse> {
+  try {
+    // Obtener sesión
+    const session = await getOrCreateSession(phoneNumber)
+
+    // Primero, intentar interpretar el mensaje con Gemini
+    const model = vertexAI.getGenerativeModel({
+      model: MODEL_NAME,
+      systemInstruction: SYSTEM_PROMPT
+    })
+
+    // Prompt para detectar intención
+    const intentPrompt = `Analiza el siguiente mensaje de WhatsApp y determina la intención del usuario:
+
+Mensaje: "${message}"
+
+Posibles intenciones:
+- pedido: El cliente quiere hacer un pedido
+- consulta_stock: El cliente pregunta por productos disponibles
+- consulta_estado: El cliente pregunta por el estado de un pedido
+- consulta_saldo: El cliente pregunta por su saldo pendiente
+- reclamo: El cliente quiere hacer un reclamo
+- saludo: El cliente está saludando
+- otro: Cualquier otra intención
+
+Responde SOLO con el nombre de la intención (ej: "pedido", "consulta_stock", etc.)`
+
+    const intentResult = await model.generateContent(intentPrompt)
+    const intent = extractTextFromResponse(intentResult.response).trim().toLowerCase()
+
+    // Ejecutar tool según intención
+    switch (intent) {
+      case 'pedido':
+        if (clienteId) {
+          // Extraer productos del mensaje
+          const productos = await extraerProductosDelMensaje(message)
+
+          if (productos.length > 0) {
+            const result = await crearPresupuestoTool({
+              cliente_id: clienteId,
+              productos
+            })
+
+            if (result.success) {
+              return {
+                text: `¡Perfecto! Creé tu presupuesto ${result.numero_presupuesto} por un total de $${result.total_estimado}. Te confirmo los detalles en breve.`,
+                context: { presupuesto_id: result.presupuesto_id }
+              }
+            } else {
+              return {
+                text: `Hubo un error creando el presupuesto: ${result.error}. ¿Podés intentarlo de otra forma?`
+              }
+            }
+          }
+        }
+        break
+
+      case 'consulta_stock':
+        const stockResult = await consultarStockTool({
+          producto_nombre: message
+        })
+
+        if (stockResult.success && stockResult.productos) {
+          const productosList = stockResult.productos
+            .map(p => `- ${p.nombre}: ${p.stock_disponible} ${p.unidad_medida}`)
+            .join('\n')
+          return {
+            text: `Tenemos disponibles:\n${productosList}`
+          }
+        }
+        break
+
+      case 'consulta_estado':
+        if (clienteId) {
+          const estadoResult = await consultarEstadoTool({
+            cliente_id: clienteId
+          })
+
+          if (estadoResult.success && estadoResult.pedidos) {
+            const pedidosList = estadoResult.pedidos
+              .map(p => `- ${p.numero_pedido}: ${p.estado}`)
+              .join('\n')
+            return {
+              text: `Tus pedidos:\n${pedidosList}`
+            }
+          }
+        }
+        break
+
+      case 'consulta_saldo':
+        if (clienteId) {
+          const saldoResult = await consultarSaldoTool({
+            cliente_id: clienteId
+          })
+
+          if (saldoResult.success) {
+            const saldo = saldoResult.saldo || 0
+            const limite_credito = saldoResult.limite_credito || 0
+            const credito_disponible = saldoResult.credito_disponible || 0
+            const bloqueado = saldoResult.bloqueado || false
+            const mensaje = bloqueado
+              ? `⚠️ Tu cuenta está bloqueada por saldo pendiente.\n\nSaldo actual: $${saldo.toFixed(2)}\nLímite de crédito: $${limite_credito.toFixed(2)}\n\nPor favor regulariza tu cuenta para realizar nuevos pedidos.`
+              : `💰 Tu saldo actual: $${saldo.toFixed(2)}\nLímite de crédito: $${limite_credito.toFixed(2)}\nCrédito disponible: $${credito_disponible.toFixed(2)}`
+            return { text: mensaje }
+          }
+        }
+        break
+
+      case 'reclamo':
+        if (clienteId) {
+          // Extraer tipo de reclamo y descripción del mensaje
+          const reclamoData = await extraerReclamoDelMensaje(message)
+
+          if (reclamoData) {
+            const result = await crearReclamoTool({
+              cliente_id: clienteId,
+              tipo_reclamo: reclamoData.tipo as 'producto_dañado' | 'entrega_tardia' | 'cantidad_erronea' | 'producto_equivocado' | 'precio_incorrecto' | 'calidad_deficiente' | 'empaque_dañado' | 'otro',
+              descripcion: reclamoData.descripcion,
+              prioridad: 'media'
+            })
+
+            if (result.success) {
+              return {
+                text: `✅ Reclamo creado exitosamente.\n\nNúmero: ${result.numero_reclamo}\nTipo: ${reclamoData.tipo}\n\nNuestro equipo revisará tu caso y te contactará pronto.`
+              }
+            } else {
+              return {
+                text: `Hubo un error creando el reclamo: ${result.error}. ¿Podés intentarlo de otra forma?`
+              }
+            }
+          }
+        }
+        break
+    }
+
+    // Si no se ejecutó ninguna tool, usar respuesta normal de Gemini
+    return await processMessage(phoneNumber, message)
+  } catch (error) {
+    console.error('[Vertex AI Agent] Error con tools:', error)
+    throw error
+  }
+}
+
+/**
+ * Extrae productos de un mensaje usando Gemini
+ */
+async function extraerProductosDelMensaje(
+  message: string
+): Promise<Array<{ producto_id: string; cantidad: number }>> {
+  try {
+    const model = vertexAI.getGenerativeModel({
+      model: MODEL_NAME
+    })
+
+    const prompt = `Extrae los productos y cantidades del siguiente mensaje:
+
+"${message}"
+
+Productos disponibles: Ala, Pechuga, Muslo, Pata, Filet, Suprema
+
+Responde SOLO con un JSON válido:
+[
+  {"nombre": "NOMBRE_PRODUCTO", "cantidad": NUMERO}
+]
+
+Si no mencionan productos, devuelve un array vacío []`
+
+    const result = await model.generateContent(prompt)
+    const text = extractTextFromResponse(result.response)
+
+    // Limpiar respuesta
+    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+
+    let parsed: Array<{ nombre: string; cantidad: number }> = []
+    try {
+      parsed = JSON.parse(cleaned)
+    } catch {
+      return []
+    }
+
+    if (!Array.isArray(parsed) || parsed.length === 0) return []
+
+    const supabase = createAdminClient()
+    const resolved: Array<{ producto_id: string; cantidad: number }> = []
+
+    for (const item of parsed) {
+      const nombre = (item?.nombre || '').toString().trim()
+      const cantidad = Number(item?.cantidad || 0)
+      if (!nombre || !Number.isFinite(cantidad) || cantidad <= 0) continue
+
+      const { data: producto } = await supabase
+        .from('productos')
+        .select('id, nombre')
+        .eq('activo', true)
+        .ilike('nombre', `%${nombre}%`)
+        .limit(1)
+        .single()
+
+      if (producto?.id) {
+        resolved.push({ producto_id: producto.id, cantidad })
+      }
+    }
+
+    return resolved
+  } catch (error) {
+    console.error('[Extraer Productos] Error:', error)
+    return []
+  }
+}
+
+/**
+ * Extrae información de reclamo de un mensaje usando Gemini
+ */
+async function extraerReclamoDelMensaje(
+  message: string
+): Promise<{ tipo: string; descripcion: string } | null> {
+  try {
+    const model = vertexAI.getGenerativeModel({
+      model: MODEL_NAME
+    })
+
+    const prompt = `Analiza el siguiente mensaje de WhatsApp y extrae la información del reclamo:
+
+"${message}"
+
+Tipos de reclamo posibles:
+- producto_dañado: El producto llegó dañado o en mal estado
+- entrega_tardia: La entrega llegó tarde o no llegó
+- cantidad_erronea: La cantidad entregada no coincide con lo pedido
+- producto_equivocado: Entregaron un producto diferente al pedido
+- precio_incorrecto: El precio cobrado no coincide con lo acordado
+- calidad_deficiente: La calidad del producto no es la esperada
+- empaque_dañado: El empaque está roto o dañado
+- otro: Cualquier otro problema
+
+Responde SOLO con un JSON válido:
+{
+  "tipo": "TIPO_RECLAMO",
+  "descripcion": "DESCRIPCION_DETALLADA_DEL_PROBLEMA"
+}
+
+Si no hay un reclamo claro, devuelve null`
+
+    const result = await model.generateContent(prompt)
+    const text = extractTextFromResponse(result.response)
+
+    // Limpiar respuesta
+    const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+
+    if (cleaned.toLowerCase() === 'null') return null
+
+    try {
+      const parsed = JSON.parse(cleaned)
+      if (parsed.tipo && parsed.descripcion) {
+        return {
+          tipo: parsed.tipo,
+          descripcion: parsed.descripcion
+        }
+      }
+    } catch {
+      return null
+    }
+
+    return null
+  } catch (error) {
+    console.error('[Extraer Reclamo] Error:', error)
+    return null
+  }
+}

@@ -5,6 +5,7 @@ import { crearReclamoBotAction, crearClienteDesdeBotAction } from '@/actions/ven
 import { obtenerListasClienteAction, obtenerPrecioProductoAction } from '@/actions/listas-precios.actions'
 import { sendWhatsAppMessage, getWhatsAppProvider, isWhatsAppMetaAvailable } from '@/lib/services/whatsapp-meta'
 import { interpretarMensajeConIA } from '@/lib/services/whatsapp-ia-interpreter'
+import { processMessageWithTools } from '@/lib/vertex/agent'
 import type { MetaListSection } from '@/types/whatsapp-meta'
 
 // Tipos para las llamadas de Botpress
@@ -937,40 +938,6 @@ const pendingConfirmations = new Map<string, {
   timestamp: number;
 }>()
 
-// Función auxiliar para verificar horario de atención
-function isHorarioAtencion(): { abierto: boolean; mensaje?: string } {
-  const now = new Date()
-  const hora = now.getHours()
-  const dia = now.getDay() // 0 = Domingo, 6 = Sábado
-
-  // Lunes a Viernes: 8am - 6pm
-  if (dia >= 1 && dia <= 5) {
-    if (hora >= 8 && hora < 18) {
-      return { abierto: true }
-    }
-  }
-
-  // Sábado: 8am - 1pm
-  if (dia === 6) {
-    if (hora >= 8 && hora < 13) {
-      return { abierto: true }
-    }
-  }
-
-  // Fuera de horario
-  return {
-    abierto: false,
-    mensaje: `🌙 *Estamos cerrados*
-
-Horario de atención:
-📅 Lun-Vie: 8:00am - 6:00pm
-📅 Sábado: 8:00am - 1:00pm
-📅 Domingo: Cerrado
-
-Tu mensaje será atendido en el próximo horario hábil. ¡Gracias!`
-  }
-}
-
 // Función auxiliar para obtener URL base del sistema
 function getBaseUrl(): string {
   if (process.env.NEXT_PUBLIC_SITE_URL) {
@@ -1118,11 +1085,102 @@ async function handleTwilioWebhook(formData: FormData) {
       }
     }
 
-    // Verificar horario de atención (excepto para consultas)
-    const horario = isHorarioAtencion()
-    if (!horario.abierto && !bodyLower.includes('estado') && !bodyLower.includes('consulta')) {
-      responseMessage = horario.mensaje || ''
-      // Continuar procesando de todos modos
+    // Intentar usar Vertex AI Agent con tools PRIMERO (antes de comandos específicos)
+    // Solo si no es un comando explícito de menú o cancelación
+    const cliente = await findClienteByPhone(phoneNumber)
+    const clienteId = cliente?.id
+
+    if (!bodyLower.includes('hola') && !bodyLower.includes('ayuda') && !bodyLower.includes('menu') &&
+        !bodyLower.includes('inicio') && !bodyLower.includes('cancelar') &&
+        !body.startsWith('prod_') && !body.startsWith('pedido_') &&
+        body !== '1' && body !== '2' && body !== '3' && body !== '4' && body !== '5' &&
+        !bodyLower.startsWith('opcion ') && !body.startsWith('btn_')) {
+
+      try {
+        const vertexResponse = await processMessageWithTools(phoneNumber, body, clienteId)
+        responseMessage = vertexResponse.text || '[Vertex AI devolvió respuesta vacía]'
+      } catch (vertexError) {
+        console.error('[Vertex AI] Error, usando fallback:', vertexError)
+
+        // Fallback a interpretación IA actual
+        const interpretacionIA = await interpretarMensajeConIA(body)
+
+        if (interpretacionIA.success && interpretacionIA.interpretacion) {
+          const { intencion, productos, respuestaSugerida, confianza } = interpretacionIA.interpretacion
+
+          // Si la IA tiene alta confianza y detectó un pedido
+          if (intencion === 'pedido' && productos.length > 0 && confianza >= 60) {
+            // Buscar cliente
+            const cliente = await findClienteByPhone(phoneNumber)
+
+            if (!cliente) {
+              // Iniciar registro con los productos detectados
+              const productosParaRegistro = productos.map((p: any) => ({
+                codigo: p.nombre.toUpperCase().replace(/\s+/g, ''),
+                cantidad: p.cantidad
+              }))
+              responseMessage = iniciarRegistroCliente(phoneNumber, productosParaRegistro)
+            } else {
+              // Crear presupuesto con productos detectados
+              const items: any[] = []
+              const productosNoEncontrados: string[] = []
+
+              for (const prod of productos) {
+                // Buscar producto por nombre aproximado
+                const supabase = await createClient()
+                const { data: productoEncontrado } = await supabase
+                  .from('productos')
+                  .select('id, codigo, nombre, precio_venta, unidad_medida')
+                  .ilike('nombre', `%${prod.nombre}%`)
+                  .eq('activo', true)
+                  .limit(1)
+                  .single()
+
+                if (productoEncontrado) {
+                  items.push({
+                    producto_id: productoEncontrado.id,
+                    cantidad_solicitada: prod.cantidad,
+                    precio_unit_est: productoEncontrado.precio_venta
+                  })
+                } else {
+                  productosNoEncontrados.push(prod.nombre)
+                }
+              }
+
+              if (items.length > 0) {
+                // Crear presupuesto
+                const formData = new FormData()
+                formData.append('cliente_id', cliente.id)
+                formData.append('observaciones', 'Presupuesto desde WhatsApp (IA)')
+                formData.append('items', JSON.stringify(items))
+
+                const presupuestoResult = await crearPresupuestoAction(formData)
+
+                if (presupuestoResult.success && presupuestoResult.data) {
+                  const numeroPresupuesto = presupuestoResult.data.numero_presupuesto || presupuestoResult.data.numeroPresupuesto
+                  responseMessage = `✅ *¡Entendido, ${nombreCliente || 'cliente'}!*
+
+📋 Presupuesto creado: *${numeroPresupuesto}*
+
+${productosNoEncontrados.length > 0 ? `⚠️ No encontré: ${productosNoEncontrados.join(', ')}\n\n` : ''}💡 Para consultar: *estado ${numeroPresupuesto}*`
+                } else {
+                  responseMessage = respuestaSugerida
+                }
+              } else {
+                responseMessage = `🤔 Entendí que querés pedir: ${productos.map((p: any) => `${p.cantidad} ${p.unidad} de ${p.nombre}`).join(', ')}
+
+Pero no encontré esos productos. ¿Podés escribir el código del producto?
+
+Ejemplo: *POLLO001 5*`
+              }
+            }
+          }
+          // Respuesta de la IA para otros casos
+          else if (respuestaSugerida) {
+            responseMessage = respuestaSugerida
+          }
+        }
+      }
     }
 
     // Comando: Hola / Ayuda
@@ -2087,119 +2145,6 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
         responseMessage = '❌ No se encontró tu perfil. Por favor contacta con ventas para registrarte.'
       } else {
         responseMessage = iniciarReclamo(phoneNumber)
-      }
-    }
-    // Mensaje no reconocido - Intentar interpretar con IA
-    else {
-      // Usar IA para interpretar el mensaje en lenguaje natural
-      const interpretacionIA = await interpretarMensajeConIA(body)
-
-      if (interpretacionIA.success && interpretacionIA.interpretacion) {
-        const { intencion, productos, respuestaSugerida, confianza } = interpretacionIA.interpretacion
-
-        // Si la IA tiene alta confianza y detectó un pedido
-        if (intencion === 'pedido' && productos.length > 0 && confianza >= 60) {
-          // Buscar cliente
-          const cliente = await findClienteByPhone(phoneNumber)
-
-          if (!cliente) {
-            // Iniciar registro con los productos detectados
-            const productosParaRegistro = productos.map(p => ({
-              codigo: p.nombre.toUpperCase().replace(/\s+/g, ''),
-              cantidad: p.cantidad
-            }))
-            responseMessage = iniciarRegistroCliente(phoneNumber, productosParaRegistro)
-          } else {
-            // Crear presupuesto con productos detectados
-            const items = []
-            const productosNoEncontrados = []
-
-            for (const prod of productos) {
-              // Buscar producto por nombre aproximado
-              const supabase = await createClient()
-              const { data: productoEncontrado } = await supabase
-                .from('productos')
-                .select('id, codigo, nombre, precio_venta, unidad_medida')
-                .ilike('nombre', `%${prod.nombre}%`)
-                .eq('activo', true)
-                .limit(1)
-                .single()
-
-              if (productoEncontrado) {
-                items.push({
-                  producto_id: productoEncontrado.id,
-                  cantidad_solicitada: prod.cantidad,
-                  precio_unit_est: productoEncontrado.precio_venta
-                })
-              } else {
-                productosNoEncontrados.push(prod.nombre)
-              }
-            }
-
-            if (items.length > 0) {
-              // Crear presupuesto
-              const formData = new FormData()
-              formData.append('cliente_id', cliente.id)
-              formData.append('observaciones', 'Presupuesto desde WhatsApp (IA)')
-              formData.append('items', JSON.stringify(items))
-
-              const presupuestoResult = await crearPresupuestoAction(formData)
-
-              if (presupuestoResult.success && presupuestoResult.data) {
-                const numeroPresupuesto = presupuestoResult.data.numero_presupuesto || presupuestoResult.data.numeroPresupuesto
-                responseMessage = `✅ *¡Entendido, ${nombreCliente || 'cliente'}!*
-
-📋 Presupuesto creado: *${numeroPresupuesto}*
-
-${productosNoEncontrados.length > 0 ? `⚠️ No encontré: ${productosNoEncontrados.join(', ')}\n\n` : ''}💡 Para consultar: *estado ${numeroPresupuesto}*`
-              } else {
-                responseMessage = respuestaSugerida
-              }
-            } else {
-              responseMessage = `🤔 Entendí que querés pedir: ${productos.map(p => `${p.cantidad} ${p.unidad} de ${p.nombre}`).join(', ')}
-
-Pero no encontré esos productos. ¿Podés escribir el código del producto?
-
-Ejemplo: *POLLO001 5*`
-            }
-          }
-        }
-        // Respuesta de la IA para otros casos
-        else if (confianza >= 50) {
-          responseMessage = respuestaSugerida
-        }
-        // Baja confianza - mostrar menú de ayuda
-        else {
-          responseMessage = `🤔 *No entendí tu mensaje*
-
-💡 *Comandos disponibles:*
-   • *menu* o *ayuda* - Ver menú principal
-   • *productos* - Ver catálogo completo
-   • *[CODIGO] [CANTIDAD]* - Crear presupuesto
-      Ejemplo: *POLLO001 5*
-   • *estado PRES-XXXXX* - Consultar presupuesto
-   • *reclamo* - Crear nuevo reclamo
-   • *deuda* - Ver saldo pendiente
-
-💡 También podés escribir en lenguaje natural:
-   *"Quiero 5 kg de ala para mañana"*`
-        }
-      } else {
-        // Fallback sin IA
-        responseMessage = `🤔 *No entendí tu mensaje*
-
-💡 *Comandos disponibles:*
-   • *menu* o *ayuda* - Ver menú principal
-   • *productos* - Ver catálogo completo
-   • *[CODIGO] [CANTIDAD]* - Crear presupuesto
-      Ejemplo: *POLLO001 5*
-   • *estado PRES-XXXXX* - Consultar presupuesto
-   • *reclamo* - Crear nuevo reclamo
-   • *mis reclamos* - Ver tus reclamos
-   • *reclamo REC-XXXXX* - Consultar reclamo
-   • *deuda* - Ver saldo pendiente
-
-📞 Si necesitas ayuda personalizada, contacta a tu vendedor.`
       }
     }
 

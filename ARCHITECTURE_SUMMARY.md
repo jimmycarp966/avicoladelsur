@@ -1,14 +1,15 @@
 # 🏗️ Arquitectura del Sistema - Avícola del Sur ERP
 
 **Última Actualización:** Enero 2026  
-**Estado:** ✅ PRODUCCIÓN
+**Estado:** ✅ PRODUCCIÓN  
+**Docs relacionadas:** [README](./README.md) · [Architecture Deep-Dive](./ARCHITECTURE.md) · [Supabase Setup](./SUPABASE_SETUP.md)
 
 ## 📚 Índice Rápido
 
 | Sección | Descripción |
 |---------|-------------|
 | [TL;DR](#-tldr-resumen-ejecutivo) | Resumen ejecutivo del sistema |
-| [Stack](#️-stack-tecnológico) | Tecnologías utilizadas |
+| [Stack](#-stack-tecnológico) | Tecnologías utilizadas |
 | [Módulos](#-módulos-principales-mapa-técnico) | §1-§6 Reparto, Tesorería, Almacén, Ventas, RRHH, Sucursales |
 | [Servicios IA](#-servicios-de-ia--google-cloud) | Gemini, Maps, Predictions |
 | [Patrones](#️-patrones-de-arquitectura-de-software) | Arquitectura Server-Authoritative |
@@ -26,7 +27,7 @@
 
 ## 📋 TL;DR (Resumen Ejecutivo)
 
-Sistema ERP modular completo para Avícola del Sur que unifica **Almacén (WMS)**, **Ventas (CRM)**, **Reparto (TMS)**, **Tesorería** y **RRHH** en una única fuente de verdad sobre **Supabase**.
+Sistema ERP modular completo para Avícola del Sur que unifica **Almacén (WMS)**, **Ventas (CRM)**, **Reparto (TMS)**, **Tesorería** y **RRHH** en una única fuente de verdad sobre **Supabase**. Para una vista operativa general ver [README](./README.md); para la especificación técnica completa ver [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ### Diferenciales Clave (Enero 2026)
 1.  **IA Omnipresente**: Google Gemini integrado en validación de stock (pesaje), conciliación bancaria inteligente, chatbot de ventas y optimización de rutas.
@@ -36,7 +37,7 @@ Sistema ERP modular completo para Avícola del Sur que unifica **Almacén (WMS)*
 
 ---
 
-## 🛠️ Stack Tecnológico
+## 🛠️ Stack Tecnológico *(resumen – detalles en README#arquitectura-del-sistema)*
 
 - **Framework**: Next.js 16 (App Router, Server Actions)
 - **Frontend**: React 19 + TypeScript + Tailwind CSS v4 + shadcn/ui
@@ -49,6 +50,8 @@ Sistema ERP modular completo para Avícola del Sur que unifica **Almacén (WMS)*
 ---
 
 ## 📦 Módulos Principales (Mapa Técnico)
+
+> Para un desglose extendido de cada dominio revisa [ARCHITECTURE.md#🏢-dominios-de-negocio](./ARCHITECTURE.md#🏢-dominios-de-negocio).
 
 ### 1. 🚛 Reparto (TMS) & Navegación
 *Scope: Logística last-mile, app de conductor y monitoreo.*
@@ -82,7 +85,7 @@ Sistema ERP modular completo para Avícola del Sur que unifica **Almacén (WMS)*
 
 ### 4. 🛒 Ventas & Clientes
 *Scope: CRM, facturación y toma de pedidos.*
-- **Backend Logic**: `ventas.actions.ts`, `bot/route.ts` (Webhook WhatsApp), `listas-precios.actions.ts`.
+- **Backend Logic**: `ventas.actions.ts`, `src/app/api/bot/route.ts` (Bot principal), `src/app/api/webhooks/whatsapp-meta/route.ts` (Webhook Meta), `listas-precios.actions.ts`.
 - **Data Models**: `pedidos` (Agregador de entregas), `presupuestos`, `clientes`, `listas_precios`.
 - **Features 2.0**:
   - Chatbot NLU para toma de pedidos natural.
@@ -108,7 +111,7 @@ Sistema ERP modular completo para Avícola del Sur que unifica **Almacén (WMS)*
 
 ---
 
-## 🤖 Servicios de IA & Google Cloud
+## 🤖 Servicios de IA & Google Cloud *(ver también README#🧠-inteligencia-artificial-aplicada-gemini)*
 
 | Servicio | Implementación | Propósito |
 |----------|----------------|-----------|
@@ -184,9 +187,10 @@ El sistema sigue una arquitectura **Server-Authoritative** estricta para garanti
 src/
 ├── actions/                  # Server Actions (Mutaciones seguraas)
 ├── app/
-│   ├── (admin)/              # Dashboard Backoffice (Layout principal)
+│   ├── (admin)/              # Backoffice (Layout principal + sidebar)
 │   │   ├── (dominios)/       # Módulos de negocio (almacen, ventas, etc)
 │   ├── (repartidor)/         # App Móvil (Layout simplificado)
+│   ├── sucursal/             # POS / Panel de sucursal (layout propio)
 │   ├── api/                  # Endpoints (Webhooks, Cron jobs, Proxy)
 ├── components/
 │   ├── ui/                   # Design System (shadcn)
@@ -203,6 +207,8 @@ src/
 ---
 
 ## 🧭 Mapa de Navegación del Sistema (Menú Oficial)
+
+> Para el árbol completo del App Router revisa [README#📁-estructura-del-proyecto](./README.md#📁-estructura-del-proyecto).
 
 Jerarquía completa de opciones disponibles en el Sidebar Administrativo (`AdminSidebar.tsx`):
 
@@ -266,7 +272,8 @@ Endpoints que operan sin interfaz gráfica:
 
 | Endpoint | Método | Función | Seguridad |
 |----------|--------|---------|-----------|
-| `/api/bot/webhook` | POST | Gateway de WhatsApp (Meta) | **Pública** (Valida Token Meta) |
+| `/api/webhooks/whatsapp-meta` | GET/POST | Webhook WhatsApp Business (Meta) | **Pública** (verificación + recepción) |
+| `/api/bot` | POST | Bot principal (procesa comandos + IA + genera presupuestos/reclamos) | **Pública** (entra por webhook) |
 | `/api/ia/prediccion-stock` | GET/CRON | Ejecuta modelos de predicción de inventario | Admin Only |
 | `/api/ia/auditar-cobros` | POST | Cruza pagos recibidos vs pedidos cerrados | Admin Only |
 | `/api/webhooks/mercadopago` | POST | Notificación de pagos exitosos | **Pública** (Valida Firma MP) |
@@ -314,54 +321,24 @@ Endpoints que operan sin interfaz gráfica:
 
 ## 📝 Cambios Recientes (Últimos 5)
 
-### 2026-01-12 - Indicadores de Stock en Presupuestos
-- **Nueva Funcionalidad**: Se agregaron indicadores visuales de "Stock Real" y "Stock Preventivo" (Reservado) en el desplegable de selección de productos.
-- **Backend**: Implementada función RPC `fn_obtener_productos_con_stock_detalle` para cálculo eficiente de stock disponible vs real en una sola consulta.
-- **UX**: Mejora en la toma de decisiones del vendedor al visualizar disponibilidad real.
+> Histórico completo disponible en [ARCHITECTURE.md#📝-cambios-recientes](./ARCHITECTURE.md#📝-cambios-recientes).
 
-### 2026-01-12 - Fix Conversión Mayorista Pesable (Hotfix)
-- **Corrección Lógica**: Se ajustó `fn_convertir_presupuesto_a_pedido` para que los items mayoristas pesables (ej: Suprema) respeten el `peso_final` real de balanza en lugar de forzar una conversión estándar por bulto (1 caja = 10kg).
-- **Data Integrity**: Script de corrección para pedidos afectados.
+### 2026-01-12 · Indicadores de Stock en Presupuestos
+- Indicadores visuales de Stock Real/Preventivo en selección de productos.
+- Nueva RPC `fn_obtener_productos_con_stock_detalle` para cálculo unificado.
 
+### 2026-01-12 · Fix Conversión Mayorista Pesable
+- `fn_convertir_presupuesto_a_pedido` respeta `peso_final` real en mayoristas pesables.
+- Script de saneamiento ejecutado sobre pedidos afectados.
 
-### 2026-01-12 - Fix Pesaje Mayorista
-- **Cálculo de Precios**: Corregido bug donde el precio por unidad mayor se multiplicaba por kg totales en lugar de por unidades (bolsas).
-- **UI Dinámica**: Etiqueta "Precio por KG" ahora cambia a "Precio por [Unidad]" según el producto.
+### 2026-01-12 · Fix Pesaje Mayorista
+- Corrección del cálculo de precios por unidad mayor vs kg totales.
+- Etiquetas dinámicas en UI según unidad configurada.
 
-### 2026-01-12 - Lógica de Pesables y Venta
-- **Pesables Mayoristas**: Refactorización de lógica SQL/Action para permitir productos pesables en listas mayoristas si tienen `requiere_pesaje=true`.
-- **UI de Preparación**: Corrección de validación en botones de "Comenzar Pesaje" y "Pasar a Pedido" para respetar estrictamente `requiere_pesaje`.
-- **Unificación de Zonas**: Implementación de auto-selección de `zona_id` en presupuestos basada en la configuración del cliente.
-- **Migración de Precios**: Ejecución de migración SQL masiva para asignar lista **MAYORISTA** a todos los clientes (204 procesados).
-- **UX**: Auto-aplicación automática de Lista de Precios y Zona al seleccionar cliente en `presupuesto-form.tsx`.
-### 2026-01-12 - Mejoras UX Pedidos
-- **Detalle de Entregas**: Visualización de items dentro de la tarjeta expandible de entrega (nuevo campo JSONB en RPC `fn_obtener_entregas_pedido`).
-- **Agrupación de Productos**: Resumen consolidado del pedido agrupando por producto (suma de pesos y subtotales) para mayor claridad.
-- **Fix dependencias**: Solucionado error de compilación por `leaflet` y limpieza de `next.config.ts`.
+### 2026-01-12 · Lógica de Pesables y Venta
+- Refactor SQL/Actions para `requiere_pesaje=true` en listas mayoristas.
+- Auto-selección de `zona_id` y listas al elegir cliente + migración masiva MAYORISTA.
 
-### 2026-01-11 - Robustez en Conciliación
-- Parser de montos mejorado para manejar formatos regionales ($ 14.000,00)
-- Corrección de desincronización de índices en motor de conciliación
-- Implementación de acreditación atómica (CC + Caja) vía RPC SQL
-
-### 2026-01-10 - Auditoría de Reglas
-- Fusión de metodologías de trabajo: §7 Debugging con hipótesis, §8 Plan de respuesta
-- Actualización de workflows `/start`, `/end`, `/remember`, `/actualizar`
-
-### 2026-01-10 - Hotfix Base de Datos
-- Restauración de tablas `gastos` y `gastos_categorias`
-- Implementación completa de Proveedores (facturas, pagos, deuda)
-- KPIs financieros y alertas en Dashboard Tesorería
-
-### 2026-01-09 - Mejoras Tesorería
-- Módulo de Proveedores con CRUD completo
-- Retiros de Sucursales con tracking
-- Gestión de Moratoria y recordatorios de cobranza
-
-### 2026-01-09 - Listas de Precios
-- Migración masiva "Lista Mayorista" a todos los clientes
-- Auto-selección de lista en formulario de presupuestos
-
-### 2026-01-08 - Fix RLS y Coordenadas
-- Políticas RLS para `rutas_reparto` y `detalles_ruta`
-- Corrección de extracción PostGIS (`ST_X`, `ST_Y`)
+### 2026-01-12 · Mejoras UX Pedidos
+- Entregas muestran items agregados (JSONB en `fn_obtener_entregas_pedido`).
+- Resumen consolidado por producto + fix dependencias `leaflet`.
