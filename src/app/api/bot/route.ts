@@ -1186,13 +1186,16 @@ Ejemplo: *POLLO001 5*`
     // Comando: Hola / Ayuda
     if (bodyLower.includes('hola') || bodyLower.includes('ayuda') || bodyLower.includes('menu') || bodyLower.includes('inicio') || body === 'btn_menu') {
       const saludo = nombreCliente ? `¡Hola ${nombreCliente}! 👋` : '¡Hola! 👋'
-      const menuText = `${saludo} Bienvenido a *Avícola del Sur*
+      const menuText = `${saludo} ¿En qué puedo ayudarte hoy?
 
-🏡 Tu distribuidor de confianza
+Puedo:
+• Crearte un presupuesto
+• Consultar stock de productos
+• Ver el estado de tus pedidos
+• Consultar tu saldo pendiente
+• Registrar un reclamo
 
-🛒 *Menú Principal*
-
-Selecciona una opción:`
+Escribí lo que necesitás y te ayudo.`
 
       // Si Meta está disponible, usar botones; sino texto
       if (isWhatsAppMetaAvailable()) {
@@ -1203,22 +1206,19 @@ Selecciona una opción:`
             { id: 'btn_presupuesto', title: '🛒 Crear Presupuesto' },
             { id: 'btn_estado', title: '📊 Consultar Estado' },
           ],
-          footer: 'Escribe *ayuda* para ver este menú',
+          footer: 'Escribí lo que necesitás, te ayudo.',
         })
         responseMessage = '' // Ya se envió con botones
       } else {
         // Fallback a texto tradicional
         responseMessage = `${menuText}
 
-1️⃣ Ver productos disponibles
-2️⃣ Crear presupuesto
-3️⃣ Consultar estado de pedidos
-4️⃣ Registrar reclamo
-5️⃣ Consultar saldo pendiente
-
-📝 *Responde con el número* de la opción que deseas.
-
-❓ Escribe *ayuda* en cualquier momento para ver este menú`
+💡 *Ejemplos:*
+   "Quiero 5 kg de pechuga"
+   "¿Qué stock tienen?"
+   "Estado de mi pedido"
+   "¿Cuánto me debe?"
+   "Tengo un problema con mi pedido"`
       }
     }
     // Manejar selección de producto desde lista (prod_CODIGO)
