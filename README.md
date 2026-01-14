@@ -27,7 +27,7 @@
 - **Optimización Logística**: Algoritmos híbridos (Google Optimization + Heurística local) para reparto eficiente.
 
 ### 🚛 Logística Avanzada (TMS)
-- **Navegación Interactiva**: App de repartidor con selección de rutas alternativas en tiempo real (Google Directions).
+- **Navegación Interactiva**: App de repartidor con selección de rutas alternativas en tiempo real (OpenRouteService con datos OSM actualizados).
 - **Decisión Inteligente**: Priorización automática de próximo cliente basada en horario de cierre y distancia.
 - **PWA Offline-First**: Tracking GPS continuo, firma digital y cobros sin conexión.
 - **Voz Sintética**: Instrucciones de navegación "Turn-by-turn" integradas en la app.
@@ -56,7 +56,7 @@
 | --- | --- |
 | Runtime | Node.js 22.x, npm 10+, PNPM opcional (bloqueado en `packageManager`) |
 | Backend | Proyecto Supabase 15+ con Auth, Storage, Realtime, pg_cron habilitado |
-| Integraciones | WhatsApp Business API (Meta) o Twilio, Google Cloud (Maps, Directions, Places, Gemini, Predictions), cuenta ngrok |
+| Integraciones | WhatsApp Business API (Meta) o Twilio, Google Cloud (Maps, Places, Gemini, Predictions), OpenRouteService (Routing OSM), cuenta ngrok |
 | Herramientas | Git, Supabase CLI (`npm i -g supabase`), psql, jq |
 | Opcional | Botpress (NLU avanzada) |
 
@@ -115,6 +115,7 @@
 - **Backend**: Next.js Server Actions (seguridad y performance).
 - **Frontend**: React 19, Tailwind CSS, Shadcn UI.
 - **Mapas**: Google Maps JavaScript API (TMS) + Leaflet (Reportes Heatmap)
+- **Routing**: OpenRouteService (ORS) con datos OSM actualizados + fallback a Google/local
 - **Bot**: WhatsApp por **Twilio** (Twilio-only por `WHATSAPP_PROVIDER=twilio`; integración Meta opcional)
 - **Reportes**: Generación de PDF y Excel en servidor.
 - **Estado**: Zustand (solo estado global: sesión, notificaciones)
@@ -122,7 +123,7 @@
 - **Tablas**: TanStack Table (paginación, filtros, sorting)
 - **PDF**: pdfkit + Supabase Storage
 - **GPS**: Navigator API + polling cada 5s
-- **Optimización**: Google Directions API + fallback local
+- **Optimización**: OpenRouteService (ORS) con fallback a Google/local
 
 ### Estructura Modular
 - **App Admin**: Backoffice (`src/app/(admin)`), con layout + sidebar.
@@ -300,10 +301,10 @@ scripts/                         # Scripts de automatización
 - **Firma digital**: QR verificación + subida automática a Storage
 
 ### 🗺️ **Optimización de Rutas Híbrida**
-- **Google Directions API**: Optimización profesional con waypoints
+- **OpenRouteService (ORS)**: Routing con datos de OpenStreetMap actualizados (resuelve problemas de sentidos únicos desactualizados)
+- **Fallback Google/local**: Google Directions API + Nearest Neighbor + 2-opt cuando ORS falla
 - **Polylines reales**: Rutas que siguen las calles (no líneas rectas)
-- **Orden optimizado**: Google optimiza el orden de visita por distancia/tiempo
-- **Fallback local**: Nearest Neighbor + 2-opt cuando Google falla
+- **Orden optimizado**: ORS optimiza el orden de visita por distancia/tiempo
 - **Re-optimización**: Automática al agregar nuevos pedidos
 - **Monitor admin**: Mapa Google Maps con tracking en tiempo real
 - **Sincronización**: Vista del repartidor muestra el mismo orden que el monitor
@@ -1293,7 +1294,10 @@ Sistema completo de optimización de rutas y tracking en tiempo real integrado a
 
 **Variables de entorno requeridas:**
 ```env
-# Google Maps API Key (opcional - si no está, usa fallback local)
+# OpenRouteService API Key (requerida para routing con datos OSM actualizados)
+OPENROUTESERVICE_API_KEY=tu-api-key-aqui
+
+# Google Maps API Key (opcional - fallback si ORS falla)
 GOOGLE_MAPS_API_KEY=tu-api-key-aqui
 ```
 

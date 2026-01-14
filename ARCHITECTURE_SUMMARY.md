@@ -323,6 +323,14 @@ Endpoints que operan sin interfaz gráfica:
 
 > Histórico completo disponible en [ARCHITECTURE.md#📝-cambios-recientes](./ARCHITECTURE.md#📝-cambios-recientes).
 
+### 2026-01-13 · Migración Routing a OpenRouteService (ORS)
+- Reemplazo de Google Maps Directions API por OpenRouteService (ORS) para routing
+- Wrapper `ors-directions.ts` con fallback ORS → Google → Local optimizer
+- Actualización de MonitorMap, NavigationView, NavigationInteractivo y API alternativas
+- Configuración de OPENROUTESERVICE_API_KEY en .env.example (2,000 requests/día gratis)
+- ORS usa datos de OpenStreetMap más actualizados para resolver problemas de sentidos únicos
+- Cambio de vehicle: 'car' → 'driving-car' para compatibilidad con ORS
+
 ### 2026-01-13 · Flujo Cierre de Caja + Retiros Automáticos de Sucursales
 - Sistema de cierre de caja con arqueo detallado de billetes argentinos (100, 200, 500, 1000, 2000, 10000, 20000)
 - Retiros automáticos cuando saldo_final > 50,000 ARS (monto fijo por sucursal)

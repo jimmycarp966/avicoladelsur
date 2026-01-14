@@ -57,6 +57,7 @@ supabase/
 
 | Fecha | Lección |
 |-------|---------|
+| 2026-01-13 | Routing ORS: Usar `ors-directions.ts` con fallback ORS → Google → Local; vehicle debe ser 'driving-car' (no 'car') |
 | 2026-01-13 | Merma Líquida Proporcional: `fn_completar_orden_produccion` reparte merma líquida por producto usando `merma_real_kg` (factor = merma_total / peso_productos) |
 | 2026-01-13 | Cajones en Producción: Usar `venta_mayor_habilitada` + `kg_por_unidad_mayor` para autocalcular peso de salidas (cantidad × kg_unidad) |
 | 2026-01-13 | WhatsApp Twilio-only: setear `WHATSAPP_PROVIDER=twilio`; `isWhatsAppMetaAvailable()` debe respetarlo (no habilitar botones Meta) |
