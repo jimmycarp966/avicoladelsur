@@ -18,6 +18,7 @@ Se integró OpenRouteService (ORS) Optimization API para calcular el orden ópti
 **Archivos modificados:**
 - `src/lib/rutas/ors-directions.ts` (funciones `optimizeRouteORS`, `getOptimizedRoute`)
 - `src/components/reparto/MonitorMap.tsx` (sincronización de orden optimizado)
+- `src/lib/services/ruta-optimizer.ts` (ORS como proveedor principal, Google como fallback)
 
 ---
 

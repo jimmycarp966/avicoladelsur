@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { config } from '@/lib/config'
 import { getGoogleDirections, isGoogleDirectionsAvailable } from '@/lib/rutas/google-directions'
+import { getOptimizedRoute } from '@/lib/rutas/ors-directions'
 import type { Point } from '@/lib/rutas/local-optimizer' // Solo el tipo Point
 import { optimizeFleetRouting, isFleetRoutingAvailable, type FleetRoutingOptions } from '@/lib/services/google-cloud/fleet-routing'
 import { optimizeRoutes, isOptimizationAvailable, type OptimizationOptions } from '@/lib/services/google-cloud/optimization'
@@ -173,32 +174,88 @@ export async function generateRutaOptimizada({
   let polyline = ''
   let distanciaTotal = 0
   let duracionTotal = 0
-  const optimizadaPor: 'google' = 'google' // Solo Google Cloud, sin fallback local
+  let optimizadaPor: 'ors' | 'google' = 'ors'
 
-  // Verificar que Google esté disponible
-  if (!isGoogleDirectionsAvailable()) {
-    throw new Error('Google Directions API no está configurada. Verifica GOOGLE_MAPS_API_KEY en las variables de entorno.')
-  }
+  // Intentar primero con ORS Optimization (usa datos de OpenStreetMap)
+  console.log('[Optimizer] Intentando ORS Optimization con', waypointsUnicos.length, 'clientes...')
 
-  console.log('[Optimizer] Llamando a Google Directions con', waypointsUnicos.length, 'clientes...')
-  const googleResult = await getGoogleDirections({
-    origin: { lat: origin.lat, lng: origin.lng },
-    destination: { lat: destination.lat, lng: destination.lng },
-    waypoints: waypointsUnicos, // Enviar TODOS los clientes como waypoints
-    optimize: waypointsUnicos.length > 1, // Optimizar si hay más de 1 cliente
+  // Convertir waypoints al formato de ORS
+  const stopsORS = waypointsUnicos.map(wp => ({
+    id: wp.clienteId || wp.id,
+    lat: wp.lat,
+    lng: wp.lng
+  }))
+
+  const orsResult = await getOptimizedRoute({
+    depot: { lat: origin.lat, lng: origin.lng },
+    stops: stopsORS,
+    returnToDepot: config.rutas.returnToBase,
+    vehicle: 'driving-car'
   })
 
-  console.log('[Optimizer] Resultado Google:', googleResult.success ? 'OK' : 'ERROR', googleResult.error || '')
+  if (orsResult.response.success && orsResult.orderedStops && orsResult.orderedStops.length > 0) {
+    console.log('[Optimizer] ✅ ORS Optimization exitoso:', orsResult.provider)
 
-  if (!googleResult.success || !googleResult.orderedStops) {
-    throw new Error(`Error al optimizar ruta con Google: ${googleResult.error || 'Sin detalle'}`)
+    // Mapear orderedStops de ORS al formato esperado
+    ordenVisita = orsResult.orderedStops.map((stop, index) => {
+      // Buscar el waypoint original para obtener datos completos
+      const wpOriginal = waypointsUnicos.find(wp =>
+        (wp.clienteId || wp.id) === stop.id
+      )
+      return {
+        detalle_ruta_id: wpOriginal?.detalleRutaId,
+        pedido_id: wpOriginal?.pedidoId,
+        cliente_id: wpOriginal?.clienteId || stop.id,
+        cliente_nombre: wpOriginal?.nombreCliente,
+        lat: stop.lat,
+        lng: stop.lng,
+        orden: index + 1,
+        // Agregar horarios para calcular ETA
+        horario_lunes: (wpOriginal as any)?.horario_lunes,
+        horario_martes: (wpOriginal as any)?.horario_martes,
+        horario_miercoles: (wpOriginal as any)?.horario_miercoles,
+        horario_jueves: (wpOriginal as any)?.horario_jueves,
+        horario_viernes: (wpOriginal as any)?.horario_viernes,
+        horario_sabado: (wpOriginal as any)?.horario_sabado,
+        horario_domingo: (wpOriginal as any)?.horario_domingo,
+      }
+    })
+
+    polyline = orsResult.response.polyline || ''
+    distanciaTotal = (orsResult.response.distance || 0) / 1000
+    duracionTotal = Math.round((orsResult.response.duration || 0) / 60)
+    optimizadaPor = 'ors'
+
+    console.log('[Optimizer] ✅ Ruta optimizada con ORS - distancia:', distanciaTotal.toFixed(2), 'km, duración:', duracionTotal, 'min')
+  } else {
+    // Fallback a Google Directions
+    console.warn('[Optimizer] ORS falló, usando Google Directions como fallback:', orsResult.response.error)
+    optimizadaPor = 'google'
+
+    if (!isGoogleDirectionsAvailable()) {
+      throw new Error('Ni ORS ni Google Directions están disponibles. Verifica las claves de API.')
+    }
+
+    console.log('[Optimizer] Llamando a Google Directions con', waypointsUnicos.length, 'clientes...')
+    const googleResult = await getGoogleDirections({
+      origin: { lat: origin.lat, lng: origin.lng },
+      destination: { lat: destination.lat, lng: destination.lng },
+      waypoints: waypointsUnicos,
+      optimize: waypointsUnicos.length > 1,
+    })
+
+    console.log('[Optimizer] Resultado Google:', googleResult.success ? 'OK' : 'ERROR', googleResult.error || '')
+
+    if (!googleResult.success || !googleResult.orderedStops) {
+      throw new Error(`Error al optimizar ruta: ${googleResult.error || 'Sin detalle'}`)
+    }
+
+    ordenVisita = mapOrderedStops(googleResult.orderedStops, waypointsUnicos)
+    polyline = googleResult.polyline || ''
+    distanciaTotal = (googleResult.distance || 0) / 1000
+    duracionTotal = Math.round((googleResult.duration || 0) / 60)
+    console.log('[Optimizer] ✅ Ruta optimizada con Google Directions - polyline length:', polyline.length)
   }
-
-  ordenVisita = mapOrderedStops(googleResult.orderedStops, waypointsUnicos)
-  polyline = googleResult.polyline || ''
-  distanciaTotal = (googleResult.distance || 0) / 1000
-  duracionTotal = Math.round((googleResult.duration || 0) / 60)
-  console.log('[Optimizer] ✅ Ruta optimizada con Google Directions - polyline length:', polyline.length)
 
   // Actualizar ruta_planificada
   const { data: rutaPlanificada, error: saveError } = await (supabase as any)
@@ -380,7 +437,7 @@ export interface AdvancedOptimizationResult {
   polyline: string
   distanciaTotalKm: number
   duracionTotalMin: number
-  optimizadaPor: 'fleet-routing' | 'optimization' | 'google' | 'local'
+  optimizadaPor: 'fleet-routing' | 'optimization' | 'google' | 'ors' | 'local'
   metricas?: {
     ahorroDistancia?: number // % de ahorro
     ahorroTiempo?: number // % de ahorro
