@@ -325,6 +325,13 @@ Endpoints que operan sin interfaz gráfica:
 
 > Histórico completo disponible en [ARCHITECTURE.md#📝-cambios-recientes](./ARCHITECTURE.md#📝-cambios-recientes).
 
+### 2026-01-14 · Consistencia Monitor GPS ↔ Vista Repartidor
+- Simplificación de vista repartidor: obtiene datos directamente de `rutas_planificadas` (sin fetch a endpoint)
+- Generación de orden optimizado en tiempo real si no hay ruta planificada (ORS/Google)
+- Incluye retorno a la base en ruta optimizada (`returnToDepot: true`)
+- Logs de debug en client-side para troubleshooting de orden de entregas
+- Asegura que Monitor y repartidor muestren el mismo orden optimizado y polyline
+
 ### 2026-01-13 · Migración Routing a OpenRouteService (ORS)
 - Reemplazo de Google Maps Directions API por OpenRouteService (ORS) para routing
 - Wrapper `ors-directions.ts` con fallback ORS → Google → Local optimizer

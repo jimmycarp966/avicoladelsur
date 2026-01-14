@@ -30,6 +30,8 @@ import GpsTracker from '@/components/reparto/GpsTracker'
 import NavigationInteractivo from '@/components/reparto/NavigationInteractivo'
 import { ChecklistInicioForm } from './checklist-inicio-form'
 import { useLocationTracker } from '@/hooks/useLocationTracker'
+import { config } from '@/lib/config'
+import { getDirectionsWithFallback } from '@/lib/rutas/ors-directions'
 
 interface RutaMapaContentProps {
     ruta: any
@@ -68,11 +70,103 @@ export function RutaMapaContent({ ruta }: RutaMapaContentProps) {
     const userMarkerRef = useRef<any>(null)
 
     const [mapLoaded, setMapLoaded] = useState(false)
+    const [geometryReady, setGeometryReady] = useState(false)
     const [selectedEntrega, setSelectedEntrega] = useState<any>(null)
     const [showChecklistInicio, setShowChecklistInicio] = useState(false)
     const [showEntregaPanel, setShowEntregaPanel] = useState(false)
     const [showNavigation, setShowNavigation] = useState(false)
     const [loading, setLoading] = useState(false)
+
+    const unwrap = (v: any) => (Array.isArray(v) ? v[0] : v)
+
+    const getClienteFromEntrega = (entrega: any) => {
+        const pedido = unwrap(entrega?.pedido)
+        return unwrap(pedido?.cliente) || null
+    }
+
+    const getCoordsFromValue = (value: any): { lat: number; lng: number } | null => {
+        if (!value) return null
+
+        // {lat, lng}
+        if (typeof value === 'object' && 'lat' in value && 'lng' in value) {
+            const lat = Number((value as any).lat)
+            const lng = Number((value as any).lng)
+            if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng }
+        }
+
+        // GeoJSON {type, coordinates:[lng,lat]}
+        if (typeof value === 'object' && 'coordinates' in value && Array.isArray((value as any).coordinates)) {
+            const coords = (value as any).coordinates
+            const lng = Number(coords[0])
+            const lat = Number(coords[1])
+            if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng }
+        }
+
+        return null
+    }
+
+    const getClienteCoords = (entrega: any): { lat: number; lng: number } | null => {
+        const cliente = getClienteFromEntrega(entrega)
+        return getCoordsFromValue(cliente?.coordenadas)
+    }
+
+    const isLatLng = (v: any): v is { lat: number; lng: number } => {
+        return !!v && Number.isFinite(v.lat) && Number.isFinite(v.lng)
+    }
+
+    const decodeEncodedPolyline = (encoded: string, precision: 5 | 6): Array<{ lat: number; lng: number }> => {
+        const factor = precision === 6 ? 1e6 : 1e5
+        const points: Array<{ lat: number; lng: number }> = []
+        let index = 0
+        let lat = 0
+        let lng = 0
+
+        while (index < encoded.length) {
+            let b
+            let shift = 0
+            let result = 0
+            do {
+                b = encoded.charCodeAt(index++) - 63
+                result |= (b & 0x1f) << shift
+                shift += 5
+            } while (b >= 0x20)
+            const dlat = (result & 1) ? ~(result >> 1) : (result >> 1)
+            lat += dlat
+
+            shift = 0
+            result = 0
+            do {
+                b = encoded.charCodeAt(index++) - 63
+                result |= (b & 0x1f) << shift
+                shift += 5
+            } while (b >= 0x20)
+            const dlng = (result & 1) ? ~(result >> 1) : (result >> 1)
+            lng += dlng
+
+            points.push({ lat: lat / factor, lng: lng / factor })
+        }
+
+        return points
+    }
+
+    const decodeEncodedPolylineAuto = (encoded: string): Array<{ lat: number; lng: number }> => {
+        const p5 = decodeEncodedPolyline(encoded, 5)
+        const p6 = decodeEncodedPolyline(encoded, 6)
+
+        const homeBase = config.rutas.homeBase
+
+        const score = (pts: Array<{ lat: number; lng: number }>) => {
+            if (pts.length === 0) return Number.POSITIVE_INFINITY
+            const p = pts[0]
+            if (Math.abs(p.lat) > 90 || Math.abs(p.lng) > 180) return Number.POSITIVE_INFINITY
+            // Distancia simple (no Haversine) suficiente para elegir escala correcta
+            const dLat = p.lat - homeBase.lat
+            const dLng = p.lng - homeBase.lng
+            return Math.abs(dLat) + Math.abs(dLng)
+        }
+
+        return score(p5) <= score(p6) ? p5 : p6
+    }
 
     // Tracking GPS continuo desde que se abre la página
     const {
@@ -96,23 +190,88 @@ export function RutaMapaContent({ ruta }: RutaMapaContentProps) {
     // Ordenar entregas por orden_entrega (o entrega_orden si existe)
     const entregas = entregasLocales
     const entregasOrdenadas = useMemo(() => {
-        return [...entregas].sort((a, b) => {
+        const ordenVisita = Array.isArray((ruta as any)?.orden_visita) ? (ruta as any).orden_visita : []
+
+        console.log('🔍 [DEBUG CLIENT] orden_visita recibido:', ordenVisita)
+        console.log('🔍 [DEBUG CLIENT] entregas antes de ordenar:', entregas.map((e: any) => ({
+            id: e.id,
+            orden_entrega: e.orden_entrega,
+            pedido_id: e.pedido_id,
+            cliente_id: e.cliente_id,
+            cliente_nombre: e.pedido?.cliente?.nombre || 'N/A'
+        })))
+
+        const orderByKey = new Map<string, number>()
+        for (const p of ordenVisita) {
+            const orden = typeof p?.orden === 'number' ? p.orden : null
+            const clienteId = typeof p?.cliente_id === 'string' ? p.cliente_id : null
+            const pedidoId = typeof p?.pedido_id === 'string' ? p.pedido_id : null
+            if (orden === null) continue
+            if (pedidoId && clienteId) orderByKey.set(`${pedidoId}:${clienteId}`, orden)
+            if (clienteId) orderByKey.set(clienteId, orden)
+        }
+
+        console.log('🔍 [DEBUG CLIENT] orderByKey:', Array.from(orderByKey.entries()))
+
+        const getPlannedOrder = (e: any): number | null => {
+            const pedido = Array.isArray(e?.pedido) ? e.pedido[0] : e?.pedido
+            const cliente = Array.isArray(pedido?.cliente) ? pedido.cliente[0] : pedido?.cliente
+            const pedidoId = typeof e?.pedido_id === 'string' ? e.pedido_id : (typeof pedido?.id === 'string' ? pedido.id : null)
+            const clienteId = typeof e?.cliente_id === 'string' ? e.cliente_id : (typeof cliente?.id === 'string' ? cliente.id : null)
+
+            const orden = pedidoId && clienteId
+                ? orderByKey.get(`${pedidoId}:${clienteId}`) ?? null
+                : (clienteId ? orderByKey.get(clienteId) ?? null : null)
+
+            console.log(`🔍 [DEBUG CLIENT] getPlannedOrder para ${e.pedido?.cliente?.nombre}:`, {
+                pedidoId,
+                clienteId,
+                ordenEncontrado: orden
+            })
+
+            return orden
+        }
+
+        const sorted = [...entregas].sort((a, b) => {
+            const plannedA = getPlannedOrder(a)
+            const plannedB = getPlannedOrder(b)
+            if (plannedA !== null || plannedB !== null) {
+                return (plannedA ?? Number.MAX_SAFE_INTEGER) - (plannedB ?? Number.MAX_SAFE_INTEGER)
+            }
             const ordenA = a.entrega_orden ?? a.orden_entrega ?? 0
             const ordenB = b.entrega_orden ?? b.orden_entrega ?? 0
             return ordenA - ordenB
         })
-    }, [entregas])
+
+        console.log('🔍 [DEBUG CLIENT] entregas después de ordenar:', sorted.map((e: any) => ({
+            id: e.id,
+            orden_entrega: e.orden_entrega,
+            pedido_id: e.pedido_id,
+            cliente_id: e.cliente_id,
+            cliente_nombre: e.pedido?.cliente?.nombre || 'N/A'
+        })))
+
+        return sorted.map((e: any) => {
+            const planned = getPlannedOrder(e)
+            if (planned === null) return e
+            return {
+                ...e,
+                orden_entrega: planned,
+                entrega_orden: planned,
+            }
+        })
+    }, [entregas, ruta])
 
     // Convertir entregas al formato DeliveryStop para NavigationView
     const deliveryStops = useMemo(() => {
         return entregasOrdenadas.map((e: any, index: number) => ({
             id: e.id,
             orden: e.entrega_orden ?? e.orden_entrega ?? (index + 1),
-            cliente_nombre: e.pedido?.cliente?.nombre || 'Cliente',
-            direccion: e.pedido?.cliente?.direccion,
-            telefono: e.pedido?.cliente?.telefono,
-            lat: e.pedido?.cliente?.coordenadas?.lat || 0,
-            lng: e.pedido?.cliente?.coordenadas?.lng || 0,
+            cliente_nombre: getClienteFromEntrega(e)?.nombre || 'Cliente',
+            direccion: getClienteFromEntrega(e)?.direccion,
+            telefono: getClienteFromEntrega(e)?.telefono,
+            lat: getClienteCoords(e)?.lat || 0,
+            lng: getClienteCoords(e)?.lng || 0,
             estado: (e.estado_entrega === 'entregado' ? 'entregado' :
                 e.estado_entrega === 'rechazado' ? 'ausente' : 'pendiente') as 'pendiente' | 'entregado' | 'ausente'
         }))
@@ -137,10 +296,11 @@ export function RutaMapaContent({ ruta }: RutaMapaContentProps) {
 
     // Centro del mapa
     const mapCenter = useMemo(() => {
-        if (proximaEntrega?.pedido?.cliente?.coordenadas) {
-            return proximaEntrega.pedido.cliente.coordenadas
+        const coordsProxima = proximaEntrega ? getClienteCoords(proximaEntrega) : null
+        if (coordsProxima) {
+            return coordsProxima
         }
-        const primerCliente = entregasOrdenadas[0]?.pedido?.cliente?.coordenadas
+        const primerCliente = entregasOrdenadas[0] ? getClienteCoords(entregasOrdenadas[0]) : null
         if (primerCliente) return primerCliente
         return { lat: -27.1725, lng: -65.4992 }
     }, [proximaEntrega, entregasOrdenadas])
@@ -191,6 +351,28 @@ export function RutaMapaContent({ ruta }: RutaMapaContentProps) {
         }
     }, [mapCenter])
 
+    useEffect(() => {
+        if (!mapLoaded) return
+        if (geometryReady) return
+
+        let tries = 0
+        const maxTries = 50
+        const interval = setInterval(() => {
+            const ready = !!window.google?.maps?.geometry?.encoding?.decodePath
+            if (ready) {
+                setGeometryReady(true)
+                clearInterval(interval)
+                return
+            }
+            tries += 1
+            if (tries >= maxTries) {
+                clearInterval(interval)
+            }
+        }, 200)
+
+        return () => clearInterval(interval)
+    }, [mapLoaded, geometryReady])
+
     // Actualizar marcadores cuando cambian las entregas
     useEffect(() => {
         if (!mapInstanceRef.current || !window.google?.maps) return
@@ -203,7 +385,7 @@ export function RutaMapaContent({ ruta }: RutaMapaContentProps) {
         const bounds = new window.google.maps.LatLngBounds()
 
         entregasOrdenadas.forEach((entrega: any, index: number) => {
-            const coords = entrega.pedido?.cliente?.coordenadas
+            const coords = getClienteCoords(entrega)
             if (!coords || !coords.lat || !coords.lng) return
 
             const isCompleted = entrega.estado_entrega === 'entregado' || entrega.estado_entrega === 'rechazado'
@@ -249,36 +431,109 @@ export function RutaMapaContent({ ruta }: RutaMapaContentProps) {
             polylineRef.current.setMap(null)
         }
 
-        // Usar la polyline real de la ruta si existe
-        if (ruta.polyline && window.google?.maps?.geometry?.encoding) {
-            try {
-                const decodedPath = window.google.maps.geometry.encoding.decodePath(ruta.polyline)
-                if (decodedPath && decodedPath.length > 0) {
-                    polylineRef.current = new window.google.maps.Polyline({
-                        path: decodedPath,
-                        geodesic: true,
-                        strokeColor: '#3b82f6',
-                        strokeOpacity: 0.8,
-                        strokeWeight: 4,
-                        map: mapInstanceRef.current,
+        let cancelled = false
+
+        const decodePolylineToPath = (polylineString: string): any[] | null => {
+            if (!polylineString || typeof polylineString !== 'string') return null
+            const trimmed = polylineString.trim()
+            if (!trimmed) return null
+
+            // Formato simple lat,lng;lat,lng
+            if (trimmed.includes(';')) {
+                const pts = trimmed
+                    .split(';')
+                    .map((coord: string) => {
+                        const [lat, lng] = coord.split(',').map(Number)
+                        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+                        return new window.google.maps.LatLng(lat, lng)
                     })
-                    console.log('✅ Polyline real cargada con', decodedPath.length, 'puntos')
-                }
-            } catch (error) {
-                console.error('Error decodificando polyline:', error)
-                // Fallback: dibujar línea recta entre puntos
-                drawFallbackPolyline()
+                    .filter(Boolean)
+                return pts.length >= 2 ? pts : null
             }
-        } else {
-            // Fallback: dibujar línea recta entre puntos pendientes
+
+            // Formato encoded polyline
+            try {
+                const decoded = decodeEncodedPolylineAuto(trimmed)
+                const pts = decoded
+                    .map(p => {
+                        if (!Number.isFinite(p.lat) || !Number.isFinite(p.lng)) return null
+                        if (Math.abs(p.lat) > 90 || Math.abs(p.lng) > 180) return null
+                        return new window.google.maps.LatLng(p.lat, p.lng)
+                    })
+                    .filter(Boolean)
+                return pts.length >= 2 ? pts : null
+            } catch {
+                return null
+            }
+        }
+
+        const drawPolylinePath = (path: any[], label: string) => {
+            if (!path || path.length < 2) return
+            polylineRef.current = new window.google.maps.Polyline({
+                path,
+                geodesic: true,
+                strokeColor: '#3b82f6',
+                strokeOpacity: 0.8,
+                strokeWeight: 4,
+                map: mapInstanceRef.current,
+            })
+            console.log(label, path.length)
+        }
+
+        const drawRutaPolyline = async () => {
+            // 1) Intentar polyline guardada
+            if (ruta.polyline) {
+                const path = decodePolylineToPath(ruta.polyline)
+                if (path) {
+                    drawPolylinePath(path, '✅ Polyline cargada con puntos:')
+                    return
+                }
+            }
+
+            // 2) Si no se puede decodificar, recalcular ruta real (ORS/Google/local)
+            const stopsCoords = entregasOrdenadas
+                .map((e: any) => getClienteCoords(e))
+                .filter(isLatLng)
+
+            if (stopsCoords.length >= 2) {
+                const homeBase = config.rutas.homeBase
+                const returnToBase = config.rutas.returnToBase
+                const destination = returnToBase ? { lat: homeBase.lat, lng: homeBase.lng } : stopsCoords[stopsCoords.length - 1]
+                const waypoints = returnToBase ? stopsCoords : stopsCoords.slice(0, -1)
+
+                const { response, provider } = await getDirectionsWithFallback({
+                    origin: { lat: homeBase.lat, lng: homeBase.lng },
+                    destination,
+                    waypoints,
+                    vehicle: 'driving-car',
+                })
+
+                if (cancelled) return
+
+                if (response.success && response.polyline) {
+                    const path = decodePolylineToPath(response.polyline)
+                    if (path) {
+                        drawPolylinePath(path, `✅ Polyline recalculada (${provider}) con puntos:`)
+                        return
+                    }
+                }
+            }
+
+            // 3) Último recurso: dibujar línea recta entre puntos pendientes
             drawFallbackPolyline()
+        }
+
+        void drawRutaPolyline()
+
+        return () => {
+            cancelled = true
         }
 
         function drawFallbackPolyline() {
             const pathCoords = entregasOrdenadas
                 .filter((e: any) => e.estado_entrega !== 'entregado' && e.estado_entrega !== 'rechazado')
-                .map((e: any) => e.pedido?.cliente?.coordenadas)
-                .filter((c: any) => c && c.lat && c.lng)
+                .map((e: any) => getClienteCoords(e))
+                .filter(isLatLng)
 
             if (pathCoords.length > 1) {
                 polylineRef.current = new window.google.maps.Polyline({
@@ -298,7 +553,7 @@ export function RutaMapaContent({ ruta }: RutaMapaContentProps) {
         if (markersRef.current.size > 0) {
             mapInstanceRef.current.fitBounds(bounds, { padding: 50 })
         }
-    }, [entregasOrdenadas, proximaEntrega, mapLoaded, ruta.polyline])
+    }, [entregasOrdenadas, proximaEntrega, mapLoaded, geometryReady, ruta.polyline])
 
     // Actualizar marcador de usuario en el mapa cuando cambia la ubicación
     useEffect(() => {
