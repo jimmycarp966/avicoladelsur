@@ -1,7 +1,7 @@
 /**
  * API Route: Rutas Alternativas
  * 
- * Obtiene rutas alternativas de Google Directions para un origen y destino.
+ * Obtiene rutas alternativas de OpenRouteService (con fallback a Google) para un origen y destino.
  * POST /api/rutas/alternativas
  * 
  * Body: { origen: { lat, lng }, destino: { lat, lng } }
@@ -9,7 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getGoogleDirections, type RutaAlternativa } from '@/lib/rutas/google-directions'
+import { getDirectionsWithFallback, type RutaAlternativa } from '@/lib/rutas/ors-directions'
 
 export async function POST(request: NextRequest) {
     try {
@@ -25,28 +25,31 @@ export async function POST(request: NextRequest) {
 
         console.log('[API rutas/alternativas] Solicitando rutas:', { origen, destino })
 
-        // Llamar a Google Directions con alternatives=true
-        const result = await getGoogleDirections({
+        // Usar OpenRouteService con fallback a Google y local
+        const { response, provider } = await getDirectionsWithFallback({
             origin: origen,
             destination: destino,
             waypoints: [], // Sin waypoints para habilitar alternativas
-            alternatives: true
+            alternatives: true,
+            vehicle: 'driving-car'
         })
 
-        if (!result.success) {
-            console.error('[API rutas/alternativas] Error:', result.error)
+        console.log('[API rutas/alternativas] Proveedor usado:', provider)
+
+        if (!response.success) {
+            console.error('[API rutas/alternativas] Error:', response.error)
             return NextResponse.json(
-                { error: result.error || 'No se pudieron obtener rutas' },
+                { error: response.error || 'No se pudieron obtener rutas' },
                 { status: 500 }
             )
         }
 
         // Si no hay alternativas, crear una sola ruta
-        const rutas: RutaAlternativa[] = result.rutasAlternativas || [
+        const rutas: RutaAlternativa[] = response.rutasAlternativas || [
             {
-                polyline: result.polyline || '',
-                distancia: result.distance || 0,
-                duracion: result.duration || 0,
+                polyline: response.polyline || '',
+                distancia: response.distance || 0,
+                duracion: response.duration || 0,
                 resumen: 'Ruta principal',
                 esPreferida: true
             }
@@ -54,7 +57,7 @@ export async function POST(request: NextRequest) {
 
         console.log('[API rutas/alternativas] Rutas encontradas:', rutas.length)
 
-        return NextResponse.json({ rutas })
+        return NextResponse.json({ rutas, provider })
     } catch (error: any) {
         console.error('[API rutas/alternativas] Error:', error)
         return NextResponse.json(

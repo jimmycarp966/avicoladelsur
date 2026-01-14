@@ -31,6 +31,7 @@ import {
     Phone,
     FileText
 } from 'lucide-react'
+import { getDirectionsWithFallback } from '@/lib/rutas/ors-directions'
 
 // Types
 interface DeliveryStop {
@@ -342,44 +343,86 @@ export default function NavigationView({
             destino: { lat: currentStop.lat, lng: currentStop.lng, nombre: currentStop.cliente_nombre }
         })
 
-        const directionsService = new window.google.maps.DirectionsService()
-
         try {
-            console.log('[NavigationView] requesting route...')
-            const result = await new Promise<any>((resolve, reject) => {
-                directionsService.route({
-                    origin: currentPosition,
-                    destination: { lat: currentStop.lat, lng: currentStop.lng },
-                    travelMode: window.google.maps.TravelMode.DRIVING
-                }, (res: any, status: any) => {
-                    console.log('[NavigationView] Directions status:', status)
-                    if (status === 'OK') resolve(res)
-                    else reject(new Error(status))
-                })
+            console.log('[NavigationView] requesting route with GraphHopper/Google fallback...')
+            
+            // Usar GraphHopper con fallback a Google y local
+            const { response, provider } = await getDirectionsWithFallback({
+                origin: currentPosition,
+                destination: { lat: currentStop.lat, lng: currentStop.lng },
+                vehicle: 'driving-car'
             })
 
-            console.log('[NavigationView] Route received')
+            console.log(`[NavigationView] Route received from provider: ${provider}`)
 
-            // Display route
-            if (directionsRendererRef.current) {
-                directionsRendererRef.current.setDirections(result)
-            } else {
-                console.warn('[NavigationView] directionsRendererRef is null')
+            if (!response.success || !response.polyline) {
+                throw new Error(response.error || 'No se pudo calcular la ruta')
             }
 
-            // Extract steps
-            const route = result.routes[0]
-            const leg = route.legs[0]
+            // Decodificar polyline
+            let routePath: any[] = []
+            
+            if (window.google?.maps?.geometry?.encoding) {
+                try {
+                    routePath = window.google.maps.geometry.encoding.decodePath(response.polyline)
+                } catch (e) {
+                    // Si falla, intentar formato simple
+                    routePath = response.polyline.split(';').map((coord: string) => {
+                        const [lat, lng] = coord.split(',').map(Number)
+                        return new window.google.maps.LatLng(lat, lng)
+                    })
+                }
+            } else {
+                routePath = response.polyline.split(';').map((coord: string) => {
+                    const [lat, lng] = coord.split(',').map(Number)
+                    return new window.google.maps.LatLng(lat, lng)
+                })
+            }
 
-            setDistanceToNextStop(leg.distance.text)
-            setDurationToNextStop(leg.duration.text)
+            // Display route en el mapa
+            if (directionsRendererRef.current && routePath.length > 0) {
+                const directionsPolyline = new window.google.maps.Polyline({
+                    path: routePath,
+                    geodesic: true,
+                    strokeColor: '#3B82F6',
+                    strokeWeight: 6,
+                    strokeOpacity: 0.8,
+                    map: mapInstanceRef.current
+                })
 
-            const newSteps: NavigationStep[] = leg.steps.map((step: any) => ({
-                instruction: step.instructions.replace(/<[^>]*>/g, ''), // Remove HTML
-                distance: step.distance.text,
-                duration: step.duration.text,
-                maneuver: step.maneuver
-            }))
+                // Limpiar polyline anterior si existe
+                const oldPolyline = directionsRendererRef.current
+                if (oldPolyline && oldPolyline.setMap) {
+                    oldPolyline.setMap(null)
+                }
+                directionsRendererRef.current = directionsPolyline
+
+                // Ajustar bounds para ver toda la ruta
+                const bounds = new window.google.maps.LatLngBounds()
+                routePath.forEach((point: any) => bounds.extend(point))
+                mapInstanceRef.current.fitBounds(bounds, { padding: 100 })
+
+                console.log('[NavigationView] Route displayed on map')
+            } else {
+                console.warn('[NavigationView] directionsRendererRef is null or empty path')
+            }
+
+            // Calcular distancia y duración
+            const distanceM = response.distance || 0
+            const durationS = response.duration || 0
+
+            setDistanceToNextStop(distanceM < 1000 ? `${Math.round(distanceM)}m` : `${(distanceM / 1000).toFixed(1)}km`)
+            setDurationToNextStop(durationS < 3600 ? `${Math.round(durationS / 60)}min` : `${Math.floor(durationS / 3600)}h ${Math.round((durationS % 3600) / 60)}min`)
+
+            // Crear instrucciones simples (GraphHopper no devuelve steps detallados como Google)
+            const newSteps: NavigationStep[] = [
+                {
+                    instruction: `Continúa hacia ${currentStop.cliente_nombre}`,
+                    distance: distanceM < 1000 ? `${Math.round(distanceM)}m` : `${(distanceM / 1000).toFixed(1)}km`,
+                    duration: durationS < 3600 ? `${Math.round(durationS / 60)}min` : `${Math.floor(durationS / 3600)}h ${Math.round((durationS % 3600) / 60)}min`,
+                    maneuver: 'straight'
+                }
+            ]
 
             console.log('[NavigationView] Steps set:', newSteps.length)
             setSteps(newSteps)

@@ -24,7 +24,7 @@ import {
     type ClientePendiente,
     type ClienteCalificado
 } from '@/lib/rutas/next-client-selector'
-import type { RutaAlternativa } from '@/lib/rutas/google-directions'
+import type { RutaAlternativa } from '@/lib/rutas/ors-directions'
 import {
     obtenerPreferenciaDominante,
     registrarPreferencia,

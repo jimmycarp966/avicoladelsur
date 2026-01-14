@@ -23,6 +23,7 @@ import RutasSidebar from './RutasSidebar'
 import { toast } from 'sonner'
 import { config } from '@/lib/config'
 import { useRealtime } from '@/lib/hooks/useRealtime'
+import { getDirectionsWithFallback } from '@/lib/rutas/ors-directions'
 
 // Tipos
 interface UbicacionVehiculo {
@@ -630,7 +631,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
   }, [setSelectedRutaId])
 
   // Actualizar elementos del mapa
-  const updateMapElements = useCallback(() => {
+  const updateMapElements = useCallback(async () => {
     // Verificación mejorada: asegurar que mapInstance esté completamente inicializado
     if (!mapInstanceRef.current) {
       console.warn('[MonitorMap] mapInstanceRef no está disponible aún')
@@ -688,7 +689,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
     let hasPoints = false
 
     // 1. Dibujar Rutas (Polylines y Clientes)
-    rutas.forEach((ruta, rutaIndex) => {
+    for (const [rutaIndex, ruta] of Array.from(rutas.entries())) {
       console.log(`🎨 [DEBUG] Dibujando ruta ${rutaIndex + 1}:`, {
         id: ruta.id,
         numero: ruta.numero,
@@ -744,17 +745,15 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
 
       // Si no hay polyline válido o tiene menos de 2 puntos (se necesitan al menos 2 para dibujar línea)
       if (!path || path.length < 2) {
-        console.log(`🎨 [DEBUG] Polyline insuficiente, solicitando ruta real a Google Directions para ${ruta.numero}`)
+        console.log(`🎨 [DEBUG] Polyline insuficiente, solicitando ruta real con GraphHopper/Google para ${ruta.numero}`)
 
         // Construir waypoints desde: casa central -> clientes (en orden) -> casa central
         const homeBase = config.rutas.homeBase
         const clientesOrdenados = [...ruta.ordenVisita].sort((a, b) => (a.orden || 0) - (b.orden || 0))
         const clientesValidos = clientesOrdenados.filter(c => c.lat && c.lng && !isNaN(c.lat) && !isNaN(c.lng))
 
-        if (clientesValidos.length > 0 && window.google.maps.DirectionsService) {
+        if (clientesValidos.length > 0) {
           try {
-            const directionsService = new window.google.maps.DirectionsService()
-
             const origin = { lat: homeBase.lat, lng: homeBase.lng }
             const destination = config.rutas.returnToBase
               ? { lat: homeBase.lat, lng: homeBase.lng }
@@ -762,8 +761,8 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
 
             // Preparar waypoints (puntos intermedios)
             const waypoints = clientesValidos.map(c => ({
-              location: { lat: c.lat, lng: c.lng },
-              stopover: true
+              lat: c.lat,
+              lng: c.lng
             }))
 
             // Si volvemos a la base, todos los clientes son waypoints
@@ -772,43 +771,65 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
               ? waypoints
               : waypoints.slice(0, -1)
 
-            console.log(`🗺️ [DEBUG] Solicitando Directions: origen=${JSON.stringify(origin)}, destino=${JSON.stringify(destination)}, waypoints=${waypointsToUse.length}`)
+            console.log(`🗺️ [DEBUG] Solicitando ruta: origen=${JSON.stringify(origin)}, destino=${JSON.stringify(destination)}, waypoints=${waypointsToUse.length}`)
 
-            directionsService.route({
+            // Usar GraphHopper con fallback a Google y local
+            const { response, provider } = await getDirectionsWithFallback({
               origin,
               destination,
               waypoints: waypointsToUse,
-              optimizeWaypoints: false, // Mantener el orden que definimos
-              travelMode: window.google.maps.TravelMode.DRIVING
-            }, (result: any, status: any) => {
-              if (status === 'OK' && result.routes && result.routes.length > 0) {
-                console.log(`✅ [DEBUG] Directions OK para ruta ${ruta.numero}`)
+              optimize: false, // Mantener el orden que definimos
+              vehicle: 'driving-car'
+            })
 
-                // Crear polyline desde el resultado de Directions
-                const routePath = result.routes[0].overview_path
+            console.log(`🗺️ [DEBUG] Proveedor usado: ${provider}`)
 
-                if (routePath && routePath.length > 0) {
-                  const directionsPolyline = new window.google.maps.Polyline({
-                    path: routePath,
-                    geodesic: true,
-                    strokeColor: ruta.color,
-                    strokeOpacity: selectedRutaId === ruta.id ? 0.9 : 0.7,
-                    strokeWeight: selectedRutaId === ruta.id ? 6 : 4,
-                    zIndex: selectedRutaId === ruta.id ? 10 : 1,
-                    map: mapInstanceRef.current
+            if (response.success && response.polyline) {
+              console.log(`✅ [DEBUG] Ruta obtenida para ruta ${ruta.numero} (provider: ${provider})`)
+
+              // Decodificar polyline si está codificado
+              let routePath: any[] = []
+              
+              if (window.google?.maps?.geometry?.encoding) {
+                // Intentar decodificar como polyline de Google
+                try {
+                  routePath = window.google.maps.geometry.encoding.decodePath(response.polyline)
+                } catch (e) {
+                  // Si falla, intentar formato simple
+                  routePath = response.polyline.split(';').map((coord: string) => {
+                    const [lat, lng] = coord.split(',').map(Number)
+                    return new window.google.maps.LatLng(lat, lng)
                   })
-
-                  polylinesRef.current.set(`ruta-directions-${ruta.id}`, directionsPolyline)
-                  console.log(`🎨 [DEBUG] Polyline de Directions dibujada con ${routePath.length} puntos`)
                 }
               } else {
-                console.warn(`⚠️ [DEBUG] Directions falló para ruta ${ruta.numero}: ${status}`)
-                // Fallback: dibujar línea recta
-                drawStraightLineFallback()
+                // Fallback: formato simple
+                routePath = response.polyline.split(';').map((coord: string) => {
+                  const [lat, lng] = coord.split(',').map(Number)
+                  return new window.google.maps.LatLng(lat, lng)
+                })
               }
-            })
+
+              if (routePath && routePath.length > 0) {
+                const directionsPolyline = new window.google.maps.Polyline({
+                  path: routePath,
+                  geodesic: true,
+                  strokeColor: ruta.color,
+                  strokeOpacity: selectedRutaId === ruta.id ? 0.9 : 0.7,
+                  strokeWeight: selectedRutaId === ruta.id ? 6 : 4,
+                  zIndex: selectedRutaId === ruta.id ? 10 : 1,
+                  map: mapInstanceRef.current
+                })
+
+                polylinesRef.current.set(`ruta-directions-${ruta.id}`, directionsPolyline)
+                console.log(`🎨 [DEBUG] Polyline dibujada con ${routePath.length} puntos (provider: ${provider})`)
+              }
+            } else {
+              console.warn(`⚠️ [DEBUG] Ruta falló para ruta ${ruta.numero}: ${response.error}`)
+              // Fallback: dibujar línea recta
+              drawStraightLineFallback()
+            }
           } catch (err: any) {
-            console.error(`❌ [DEBUG] Error solicitando Directions:`, err)
+            console.error(`❌ [DEBUG] Error solicitando ruta:`, err)
             drawStraightLineFallback()
           }
 
@@ -965,7 +986,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
         markersRef.current.set(`cliente-${cliente.id}`, marker)
         infoWindowsRef.current.set(`cliente-${cliente.id}`, infoWindow)
       })
-    })
+    }
 
     // 2. Dibujar Marcador de Casa Central (homeBase) para todas las rutas visibles
     if (rutas.size > 0 && window.google.maps.Marker) {
@@ -1080,7 +1101,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
     })
 
     // NOTA: Eliminamos fitBounds de aquí para evitar saltos
-  }, [rutas, ubicaciones, selectedRutaId, createClientIcon, createTruckIcon])
+  }, [rutas, ubicaciones, selectedRutaId, createClientIcon, createTruckIcon, config])
 
   // Función auxiliar para limitar ubicaciones por rendimiento
   const getUbicacionesLimitadas = useCallback((ubicaciones: UbicacionVehiculo[]) => {
