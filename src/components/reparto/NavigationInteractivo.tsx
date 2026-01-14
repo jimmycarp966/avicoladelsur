@@ -11,7 +11,7 @@
  * 5. Al completar entrega, repite desde paso 1
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -108,9 +108,17 @@ export default function NavigationInteractivo({
 
     // Calcular próximo cliente cuando cambia la posición o los clientes pendientes
     const calcularProximoCliente = useCallback(async () => {
-        if (!posicionActual || clientesPendientes.length === 0) return
+        console.log('[NavigationInteractivo] 🔍 DEBUG calcularProximoCliente iniciado')
+        console.log('[NavigationInteractivo] 🔍 DEBUG posicionActual:', posicionActual)
+        console.log('[NavigationInteractivo] 🔍 DEBUG clientesPendientes.length:', clientesPendientes.length)
+        
+        if (!posicionActual || clientesPendientes.length === 0) {
+            console.log('[NavigationInteractivo] 🔍 DEBUG: No hay posición o clientes pendientes, retornando')
+            return
+        }
 
         setFase('calculando')
+        console.log('[NavigationInteractivo] 🔍 DEBUG: Fase cambiada a calculando')
 
         try {
             // Convertir stops a ClientePendiente
@@ -124,6 +132,8 @@ export default function NavigationInteractivo({
                 pedidoId: s.pedidoId
             }))
 
+            console.log('[NavigationInteractivo] 🔍 DEBUG: Clientes convertidos:', clientes.length)
+
             // Calcular próximo cliente óptimo
             const proximoCliente = obtenerProximoCliente({
                 posicionActual,
@@ -131,7 +141,10 @@ export default function NavigationInteractivo({
                 horaActual: new Date()
             })
 
+            console.log('[NavigationInteractivo] 🔍 DEBUG: proximoCliente calculado:', proximoCliente)
+
             if (!proximoCliente) {
+                console.log('[NavigationInteractivo] 🔍 DEBUG: No hay próximo cliente')
                 setError('No hay clientes pendientes')
                 setFase('error')
                 return
@@ -139,9 +152,12 @@ export default function NavigationInteractivo({
 
             console.log('[NavigationInteractivo] Próximo cliente:', proximoCliente.nombre)
             setClienteSugerido(proximoCliente)
+            console.log('[NavigationInteractivo] 🔍 DEBUG: clienteSugerido seteado')
 
             // Obtener rutas alternativas de Google
+            console.log('[NavigationInteractivo] 🔍 DEBUG: Llamando obtenerRutasAlternativas...')
             await obtenerRutasAlternativas(proximoCliente)
+            console.log('[NavigationInteractivo] 🔍 DEBUG: obtenerRutasAlternativas completado')
         } catch (err: any) {
             console.error('[NavigationInteractivo] Error calculando:', err)
             setError(err.message || 'Error al calcular próximo cliente')
@@ -151,9 +167,17 @@ export default function NavigationInteractivo({
 
     // Obtener rutas alternativas de Google
     const obtenerRutasAlternativas = async (cliente: ClienteCalificado) => {
-        if (!posicionActual) return
+        console.log('[NavigationInteractivo] 🔍 DEBUG obtenerRutasAlternativas iniciado')
+        console.log('[NavigationInteractivo] 🔍 DEBUG cliente:', cliente)
+        console.log('[NavigationInteractivo] 🔍 DEBUG posicionActual:', posicionActual)
+        
+        if (!posicionActual) {
+            console.log('[NavigationInteractivo] 🔍 DEBUG: No hay posicionActual, retornando')
+            return
+        }
 
         try {
+            console.log('[NavigationInteractivo] 🔍 DEBUG: Llamando a /api/rutas/alternativas...')
             // Llamar a la API de rutas alternativas
             const response = await fetch('/api/rutas/alternativas', {
                 method: 'POST',
@@ -164,24 +188,31 @@ export default function NavigationInteractivo({
                 })
             })
 
+            console.log('[NavigationInteractivo] 🔍 DEBUG: Response status:', response.status)
+
             if (!response.ok) {
                 throw new Error('Error al obtener rutas alternativas')
             }
 
             const data = await response.json()
+            console.log('[NavigationInteractivo] 🔍 DEBUG: Response data:', data)
 
             if (!data.rutas || data.rutas.length === 0) {
                 throw new Error('No se encontraron rutas')
             }
 
+            console.log('[NavigationInteractivo] 🔍 DEBUG: Rutas obtenidas:', data.rutas.length)
+
             // Obtener preferencia del repartidor y marcar ruta preferida
             const preferencia = await obtenerPreferenciaDominante(supabase, repartidorId)
             const rutasConPreferencia = marcarRutaPreferida(data.rutas, preferencia)
 
-            console.log('[NavigationInteractivo] Rutas obtenidas:', rutasConPreferencia.length)
+            console.log('[NavigationInteractivo] 🔍 DEBUG: Rutas con preferencia:', rutasConPreferencia.length)
+            console.log('[NavigationInteractivo] 🔍 DEBUG: Cambiando fase a seleccionando')
             setRutasAlternativas(rutasConPreferencia)
             setFase('seleccionando')
         } catch (err: any) {
+            console.error('[NavigationInteractivo] 🔍 DEBUG Error en obtenerRutasAlternativas:', err)
             console.error('[NavigationInteractivo] Error obteniendo rutas:', err)
             setError(err.message || 'Error al obtener rutas')
             setFase('error')
@@ -189,15 +220,20 @@ export default function NavigationInteractivo({
     }
 
     // Iniciar cálculo cuando hay posición
+    const isCalculating = useRef(false)
     useEffect(() => {
-        if (posicionActual && clientesPendientes.length > 0 && fase === 'calculando') {
-            calcularProximoCliente()
+        if (posicionActual && clientesPendientes.length > 0 && fase === 'calculando' && !isCalculating.current) {
+            isCalculating.current = true
+            calcularProximoCliente().finally(() => {
+                isCalculating.current = false
+            })
         }
-    }, [posicionActual, clientesPendientes.length, fase, calcularProximoCliente])
+    }, [posicionActual, clientesPendientes.length, fase])
 
     // Manejar selección de ruta
     const handleSeleccionarRuta = async (ruta: RutaAlternativa) => {
-        console.log('[NavigationInteractivo] Ruta seleccionada:', ruta.resumen)
+        console.log('[NavigationInteractivo] 🔍 DEBUG: Ruta seleccionada:', ruta.resumen)
+        console.log('[NavigationInteractivo] 🔍 DEBUG: Ruta completa:', ruta)
         setRutaSeleccionada(ruta)
 
         // Registrar preferencia para aprendizaje
@@ -205,6 +241,7 @@ export default function NavigationInteractivo({
             await registrarPreferencia(supabase, repartidorId, ruta, rutasAlternativas)
         }
 
+        console.log('[NavigationInteractivo] 🔍 DEBUG: Cambiando fase a navegando')
         setFase('navegando')
     }
 
@@ -306,6 +343,11 @@ export default function NavigationInteractivo({
     }
 
     if (fase === 'navegando' && clienteSugerido) {
+        console.log('[NavigationInteractivo] 🔍 DEBUG: Render fase navegando')
+        console.log('[NavigationInteractivo] 🔍 DEBUG: clienteSugerido:', clienteSugerido)
+        console.log('[NavigationInteractivo] 🔍 DEBUG: posicionActual:', posicionActual)
+        console.log('[NavigationInteractivo] 🔍 DEBUG: rutaSeleccionada:', rutaSeleccionada)
+        
         // Crear un stop temporal con los datos del cliente sugerido
         const stopActual: DeliveryStop = {
             id: clienteSugerido.id,
@@ -317,6 +359,9 @@ export default function NavigationInteractivo({
             lng: clienteSugerido.lng,
             estado: 'pendiente'
         }
+
+        console.log('[NavigationInteractivo] 🔍 DEBUG: stopActual:', stopActual)
+        console.log('[NavigationInteractivo] 🔍 DEBUG: Renderizando NavigationView...')
 
         return (
             <NavigationView
@@ -330,6 +375,9 @@ export default function NavigationInteractivo({
     }
 
     // Fallback
+    console.log('[NavigationInteractivo] 🔍 DEBUG: Fallback render, fase:', fase)
+    console.log('[NavigationInteractivo] 🔍 DEBUG: clienteSugerido:', clienteSugerido)
+    console.log('[NavigationInteractivo] 🔍 DEBUG: rutasAlternativas:', rutasAlternativas.length)
     return (
         <div className="fixed inset-0 z-50 bg-background flex items-center justify-center">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
