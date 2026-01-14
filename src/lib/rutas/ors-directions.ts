@@ -29,7 +29,7 @@ export interface ORSResponse {
   error?: string
 }
 
-const ORS_API_KEY = process.env.OPENROUTESERVICE_API_KEY
+const ORS_API_KEY = process.env.NEXT_PUBLIC_OPENROUTESERVICE_API_KEY
 const ORS_URL = 'https://api.openrouteservice.org/v2/directions'
 
 function decodePolyline(encoded: string): Array<{ lat: number; lng: number }> {
@@ -77,12 +77,12 @@ function parseORS(data: any): ORSResponse {
 
   const rutasAlternativas: RutaAlternativa[] | undefined = data.routes.length > 1
     ? data.routes.map((r: any, idx: number) => ({
-        polyline: r.geometry,
-        distancia: r.summary?.distance || 0,
-        duracion: r.summary?.duration || 0,
-        resumen: r.summary?.text || `Ruta ${idx + 1}`,
-        esPreferida: idx === 0
-      }))
+      polyline: r.geometry,
+      distancia: r.summary?.distance || 0,
+      duracion: r.summary?.duration || 0,
+      resumen: r.summary?.text || `Ruta ${idx + 1}`,
+      esPreferida: idx === 0
+    }))
     : undefined
 
   return {
@@ -108,7 +108,7 @@ export async function getORSDirections(request: ORSRequest): Promise<ORSResponse
   const body: any = {
     coordinates: coords,
     instructions: false,
-    geometry: 'encodedpolyline',
+    geometry: true,  // ORS devuelve polyline codificado por defecto
     geometry_simplify: false
   }
 
@@ -134,7 +134,9 @@ export async function getORSDirections(request: ORSRequest): Promise<ORSResponse
     })
 
     if (!response.ok) {
-      return { success: false, error: `HTTP ${response.status}` }
+      const errorText = await response.text()
+      console.error('[ORS] Error response:', response.status, errorText)
+      return { success: false, error: `HTTP ${response.status}: ${errorText}` }
     }
 
     const data = await response.json()
@@ -206,5 +208,194 @@ export async function getDirectionsWithFallback(
       response: { success: false, error: 'Todos los proveedores fallaron' },
       provider: 'local'
     }
+  }
+}
+
+// ============================================
+// ORS OPTIMIZATION API - Reordena paradas óptimamente
+// ============================================
+
+export interface OptimizationRequest {
+  depot: { lat: number; lng: number } // Punto de partida (base)
+  stops: Array<{ id: string; lat: number; lng: number; serviceTime?: number }>
+  returnToDepot?: boolean
+  vehicle?: 'driving-car' | 'driving-hgv'
+}
+
+export interface OptimizationResult {
+  success: boolean
+  orderedStops?: Array<{ id: string; lat: number; lng: number }>
+  polyline?: string
+  totalDistance?: number // metros
+  totalDuration?: number // segundos
+  error?: string
+}
+
+const ORS_OPTIMIZATION_URL = 'https://api.openrouteservice.org/optimization'
+
+/**
+ * Optimiza el orden de visitas usando ORS VROOM (TSP solver)
+ * Considera rutas reales, sentidos de calle, tiempos de giro, etc.
+ */
+export async function optimizeRouteORS(request: OptimizationRequest): Promise<OptimizationResult> {
+  if (!ORS_API_KEY) {
+    return { success: false, error: 'OPENROUTESERVICE_API_KEY no está configurada' }
+  }
+
+  if (request.stops.length === 0) {
+    return { success: false, error: 'No hay paradas para optimizar' }
+  }
+
+  // Si solo hay 1 parada, no hay nada que optimizar
+  if (request.stops.length === 1) {
+    return {
+      success: true,
+      orderedStops: request.stops,
+      totalDistance: 0,
+      totalDuration: 0
+    }
+  }
+
+  // Construir jobs (paradas a visitar)
+  const jobs = request.stops.map((stop, idx) => ({
+    id: idx + 1, // VROOM necesita IDs numéricos empezando en 1
+    location: [stop.lng, stop.lat],
+    service: stop.serviceTime || 300 // 5 minutos por defecto
+  }))
+
+  // Construir vehicle (camión de reparto)
+  const vehicles = [{
+    id: 1,
+    profile: request.vehicle || 'driving-car',
+    start: [request.depot.lng, request.depot.lat],
+    end: request.returnToDepot !== false ? [request.depot.lng, request.depot.lat] : undefined
+  }]
+
+  const body = {
+    jobs,
+    vehicles,
+    options: {
+      g: true // Incluir geometría
+    }
+  }
+
+  try {
+    console.log('[ORS Optimization] Solicitando optimización para', request.stops.length, 'paradas...')
+
+    const response = await fetch(ORS_OPTIMIZATION_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': ORS_API_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('[ORS Optimization] Error:', response.status, errorText)
+      return { success: false, error: `HTTP ${response.status}: ${errorText}` }
+    }
+
+    const data = await response.json()
+
+    if (!data.routes || data.routes.length === 0) {
+      return { success: false, error: 'No se encontró solución de optimización' }
+    }
+
+    const route = data.routes[0]
+
+    // Extraer el orden optimizado de los steps
+    const orderedStops: Array<{ id: string; lat: number; lng: number }> = []
+    for (const step of route.steps || []) {
+      if (step.type === 'job') {
+        // El job ID es 1-indexed, convertir al stop original
+        const originalStop = request.stops[step.job - 1]
+        if (originalStop) {
+          orderedStops.push(originalStop)
+        }
+      }
+    }
+
+    // Log detallado del orden original vs optimizado
+    console.log('[ORS Optimization] 📋 Orden ORIGINAL:', request.stops.map(s => s.id).join(' → '))
+    console.log('[ORS Optimization] 🎯 Orden OPTIMIZADO:', orderedStops.map(s => s.id).join(' → '))
+    console.log('[ORS Optimization] ✅ Ruta optimizada:', orderedStops.length, 'paradas, distancia:', route.distance, 'm, duración:', Math.round(route.duration / 60), 'min')
+
+    return {
+      success: true,
+      orderedStops,
+      polyline: route.geometry,
+      totalDistance: route.distance,
+      totalDuration: route.duration
+    }
+  } catch (error: any) {
+    console.error('[ORS Optimization] Exception:', error)
+    return { success: false, error: error.message || 'Error en optimización ORS' }
+  }
+}
+
+/**
+ * Optimiza y obtiene ruta completa en un solo paso
+ * 1. Primero optimiza el orden con ORS Optimization
+ * 2. Luego obtiene la ruta detallada con ORS Directions
+ */
+export async function getOptimizedRoute(request: OptimizationRequest): Promise<{
+  response: ORSResponse
+  orderedStops: Array<{ id: string; lat: number; lng: number }>
+  provider: 'ors-optimized' | 'ors' | 'google' | 'local'
+}> {
+  // Paso 1: Optimizar el orden
+  const optimized = await optimizeRouteORS(request)
+
+  if (optimized.success && optimized.orderedStops && optimized.orderedStops.length > 0) {
+    // Si la optimización devuelve polyline, usarla directamente
+    if (optimized.polyline) {
+      return {
+        response: {
+          success: true,
+          polyline: optimized.polyline,
+          distance: optimized.totalDistance,
+          duration: optimized.totalDuration
+        },
+        orderedStops: optimized.orderedStops,
+        provider: 'ors-optimized'
+      }
+    }
+
+    // Si no, obtener la ruta con el orden optimizado
+    const lastStop = optimized.orderedStops[optimized.orderedStops.length - 1]
+    const intermediateStops = optimized.orderedStops.slice(0, -1)
+
+    const { response, provider } = await getDirectionsWithFallback({
+      origin: request.depot,
+      destination: request.returnToDepot !== false ? request.depot : lastStop,
+      waypoints: request.returnToDepot !== false ? optimized.orderedStops : intermediateStops,
+      vehicle: request.vehicle
+    })
+
+    return {
+      response,
+      orderedStops: optimized.orderedStops,
+      provider: provider === 'ors' ? 'ors-optimized' : provider
+    }
+  }
+
+  // Fallback: usar orden original sin optimización
+  console.warn('[ORS Optimization] Fallback a ruta sin optimizar')
+  const lastStop = request.stops[request.stops.length - 1]
+  const intermediateStops = request.stops.slice(0, -1)
+
+  const { response, provider } = await getDirectionsWithFallback({
+    origin: request.depot,
+    destination: request.returnToDepot !== false ? request.depot : lastStop,
+    waypoints: request.returnToDepot !== false ? request.stops : intermediateStops,
+    vehicle: request.vehicle
+  })
+
+  return {
+    response,
+    orderedStops: request.stops,
+    provider
   }
 }

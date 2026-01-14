@@ -23,7 +23,7 @@ import RutasSidebar from './RutasSidebar'
 import { toast } from 'sonner'
 import { config } from '@/lib/config'
 import { useRealtime } from '@/lib/hooks/useRealtime'
-import { getDirectionsWithFallback } from '@/lib/rutas/ors-directions'
+import { getDirectionsWithFallback, getOptimizedRoute } from '@/lib/rutas/ors-directions'
 
 // Tipos
 interface UbicacionVehiculo {
@@ -52,6 +52,7 @@ interface Alerta {
 
 interface ClientePunto {
   id: string
+  cliente_id?: string
   cliente_nombre: string
   direccion?: string
   telefono?: string
@@ -754,42 +755,56 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
 
         if (clientesValidos.length > 0) {
           try {
-            const origin = { lat: homeBase.lat, lng: homeBase.lng }
-            const destination = config.rutas.returnToBase
-              ? { lat: homeBase.lat, lng: homeBase.lng }
-              : { lat: clientesValidos[clientesValidos.length - 1].lat, lng: clientesValidos[clientesValidos.length - 1].lng }
+            const depot = { lat: homeBase.lat, lng: homeBase.lng }
 
-            // Preparar waypoints (puntos intermedios)
-            const waypoints = clientesValidos.map(c => ({
+            // Preparar paradas con IDs para optimización
+            const stops = clientesValidos.map(c => ({
+              id: c.cliente_id || c.id || `stop-${c.lat}-${c.lng}`,
               lat: c.lat,
               lng: c.lng
             }))
 
-            // Si volvemos a la base, todos los clientes son waypoints
-            // Si no, el último cliente es el destino
-            const waypointsToUse = config.rutas.returnToBase
-              ? waypoints
-              : waypoints.slice(0, -1)
+            console.log(`🗺️ [DEBUG] Solicitando ruta OPTIMIZADA: depot=${JSON.stringify(depot)}, paradas=${stops.length}`)
 
-            console.log(`🗺️ [DEBUG] Solicitando ruta: origen=${JSON.stringify(origin)}, destino=${JSON.stringify(destination)}, waypoints=${waypointsToUse.length}`)
-
-            // Usar GraphHopper con fallback a Google y local
-            const { response, provider } = await getDirectionsWithFallback({
-              origin,
-              destination,
-              waypoints: waypointsToUse,
-              optimize: false, // Mantener el orden que definimos
+            // Usar ORS Optimization para reordenar + calcular ruta óptima
+            const { response, orderedStops, provider } = await getOptimizedRoute({
+              depot,
+              stops,
+              returnToDepot: config.rutas.returnToBase !== false,
               vehicle: 'driving-car'
             })
 
             console.log(`🗺️ [DEBUG] Proveedor usado: ${provider}`)
+
+            // Actualizar el orden de visita según la optimización
+            if (orderedStops && orderedStops.length > 0) {
+              const ordenOptimizado = new Map<string, number>()
+              orderedStops.forEach((stop, index) => {
+                ordenOptimizado.set(stop.id, index + 1)
+              })
+
+              // Actualizar el orden de cada cliente según la optimización
+              ruta.ordenVisita.forEach(cliente => {
+                const clienteId = cliente.cliente_id || cliente.id || `stop-${cliente.lat}-${cliente.lng}`
+                const nuevoOrden = ordenOptimizado.get(clienteId)
+                if (nuevoOrden !== undefined) {
+                  cliente.orden = nuevoOrden
+                }
+              })
+
+              // Reordenar la lista de clientes según el nuevo orden
+              ruta.ordenVisita.sort((a, b) => (a.orden || 0) - (b.orden || 0))
+
+              console.log(`🎯 [DEBUG] Orden de visita actualizado para ruta ${ruta.numero}:`,
+                ruta.ordenVisita.map(c => `${c.orden}. ${c.cliente_nombre}`).join(' → '))
+            }
 
             if (response.success && response.polyline) {
               console.log(`✅ [DEBUG] Ruta obtenida para ruta ${ruta.numero} (provider: ${provider})`)
 
               // Decodificar polyline si está codificado
               let routePath: any[] = []
-              
+
               if (window.google?.maps?.geometry?.encoding) {
                 // Intentar decodificar como polyline de Google
                 try {

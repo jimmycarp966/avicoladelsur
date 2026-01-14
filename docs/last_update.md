@@ -1,13 +1,25 @@
-# Última Actualización de Documentación
+# Última Actualización - 2026-01-14
 
-**Fecha**: 2026-01-12 18:55
-**Archivos modificados detectados**:
-- src/app/(admin)/(dominios)/ventas/presupuestos/nuevo/page.tsx
-- src/app/(admin)/(dominios)/ventas/presupuestos/nuevo/presupuesto-form.tsx
-- src/app/(admin)/(dominios)/ventas/presupuestos/nuevo/producto-item-row.tsx
-- supabase/migrations/20260113_get_products_with_stock_details.sql
+## Fecha y Hora
+2026-01-14 15:32:00 -03:00
 
-**Resumen Técnico**:
-Se implementó `fn_obtener_productos_con_stock_detalle` y se actualizó el formulario de presupuestos para mostrar Stock Real y Preventivo en el selector de productos, mejorando la visibilidad del inventario para vendedores. Impacto: DB Schema (nueva función), Frontend.
+## Archivos Modificados
+- `src/lib/rutas/ors-directions.ts` - Funciones `optimizeRouteORS()` y `getOptimizedRoute()`
+- `src/components/reparto/MonitorMap.tsx` - Sincronización de orden optimizado con marcadores
 
-**Diagrama**: No se requieren cambios en el diagrama de arquitectura para esta funcionalidad de UI/DB interna.
+## Archivos Nuevos (no trackeados)
+- `.agent/skills/` - Skills de desarrollo
+
+## Resumen Técnico
+Se integró OpenRouteService (ORS) Optimization API para calcular el orden óptimo de visitas en las rutas de reparto. El sistema ahora usa el algoritmo VROOM (TSP solver) que considera calles reales de OpenStreetMap, incluyendo sentidos de calle editados por el usuario. Los marcadores del mapa ahora reflejan el orden de visita optimizado.
+
+Impacto: Mejora en eficiencia de rutas (menos distancia, menos tiempo). Sin cambios en DB schema.
+
+## Diagrama
+N/A (sin cambios arquitecturales mayores)
+
+## Checklist
+- [x] `ARCHITECTURE_SUMMARY.md` actualizado (sección Cambio reciente + Features 2.0)
+- [x] `docs/CHANGELOG.md` con nueva línea
+- [x] `docs/last_update.md` con evidencia
+- [ ] Commit y push pendientes

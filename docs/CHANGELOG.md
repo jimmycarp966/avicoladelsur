@@ -1,5 +1,26 @@
 # Changelog - Avícola del Sur ERP
 
+## 2026-01-14 — Antigravity
+**Feat: ORS Optimization API - Optimización Inteligente de Rutas de Reparto**
+
+Se integró OpenRouteService (ORS) Optimization API para calcular el orden óptimo de visitas en las rutas de reparto, considerando calles reales de OpenStreetMap:
+
+- **ORS Optimization**: Nueva función `optimizeRouteORS()` que usa el algoritmo VROOM (TSP solver) para reordenar paradas.
+- **Fallback Chain**: ORS → Google Directions → Local optimizer.
+- **Sincronización de Marcadores**: Los números en el mapa ahora reflejan el orden de visita optimizado, no el orden original de la base de datos.
+- **Logs Detallados**: Consola muestra orden original vs optimizado para verificación.
+
+**Ventajas:**
+- Rutas más cortas y rápidas
+- Considera sentidos de calle (editados por el usuario en OSM)
+- Considera restricciones de tránsito reales
+
+**Archivos modificados:**
+- `src/lib/rutas/ors-directions.ts` (funciones `optimizeRouteORS`, `getOptimizedRoute`)
+- `src/components/reparto/MonitorMap.tsx` (sincronización de orden optimizado)
+
+---
+
 ## 2026-01-12 — Antigravity
 **Fix: Conversión de Pedidos Mayoristas Pesables**
 

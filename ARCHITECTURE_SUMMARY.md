@@ -59,8 +59,10 @@ Sistema ERP modular completo para Avícola del Sur que unifica **Almacén (WMS)*
 - **Data Models**: `rutas_reparto` (Cabecera), `detalles_ruta` (Entregas), `ubicaciones_repartidores` (Tracking), `preferencias_rutas_repartidor`.
 - **UI Key Components**: `NavigationInteractivo.tsx` (App Conductor), `MonitorMap.tsx` (Admin Dashboard), `RutaAlternativasSelector.tsx`.
 - **Features 2.0**:
+  - **ORS Optimization API**: Optimización de orden de visitas (TSP solver VROOM) con datos de OpenStreetMap.
   - Selección de rutas alternativas (Google Alternatives).
   - Priorización inteligente de clientes (`next-client-selector.ts`).
+  - Marcadores de clientes sincronizados con orden optimizado.
 
 ### 2. 💰 Tesorería & Conciliación IA
 *Scope: Flujo de dinero, cajas, bancos, proveedores y cuentas corrientes.*
@@ -338,6 +340,12 @@ Endpoints que operan sin interfaz gráfica:
 - Dashboard de repartidor `/repartidor/dashboard` con retiros y transferencias por zona
 - Validar Rutas muestra retiros con detalle de arqueo para tesorería
 - Zonas asignadas: 3 sucursales → Monteros, 2 sucursales → Simoca
+
+### 2026-01-14 · ORS Optimization API para Rutas de Reparto
+- Integración con OpenRouteService Optimization API (algoritmo VROOM/TSP solver)
+- Optimización automática del orden de visitas considerando calles reales de OSM
+- Sincronización de marcadores del mapa con orden de visita optimizado
+- Fallback chain: ORS → Google Directions → Local optimizer
 
 ### 2026-01-13 · Merma Líquida Proporcional + Optimización Cajones
 - `fn_completar_orden_produccion` distribuye merma líquida proporcionalmente entre productos generados (`merma_real_kg`)
