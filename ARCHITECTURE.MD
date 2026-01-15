@@ -59,6 +59,63 @@
 
 ---
 
+## 🤖 Skills de IA - INSTALADAS ✅
+
+El sistema cuenta con 69 skills instaladas para mejorar la productividad del desarrollo:
+
+### Skills Personalizadas de Alta Prioridad (6)
+
+| Skill | Descripción | Uso |
+|-------|-------------|-----|
+| **avicola-react-best-practices** | React y Next.js 16 performance optimization | Al escribir componentes React/Next.js |
+| **avicola-test-driven-development** | Test-driven development para ERP | Al escribir tests de módulos críticos |
+| **avicola-systematic-debugging** | Systematic debugging guide | Al troubleshooting de producción |
+| **avicola-software-architecture** | Software architecture guide | Al tomar decisiones arquitectónicas |
+| **avicola-prompt-engineering** | Prompt engineering para Vertex AI | Al mejorar prompts de Gemini |
+| **avicola-mcp-builder** | MCP server builder guide | Al crear servidores MCP |
+
+### Skills Existentes Mejoradas (5)
+
+| Skill | Descripción | Mejoras |
+|-------|-------------|---------|
+| **erp-produccion-stock** | Control FIFO, Merma Líquida | Debugging, optimización de queries |
+| **erp-reparto** | Logística last-mile, GPS tracking | Debugging GPS, rutas, navegación |
+| **erp-tesoreria** | Conciliación bancaria | Debugging matching, acreditación |
+| **erp-ventas-chatbot** | Bot WhatsApp, presupuestos | Debugging bot, conversión |
+| **supabase-rls-audit** | Auditoría RLS | Debugging RLS, patrones por rol |
+
+### Skills Nuevas Creadas (2)
+
+| Skill | Descripción | Características |
+|-------|-------------|----------------|
+| **erp-sucursales-auditoria** | Auditoría de sucursales | Conteos físicos, detección anomalías |
+| **erp-rrhh-liquidaciones** | Liquidaciones de sueldos | Cálculo sueldos, asistencia, adelantos |
+
+### Skills de Antigravity (62)
+
+62 skills genéricas de desarrollo, testing, debugging y más, clasificadas por relevancia:
+- **Alta prioridad (6)**: React best practices, TDD, debugging, architecture, prompt engineering, MCP builder
+- **Media prioridad (5)**: Backend/frontend guidelines, senior architect, doc coauthoring, verification
+- **Baja prioridad (51)**: Skills específicas de otras tecnologías y contextos
+
+### Documentación
+
+- **Skills instaladas**: `.agent/skills/SKILLS_INSTALADAS.md`
+- **Clasificación**: `.agent/skills/SKILLS_CLASIFICACION.md`
+- **Plan de instalación**: `.windsurf/plans/instalar-skills-antigravity-plan.md`
+
+### Invocación Automática
+
+Las skills se invocan automáticamente cuando Cascade detecta contextos relevantes:
+- Al trabajar con componentes React/Next.js → `avicola-react-best-practices`
+- Al escribir tests → `avicola-test-driven-development`
+- Al troubleshooting → `avicola-systematic-debugging`
+- Al diseñar arquitectura → `avicola-software-architecture`
+- Al trabajar con Vertex AI → `avicola-prompt-engineering`
+- Al modificar módulos específicos → Skills correspondientes (erp-*, supabase-rls-audit)
+
+---
+
 ## 🔄 Flujos de Datos Principales - COMPLETOS ✅
 
 ### Flujo A: Aplicación Web (Admin y Repartidor)
