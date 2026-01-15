@@ -122,13 +122,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Registrar información de pago según el caso:
+    // - Si es_cuenta_corriente: Todo a cuenta corriente del cliente
     // - Si es_pago_parcial: Pagó parcialmente
     // - Si motivo_rechazo: Rechazó el pedido
     // - Si monto_cobrado > 0: Ya pagó
     // - Si monto_cobrado = 0 pero hay metodo_pago: Pendiente de pago
     // - Si monto_cobrado = 0 y no hay metodo_pago: Pagará después (solo notas)
 
-    if (data.motivo_rechazo) {
+    if (data.es_cuenta_corriente) {
+      // Todo a cuenta corriente - marcar como registrado (a crédito)
+      updateData.pago_registrado = true
+      updateData.metodo_pago_registrado = 'cuenta_corriente'
+      updateData.monto_cobrado_registrado = 0
+      updateData.notas_pago = data.notas_entrega || 'Cargado a cuenta corriente'
+    } else if (data.motivo_rechazo) {
       // Pedido rechazado
       updateData.pago_registrado = true // Marcamos como "registrado" para que se pueda ver el estado
       updateData.metodo_pago_registrado = null
