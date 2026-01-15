@@ -1,6 +1,6 @@
 # 🏗️ Arquitectura del Sistema - Avícola del Sur ERP
 
-**Última Actualización:** 14 de Enero 2026 (22:40)  
+**Última Actualización:** 15 de Enero 2026 (22:50)  
 **Estado:** ✅ PRODUCCIÓN  
 **Docs relacionadas:** [README](./README.md) · [Architecture Deep-Dive](./ARCHITECTURE.md) · [Supabase Setup](./SUPABASE_SETUP.md)
 
@@ -34,6 +34,7 @@ Sistema ERP modular completo para Avícola del Sur que unifica **Almacén (WMS)*
 2.  **Reparto Autónomo**: Navegación interactiva con selección de rutas (Google Directions), decisión inteligente del próximo cliente y GPS tracking en tiempo real.
 3.  **Conciliación Bancaria AI**: Motor que ingesta extractos PDF/Excel y matchea transacciones automáticamente con movimientos de caja.
 4.  **Producción Científica**: Módulo de desposte con análisis de rendimientos esperados vs reales y control estricto de mermas.
+5.  **Memory Bank Inteligente**: El bot de WhatsApp aprende de cada conversación, extrayendo hechos y preferencias automáticamente para personalizar la atención.
 
 ---
 
@@ -88,10 +89,13 @@ Sistema ERP modular completo para Avícola del Sur que unifica **Almacén (WMS)*
 ### 4. 🛒 Ventas & Clientes
 *Scope: CRM, facturación y toma de pedidos.*
 - **Backend Logic**: `ventas.actions.ts`, `src/app/api/bot/route.ts` (Bot principal), `src/app/api/webhooks/whatsapp-meta/route.ts` (Webhook Meta), `listas-precios.actions.ts`.
-- **Data Models**: `pedidos` (Agregador de entregas), `presupuestos`, `clientes`, `listas_precios`.
+- **AI Core**: `agent.ts` (Orquestador), `memory-extractor.ts` (Extracción de hechos).
+- **Data Models**: `pedidos` (Agregador de entregas), `presupuestos`, `clientes`, `listas_precios`, `bot_sessions` (Contexto persistente).
 - **Features 2.0**:
   - Chatbot NLU para toma de pedidos natural.
   - Listas de precios dinámicas con vigencia y auditoría de cambios.
+  - **Memory Bank Inteligente**: Aprendizaje automático de preferencias por cliente (tipo de negocio, productos favoritos, días de pedido).
+  - **Persistencia de Intenciones**: Capacidad de retomar un pedido pendiente después del registro del cliente.
 
 ### 5. 👥 RRHH (Human Resources)
 *Scope: Gestión de personal, asistencia y pagos.*
@@ -118,6 +122,7 @@ Sistema ERP modular completo para Avícola del Sur que unifica **Almacén (WMS)*
 | Servicio | Implementación | Propósito |
 |----------|----------------|-----------|
 | **Gemini 2.5 Flash** | `src/lib/gemini.ts` | Validaciones rápidas (balanza), Chatbot ventas, Clasificación de Gastos. |
+| **Gemini 2.5 Flash** | `vertex/memory-extractor.ts` | Extracción automática de hechos y preferencias del cliente. |
 | **Gemini 3.0 Pro** | `conciliacion/gemini-matcher.ts` | Razonamiento complejo: Conciliación bancaria y Auditoría de Cobros. |
 | **Maps JS API** | `components/shared/LocationPicker` | Selector de ubicaciones y visualización de rutas |
 | **Directions API** | `lib/rutas/google-directions.ts` | Cálculo de rutas óptimas y alternativas |
@@ -324,6 +329,13 @@ Endpoints que operan sin interfaz gráfica:
 ## 📝 Cambios Recientes (Últimos 5)
 
 > Histórico completo disponible en [ARCHITECTURE.md#📝-cambios-recientes](./ARCHITECTURE.md#📝-cambios-recientes).
+
+### 2026-01-15 · Mejoras de Contexto e Inteligencia del Bot
+- **Memory Bank Inteligente**: Extracción automática de hechos y preferencias con Gemini 2.5 Flash.
+- **Contexto Conversacional**: Historial de mensajes en el prompt de intención para manejar respuestas cortas (ej: "Completa").
+- **Persistencia de Intentos**: El bot recuerda qué quería pedir el cliente antes de registrarse y lo retoma automáticamente.
+- **Herramienta de Precios**: Integración de `consultar_precios` para informar precios reales por cliente o lista mayorista.
+- **Flujo de Registro**: Refinado con resumen de pedido y confirmación previa al alta del cliente.
 
 ### 2026-01-14 · Optimización Bot WhatsApp & Registro de Clientes
 - Registro de clientes con **códigos numéricos consecutivos** y asignación de `zona_id`.

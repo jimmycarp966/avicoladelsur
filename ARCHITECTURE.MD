@@ -7,7 +7,7 @@
 **Sistema ERP Completo y Funcional** diseñado para eliminar silos de información entre Almacén, Ventas, Reparto y Tesorería, creando una única fuente de la verdad en Supabase con planificación semanal de rutas, GPS tracking en tiempo real y optimización automática. Para una introducción operativa rápida revisa el [README](./README.md); este documento es el deep-dive técnico.
 
 ### 🎯 Estado Actual (Enero 2026) - PRODUCCIÓN ✅
-- **Inteligencia Artificial**: Integración profunda de Google Gemini (2.5 Flash y 3.0 Pro) para conciliación bancaria, validación de stock y chatbots. Implementación de **Auto-selección inteligente** de zonas y precios en presupuestos.
+- **Inteligencia Artificial**: Integración profunda de Google Gemini (2.5 Flash y 3.0 Pro) para conciliación bancaria, validación de stock y chatbots. Implementación de **Memory Bank Inteligente** para aprendizaje automático de clientes y **Auto-selección inteligente** de zonas y precios.
 - **Logística Autónoma**: Reparto con navegación interactiva, selección de rutas (Google Directions alternatives) y unificación estricta de zonas mediante `zona_id`.
 - **Producción Científica**: Módulo de desposte con control de rendimientos esperados, mermas líquidas/sólidas y trazabilidad total.
 - **Tesorería Blindada**: Motor de conciliación automática que cruza extractos bancarios vs movimientos de sistema con IA (Gemini 3.0 Pro) y acreditación atómica mediante RPC SQL para evitar desincronización de saldos.
@@ -522,6 +522,9 @@ Para optimizar la logística y la facturación, el sistema implementa un modelo 
 - ✅ **Instrucciones para Repartidores**: Incluye monto y referencia de pago en mensajes de confirmación
 - ✅ **Registro de Reclamos**: Implementado (Schemas, API y Acciones)
 - ✅ **Registro de Clientes**: Máquina de estados en memoria para flujo conversacional (Nombre → Dirección → Localidad)
+- ✅ **Memory Bank Inteligente**: Extracción automática de hechos (tipo de negocio, preferencias, productos favoritos) usando Gemini 2.5 Flash.
+- ✅ **Contexto Conversacional**: Mantiene el historial de la conversación en el prompt de intención para entender respuestas cortas o contextuadas.
+- ✅ **Persistencia de Intentos**: El bot recuerda qué quería pedir un cliente nuevo y retoma el pedido automáticamente tras el registro exitoso.
 - 🚧 **Notificaciones Push**: En desarrollo (Implementado solo para Balanza IoT)
 
 **Máquina de Estados (Registro de Clientes):**

@@ -1,6 +1,6 @@
 # 🚀 Avícola del Sur ERP - Sistema Integral de Gestión
 
-**Versión:** Enero 2026  
+**Versión:** Enero 2026 (v2.1)  
 **Estado:** ✅ PRODUCCIÓN  
 **Docs relacionadas:** [Architecture Summary](./ARCHITECTURE_SUMMARY.md) · [Architecture Deep-Dive](./ARCHITECTURE.md) · [Supabase Setup](./SUPABASE_SETUP.md)
 
@@ -24,6 +24,7 @@
 - **Validación de Peso**: Gemini 2.5 Flash detecta errores de tipeo en balanzas en tiempo real.
 - **Conciliación Bancaria**: Gemini 3.0 Pro analiza extractos bancarios y sugiere matchings contables complejos.
 - **Chatbot de Ventas**: Intérprete de lenguaje natural para toma de pedidos vía WhatsApp.
+- **Memory Bank Inteligente**: Extracción automática de hechos y preferencias con Gemini 2.5 Flash para atención personalizada.
 - **Optimización Logística**: Algoritmos híbridos (Google Optimization + Heurística local) para reparto eficiente.
 
 ### 🚛 Logística Avanzada (TMS)
@@ -424,8 +425,10 @@ Sistema completo de presupuestos que transforma el proceso operativo:
 
 ### Características Principales
 - 🤖 **Bot WhatsApp con Vertex AI**: Gemini 1.5 Flash para conversaciones naturales 24/7
-  - 5 tools: crear-presupuesto, consultar-stock, consultar-estado, consultar-saldo, crear-reclamo
-  - Memory Bank con customer context persistente (productos_frecuentes, preferencias)
+  - 5 tools: consultar-precios, consultar-stock, consultar-estado, consultar-saldo, crear-reclamo
+  - **Memory Bank Inteligente**: Extracción automática de hechos y preferencias (tipo de negocio, productos favoritos, etc.)
+  - **Contexto Conversacional**: Entiende respuestas cortas gracias al historial integrado en el prompt de intención.
+  - **Persistencia de Intentos**: El bot "recuerda" el pedido iniciado por un cliente no registrado y lo retoma automáticamente tras el alta.
   - Creación de presupuestos vía RPC sin validación de usuario (bypass)
 - 📋 **Números Únicos**: PRES-YYYYMMDD-XXXX con links de seguimiento
 - ⏰ **Asignación Automática de Turno**: Al crear presupuesto, se asigna turno según horario:
