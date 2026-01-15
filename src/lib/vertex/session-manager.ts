@@ -27,6 +27,24 @@ export interface CustomerContext {
     total_pedidos?: number
     total_gastado?: number
   }
+  // Intent pendiente para retomar después del registro
+  pending_intent?: {
+    type: 'pedido' | 'consulta_precio' | 'consulta_estado'
+    productos?: Array<{ codigo: string; cantidad: number; nombre?: string }>
+    timestamp: number
+  }
+  // Hechos aprendidos automáticamente de las conversaciones
+  learned_facts?: {
+    tipo_negocio?: string        // ej: "restaurante", "carnicería"
+    dia_preferido?: string       // ej: "viernes"
+    horario_preferido?: string   // ej: "mañana", "tarde"
+    zona_mencionada?: string
+    productos_favoritos?: string[]
+    cantidad_tipica?: string
+    observaciones?: string
+    confianza?: number
+    ultima_extraccion?: string   // timestamp ISO
+  }
 }
 
 /**

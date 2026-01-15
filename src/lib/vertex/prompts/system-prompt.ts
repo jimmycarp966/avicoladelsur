@@ -78,3 +78,58 @@ export const SYSTEM_PROMPT_COMPACTO = `Eres el asistente de Avícola del Sur (Ar
 - Turnos: mañana (antes de 12:00) / tarde (después de 12:00)
 - Horario: 07:00 - 18:00
 - Si no entendés algo, preguntá amablemente`
+
+/**
+ * Genera contexto adicional personalizado basado en hechos aprendidos del cliente
+ */
+export function generatePersonalizedContext(
+    learnedFacts?: {
+        tipo_negocio?: string
+        dia_preferido?: string
+        horario_preferido?: string
+        zona_mencionada?: string
+        productos_favoritos?: string[]
+        cantidad_tipica?: string
+        observaciones?: string
+    },
+    clienteNombre?: string
+): string {
+    if (!learnedFacts || Object.keys(learnedFacts).filter(k => k !== 'confianza' && k !== 'ultima_extraccion').length === 0) {
+        return ''
+    }
+
+    const parts: string[] = []
+
+    if (clienteNombre) {
+        parts.push(`El cliente se llama ${clienteNombre}.`)
+    }
+
+    if (learnedFacts.tipo_negocio) {
+        parts.push(`Tiene un negocio tipo: ${learnedFacts.tipo_negocio}.`)
+    }
+
+    if (learnedFacts.dia_preferido) {
+        parts.push(`Suele pedir los ${learnedFacts.dia_preferido}.`)
+    }
+
+    if (learnedFacts.horario_preferido) {
+        parts.push(`Prefiere entregas por la ${learnedFacts.horario_preferido}.`)
+    }
+
+    if (learnedFacts.productos_favoritos && learnedFacts.productos_favoritos.length > 0) {
+        parts.push(`Sus productos favoritos son: ${learnedFacts.productos_favoritos.join(', ')}.`)
+    }
+
+    if (learnedFacts.cantidad_tipica) {
+        parts.push(`Típicamente pide ${learnedFacts.cantidad_tipica}.`)
+    }
+
+    if (learnedFacts.observaciones) {
+        parts.push(`Nota: ${learnedFacts.observaciones}`)
+    }
+
+    if (parts.length === 0) return ''
+
+    return `\n\nCONTEXTO DEL CLIENTE (información aprendida de conversaciones anteriores):\n${parts.join('\n')}\n\nUsá esta información para personalizar la conversación, pero NO menciones que "recordás" esto a menos que sea natural.`
+}
+

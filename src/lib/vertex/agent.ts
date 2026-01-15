@@ -10,7 +10,8 @@ import { consultarStockTool } from './tools/consultar-stock'
 import { consultarEstadoTool } from './tools/consultar-estado'
 import { consultarSaldoTool } from './tools/consultar-saldo'
 import { crearReclamoTool } from './tools/crear-reclamo'
-import { SYSTEM_PROMPT } from './prompts/system-prompt'
+import { consultarPreciosTool } from './tools/consultar-precios'
+import { SYSTEM_PROMPT, generatePersonalizedContext } from './prompts/system-prompt'
 import { createAdminClient } from '@/lib/supabase/server'
 import { ensureGoogleApplicationCredentials } from './ensure-google-credentials'
 
@@ -105,27 +106,43 @@ export async function processMessageWithTools(
     // Obtener sesión
     const session = await getOrCreateSession(phoneNumber)
 
-    // Primero, intentar interpretar el mensaje con Gemini
+    // Generar contexto personalizado basado en hechos aprendidos
+    const personalizedContext = generatePersonalizedContext(
+      session.customerContext?.learned_facts,
+      session.customerContext?.nombre
+    )
+
+    // Crear modelo con system prompt + contexto personalizado
     const model = vertexAI.getGenerativeModel({
       model: MODEL_NAME,
-      systemInstruction: SYSTEM_PROMPT
+      systemInstruction: SYSTEM_PROMPT + personalizedContext
     })
 
-    // Prompt para detectar intención
-    const intentPrompt = `Analiza el siguiente mensaje de WhatsApp y determina la intención del usuario:
+    // Construir contexto de historial reciente (últimos 3 mensajes)
+    const historialReciente = session.history.length > 0
+      ? session.history.slice(-3)
+        .map(m => `${m.role === 'user' ? 'Cliente' : 'Bot'}: ${m.content.substring(0, 100)}`)
+        .join('\n')
+      : ''
 
-Mensaje: "${message}"
+    // Prompt para detectar intención CON contexto conversacional
+    const intentPrompt = `Analiza el siguiente mensaje de WhatsApp y determina la intención del usuario.
+${historialReciente ? `\nContexto de la conversación:\n${historialReciente}\n` : ''}
+Mensaje actual: "${message}"
 
 Posibles intenciones:
-- pedido: El cliente quiere hacer un pedido
-- consulta_stock: El cliente pregunta por productos disponibles
+- pedido: El cliente quiere hacer un pedido o menciona productos con cantidades
+- consulta_precio: El cliente pregunta por precios, lista de precios, cuánto cuesta algo, o responde "completa/todos" a una pregunta sobre precios
+- consulta_stock: El cliente pregunta por productos disponibles o stock
 - consulta_estado: El cliente pregunta por el estado de un pedido
 - consulta_saldo: El cliente pregunta por su saldo pendiente
 - reclamo: El cliente quiere hacer un reclamo
 - saludo: El cliente está saludando
 - otro: Cualquier otra intención
 
-Responde SOLO con el nombre de la intención (ej: "pedido", "consulta_stock", etc.)`
+IMPORTANTE: Si el mensaje es una respuesta corta como "completa", "todos", "si", "dale", etc., usa el CONTEXTO de la conversación para determinar la intención real.
+
+Responde SOLO con el nombre de la intención (ej: "pedido", "consulta_precio", "consulta_stock", etc.)`
 
     const intentResult = await model.generateContent(intentPrompt)
     const intent = extractTextFromResponse(intentResult.response).trim().toLowerCase()
@@ -186,6 +203,38 @@ Por ejemplo, podés escribir:
           }
         }
         break
+
+      case 'consulta_precio': {
+        // Extraer posible nombre de producto del mensaje
+        const productoFiltro = message.toLowerCase().replace(/precio|cuesta|cuanto|cuánto|lista|precios?/gi, '').trim()
+
+        const preciosResult = await consultarPreciosTool({
+          cliente_id: clienteId,
+          producto_nombre: productoFiltro.length > 2 ? productoFiltro : undefined,
+          mostrar_todos: productoFiltro.length <= 2
+        })
+
+        if (preciosResult.success && preciosResult.productos && preciosResult.productos.length > 0) {
+          const listaPrecios = preciosResult.productos
+            .map(p => `• ${p.nombre}: $${p.precio.toLocaleString('es-AR')}/${p.unidad_medida}`)
+            .join('\n')
+
+          return {
+            text: `📋 *Lista de Precios* (${preciosResult.lista_nombre})
+
+${listaPrecios}
+
+💡 Para hacer un pedido, escribí algo como:
+"Quiero 5 kg de pechuga y 3 kg de ala"`
+          }
+        } else {
+          return {
+            text: `No encontré productos con ese nombre. ¿Podés ser más específico?
+
+Escribí "lista de precios" para ver todos los productos disponibles.`
+          }
+        }
+      }
 
       case 'consulta_stock':
         const stockResult = await consultarStockTool({
@@ -432,3 +481,61 @@ Si no hay un reclamo claro, devuelve null`
     return null
   }
 }
+
+/**
+ * Extrae hechos de la conversación y los guarda en el CustomerContext
+ * Se ejecuta en background (fire-and-forget) para no bloquear la respuesta
+ */
+export async function extractAndSaveFactsInBackground(
+  phoneNumber: string
+): Promise<void> {
+  try {
+    // Importar dinámicamente para evitar dependencias circulares
+    const { extractFactsFromConversation, mergeLearnedFacts } = await import('./memory-extractor')
+    const { getOrCreateSession, updateCustomerContext } = await import('./session-manager')
+
+    const session = await getOrCreateSession(phoneNumber)
+
+    // Solo extraer si hay suficiente historial
+    if (session.history.length < 4) {
+      return
+    }
+
+    // Solo extraer si pasó al menos 5 minutos desde la última extracción
+    const ultimaExtraccion = session.customerContext?.learned_facts?.ultima_extraccion
+    if (ultimaExtraccion) {
+      const minutosDesdeUltima = (Date.now() - new Date(ultimaExtraccion).getTime()) / 1000 / 60
+      if (minutosDesdeUltima < 5) {
+        return
+      }
+    }
+
+    // Extraer hechos
+    const newFacts = await extractFactsFromConversation(session.history)
+
+    if (newFacts && newFacts.confianza >= 30) {
+      // Combinar con hechos existentes
+      const mergedFacts = mergeLearnedFacts(
+        session.customerContext?.learned_facts,
+        newFacts
+      )
+
+      // Agregar timestamp
+      const factsWithTimestamp = {
+        ...mergedFacts,
+        ultima_extraccion: new Date().toISOString()
+      }
+
+      // Guardar
+      await updateCustomerContext(phoneNumber, {
+        learned_facts: factsWithTimestamp
+      })
+
+      console.log(`[Memory Bank] Hechos extraídos para ${phoneNumber}:`, factsWithTimestamp)
+    }
+  } catch (error) {
+    // No fallar silenciosamente pero no bloquear
+    console.error('[Memory Bank] Error extrayendo hechos:', error)
+  }
+}
+

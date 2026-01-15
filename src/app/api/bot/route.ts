@@ -5,7 +5,8 @@ import { crearReclamoBotAction, crearClienteDesdeBotAction } from '@/actions/ven
 import { obtenerListasClienteAction, obtenerPrecioProductoAction } from '@/actions/listas-precios.actions'
 import { sendWhatsAppMessage, getWhatsAppProvider, isWhatsAppMetaAvailable } from '@/lib/services/whatsapp-meta'
 import { interpretarMensajeConIA } from '@/lib/services/whatsapp-ia-interpreter'
-import { processMessageWithTools } from '@/lib/vertex/agent'
+import { processMessageWithTools, extractAndSaveFactsInBackground } from '@/lib/vertex/agent'
+import { updateCustomerContext } from '@/lib/vertex/session-manager'
 import type { MetaListSection } from '@/types/whatsapp-meta'
 
 // Tipos para las llamadas de Botpress
@@ -229,7 +230,7 @@ async function getCuentaCorriente(clienteId: string) {
 // ===========================================
 
 interface RegistroClienteEstado {
-  estado: 'esperando_nombre' | 'esperando_direccion' | 'esperando_zona'
+  estado: 'esperando_confirmacion' | 'esperando_nombre' | 'esperando_direccion' | 'esperando_zona'
   nombre?: string
   apellido?: string
   direccion?: string
@@ -357,6 +358,29 @@ async function procesarRegistroCliente(phoneNumber: string, mensaje: string): Pr
   }
 
   switch (estado.estado) {
+    case 'esperando_confirmacion': {
+      // El cliente vio el resumen de precios y está decidiendo
+      if (bodyLower === 'si' || bodyLower === 'sí' || bodyLower === 'confirmar' || bodyLower === 'confirmo' || bodyLower === 'dale') {
+        // Ahora sí iniciar el registro
+        estado.estado = 'esperando_nombre'
+        estado.timestamp = Date.now()
+
+        return `👋 *¡Excelente! Para completar tu pedido necesitamos algunos datos.*
+
+📝 *Paso 1 de 3*
+Por favor, envía tu *nombre y apellido*:
+
+Ejemplo: *Juan Pérez*`
+      } else if (bodyLower === 'no' || bodyLower === 'cancelar' || bodyLower === 'cancel') {
+        registroClientesPendientes.delete(phoneNumber)
+        return `👍 Sin problema. Si querés consultar algo más, escribí *precios* para ver la lista o *menu* para ver las opciones.`
+      } else {
+        // Probablemente quiere modificar el pedido - dejar que Vertex AI procese
+        registroClientesPendientes.delete(phoneNumber)
+        return null // Devolver null para que se procese normalmente
+      }
+    }
+
     case 'esperando_nombre': {
       // Validar que tenga al menos 2 palabras (nombre y apellido)
       const palabras = mensaje.trim().split(/\s+/)
@@ -503,6 +527,9 @@ Sin embargo, no se pudieron procesar los productos de tu pedido. Por favor inten
           ? productosDetalle.map((detalle, idx) => `   ${idx + 1}. ${detalle}`).join('\n')
           : `${productosDetalle.length} productos diferentes`
 
+        // Limpiar pending_intent del CustomerContext
+        await updateCustomerContext(phoneNumber, { pending_intent: undefined })
+
         return `✅ *¡Cliente registrado y presupuesto creado exitosamente!*
 
 📋 *Número de presupuesto:*
@@ -525,7 +552,7 @@ ${detalleProductos}
       } else {
         return `✅ *¡Cliente registrado exitosamente!*
 
-Sin embargo, hubo un error al crear el presupuesto: ${presupuestoResult.message}
+Sin embargo, hubo un error al crear el presupuesto: ${presupuestoResult.error || presupuestoResult.message || 'Error desconocido'}
 
 Por favor intenta crear un nuevo presupuesto escribiendo el código y cantidad.`
       }
@@ -1222,12 +1249,78 @@ async function handleTwilioWebhook(formData: FormData) {
             const cliente = await findClienteByPhone(phoneNumber)
 
             if (!cliente) {
-              // Iniciar registro con los productos detectados
-              const productosParaRegistro = productos.map((p: any) => ({
-                codigo: p.nombre.toUpperCase().replace(/\s+/g, ''),
-                cantidad: p.cantidad
-              }))
-              responseMessage = iniciarRegistroCliente(phoneNumber, productosParaRegistro)
+              // Cliente no registrado: mostrar resumen del pedido detectado y preguntar si confirma
+              // El registro se pedirá SOLO cuando confirme que quiere comprar
+              const supabase = await createClient()
+
+              // Buscar precios de los productos detectados
+              const productosConPrecios: Array<{ nombre: string; cantidad: number; precio: number; unidad: string }> = []
+
+              for (const prod of productos) {
+                const { data: productoEncontrado } = await supabase
+                  .from('productos')
+                  .select('nombre, precio_venta, unidad_medida')
+                  .ilike('nombre', `%${prod.nombre}%`)
+                  .eq('activo', true)
+                  .limit(1)
+                  .single()
+
+                if (productoEncontrado) {
+                  productosConPrecios.push({
+                    nombre: productoEncontrado.nombre,
+                    cantidad: prod.cantidad,
+                    precio: productoEncontrado.precio_venta || 0,
+                    unidad: prod.unidad || 'kg'
+                  })
+                }
+              }
+
+              if (productosConPrecios.length > 0) {
+                const totalEstimado = productosConPrecios.reduce((acc, p) => acc + (p.precio * p.cantidad), 0)
+                const detallePedido = productosConPrecios
+                  .map(p => `• ${p.cantidad} ${p.unidad} de ${p.nombre}: $${(p.precio * p.cantidad).toLocaleString('es-AR')}`)
+                  .join('\n')
+
+                // Guardar productos en memoria para cuando confirme
+                const productosParaRegistro = productos.map((p: any) => ({
+                  codigo: p.nombre.toUpperCase().replace(/\s+/g, ''),
+                  cantidad: p.cantidad,
+                  nombre: p.nombre
+                }))
+
+                // Guardar en estado temporal local (se usará si confirma)
+                registroClientesPendientes.set(phoneNumber, {
+                  estado: 'esperando_confirmacion' as any,
+                  productos_pendientes: productosParaRegistro,
+                  timestamp: Date.now()
+                })
+
+                // TAMBIÉN guardar en sesión persistente (CustomerContext)
+                await updateCustomerContext(phoneNumber, {
+                  pending_intent: {
+                    type: 'pedido',
+                    productos: productosParaRegistro,
+                    timestamp: Date.now()
+                  }
+                })
+
+                responseMessage = `📋 *Resumen de tu pedido:*
+
+${detallePedido}
+
+💰 *Total estimado:* $${totalEstimado.toLocaleString('es-AR')}
+
+¿Querés confirmar este pedido? Respondé *SI* para continuar.
+
+💡 Si querés agregar o cambiar algo, simplemente escribilo (ej: "agregá 2 kg de ala").`
+              } else {
+                // No se encontraron productos válidos
+                responseMessage = `🤔 Entendí que querés: ${productos.map((p: any) => `${p.cantidad} ${p.unidad || 'kg'} de ${p.nombre}`).join(', ')}
+
+Pero no encontré esos productos en nuestro catálogo.
+
+📋 Escribí *precios* para ver la lista de productos disponibles.`
+              }
             } else {
               // Crear presupuesto con productos detectados
               const items: any[] = []
@@ -2340,6 +2433,14 @@ export async function POST(request: NextRequest) {
 
     // Procesar la solicitud
     const response = await handleBotpressWebhook(payload)
+
+    // === Memory Bank: Extraer hechos en background (fire-and-forget) ===
+    // No bloquea la respuesta al usuario
+    if (payload.session?.userId) {
+      extractAndSaveFactsInBackground(payload.session.userId).catch(() => {
+        // Silenciar errores - ya se logean internamente
+      })
+    }
 
     // Retornar respuesta
     return NextResponse.json(response, {
