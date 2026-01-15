@@ -4,6 +4,17 @@ Este documento registra la evolución del sistema, decisiones críticas y leccio
 
 ## 📅 Enero 2026
 
+### Sesión: Mejoras Bot WhatsApp (Zonas, Cliente, Productos)
+- **Fecha**: 2026-01-14
+- **Problemas corregidos**:
+  1. Zonas ahora muestran localidades entre paréntesis (Monteros, Concepción con sus localidades)
+  2. `crearClienteDesdeBotAction` ahora asigna `zona_id` y geocodifica coordenadas automáticamente
+  3. Productos se obtienen dinámicamente de Supabase (eliminada lista mockeada "Ala, Pechuga...")
+  4. Bot insiste en agregar productos si el cliente no especifica ninguno
+- **Archivos modificados**: `route.ts` (obtenerZonasActivas), `ventas.actions.ts` (crearClienteDesdeBotAction), `agent.ts` (extraerProductosDelMensaje, processMessageWithTools), `system-prompt.ts`
+- **Aprendizaje**: Evitar listas hardcodeadas en prompts de IA; consultar siempre datos reales de BD para mantener sincronía. Mapeos temporales como fallback (LOCALIDADES_POR_ZONA) son aceptables mientras se completa la data en BD.
+
+
 ### Sesión: Flujo Cierre de Caja + Retiros Automáticos de Sucursales
 - **Fecha**: 2026-01-13
 - **Implementación**: Sistema de cierre de caja con arqueo detallado de billetes argentinos (100, 200, 500, 1000, 2000, 10000, 20000)

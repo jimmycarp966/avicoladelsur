@@ -67,23 +67,56 @@ async function findClienteByCode(code: string) {
   return cliente
 }
 
-// Función auxiliar para encontrar producto por código
+// Función auxiliar para encontrar producto por código o nombre
 async function findProductoByCode(code: string) {
   const supabase = await createClient()
+  const searchTerm = code.trim().toUpperCase()
 
-  const { data: producto, error } = await supabase
+  // Primero buscar por código exacto
+  const { data: productoExacto, error: errorExacto } = await supabase
     .from('productos')
     .select('id, codigo, nombre, precio_venta, unidad_medida')
-    .eq('codigo', code.toUpperCase())
+    .eq('codigo', searchTerm)
     .eq('activo', true)
     .single()
 
-  if (error && error.code !== 'PGRST116') {
-    console.error('Error finding producto:', error)
-    return null
+  if (productoExacto) {
+    return productoExacto
   }
 
-  return producto
+  // Si no encuentra por código, buscar por nombre parcial
+  const { data: productoPorNombre, error: errorNombre } = await supabase
+    .from('productos')
+    .select('id, codigo, nombre, precio_venta, unidad_medida')
+    .eq('activo', true)
+    .ilike('nombre', `%${searchTerm}%`)
+    .limit(1)
+    .single()
+
+  if (productoPorNombre) {
+    return productoPorNombre
+  }
+
+  // Si tampoco encuentra por nombre, intentar con las primeras 3 letras
+  if (searchTerm.length >= 3) {
+    const { data: productoApprox } = await supabase
+      .from('productos')
+      .select('id, codigo, nombre, precio_venta, unidad_medida')
+      .eq('activo', true)
+      .ilike('nombre', `${searchTerm.slice(0, 3)}%`)
+      .limit(1)
+      .single()
+
+    if (productoApprox) {
+      return productoApprox
+    }
+  }
+
+  if (errorExacto && errorExacto.code !== 'PGRST116') {
+    console.error('Error finding producto:', errorExacto)
+  }
+
+  return null
 }
 
 // Función auxiliar para obtener estado de pedido
@@ -238,13 +271,24 @@ function limpiarEstadosExpirados() {
   }
 }
 
-// Función auxiliar para obtener zonas activas
+// Mapeo de localidades para zonas (usado si no hay data en BD)
+const LOCALIDADES_POR_ZONA: Record<string, string[]> = {
+  'Monteros': ['Achereal', 'Sta Lucía', 'El Cercado', 'Maldonado', 'Cáceres'],
+  'Concepción': ['Río Seco', 'Villa Quinteros', 'Arcadia', 'León Rougés', 'Trinidad'],
+}
+
+// Función auxiliar para obtener zonas activas con sus localidades
 async function obtenerZonasActivas() {
   const supabase = await createClient()
 
-  const { data, error } = await supabase
+  // Intentar obtener zonas con localidades desde BD
+  const { data: zonasData, error } = await supabase
     .from('zonas')
-    .select('id, nombre')
+    .select(`
+      id, 
+      nombre,
+      localidades (nombre)
+    `)
     .eq('activo', true)
     .order('nombre', { ascending: true })
 
@@ -253,7 +297,30 @@ async function obtenerZonasActivas() {
     return []
   }
 
-  return data || []
+  if (!zonasData) return []
+
+  // Formatear zonas con localidades
+  return zonasData.map((zona: any) => {
+    // Obtener localidades de la BD o del mapeo temporal
+    let localidadesArray: string[] = []
+
+    if (zona.localidades && Array.isArray(zona.localidades) && zona.localidades.length > 0) {
+      localidadesArray = zona.localidades.map((l: any) => l.nombre).filter(Boolean)
+    } else if (LOCALIDADES_POR_ZONA[zona.nombre]) {
+      // Usar mapeo temporal si no hay localidades en BD
+      localidadesArray = LOCALIDADES_POR_ZONA[zona.nombre]
+    }
+
+    const localidadesTexto = localidadesArray.length > 0
+      ? ` (${localidadesArray.join(', ')})`
+      : ''
+
+    return {
+      id: zona.id,
+      nombre: zona.nombre,
+      nombre_con_localidades: `${zona.nombre}${localidadesTexto}`
+    }
+  })
 }
 
 // Función para iniciar flujo de registro de cliente
@@ -337,7 +404,7 @@ Selecciona tu *zona* (responde con el número):
 
 `
       zonas.forEach((zona: any, index: number) => {
-        mensajeZonas += `${index + 1}. ${zona.nombre}\n`
+        mensajeZonas += `${index + 1}. ${zona.nombre_con_localidades}\n`
       })
       mensajeZonas += `\nResponde con el número de tu zona.`
 
@@ -1055,15 +1122,15 @@ async function handleTwilioWebhook(formData: FormData) {
     const pending = pendingConfirmations.get(phoneNumber)
     const isPendingConfirmationReply = Boolean(
       pending &&
-        (
-          bodyLower === 'si' ||
-          bodyLower === 'sí' ||
-          bodyLower === 'confirmar' ||
-          bodyLower === 'confirmo' ||
-          bodyLower === 'no' ||
-          bodyLower === 'cancelar' ||
-          bodyLower === 'cancel'
-        )
+      (
+        bodyLower === 'si' ||
+        bodyLower === 'sí' ||
+        bodyLower === 'confirmar' ||
+        bodyLower === 'confirmo' ||
+        bodyLower === 'no' ||
+        bodyLower === 'cancelar' ||
+        bodyLower === 'cancel'
+      )
     )
 
     let vertexHandled = false

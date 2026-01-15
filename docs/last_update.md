@@ -1,25 +1,17 @@
-# Última Actualización - 2026-01-14
-
-## Fecha y Hora
-2026-01-14 15:32:00 -03:00
+# Evidencia de Actualización
+**Fecha y Hora:** 14 de enero de 2026 - 22:45
 
 ## Archivos Modificados
-- `src/lib/rutas/ors-directions.ts` - Funciones `optimizeRouteORS()` y `getOptimizedRoute()`
-- `src/components/reparto/MonitorMap.tsx` - Sincronización de orden optimizado con marcadores
+- `.context/MEMORY.md`
+- `src/actions/ventas.actions.ts`
+- `src/app/api/bot/route.ts`
+- `src/lib/vertex/agent.ts`
+- `src/lib/vertex/prompts/system-prompt.ts`
+- `ARCHITECTURE_SUMMARY.md`
+- `docs/CHANGELOG.md`
 
-## Archivos Nuevos (no trackeados)
-- `.agent/skills/` - Skills de desarrollo
+## Resumen del Cambio
+Se optimizó el Bot WhatsApp para mejorar el flujo de registro de clientes (códigos numéricos consecutivos, geocodificación de coordenadas y asignación de zona_id) y la precisión en la toma de pedidos mediante lectura dinámica de productos desde Supabase y un sistema inteligente de búsqueda (código/nombre), impacto: mejora en la consistencia de datos de clientes y tickets de venta.
 
-## Resumen Técnico
-Se integró OpenRouteService (ORS) Optimization API para calcular el orden óptimo de visitas en las rutas de reparto. El sistema ahora usa el algoritmo VROOM (TSP solver) que considera calles reales de OpenStreetMap, incluyendo sentidos de calle editados por el usuario. Los marcadores del mapa ahora reflejan el orden de visita optimizado.
-
-Impacto: Mejora en eficiencia de rutas (menos distancia, menos tiempo). Sin cambios en DB schema.
-
-## Diagrama
-N/A (sin cambios arquitecturales mayores)
-
-## Checklist
-- [x] `ARCHITECTURE_SUMMARY.md` actualizado (sección Cambio reciente + Features 2.0)
-- [x] `docs/CHANGELOG.md` con nueva línea
-- [x] `docs/last_update.md` con evidencia
-- [ ] Commit y push pendientes
+## Diagrama de Arquitectura
+Ruta: `docs/diagrams/architecture.mmd` (Actualizado para reflejar flujo Bot -> DB dinámico)

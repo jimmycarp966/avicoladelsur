@@ -1,6 +1,27 @@
 # Changelog - Avícola del Sur ERP
 
 ## 2026-01-14 — Antigravity
+**Feat: Optimización Bot WhatsApp & Registro de Clientes**
+
+Se implementaron mejoras críticas en el flujo de ventas vía WhatsApp y el registro de nuevos clientes:
+
+- **Registro de Clientes con códigos numéricos consecutivos**: Ahora el sistema busca automáticamente el último código numérico y asigna el siguiente (ej: 1500 -> 1501).
+- **Geocodificación PostGIS**: Al registrar un cliente desde el bot, la dirección se geocodifica automáticamente para obtener coordenadas de entrega.
+- **Asignación de zona_id**: Corrección en el INSERT de clientes para persistir correctamente el ID de la zona.
+- **Toma de pedidos con lectura dinámica de productos**: El bot ahora consulta la lista real de productos activos de Supabase, eliminando la dependencia de listas estáticas/mockeadas.
+- **Búsqueda Inteligente de Productos (`findProductoByCode`)**: Búsqueda en 3 pasos (Código exacto -> Nombre parcial -> Prefijo) para maximizar la resolución de items mencionados por el cliente.
+- **Lógica de Insistencia**: El bot ahora solicita productos explícitamente si detecta intención de pedido sin items válidos.
+
+**Archivos modificados:**
+- `src/app/api/bot/route.ts` (Zonas con localidades, findProductoByCode, lógica de registro)
+- `src/actions/ventas.actions.ts` (crearClienteDesdeBotAction con zona_id, coordenadas y códigos consecutivos)
+- `src/lib/vertex/agent.ts` (extraerProductosDelMensaje dinámico e insistencia en pedidos)
+- `src/lib/vertex/prompts/system-prompt.ts` (Actualización de instrucciones de productos)
+
+---
+
+
+## 2026-01-14 — Antigravity
 **Feat: ORS Optimization API - Optimización Inteligente de Rutas de Reparto**
 
 Se integró OpenRouteService (ORS) Optimization API para calcular el orden óptimo de visitas en las rutas de reparto, considerando calles reales de OpenStreetMap:

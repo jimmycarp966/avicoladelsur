@@ -157,6 +157,32 @@ Si querés, te sugiero 1 opción para aprovechar el envío.`,
                 text: `Hubo un error creando el presupuesto: ${result.error}. ¿Podés intentarlo de otra forma?`
               }
             }
+          } else {
+            // No se detectaron productos - insistir para que agregue al menos uno
+            const supabase = createAdminClient()
+            const { data: productosDisponibles } = await supabase
+              .from('productos')
+              .select('nombre')
+              .eq('activo', true)
+              .limit(8)
+              .order('nombre', { ascending: true })
+
+            const listaProductos = productosDisponibles?.map((p: any) => p.nombre).join(', ') || 'Ala, Pechuga, Muslo, Filet'
+
+            return {
+              text: `¡Genial que quieras hacer un pedido! 🛒
+
+Para armar tu presupuesto necesito saber qué productos querés llevar.
+
+📦 *Productos disponibles:*
+${listaProductos}
+
+Por ejemplo, podés escribir:
+• "5 kg de ala y 3 kg de pechuga"
+• "2 cajones de filet"
+
+¿Qué te gustaría llevar?`
+            }
           }
         }
         break
@@ -248,28 +274,55 @@ Si querés, te sugiero 1 opción para aprovechar el envío.`,
 }
 
 /**
- * Extrae productos de un mensaje usando Gemini
+ * Extrae productos de un mensaje usando Gemini con lista real de Supabase
  */
 async function extraerProductosDelMensaje(
   message: string
 ): Promise<Array<{ producto_id: string; cantidad: number }>> {
   try {
+    const supabase = createAdminClient()
+
+    // Obtener lista real de productos activos desde Supabase
+    const { data: productosDB, error: prodError } = await supabase
+      .from('productos')
+      .select('id, codigo, nombre')
+      .eq('activo', true)
+      .order('nombre', { ascending: true })
+
+    if (prodError || !productosDB || productosDB.length === 0) {
+      console.error('[Extraer Productos] Error obteniendo productos de BD:', prodError)
+      return []
+    }
+
+    // Construir lista de productos para el prompt
+    const listaProductos = productosDB
+      .map((p: any) => `${p.codigo}: ${p.nombre}`)
+      .join('\n')
+
     const model = vertexAI.getGenerativeModel({
       model: MODEL_NAME
     })
 
-    const prompt = `Extrae los productos y cantidades del siguiente mensaje:
+    const prompt = `Extrae los productos y cantidades del siguiente mensaje de WhatsApp:
 
 "${message}"
 
-Productos disponibles: Ala, Pechuga, Muslo, Pata, Filet, Suprema
+Lista de productos disponibles (CÓDIGO: NOMBRE):
+${listaProductos}
 
-Responde SOLO con un JSON válido:
+REGLAS:
+- Identifica los productos mencionados en el mensaje
+- Usa el CÓDIGO exacto del producto (no el nombre)
+- Si mencionan un producto parcialmente (ej: "ala", "pechuga"), encuentra el más cercano
+- Las cantidades pueden estar en kg, unidades o cajones
+
+Responde SOLO con un JSON válido. Ejemplo:
 [
-  {"nombre": "NOMBRE_PRODUCTO", "cantidad": NUMERO}
+  {"codigo": "ALA", "cantidad": 5},
+  {"codigo": "PECH", "cantidad": 10}
 ]
 
-Si no mencionan productos, devuelve un array vacío []`
+Si no mencionan productos claramente, devuelve un array vacío []`
 
     const result = await model.generateContent(prompt)
     const text = extractTextFromResponse(result.response)
@@ -277,32 +330,38 @@ Si no mencionan productos, devuelve un array vacío []`
     // Limpiar respuesta
     const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
 
-    let parsed: Array<{ nombre: string; cantidad: number }> = []
+    let parsed: Array<{ codigo: string; cantidad: number }> = []
     try {
       parsed = JSON.parse(cleaned)
     } catch {
+      console.warn('[Extraer Productos] JSON inválido:', cleaned)
       return []
     }
 
     if (!Array.isArray(parsed) || parsed.length === 0) return []
 
-    const supabase = createAdminClient()
+    // Resolver productos por código o nombre
     const resolved: Array<{ producto_id: string; cantidad: number }> = []
 
     for (const item of parsed) {
-      const nombre = (item?.nombre || '').toString().trim()
+      const codigo = (item?.codigo || '').toString().trim().toUpperCase()
       const cantidad = Number(item?.cantidad || 0)
-      if (!nombre || !Number.isFinite(cantidad) || cantidad <= 0) continue
+      if (!codigo || !Number.isFinite(cantidad) || cantidad <= 0) continue
 
-      const { data: producto } = await supabase
-        .from('productos')
-        .select('id, nombre')
-        .eq('activo', true)
-        .ilike('nombre', `%${nombre}%`)
-        .limit(1)
-        .single()
+      // Buscar primero por código exacto, luego por nombre similar
+      let producto = productosDB.find((p: any) =>
+        p.codigo.toUpperCase() === codigo
+      )
 
-      if (producto?.id) {
+      if (!producto) {
+        // Buscar por nombre similar
+        producto = productosDB.find((p: any) =>
+          p.nombre.toUpperCase().includes(codigo) ||
+          codigo.includes(p.nombre.toUpperCase().slice(0, 3))
+        )
+      }
+
+      if (producto) {
         resolved.push({ producto_id: producto.id, cantidad })
       }
     }

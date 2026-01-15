@@ -145,17 +145,29 @@ export async function crearClienteDesdeBotAction(
       ? `${clienteData.nombre} ${clienteData.apellido}`
       : clienteData.nombre
 
-    // Generar código automático basado en timestamp y nombre
-    // Formato: CLI-YYYYMMDDHHMMSS o usar un contador
-    const timestamp = Date.now().toString().slice(-10)
-    const codigoBase = nombreCompleto
-      .toUpperCase()
-      .replace(/[^A-Z0-9]/g, '')
-      .slice(0, 10)
-    const codigoAuto = `CLI-${codigoBase}-${timestamp}`.slice(0, 50)
+    // Generar código numérico consecutivo basado en el máximo existente
+    // Buscar el código numérico más alto de los clientes actuales
+    const { data: ultimoCliente } = await supabase
+      .from('clientes')
+      .select('codigo')
+      .order('codigo', { ascending: false })
+      .limit(100)
 
-    // Verificar que el código no exista, si existe, agregar número
-    let codigoFinal = codigoAuto
+    // Encontrar el número más alto de códigos numéricos
+    let maxCodigo = 0
+    if (ultimoCliente && ultimoCliente.length > 0) {
+      for (const cliente of ultimoCliente) {
+        const numCodigo = parseInt(cliente.codigo, 10)
+        if (!isNaN(numCodigo) && numCodigo > maxCodigo) {
+          maxCodigo = numCodigo
+        }
+      }
+    }
+
+    // El nuevo código es el siguiente número
+    let codigoFinal = String(maxCodigo + 1)
+
+    // Verificar que el código no exista (por si acaso)
     let contador = 1
     while (true) {
       const { data: existing } = await supabase
@@ -165,8 +177,27 @@ export async function crearClienteDesdeBotAction(
         .single()
 
       if (!existing) break
-      codigoFinal = `${codigoAuto.slice(0, 45)}-${contador}`.slice(0, 50)
+      codigoFinal = String(maxCodigo + 1 + contador)
       contador++
+    }
+
+    // Intentar geocodificar la dirección
+    let coordenadasStr: string | null = null
+    try {
+      const { geocodificarDireccion, construirDireccionCompleta } = await import('@/lib/utils/geocoding')
+      const direccionCompleta = construirDireccionCompleta(
+        clienteData.direccion,
+        zona.nombre,
+        'Tucumán',
+        'Argentina'
+      )
+      const geoResult = await geocodificarDireccion(direccionCompleta)
+      if (geoResult.success && geoResult.data) {
+        coordenadasStr = `SRID=4326;POINT(${geoResult.data.lng} ${geoResult.data.lat})`
+      }
+    } catch (geoError) {
+      // Si falla geocodificación, continuar sin coordenadas
+      console.warn('[Bot] Error geocodificando dirección:', geoError)
     }
 
     const { data: cliente, error } = await supabase
@@ -177,7 +208,9 @@ export async function crearClienteDesdeBotAction(
         telefono: clienteData.telefono || clienteData.whatsapp,
         whatsapp: clienteData.whatsapp,
         direccion: clienteData.direccion,
+        zona_id: clienteData.zona_id,
         zona_entrega: zona.nombre,
+        coordenadas: coordenadasStr,
         tipo_cliente: 'minorista',
         limite_credito: 0,
         activo: true,
@@ -605,7 +638,7 @@ export async function obtenerClientePorIdAction(
         .select('zona_id')
         .eq('id', clienteData.localidad_id)
         .single()
-      
+
       if (localidad && localidad.zona_id) {
         clienteData.zona_id = localidad.zona_id
         // También inyectar el objeto localidad por si el frontend lo busca ahí

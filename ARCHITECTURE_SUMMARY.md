@@ -1,6 +1,6 @@
 # 🏗️ Arquitectura del Sistema - Avícola del Sur ERP
 
-**Última Actualización:** Enero 2026  
+**Última Actualización:** 14 de Enero 2026 (22:40)  
 **Estado:** ✅ PRODUCCIÓN  
 **Docs relacionadas:** [README](./README.md) · [Architecture Deep-Dive](./ARCHITECTURE.md) · [Supabase Setup](./SUPABASE_SETUP.md)
 
@@ -325,56 +325,28 @@ Endpoints que operan sin interfaz gráfica:
 
 > Histórico completo disponible en [ARCHITECTURE.md#📝-cambios-recientes](./ARCHITECTURE.md#📝-cambios-recientes).
 
+### 2026-01-14 · Optimización Bot WhatsApp & Registro de Clientes
+- Registro de clientes con **códigos numéricos consecutivos** y asignación de `zona_id`.
+- Geocodificación automática de **coordenadas** PostGIS al registrar direcciones desde el bot.
+- Toma de pedidos con **lectura dinámica de productos** desde Supabase (adiós a listas mockeadas).
+- Sistema inteligente de búsqueda de productos (`findProductoByCode`) con fallback a nombres parciales.
+- Lógica de "insistencia" cuando el bot detecta intención de pedido sin productos especificados.
+
 ### 2026-01-14 · Consistencia Monitor GPS ↔ Vista Repartidor
-- Simplificación de vista repartidor: obtiene datos directamente de `rutas_planificadas` (sin fetch a endpoint)
-- Generación de orden optimizado en tiempo real si no hay ruta planificada (ORS/Google)
-- Incluye retorno a la base en ruta optimizada (`returnToDepot: true`)
-- Logs de debug en client-side para troubleshooting de orden de entregas
-- Asegura que Monitor y repartidor muestren el mismo orden optimizado y polyline
+- Simplificación de vista repartidor: obtiene datos directamente de `rutas_planificadas`.
+- Generación de orden optimizado en tiempo real (ORS/Google).
+- Logs de debug en client-side y retorno a base (`returnToDepot: true`).
 
 ### 2026-01-13 · Migración Routing a OpenRouteService (ORS)
-- Reemplazo de Google Maps Directions API por OpenRouteService (ORS) para routing
-- Wrapper `ors-directions.ts` con fallback ORS → Google → Local optimizer
-- Actualización de MonitorMap, NavigationView, NavigationInteractivo y API alternativas
-- Configuración de OPENROUTESERVICE_API_KEY en .env.example (2,000 requests/día gratis)
-- ORS usa datos de OpenStreetMap más actualizados para resolver problemas de sentidos únicos
-- Cambio de vehicle: 'car' → 'driving-car' para compatibilidad con ORS
+- Reemplazo de Google Maps Directions API por ORS para routing.
+- Wrapper `ors-directions.ts` con fallback ORS → Google → Local optimizer.
+- Cambio de vehicle: 'car' → 'driving-car'.
 
 ### 2026-01-13 · Flujo Cierre de Caja + Retiros Automáticos de Sucursales
-- Sistema de cierre de caja con arqueo detallado de billetes argentinos (100, 200, 500, 1000, 2000, 10000, 20000)
-- Retiros automáticos cuando saldo_final > 50,000 ARS (monto fijo por sucursal)
-- Tablas: `rutas_retiros` (retiros pendientes de validación), `arqueo_billetes` (detalle de billetes)
-- Dashboard de repartidor `/repartidor/dashboard` con retiros y transferencias por zona
-- Validar Rutas muestra retiros con detalle de arqueo para tesorería
-- Zonas asignadas: 3 sucursales → Monteros, 2 sucursales → Simoca
+- Sistema de cierre de caja con arqueo detallado de billetes argentinos.
+- Retiros automáticos cuando saldo_final > 50,000 ARS.
+- Tablas: `rutas_retiros` y `arqueo_billetes`.
 
 ### 2026-01-14 · ORS Optimization API para Rutas de Reparto
-- Integración con OpenRouteService Optimization API (algoritmo VROOM/TSP solver)
-- Optimización automática del orden de visitas considerando calles reales de OSM
-- Sincronización de marcadores del mapa con orden de visita optimizado
-- Fallback chain: ORS → Google Directions → Local optimizer
-
-### 2026-01-13 · Merma Líquida Proporcional + Optimización Cajones
-- `fn_completar_orden_produccion` distribuye merma líquida proporcionalmente entre productos generados (`merma_real_kg`)
-- UI de producción autocalcula peso de cajones usando `kg_por_unidad_mayor` (20 kg por caja)
-- Activación automática de `venta_mayor_habilitada` para productos tipo "cajón" (migración)
-
-### 2026-01-13 · Twilio-only + Unificación de Zonas + Bot Vertex-first
-- Unificación de zonas duplicadas ("Valles" → "Tafi del valle") en Supabase (actualizando FKs)
-- WhatsApp configurado para operar Twilio-only por `WHATSAPP_PROVIDER=twilio` (sin botones/listas de Meta)
-- Webhook `/api/bot` prioriza Vertex AI (incluye saludos/ayuda) y aplica venta consultiva no invasiva
-
-### 2026-01-13 · Vertex AI Agent Builder Integration
-- Bot WhatsApp con Gemini 1.5 Flash para conversaciones naturales 24/7
-- 5 tools: crear-presupuesto, consultar-stock, consultar-estado, consultar-saldo, crear-reclamo
-- Memory Bank con customer context persistente (productos_frecuentes, preferencias)
-- Creación de presupuestos vía RPC sin validación de usuario (bypass)
-- Script de prueba `test-bot-webhook.ts` para testing local
-
-### 2026-01-12 · Indicadores de Stock en Presupuestos
-- Indicadores visuales de Stock Real/Preventivo en selección de productos.
-- Nueva RPC `fn_obtener_productos_con_stock_detalle` para cálculo unificado.
-
-### 2026-01-12 · Fix Conversión Mayorista Pesable
-- `fn_convertir_presupuesto_a_pedido` respeta `peso_final` real en mayoristas pesables.
-- Script de saneamiento ejecutado sobre pedidos afectados.
+- Integración con ORS Optimization API (VROOM/TSP solver).
+- Optimización automática del orden de visitas.

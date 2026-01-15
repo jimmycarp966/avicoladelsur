@@ -1,10 +1,23 @@
 graph TD
-    UI[Presupuesto Form] --> |Select Client| SA[obtenerClientePorIdAction]
-    SA --> |Return| CD[Client Data: Zona + Listas]
-    CD --> |Auto-Apply| UI
-    UI --> |Submit| CP[crearPedidoAction]
-    DB[(Supabase)] <--> SA
-    DB <--> CP
+    User[Cliente WhatsApp] --> |Mensaje| Bot[Webhook /api/bot]
+    Bot --> |NLU Intent| Gemini[Gemini 1.5 Flash]
+    Gemini --> |Extract Products| DB[(Supabase)]
+    DB --> |Lista Productos Activos| Gemini
+    Gemini --> |Tool: crear-presupuesto| SA[ventas.actions.ts]
+    SA --> |RPC: fn_crear_presupuesto_desde_bot| DB
     
-    Mig[Migration SQL] --> |Mass Update| DB
-    Mig --> |Set All Active to| ML[MAYORISTA Price List]
+    Bot --> |Flow: Registro| Reg[crearClienteDesdeBotAction]
+    Reg --> |Geocoding| GMap[Google Maps API]
+    GMap --> |Coordinates| Reg
+    Reg --> |Next Code| DB
+    Reg --> |Insert Cliente| DB
+    
+    subgraph CRM / Ventas
+        SA
+        Reg
+    end
+    
+    subgraph IA Services
+        Gemini
+        GMap
+    end
