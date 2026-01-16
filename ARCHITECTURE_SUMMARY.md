@@ -330,6 +330,12 @@ Endpoints que operan sin interfaz gráfica:
 
 > Histórico completo disponible en [ARCHITECTURE.md#📝-cambios-recientes](./ARCHITECTURE.md#📝-cambios-recientes).
 
+### 2026-01-16 · Ajustes en Experiencia de Repartidor (UX)
+- **Redirección tras Cobro**: El sistema ahora redirige automáticamente al mapa de navegación interactiva tras un cobro exitoso, optimizando el flujo de trabajo en calle.
+- **Selector de Facturas Vencidas**: Integración de deuda anterior en el flujo de pago, permitiendo seleccionar y cobrar múltiples facturas pendientes del cliente de forma atómica.
+- **Refactorización de Devoluciones**: Reordenamiento del formulario (Motivo primero) y campos condicionales para reducir la carga cognitiva del repartidor.
+- **Imputación de Pagos**: Soporte en API para aplicar pagos a facturas específicas desde el módulo de reparto.
+
 ### 2026-01-15 · Mejoras de Contexto e Inteligencia del Bot
 - **Memory Bank Inteligente**: Extracción automática de hechos y preferencias con Gemini 2.5 Flash.
 - **Contexto Conversacional**: Historial de mensajes en el prompt de intención para manejar respuestas cortas (ej: "Completa").

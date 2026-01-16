@@ -323,7 +323,20 @@ export default async function EntregaDetallePage({ params }: PageProps) {
     )
   }
 
-  return <EntregaDetalleContent entrega={entrega} />
+  // 3. Obtener resumen de cuenta del cliente (facturas pendientes)
+  let resumenCuenta: any = null
+  if (entrega?.pedido?.cliente?.id) {
+    const { data: resumen, error: resError } = await supabase
+      .rpc('fn_obtener_resumen_cuenta_cliente', {
+        p_cliente_id: entrega.pedido.cliente.id
+      })
+
+    if (!resError && resumen) {
+      resumenCuenta = resumen
+    }
+  }
+
+  return <EntregaDetalleContent entrega={entrega} resumenCuenta={resumenCuenta} />
 }
 
 

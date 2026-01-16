@@ -20,6 +20,7 @@ const registrarEntregaSchema = z.object({
   es_pago_parcial: z.boolean().optional(),
   motivo_rechazo: z.string().optional(),
   estado_entrega: z.enum(['pendiente', 'entregado', 'rechazado']).optional(),
+  facturas_pagadas: z.array(z.string().uuid()).optional(),
 })
 
 export async function POST(request: NextRequest) {
@@ -274,6 +275,35 @@ export async function POST(request: NextRequest) {
           factura_id: factura.id,
           estado: estadoFactura
         })
+      }
+
+      // PROCESAR FACTURAS ADICIONALES (DEUDA ANTERIOR)
+      if (data.facturas_pagadas && data.facturas_pagadas.length > 0) {
+        console.log('[API/entrega] Procesando facturas adicionales:', data.facturas_pagadas)
+
+        for (const facturaId of data.facturas_pagadas) {
+          // Obtener datos de la factura para saber el saldo
+          const { data: facturaData } = await supabase
+            .from('facturas')
+            .select('saldo_pendiente, cliente_id')
+            .eq('id', facturaId)
+            .single()
+
+          if (facturaData) {
+            // Registrar pago en cuenta corriente para esta factura específica
+            // Usando el RPC fn_registrar_pago_cuenta_corriente que es atómico
+            await supabase.rpc('fn_registrar_pago_cuenta_corriente', {
+              p_cliente_id: facturaData.cliente_id,
+              p_monto: facturaData.saldo_pendiente,
+              p_metodo_pago: data.metodo_pago || 'efectivo',
+              p_descripcion: `Pago factura ${facturaId.slice(0, 8)} vía reparto`,
+              p_usuario_id: user.id,
+              p_factura_id: facturaId
+            })
+
+            console.log(`[API/entrega] Pago registrado para factura ${facturaId}`)
+          }
+        }
       }
     }
 

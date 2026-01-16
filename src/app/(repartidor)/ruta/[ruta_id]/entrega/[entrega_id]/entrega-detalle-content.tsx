@@ -37,6 +37,7 @@ import { createClient } from '@/lib/supabase/client'
 
 interface EntregaDetalleContentProps {
   entrega: any
+  resumenCuenta?: any
 }
 
 const motivosDevolucion = [
@@ -47,7 +48,7 @@ const motivosDevolucion = [
   { value: 'otro', label: 'Otro' },
 ]
 
-export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
+export function EntregaDetalleContent({ entrega, resumenCuenta }: EntregaDetalleContentProps) {
   const router = useRouter()
   const pedido = entrega.pedido
   const cliente = pedido?.cliente
@@ -71,9 +72,13 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
 
   const [productoId, setProductoId] = useState(productos[0]?.producto_id || '')
   const [cantidadDevolucion, setCantidadDevolucion] = useState('')
-  const [motivoDevolucion, setMotivoDevolucion] = useState(motivosDevolucion[0].value)
+  const [motivoDevolucion, setMotivoDevolucion] = useState('')
   const [observacionesDevolucion, setObservacionesDevolucion] = useState('')
   const [devolucionLoading, setDevolucionLoading] = useState(false)
+
+  // Estado para selección de facturas
+  const [facturasSeleccionadas, setFacturasSeleccionadas] = useState<string[]>([])
+  const facturasPendientes = resumenCuenta?.facturas_pendientes || []
 
   const [estadoLoading, setEstadoLoading] = useState(false)
 
@@ -147,6 +152,11 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
       bodyData.estado_entrega = 'rechazado'
     }
 
+    // Agregar facturas adicionales si se seleccionaron
+    if (facturasSeleccionadas.length > 0) {
+      bodyData.facturas_pagadas = facturasSeleccionadas
+    }
+
     const response = await fetch('/api/reparto/entrega', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -162,7 +172,11 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
 
     const result = await response.json()
     toast.success(result.data?.nota || 'Información de pago registrada correctamente')
-    router.refresh()
+
+    // Redirigir a la navegación interactiva tras el cobro
+    setTimeout(() => {
+      router.push(`/ruta/${entrega.ruta_id}/mapa`)
+    }, 1500)
   }
 
   const handleRegistrarDevolucion = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -418,6 +432,55 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
                 </select>
               </div>
 
+              {/* Selector de facturas pendientes si existen */}
+              {facturasPendientes.length > 0 && estadoPago !== 'rechazado' && (
+                <div className="bg-slate-50 border rounded-md p-3 space-y-2">
+                  <p className="text-sm font-semibold flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    ¿Desea incluir facturas vencidas?
+                  </p>
+                  <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
+                    {facturasPendientes.map((factura: any) => (
+                      <label key={factura.id} className="flex items-center justify-between p-2 hover:bg-white rounded border cursor-pointer">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={facturasSeleccionadas.includes(factura.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setFacturasSeleccionadas([...facturasSeleccionadas, factura.id])
+                                // Al seleccionar una factura, sumamos su saldo al monto cobrado si está en modo 'pagado'
+                                if (estadoPago === 'pagado') {
+                                  const actual = parseFloat(montoCobrado) || 0
+                                  setMontoCobrado((actual + parseFloat(factura.saldo_pendiente)).toFixed(2))
+                                }
+                              } else {
+                                setFacturasSeleccionadas(facturasSeleccionadas.filter(id => id !== factura.id))
+                                if (estadoPago === 'pagado') {
+                                  const actual = parseFloat(montoCobrado) || 0
+                                  setMontoCobrado(Math.max(0, actual - parseFloat(factura.saldo_pendiente)).toFixed(2))
+                                }
+                              }
+                            }}
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                          />
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium">{factura.numero_factura}</span>
+                            <span className="text-xs text-muted-foreground">{new Date(factura.fecha_emision).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                        <span className="text-sm font-bold text-red-600">
+                          ${parseFloat(factura.saldo_pendiente).toLocaleString('es-AR')}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground italic">
+                    Seleccione las facturas que el cliente abonará adicionalmente hoy.
+                  </p>
+                </div>
+              )}
+
               {estadoPago === 'pagado' && (
                 <>
                   <div className="space-y-1">
@@ -667,40 +730,14 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
           <CardContent>
             <form className="space-y-3" onSubmit={handleRegistrarDevolucion}>
               <div className="space-y-1">
-                <Label>Producto</Label>
-                <select
-                  className="w-full rounded-md border px-3 py-2 text-sm"
-                  value={productoId}
-                  onChange={(e) => setProductoId(e.target.value)}
-                  disabled={productos.length === 0}
-                >
-                  {productos.length === 0 && <option>No hay productos en el pedido</option>}
-                  {productos.map((detalle: any) => (
-                    <option key={detalle.id} value={detalle.producto_id}>
-                      {detalle.producto?.nombre} ({detalle.cantidad} {detalle.producto?.unidad_medida || 'un'})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <Label>Cantidad a devolver</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={cantidadDevolucion}
-                  onChange={(e) => setCantidadDevolucion(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label>Motivo</Label>
+                <Label>Motivo *</Label>
                 <select
                   className="w-full rounded-md border px-3 py-2 text-sm"
                   value={motivoDevolucion}
                   onChange={(e) => setMotivoDevolucion(e.target.value)}
+                  required
                 >
+                  <option value="">Selecciona un motivo</option>
                   {motivosDevolucion.map(motivo => (
                     <option key={motivo.value} value={motivo.value}>
                       {motivo.label}
@@ -709,15 +746,47 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
                 </select>
               </div>
 
-              <div className="space-y-1">
-                <Label>Observaciones</Label>
-                <Textarea
-                  value={observacionesDevolucion}
-                  onChange={(e) => setObservacionesDevolucion(e.target.value)}
-                  placeholder="Detalle la razón de la devolución"
-                  rows={3}
-                />
-              </div>
+              {motivoDevolucion && (
+                <>
+                  <div className="space-y-1">
+                    <Label>Producto</Label>
+                    <select
+                      className="w-full rounded-md border px-3 py-2 text-sm"
+                      value={productoId}
+                      onChange={(e) => setProductoId(e.target.value)}
+                      disabled={productos.length === 0}
+                    >
+                      {productos.length === 0 && <option>No hay productos en el pedido</option>}
+                      {productos.map((detalle: any) => (
+                        <option key={detalle.id} value={detalle.producto_id}>
+                          {detalle.producto?.nombre} ({detalle.cantidad} {detalle.producto?.unidad_medida || 'un'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label>Cantidad a devolver</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={cantidadDevolucion}
+                      onChange={(e) => setCantidadDevolucion(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label>Observaciones</Label>
+                    <Textarea
+                      value={observacionesDevolucion}
+                      onChange={(e) => setObservacionesDevolucion(e.target.value)}
+                      placeholder="Detalle la razón de la devolución"
+                      rows={3}
+                    />
+                  </div>
+                </>
+              )}
 
               <Button
                 type="submit"
@@ -847,6 +916,6 @@ export function EntregaDetalleContent({ entrega }: EntregaDetalleContentProps) {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </div >
   )
 }
