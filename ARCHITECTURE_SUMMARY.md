@@ -1,6 +1,6 @@
 # 🏗️ Arquitectura del Sistema - Avícola del Sur ERP
 
-**Última Actualización:** 15 de Enero 2026 (22:50)  
+**Última Actualización:** 17 de Enero 2026 (14:45)  
 **Estado:** ✅ PRODUCCIÓN  
 **Docs relacionadas:** [README](./README.md) · [Architecture Deep-Dive](./ARCHITECTURE.md) · [Supabase Setup](./SUPABASE_SETUP.md)
 
@@ -98,12 +98,13 @@ Sistema ERP modular completo para Avícola del Sur que unifica **Almacén (WMS)*
   - **Persistencia de Intenciones**: Capacidad de retomar un pedido pendiente después del registro del cliente.
 
 ### 5. 👥 RRHH (Human Resources)
-*Scope: Gestión de personal, asistencia y pagos.*
-- **Backend Logic**: `rrhh.actions.ts`, `reportes-empleados.actions.ts`.
-- **Data Models**: `rrhh_empleados`, `rrhh_asistencias` (Geo-fenced), `rrhh_liquidaciones`, `rrhh_adelantos`.
+*Scope: Gestión de personal, asistencia, pagos y comunicación interna.*
+- **Backend Logic**: `rrhh.actions.ts`, `reportes-empleados.actions.ts`, `mensajes.actions.ts`.
+- **Data Models**: `rrhh_empleados`, `rrhh_asistencias` (Geo-fenced), `rrhh_liquidaciones`, `rrhh_adelantos`, `mensajes_internos`.
 - **Features 2.0**:
   - Cálculo de nómina automático basado en presentismo.
   - Adelantos con límite automático según sueldo básico.
+  - **Mensajería Interna**: Sistema de comunicación entre empleados con bandeja de entrada, enviados, y marcado de leídos.
 
 ### 6. 🏪 Sucursales & POS
 *Scope: Gestión de puntos de venta distribuidos.*
@@ -179,6 +180,7 @@ El sistema sigue una arquitectura **Server-Authoritative** estricta para garanti
 | | `ventas-sucursal.actions.ts` | Ventas locales |
 | | `sucursales-transferencias.actions.ts` | Transferencias inter-sucursales |
 | **RRHH** | `rrhh.actions.ts` | Empleados, asistencia, liquidaciones |
+| | `mensajes.actions.ts` | Mensajería interna entre empleados |
 | **Reportes** | `reportes.actions.ts` | Reportes generales |
 | | `reportes-almacen.actions.ts` | Reportes de stock |
 | | `reportes-clientes.actions.ts` | Análisis de clientes |
@@ -239,7 +241,7 @@ Jerarquía completa de opciones disponibles en el Sidebar Administrativo (`Admin
     *   `Gestión`, `Dashboard` (Vista local), `Ventas (POS)`
     *   `Inventario` (Conteos), `Alertas de Stock`, `Reportes`
 *   **👥 RRHH**:
-    *   `Empleados`, `Asistencia`, `Liquidaciones`, `Adelantos`
+    *   `Empleados`, `Mensajes` (Comunicación interna), `Asistencia`, `Liquidaciones`, `Adelantos`
     *   `Licencias`, `Evaluaciones`, `Novedades`, `Reportes`
 *   **📈 Reportes**:
     *   Ventas, Pedidos, Stock, Almacén, Reparto, Tesorería, Clientes, Empleados, Sucursales
@@ -329,6 +331,17 @@ Endpoints que operan sin interfaz gráfica:
 ## 📝 Cambios Recientes (Últimos 5)
 
 > Histórico completo disponible en [ARCHITECTURE.md#📝-cambios-recientes](./ARCHITECTURE.md#📝-cambios-recientes).
+
+### 2026-01-17 · Sistema de Mensajería Interna
+- **Nueva Tabla**: `mensajes_internos` con RLS para comunicación segura entre empleados.
+- **Módulo RRHH > Mensajes**: Bandeja de entrada, enviados, composición de mensajes, marcado de leídos.
+- **Server Actions**: `mensajes.actions.ts` con operaciones CRUD completas.
+- **Acceso**: Disponible en sidebar bajo RRHH > Mensajes.
+
+### 2026-01-17 · Rediseño UI/UX Dashboard
+- **Nuevos Componentes**: `StatCard`, `PageHeader`, `EmptyState` para consistencia visual.
+- **Mejoras Globales**: Cards con `rounded-2xl`, tablas con zebra striping, badges más grandes.
+- **Dashboard**: Integrado con nuevos componentes de métricas KPI.
 
 ### 2026-01-16 · Ajustes en Experiencia de Repartidor (UX)
 - **Redirección tras Cobro**: El sistema ahora redirige automáticamente al mapa de navegación interactiva tras un cobro exitoso, optimizando el flujo de trabajo en calle.
