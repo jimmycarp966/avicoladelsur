@@ -1,5 +1,4 @@
-@import "tailwindcss";
-@import "tw-animate-css";
+@import "tailwindcss" source("../");
 
 @keyframes accordion-down {
   from {
