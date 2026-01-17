@@ -72,7 +72,6 @@ export default async function AdminDashboard() {
       <PageHeader
         title="Dashboard"
         description={`Bienvenido, ${user?.nombre}. Resumen de tu negocio.`}
-        icon={LayoutDashboard}
       />
 
       {/* Métricas principales con StatCard */}
