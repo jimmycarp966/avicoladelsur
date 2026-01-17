@@ -68,6 +68,30 @@ async function findClienteByCode(code: string) {
   return cliente
 }
 
+// Función auxiliar para guardar mensaje del bot en Supabase
+async function saveBotMessage(
+  phoneNumber: string,
+  message: string,
+  direction: 'incoming' | 'outgoing',
+  clienteId?: string,
+  metadata?: Record<string, any>
+) {
+  try {
+    const supabase = await createClient()
+    
+    await supabase.from('bot_messages').insert({
+      phone_number: phoneNumber,
+      message,
+      direction,
+      cliente_id: clienteId,
+      metadata: metadata || {}
+    })
+  } catch (error) {
+    console.error('[Bot] Error guardando mensaje en bot_messages:', error)
+    // No fallar el flujo principal si falla el guardado
+  }
+}
+
 // Función auxiliar para encontrar producto por código o nombre
 async function findProductoByCode(code: string) {
   const supabase = await createClient()
@@ -1087,6 +1111,9 @@ async function sendBotResponse(phoneNumber: string, message: string, options?: {
 async function sendBotResponseText(phoneNumber: string, message: string): Promise<void> {
   const provider = getWhatsAppProvider()
 
+  // Guardar mensaje outgoing en Supabase
+  await saveBotMessage(phoneNumber, message, 'outgoing')
+
   // Si es Twilio, la respuesta se envía en el XML de Twilio
   // Si es Meta sin botones, usar el servicio de Meta
   if (provider === 'meta') {
@@ -1120,6 +1147,10 @@ async function handleTwilioWebhook(formData: FormData) {
   // Buscar cliente para personalizar mensajes
   const cliente = await findClienteByPhone(phoneNumber)
   const nombreCliente = cliente?.nombre || ''
+  const clienteId = cliente?.id
+
+  // Guardar mensaje incoming en Supabase
+  await saveBotMessage(phoneNumber, body, 'incoming', clienteId)
 
   let responseMessage = ''
 

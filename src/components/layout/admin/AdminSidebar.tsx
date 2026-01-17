@@ -84,6 +84,7 @@ const navigation = [
       { name: 'Listas de Precios', href: '/ventas/listas-precios' },
       { name: 'Facturas', href: '/ventas/facturas' },
       { name: 'Reclamos', href: '/ventas/reclamos' },
+      { name: 'Bot WhatsApp', href: '/admin/bot-chat' },
     ],
   },
   {
