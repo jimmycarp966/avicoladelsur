@@ -148,6 +148,7 @@ const navigation = [
     roles: ['admin'],
     children: [
       { name: 'Empleados', href: '/rrhh/empleados' },
+      { name: 'Mensajes', href: '/rrhh/mensajes' },
       { name: 'Asistencia', href: '/rrhh/asistencia' },
       { name: 'Liquidaciones', href: '/rrhh/liquidaciones' },
       { name: 'Adelantos', href: '/rrhh/adelantos' },
