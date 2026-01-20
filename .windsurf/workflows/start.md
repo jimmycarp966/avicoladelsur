@@ -31,6 +31,13 @@ Este flujo inicializa el contexto de Cascade para trabajar en el ERP de Avícola
    - Listar módulos principales y estado del stack
    - Preguntar: "¿En qué puedo ayudarte hoy?"
 
+## Skills y Documentación
+
+Antes de comenzar cualquier tarea:
+1. Ejecutar `/skills [contexto]` para consultar skills relevantes
+2. Si hay dudas sobre librerías externas, ejecutar `/docs [librería]`
+3. Para auditoría de código, ejecutar `/audit [archivo]`
+
 // turbo
 ## Verificación de Estructura
 ```powershell
@@ -39,4 +46,7 @@ Get-ChildItem .framework, .context, GEMINI.md, ARCHITECTURE_SUMMARY.md
 
 # Verificar módulos principales
 Get-ChildItem src/actions -Directory | Select-Object Name
+
+# Verificar skills disponibles
+Get-ChildItem .windsurf/skills -Directory | Select-Object Name
 ```

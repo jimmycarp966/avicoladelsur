@@ -4,6 +4,19 @@ Este documento registra la evolución del sistema, decisiones críticas y leccio
 
 ## 📅 Enero 2026
 
+### Sesión: Auditoría de Skills + Context7 MCP Integration
+- **Fecha**: 2026-01-17
+- **Problema**: Skills instaladas pero no se consultan automáticamente; Context7 MCP disponible pero no se usa
+- **Cambios realizados**:
+  - Creado workflow `/skills` para consulta automática de skills relevantes por contexto
+  - Creado workflow `/docs` para búsqueda de documentación externa con Context7 MCP
+  - Creado workflow `/audit` para auditoría de código antes de commits
+  - Actualizado workflow `/start` para incluir referencia a skills y docs
+  - Creado `.windsurf/skills/INDEX.md` con mapeo de skills por módulo, tarea y stack
+- **Skills disponibles**: 69 total (6 personalizadas avicola-*, 7 específicas erp-*, 56 antigravity)
+- **Context7 MCP**: Herramientas `mcp0_resolve-library-id` y `mcp0_query-docs` disponibles para buscar documentación actualizada de librerías
+- **Aprendizaje**: Automatizar consulta de skills y documentación externa reduce alucinaciones y mejora calidad del código; Context7 MCP es preferible para dudas sobre APIs de librerías externas
+
 ### Sesión: Mejoras Bot WhatsApp (Zonas, Cliente, Productos)
 - **Fecha**: 2026-01-14
 - **Problemas corregidos**:
