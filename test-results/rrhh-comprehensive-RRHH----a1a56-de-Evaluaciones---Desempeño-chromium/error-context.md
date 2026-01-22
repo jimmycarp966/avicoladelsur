@@ -1,0 +1,209 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e4]:
+      - generic [ref=e7]:
+        - img "Avícola del Sur" [ref=e8]
+        - generic [ref=e9]:
+          - generic [ref=e10]: Avícola
+          - generic [ref=e11]: del Sur
+      - navigation [ref=e12]:
+        - list [ref=e13]:
+          - listitem [ref=e14]:
+            - list [ref=e15]:
+              - listitem [ref=e16]:
+                - link "Dashboard" [ref=e18] [cursor=pointer]:
+                  - /url: /dashboard
+                  - img [ref=e19]
+                  - generic [ref=e24]: Dashboard
+              - listitem [ref=e25]:
+                - link "Notificaciones" [ref=e27] [cursor=pointer]:
+                  - /url: /notificaciones
+                  - img [ref=e28]
+                  - generic [ref=e31]: Notificaciones
+              - listitem [ref=e32]:
+                - link "Almacén" [ref=e34] [cursor=pointer]:
+                  - /url: /almacen
+                  - img [ref=e35]
+                  - generic [ref=e39]: Almacén
+              - listitem [ref=e40]:
+                - link "Ventas" [ref=e42] [cursor=pointer]:
+                  - /url: /ventas
+                  - img [ref=e43]
+                  - generic [ref=e47]: Ventas
+              - listitem [ref=e48]:
+                - link "Reparto" [ref=e50] [cursor=pointer]:
+                  - /url: /reparto
+                  - img [ref=e51]
+                  - generic [ref=e56]: Reparto
+              - listitem [ref=e57]:
+                - link "Tesorería" [ref=e59] [cursor=pointer]:
+                  - /url: /tesoreria
+                  - img [ref=e60]
+                  - generic [ref=e62]: Tesorería
+              - listitem [ref=e63]:
+                - link "IA" [ref=e65] [cursor=pointer]:
+                  - /url: /dashboard/predicciones
+                  - img [ref=e66]
+                  - generic [ref=e69]: IA
+              - listitem [ref=e70]:
+                - link "Sucursales" [ref=e72] [cursor=pointer]:
+                  - /url: /sucursales
+                  - img [ref=e73]
+                  - generic [ref=e77]: Sucursales
+              - listitem [ref=e78]:
+                - generic [ref=e79]:
+                  - link "RRHH" [ref=e80] [cursor=pointer]:
+                    - /url: /rrhh
+                    - img [ref=e82]
+                    - generic [ref=e86]: RRHH
+                  - generic [ref=e87]:
+                    - link "Empleados" [ref=e88] [cursor=pointer]:
+                      - /url: /rrhh/empleados
+                    - link "Mensajes" [ref=e89] [cursor=pointer]:
+                      - /url: /rrhh/mensajes
+                    - link "Asistencia" [ref=e90] [cursor=pointer]:
+                      - /url: /rrhh/asistencia
+                    - link "Liquidaciones" [ref=e91] [cursor=pointer]:
+                      - /url: /rrhh/liquidaciones
+                    - link "Adelantos" [ref=e92] [cursor=pointer]:
+                      - /url: /rrhh/adelantos
+                    - link "Licencias" [ref=e93] [cursor=pointer]:
+                      - /url: /rrhh/licencias
+                    - link "Evaluaciones" [ref=e94] [cursor=pointer]:
+                      - /url: /rrhh/evaluaciones
+                      - text: Evaluaciones
+                    - link "Novedades" [ref=e96] [cursor=pointer]:
+                      - /url: /rrhh/novedades
+                    - link "Reportes" [ref=e97] [cursor=pointer]:
+                      - /url: /rrhh/reportes
+              - listitem [ref=e98]:
+                - link "Reportes" [ref=e100] [cursor=pointer]:
+                  - /url: /reportes
+                  - img [ref=e101]
+                  - generic [ref=e104]: Reportes
+      - generic [ref=e106]:
+        - generic [ref=e108]: AS
+        - generic [ref=e109]:
+          - paragraph [ref=e110]: Administrador Sistema
+          - paragraph [ref=e111]: admin
+    - generic [ref=e112]:
+      - generic [ref=e113]:
+        - generic [ref=e114]:
+          - generic [ref=e115]:
+            - img "Avícola del Sur" [ref=e116]
+            - generic [ref=e117]:
+              - generic [ref=e118]: Avícola
+              - generic [ref=e119]: del Sur
+          - generic [ref=e120]: Admin
+        - generic [ref=e123]:
+          - button "Atajos de teclado (F12)" [ref=e124]:
+            - img
+          - button [ref=e126]:
+            - img
+          - button "AS" [ref=e127]:
+            - generic [ref=e129]: AS
+      - main [ref=e130]:
+        - generic [ref=e132]:
+          - generic [ref=e133]:
+            - generic [ref=e134]:
+              - heading "Evaluaciones de Desempeño" [level=1] [ref=e135]
+              - paragraph [ref=e136]: Evaluación del desempeño del personal por sucursal con formularios automatizados
+            - generic [ref=e137]:
+              - link "Reportes" [ref=e138] [cursor=pointer]:
+                - /url: /rrhh/evaluaciones/reportes
+                - img
+                - text: Reportes
+              - link "Nueva Evaluación" [ref=e139] [cursor=pointer]:
+                - /url: /rrhh/evaluaciones/nueva
+                - img
+                - text: Nueva Evaluación
+          - generic [ref=e140]:
+            - generic [ref=e142]:
+              - img [ref=e144]
+              - generic [ref=e147]:
+                - paragraph [ref=e148]: Total Evaluaciones
+                - paragraph [ref=e149]: "0"
+            - generic [ref=e151]:
+              - img [ref=e153]
+              - generic [ref=e155]:
+                - paragraph [ref=e156]: Completadas
+                - paragraph [ref=e157]: "0"
+            - generic [ref=e159]:
+              - img [ref=e161]
+              - generic [ref=e163]:
+                - paragraph [ref=e164]: Pendientes
+                - paragraph [ref=e165]: "0"
+            - generic [ref=e167]:
+              - img [ref=e169]
+              - generic [ref=e171]:
+                - paragraph [ref=e172]: Promedio General
+                - paragraph [ref=e173]: 0/5.0
+          - generic [ref=e175]:
+            - img [ref=e177]
+            - generic [ref=e180]:
+              - heading "Sistema de Evaluaciones Automatizadas" [level=3] [ref=e181]
+              - paragraph [ref=e182]: Las evaluaciones se crean por sucursal y período. Una vez enviadas, generan notificaciones automáticas en el sistema de avisos del empleado. Las evaluaciones completadas afectan el cálculo de presentismo y pueden influir en futuras liquidaciones de sueldo.
+          - generic [ref=e185]:
+            - generic [ref=e186]:
+              - generic [ref=e188]:
+                - img [ref=e189]
+                - textbox "Buscar evaluaciones..." [ref=e192]
+              - button "Columnas" [ref=e193]:
+                - text: Columnas
+                - img
+            - table [ref=e197]:
+              - rowgroup [ref=e198]:
+                - row "Empleado Sucursal Período Promedio Estado Fecha Evaluador Acciones" [ref=e199]:
+                  - columnheader "Empleado" [ref=e200]:
+                    - button "Empleado" [ref=e201]:
+                      - text: Empleado
+                      - img
+                  - columnheader "Sucursal" [ref=e202]:
+                    - button "Sucursal" [ref=e203]:
+                      - text: Sucursal
+                      - img
+                  - columnheader "Período" [ref=e204]:
+                    - button "Período" [ref=e205]:
+                      - text: Período
+                      - img
+                  - columnheader "Promedio" [ref=e206]:
+                    - button "Promedio" [ref=e207]:
+                      - text: Promedio
+                      - img
+                  - columnheader "Estado" [ref=e208]:
+                    - button "Estado" [ref=e209]:
+                      - text: Estado
+                      - img
+                  - columnheader "Fecha" [ref=e210]:
+                    - button "Fecha" [ref=e211]:
+                      - text: Fecha
+                      - img
+                  - columnheader "Evaluador" [ref=e212]
+                  - columnheader "Acciones" [ref=e213]
+              - rowgroup [ref=e214]:
+                - row "No se encontraron resultados." [ref=e215]:
+                  - cell "No se encontraron resultados." [ref=e216]
+            - generic [ref=e217]:
+              - generic [ref=e218]: 0 de 0 fila(s) seleccionada(s).
+              - generic [ref=e219]:
+                - button "Anterior" [disabled]
+                - button "Siguiente" [disabled]
+  - region "Notifications alt+T"
+  - generic [ref=e224] [cursor=pointer]:
+    - button "Open Next.js Dev Tools" [ref=e225]:
+      - img [ref=e226]
+    - generic [ref=e229]:
+      - button "Open issues overlay" [ref=e230]:
+        - generic [ref=e231]:
+          - generic [ref=e232]: "1"
+          - generic [ref=e233]: "2"
+        - generic [ref=e234]:
+          - text: Issue
+          - generic [ref=e235]: s
+      - button "Collapse issues badge" [ref=e236]:
+        - img [ref=e237]
+  - alert [ref=e239]
+```

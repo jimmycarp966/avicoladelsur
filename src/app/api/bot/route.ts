@@ -7,6 +7,7 @@ import { sendWhatsAppMessage, getWhatsAppProvider, isWhatsAppMetaAvailable } fro
 import { interpretarMensajeConIA } from '@/lib/services/whatsapp-ia-interpreter'
 import { processMessageWithTools, extractAndSaveFactsInBackground } from '@/lib/vertex/agent'
 import { updateCustomerContext } from '@/lib/vertex/session-manager'
+import { crearPresupuestoTool } from '@/lib/vertex/tools/crear-presupuesto'
 import type { MetaListSection } from '@/types/whatsapp-meta'
 
 // Tipos para las llamadas de Botpress
@@ -78,7 +79,7 @@ async function saveBotMessage(
 ) {
   try {
     const supabase = await createClient()
-    
+
     await supabase.from('bot_messages').insert({
       phone_number: phoneNumber,
       message,
@@ -530,11 +531,21 @@ Sin embargo, no se pudieron procesar los productos de tu pedido. Por favor inten
       }
       formData.append('items', JSON.stringify(items))
 
-      const presupuestoResult = await crearPresupuestoAction(formData)
+      const presupuestoResult = await crearPresupuestoTool({
+        cliente_id: clienteId,
+        productos: items.map(item => ({
+          producto_id: item.producto_id,
+          cantidad: item.cantidad_solicitada,
+          precio_unitario: item.precio_unit_est
+        })),
+        observaciones: 'Presupuesto desde WhatsApp - Cliente nuevo',
+        lista_precio_id: listaPrecioId,
+        zona_id: zonaSeleccionada.id
+      })
 
-      if (presupuestoResult.success && presupuestoResult.data) {
-        const numeroPresupuesto = presupuestoResult.data.numero_presupuesto || presupuestoResult.data.numeroPresupuesto
-        const totalEstimado = presupuestoResult.data.total_estimado || presupuestoResult.data.totalEstimado || 0
+      if (presupuestoResult.success) {
+        const numeroPresupuesto = presupuestoResult.numero_presupuesto
+        const totalEstimado = presupuestoResult.total_estimado || 0
         const baseUrl = getBaseUrl()
 
         // Obtener nombres de productos para el detalle
@@ -807,21 +818,20 @@ async function handleBotpressWebhook(payload: BotpressWebhookPayload): Promise<B
           }
         }
 
-        formData.append('cliente_id', cliente.id)
-        formData.append('observaciones', parameters.observaciones || 'Presupuesto creado desde WhatsApp')
-        if (listaPrecioId) {
-          formData.append('lista_precio_id', listaPrecioId)
-        }
-        formData.append('items', JSON.stringify(items.map(item => ({
-          producto_id: item.producto_id,
-          cantidad_solicitada: item.cantidad,
-          precio_unit_est: item.precio_unitario
-        }))))
+        const result = await crearPresupuestoTool({
+          cliente_id: cliente.id,
+          productos: items.map(item => ({
+            producto_id: item.producto_id,
+            cantidad: item.cantidad,
+            precio_unitario: item.precio_unitario
+          })),
+          observaciones: (parameters.observaciones || 'Presupuesto creado desde WhatsApp') as string,
+          lista_precio_id: listaPrecioId,
+          zona_id: (cliente as any).zona_id
+        })
 
-        const result = await crearPresupuestoAction(formData)
-
-        if (result.success && result.data) {
-          const numeroPresupuesto = result.data.numero_presupuesto || result.data.numeroPresupuesto
+        if (result.success) {
+          const numeroPresupuesto = result.numero_presupuesto
           return {
             success: true,
             message: `✅ ¡Presupuesto creado exitosamente!
@@ -831,16 +841,16 @@ async function handleBotpressWebhook(payload: BotpressWebhookPayload): Promise<B
 
 Nuestro equipo revisará tu presupuesto y te contactará pronto.`,
             data: {
-              presupuesto_id: result.data.presupuesto_id || result.data.presupuestoId,
+              presupuesto_id: result.presupuesto_id,
               numero_presupuesto: numeroPresupuesto,
-              total_estimado: result.data.total_estimado || result.data.totalEstimado,
+              total_estimado: result.total_estimado,
               cliente: cliente.nombre
             }
           }
         } else {
           return {
             success: false,
-            error: result.message || 'Error al crear el presupuesto'
+            error: result.error || result.message || 'Error al crear el presupuesto'
           }
         }
       }
@@ -1381,15 +1391,19 @@ Pero no encontré esos productos en nuestro catálogo.
 
               if (items.length > 0) {
                 // Crear presupuesto
-                const formData = new FormData()
-                formData.append('cliente_id', cliente.id)
-                formData.append('observaciones', 'Presupuesto desde WhatsApp (IA)')
-                formData.append('items', JSON.stringify(items))
+                const presupuestoResult = await crearPresupuestoTool({
+                  cliente_id: cliente.id,
+                  productos: items.map(p => ({
+                    producto_id: p.producto_id,
+                    cantidad: p.cantidad_solicitada,
+                    precio_unitario: p.precio_unit_est
+                  })),
+                  observaciones: 'Presupuesto desde WhatsApp (IA)',
+                  zona_id: (cliente as any).zona_id
+                })
 
-                const presupuestoResult = await crearPresupuestoAction(formData)
-
-                if (presupuestoResult.success && presupuestoResult.data) {
-                  const numeroPresupuesto = presupuestoResult.data.numero_presupuesto || presupuestoResult.data.numeroPresupuesto
+                if (presupuestoResult.success) {
+                  const numeroPresupuesto = presupuestoResult.numero_presupuesto
                   responseMessage = `✅ *¡Entendido, ${nombreCliente || 'cliente'}!*
 
 📋 Presupuesto creado: *${numeroPresupuesto}*

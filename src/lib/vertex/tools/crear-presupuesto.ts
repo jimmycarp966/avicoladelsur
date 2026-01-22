@@ -10,8 +10,12 @@ export interface CrearPresupuestoParams {
   productos: Array<{
     producto_id: string
     cantidad: number
+    precio_unitario?: number
   }>
   observaciones?: string
+  lista_precio_id?: string | null
+  zona_id?: string | null
+  fecha_entrega_estimada?: string | null
 }
 
 export interface CrearPresupuestoResult {
@@ -20,6 +24,7 @@ export interface CrearPresupuestoResult {
   numero_presupuesto?: string
   total_estimado?: number
   error?: string
+  message?: string // Para compatibilidad con ApiResponse
 }
 
 /**
@@ -31,22 +36,22 @@ export async function crearPresupuestoTool(
   try {
     const supabase = createAdminClient()
 
-    // Preparar items para RPC (la RPC calcula precios automáticamente)
+    // Preparar items para RPC (la RPC calcula precios automáticamente si se pasan como 0)
     const itemsJson = params.productos.map((p) => ({
       producto_id: p.producto_id,
       cantidad: p.cantidad,
-      precio_unitario: 0, // La RPC calculará con lista de precios del cliente
-      lista_precio_id: null // Usar lista por defecto del cliente
+      precio_unitario: p.precio_unitario || 0,
+      lista_precio_id: params.lista_precio_id || null
     }))
 
     // Llamar RPC directamente (bypass validación de usuario)
     const { data: result, error } = await supabase.rpc('fn_crear_presupuesto_desde_bot', {
       p_cliente_id: params.cliente_id,
       p_items: itemsJson,
-      p_observaciones: params.observaciones || 'Presupuesto desde WhatsApp (Vertex AI)',
-      p_zona_id: null, // El bot no maneja zonas por ahora
-      p_fecha_entrega_estimada: null, // La RPC asigna fecha automáticamente
-      p_lista_precio_id: null // Usar lista por defecto del cliente
+      p_observaciones: params.observaciones || 'Presupuesto desde WhatsApp',
+      p_zona_id: params.zona_id || null,
+      p_fecha_entrega_estimada: params.fecha_entrega_estimada || null,
+      p_lista_precio_id: params.lista_precio_id || null
     })
 
     if (error) {
@@ -69,7 +74,8 @@ export async function crearPresupuestoTool(
       success: true,
       presupuesto_id: result.presupuesto_id,
       numero_presupuesto: result.numero_presupuesto,
-      total_estimado: result.total_estimado
+      total_estimado: result.total_estimado,
+      message: `Presupuesto ${result.numero_presupuesto} creado exitosamente`
     }
   } catch (error) {
     console.error('[Tool: Crear Presupuesto] Error:', error)

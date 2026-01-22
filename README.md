@@ -43,6 +43,7 @@
 - **Conciliación Automatizada**: Motor de ingesta de extractos bancarios con matching inteligente y parser robusto multiformato.
 - **Tesorería Blindada**: Arqueos de caja ciegos y validación cruzada de rendiciones de choferes.
 - **Gestión de Crédito**: Cuentas corrientes con límites automáticos y cálculo de moras.
+- **Sistema de Remitos**: Generación de documentos PDF para entregas, traslados y producción con snapshots de datos e inmutabilidad.
 
 ### 🏢 Gestión Multi-Sucursal
 - **Auditoría de Precios**: Control estricto de listas Mayorista vs Minorista para evitar fraudes.
@@ -137,10 +138,11 @@
 2. **Ventas (CRM)**: Clientes, pedidos, cotizaciones, reclamos, listas de precios
 3. **Reparto (TMS)**: Vehículos, rutas, entregas, GPS tracking
 4. **Tesorería**: Gestión de cajas, movimientos, validación de cobros, cierres, retiros automáticos de sucursales
-5. **Sucursales**: Gestión multi-sucursal, inventario distribuido, alertas centralizadas
+5. **Sucursales**: Gestión multi-sucursal, inventario distribuido, alertas centralizadas, remitos de traslado
 6. **Control de Sucursales**: Auditoría de precios mayorista/minorista, conteos físicos de stock, detección de desvíos
 7. **RRHH**: Gestión completa de empleados, asistencia, liquidaciones, adelantos
 8. **Chatbot**: Toma automática de pedidos vía WhatsApp
+9. **Remitos**: Sistema integral de documentación documental interna y externa
 
 ## ⚡ Optimizaciones de Rendimiento Implementadas
 
@@ -360,7 +362,7 @@ scripts/                         # Scripts de automatización
 - **Liquidaciones automáticas**: Cálculo mensual con horas extras, producción y descuentos
 - **Adelantos controlados**: Gestión de adelantos en dinero/productos con límite automático del 30% del sueldo básico
 - **Licencias y descansos**: Gestión de vacaciones, enfermedad, maternidad, estudio
-- **Evaluaciones de desempeño**: Sistema por sucursal con 5 criterios (escala 1-5)
+- **Evaluaciones de desempeño**: Sistema por sucursal con 5 criterios (escala 1-5). Propuesta de **Objetivación vía Huella Digital Operativa** implementada (ver `RRHH_PROPUESTA_EVALUACIONES.md`).
 - **Novedades internas**: Comunicación segmentada (general, sucursal, categoría)
 - **Reportes avanzados**: 6 tipos de reportes exportables (Excel/CSV)
 

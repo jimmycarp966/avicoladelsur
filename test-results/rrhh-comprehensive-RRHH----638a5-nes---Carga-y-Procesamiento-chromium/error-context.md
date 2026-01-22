@@ -1,0 +1,59 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - generic [ref=e9]:
+        - img "Avícola del Sur" [ref=e10]
+        - generic [ref=e11]:
+          - generic [ref=e12]: Avícola
+          - generic [ref=e13]: del Sur
+      - generic [ref=e14]:
+        - generic [ref=e15]: Bienvenido
+        - generic [ref=e16]: Ingresa tus credenciales para acceder al sistema
+    - generic [ref=e17]:
+      - generic [ref=e18]:
+        - generic [ref=e19]:
+          - generic [ref=e20]: Email
+          - textbox "Email" [ref=e21]:
+            - /placeholder: tu@email.com
+            - text: admin@avicoladelsur.com
+        - generic [ref=e22]:
+          - generic [ref=e23]: Contraseña
+          - generic [ref=e24]:
+            - textbox "Contraseña" [ref=e25]:
+              - /placeholder: ••••••••
+              - text: "123456"
+            - button [ref=e26]:
+              - img
+        - button "Iniciar Sesión" [ref=e27]
+      - generic [ref=e29]:
+        - paragraph [ref=e30]: ¿Olvidaste tu contraseña?
+        - button "Contacta al administrador del sistema" [ref=e31]
+      - generic [ref=e32]:
+        - heading "Usuarios de Prueba:" [level=4] [ref=e33]
+        - generic [ref=e34]:
+          - generic [ref=e35]:
+            - generic [ref=e36]: "Admin:"
+            - generic [ref=e37]: admin@avicoladelsur.com
+          - generic [ref=e38]:
+            - generic [ref=e39]: "Vendedor:"
+            - generic [ref=e40]: vendedor@avicoladelsur.com
+          - generic [ref=e41]:
+            - generic [ref=e42]: "Repartidor:"
+            - generic [ref=e43]: repartidor@avicoladelsur.com
+          - generic [ref=e44]:
+            - generic [ref=e45]: "Almacenista:"
+            - generic [ref=e46]: almacenista@avicoladelsur.com
+          - paragraph [ref=e48]: "Contraseña para todos: 123456"
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e54] [cursor=pointer]:
+    - generic [ref=e57]:
+      - text: Rendering
+      - generic [ref=e58]:
+        - generic [ref=e59]: .
+        - generic [ref=e60]: .
+        - generic [ref=e61]: .
+  - alert [ref=e62]
+```

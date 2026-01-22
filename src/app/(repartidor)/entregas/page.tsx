@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/server'
 import { RepartoSkeleton } from './reparto-skeleton'
 import { FiltrosClient } from './filtros-client'
 import { getCurrentUser } from '@/actions/auth.actions'
+import { RemitoEntregaButton } from '@/components/repartidor/RemitoEntregaButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -240,20 +241,20 @@ async function RepartoContent({ searchParams }: { searchParams: { fecha?: string
             <CardContent className="p-8 text-center">
               <Truck className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
               <h3 className="text-lg font-medium">
-                {rutas.length === 0
+                {(!rutas || rutas.length === 0)
                   ? 'No hay rutas asignadas'
                   : rutasActivas.length === 0
                     ? 'No hay rutas activas'
                     : 'No hay entregas en las rutas activas'}
               </h3>
               <p className="text-muted-foreground">
-                {rutas.length === 0
+                {(!rutas || rutas.length === 0)
                   ? 'Esperando asignación de ruta por el administrador'
                   : rutasActivas.length === 0
                     ? `Hay ${rutas.length} ruta(s) pero ninguna está en estado activo (planificada/en_curso)`
                     : `Hay ${rutasActivas.length} ruta(s) activa(s) pero no tienen entregas asignadas. Contacta al administrador.`}
               </p>
-              {rutas.length > 0 && (
+              {rutas && rutas.length > 0 && (
                 <div className="mt-4 text-sm text-muted-foreground">
                   <p>Estados de rutas encontradas:</p>
                   <ul className="list-disc list-inside mt-2">
@@ -390,10 +391,13 @@ async function RepartoContent({ searchParams }: { searchParams: { fecha?: string
                             </Button>
                           )}
                           {entrega.estado === 'entregado' && (
-                            <Badge variant="default" className="flex-1 justify-center">
-                              <CheckCircle className="mr-2 h-4 w-4" />
-                              Entregado
-                            </Badge>
+                            <div className="flex-1 flex flex-col gap-2">
+                              <Badge variant="default" className="justify-center">
+                                <CheckCircle className="mr-2 h-4 w-4" />
+                                Entregado
+                              </Badge>
+                              <RemitoEntregaButton entregaId={entrega.id} />
+                            </div>
                           )}
                         </div>
                       </div>

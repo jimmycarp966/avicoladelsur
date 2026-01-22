@@ -85,6 +85,7 @@ Sistema ERP modular completo para Avícola del Sur que unifica **Almacén (WMS)*
 - **Features 2.0**:
   - Control de Merma Líquida vs Sólida.
   - Validación de Peso IA (Detección de outliers en balanza).
+  - **Sistema de Remitos Internos**: Generación de remitos de producción tras el desposte para certificar el ingreso de stock.
 
 ### 4. 🛒 Ventas & Clientes
 *Scope: CRM, facturación y toma de pedidos.*
@@ -96,6 +97,7 @@ Sistema ERP modular completo para Avícola del Sur que unifica **Almacén (WMS)*
   - Listas de precios dinámicas con vigencia y auditoría de cambios.
   - **Memory Bank Inteligente**: Aprendizaje automático de preferencias por cliente (tipo de negocio, productos favoritos, días de pedido).
   - **Persistencia de Intenciones**: Capacidad de retomar un pedido pendiente después del registro del cliente.
+  - **Remitos de Entrega**: Generación de documentos PDF con firma digital para certificar la recepción del cliente.
 
 ### 5. 👥 RRHH (Human Resources)
 *Scope: Gestión de personal, asistencia, pagos y comunicación interna.*
@@ -105,6 +107,7 @@ Sistema ERP modular completo para Avícola del Sur que unifica **Almacén (WMS)*
   - Cálculo de nómina automático basado en presentismo.
   - Adelantos con límite automático según sueldo básico.
   - **Mensajería Interna**: Sistema de comunicación entre empleados con bandeja de entrada, enviados, y marcado de leídos.
+  - **Objetivación de Evaluaciones**: Transformación de criterios subjetivos en métricas operativas basadas en datos del ERP (ver `RRHH_PROPUESTA_EVALUACIONES.md`).
 
 ### 6. 🏪 Sucursales & POS
 *Scope: Gestión de puntos de venta distribuidos.*
@@ -115,6 +118,7 @@ Sistema ERP modular completo para Avícola del Sur que unifica **Almacén (WMS)*
   - Transferencias de stock inter-sucursales.
   - Dashboard local para encargados.
   - Conteos de inventario con validación.
+  - **Remitos de Traslado**: Comprobantes internos para el transporte de mercadería entre sucursales.
 
 ---
 
@@ -179,6 +183,7 @@ El sistema sigue una arquitectura **Server-Authoritative** estricta para garanti
 | | `pos-sucursal.actions.ts` | Punto de venta táctil |
 | | `ventas-sucursal.actions.ts` | Ventas locales |
 | | `sucursales-transferencias.actions.ts` | Transferencias inter-sucursales |
+| **Remitos** | `remitos.actions.ts` | Generación de PDFs para entregas, traslados y producción |
 | **RRHH** | `rrhh.actions.ts` | Empleados, asistencia, liquidaciones |
 | | `mensajes.actions.ts` | Mensajería interna entre empleados |
 | **Reportes** | `reportes.actions.ts` | Reportes generales |
@@ -299,6 +304,7 @@ Endpoints que operan sin interfaz gráfica:
 - **Almacén**: `productos`, `lotes` (stock), `movimientos_stock`, `produccion_ordenes`
 - **Tesorería**: `tesoreria_cajas`, `tesoreria_movimientos`, `cuentas_corrientes`
 - **RRHH**: `rrhh_empleados`, `rrhh_asistencias`, `rrhh_liquidaciones`
+- **Documentos**: `remitos` (Cabecera y snapshot de items), `documentos_procesados` (OCR AI)
 
 ### Enums y Estados (Valores Exactos)
 - **Roles**: `'admin'`, `'vendedor'`, `'repartidor'`, `'almacenista'`, `'tesorero'`, `'encargado_sucursal'`
@@ -331,6 +337,20 @@ Endpoints que operan sin interfaz gráfica:
 ## 📝 Cambios Recientes (Últimos 5)
 
 > Histórico completo disponible en [ARCHITECTURE.md#📝-cambios-recientes](./ARCHITECTURE.md#📝-cambios-recientes).
+
+### 2026-01-22 · Sistema Integral de Remitos (Internos y Externos)
+- **Nueva Estructura**: Tabla `remitos` con numeración secuencial (`seq_remito_numero`) para documentar movimientos de mercadería.
+- **RemitoService**: Motor de generación de PDFs basado en `pdfkit` con soporte para logos, firmas digitales y snapshots de datos.
+- **Integración Multimódulo**:
+  - **Ventas/Reparto**: Remitos de entrega firmados por el cliente.
+  - **Almacén/Producción**: Remitos internos de ingreso de mercadería despostada.
+  - **Sucursales**: Remitos de traslado para transferencias de stock.
+- **Acceso**: Botones "Ver Remito" integrados en listados de transferencias, entregas y órdenes de producción.
+
+### 2026-01-22 · Propuesta de Objetivación de Evaluaciones RRHH
+- **Documento Maestro**: `RRHH_PROPUESTA_EVALUACIONES.md`.
+- **Enfoque**: Transformación de criterios subjetivos (Actitud, Puntualidad, etc.) en métricas de "Huella Digital Operativa" (asistencia biométrica, mermas, tiempos de respuesta, KPIs de producción).
+- **Integración**: Diseño de panel de "Soporte de Decisión" para evaluadores.
 
 ### 2026-01-17 · Sistema de Mensajería Interna
 - **Nueva Tabla**: `mensajes_internos` con RLS para comunicación segura entre empleados.

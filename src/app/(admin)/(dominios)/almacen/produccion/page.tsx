@@ -6,6 +6,7 @@ import { Plus, Factory, Package, Scale, TrendingDown, Settings, Target } from 'l
 import Link from 'next/link'
 import { obtenerOrdenesProduccionAction } from '@/actions/produccion.actions'
 import { formatDate } from '@/lib/utils'
+import { RemitoProduccionButton } from '@/components/produccion/RemitoProduccionButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -114,11 +115,16 @@ async function OrdenesProduccionList() {
                                     </div>
                                 )}
 
-                                <Link href={`/almacen/produccion/${orden.id}`}>
-                                    <Button variant="outline" size="sm">
-                                        Ver Detalle
-                                    </Button>
-                                </Link>
+                                <div className="flex items-center gap-2">
+                                    {orden.estado === 'completada' && (
+                                        <RemitoProduccionButton ordenId={orden.id} />
+                                    )}
+                                    <Link href={`/almacen/produccion/${orden.id}`}>
+                                        <Button variant="outline" size="sm">
+                                            Ver Detalle
+                                        </Button>
+                                    </Link>
+                                </div>
                             </div>
                         </div>
                     </CardContent>

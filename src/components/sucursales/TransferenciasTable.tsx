@@ -104,22 +104,20 @@ export function TransferenciasTable({ transferencias, sucursalId }: Transferenci
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4 flex-1">
                   <div
-                    className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                      tipo === 'origen'
+                    className={`w-12 h-12 rounded-lg flex items-center justify-center ${tipo === 'origen'
                         ? 'bg-blue-100'
                         : tipo === 'destino'
                           ? 'bg-green-100'
                           : 'bg-muted'
-                    }`}
+                      }`}
                   >
                     <DirectionIcon
-                      className={`w-6 h-6 ${
-                        tipo === 'origen'
+                      className={`w-6 h-6 ${tipo === 'origen'
                           ? 'text-blue-600'
                           : tipo === 'destino'
                             ? 'text-green-600'
                             : 'text-muted-foreground'
-                      }`}
+                        }`}
                     />
                   </div>
 
@@ -173,6 +171,23 @@ export function TransferenciasTable({ transferencias, sucursalId }: Transferenci
                 </div>
 
                 <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="flex items-center gap-1"
+                    onClick={async () => {
+                      const { generarRemitoTransferenciaAction } = await import('@/actions/remitos.actions')
+                      const res = await generarRemitoTransferenciaAction(transferencia.id)
+                      if (res.success && res.data?.archivo_url) {
+                        window.open(res.data.archivo_url, '_blank')
+                      } else {
+                        alert(res.error || 'Error al generar remito')
+                      }
+                    }}
+                  >
+                    <Truck className="w-4 h-4" />
+                    Remito
+                  </Button>
                   <Button variant="outline" size="sm">
                     Ver Detalles
                   </Button>

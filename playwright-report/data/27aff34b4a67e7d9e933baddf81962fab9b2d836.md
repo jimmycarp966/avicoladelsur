@@ -1,0 +1,202 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e4]:
+      - generic [ref=e7]:
+        - img "Avícola del Sur" [ref=e8]
+        - generic [ref=e9]:
+          - generic [ref=e10]: Avícola
+          - generic [ref=e11]: del Sur
+      - navigation [ref=e12]:
+        - list [ref=e13]:
+          - listitem [ref=e14]:
+            - list [ref=e15]:
+              - listitem [ref=e16]:
+                - link "Dashboard" [ref=e18] [cursor=pointer]:
+                  - /url: /dashboard
+                  - img [ref=e19]
+                  - generic [ref=e24]: Dashboard
+              - listitem [ref=e25]:
+                - link "Notificaciones" [ref=e27] [cursor=pointer]:
+                  - /url: /notificaciones
+                  - img [ref=e28]
+                  - generic [ref=e31]: Notificaciones
+              - listitem [ref=e32]:
+                - link "Almacén" [ref=e34] [cursor=pointer]:
+                  - /url: /almacen
+                  - img [ref=e35]
+                  - generic [ref=e39]: Almacén
+              - listitem [ref=e40]:
+                - link "Ventas" [ref=e42] [cursor=pointer]:
+                  - /url: /ventas
+                  - img [ref=e43]
+                  - generic [ref=e47]: Ventas
+              - listitem [ref=e48]:
+                - link "Reparto" [ref=e50] [cursor=pointer]:
+                  - /url: /reparto
+                  - img [ref=e51]
+                  - generic [ref=e56]: Reparto
+              - listitem [ref=e57]:
+                - link "Tesorería" [ref=e59] [cursor=pointer]:
+                  - /url: /tesoreria
+                  - img [ref=e60]
+                  - generic [ref=e62]: Tesorería
+              - listitem [ref=e63]:
+                - link "IA" [ref=e65] [cursor=pointer]:
+                  - /url: /dashboard/predicciones
+                  - img [ref=e66]
+                  - generic [ref=e69]: IA
+              - listitem [ref=e70]:
+                - link "Sucursales" [ref=e72] [cursor=pointer]:
+                  - /url: /sucursales
+                  - img [ref=e73]
+                  - generic [ref=e77]: Sucursales
+              - listitem [ref=e78]:
+                - generic [ref=e79]:
+                  - link "RRHH" [ref=e80] [cursor=pointer]:
+                    - /url: /rrhh
+                    - img [ref=e82]
+                    - generic [ref=e86]: RRHH
+                  - generic [ref=e87]:
+                    - link "Empleados" [ref=e88] [cursor=pointer]:
+                      - /url: /rrhh/empleados
+                    - link "Mensajes" [ref=e89] [cursor=pointer]:
+                      - /url: /rrhh/mensajes
+                    - link "Asistencia" [ref=e90] [cursor=pointer]:
+                      - /url: /rrhh/asistencia
+                    - link "Liquidaciones" [ref=e91] [cursor=pointer]:
+                      - /url: /rrhh/liquidaciones
+                    - link "Adelantos" [ref=e92] [cursor=pointer]:
+                      - /url: /rrhh/adelantos
+                    - link "Licencias" [ref=e93] [cursor=pointer]:
+                      - /url: /rrhh/licencias
+                    - link "Evaluaciones" [ref=e94] [cursor=pointer]:
+                      - /url: /rrhh/evaluaciones
+                    - link "Novedades" [ref=e95] [cursor=pointer]:
+                      - /url: /rrhh/novedades
+                      - text: Novedades
+                    - link "Reportes" [ref=e97] [cursor=pointer]:
+                      - /url: /rrhh/reportes
+              - listitem [ref=e98]:
+                - link "Reportes" [ref=e100] [cursor=pointer]:
+                  - /url: /reportes
+                  - img [ref=e101]
+                  - generic [ref=e104]: Reportes
+      - generic [ref=e106]:
+        - generic [ref=e108]: AS
+        - generic [ref=e109]:
+          - paragraph [ref=e110]: Administrador Sistema
+          - paragraph [ref=e111]: admin
+    - generic [ref=e112]:
+      - generic [ref=e113]:
+        - generic [ref=e114]:
+          - generic [ref=e115]:
+            - img "Avícola del Sur" [ref=e116]
+            - generic [ref=e117]:
+              - generic [ref=e118]: Avícola
+              - generic [ref=e119]: del Sur
+          - generic [ref=e120]: Admin
+        - generic [ref=e123]:
+          - button "Atajos de teclado (F12)" [ref=e124]:
+            - img
+          - button "9+" [ref=e126]:
+            - img
+            - generic [ref=e127]: 9+
+          - button "AS" [ref=e128]:
+            - generic [ref=e130]: AS
+      - main [ref=e131]:
+        - generic [ref=e133]:
+          - generic [ref=e134]:
+            - generic [ref=e135]:
+              - heading "Novedades RRHH" [level=1] [ref=e136]
+              - paragraph [ref=e137]: Comunicación interna y anuncios para el personal
+            - link "Nueva Novedad" [ref=e138] [cursor=pointer]:
+              - /url: /rrhh/novedades/nueva
+              - img
+              - text: Nueva Novedad
+          - generic [ref=e139]:
+            - generic [ref=e141]:
+              - img [ref=e143]
+              - generic [ref=e146]:
+                - paragraph [ref=e147]: Total Novedades
+                - paragraph [ref=e148]: "0"
+            - generic [ref=e150]:
+              - img [ref=e152]
+              - generic [ref=e155]:
+                - paragraph [ref=e156]: Activas
+                - paragraph [ref=e157]: "0"
+            - generic [ref=e159]:
+              - img [ref=e161]
+              - generic [ref=e163]:
+                - paragraph [ref=e164]: Generales
+                - paragraph [ref=e165]: "0"
+            - generic [ref=e167]:
+              - img [ref=e169]
+              - generic [ref=e171]:
+                - paragraph [ref=e172]: Urgentes
+                - paragraph [ref=e173]: "0"
+          - generic [ref=e174]:
+            - heading "Distribución por Tipo" [level=3] [ref=e175]
+            - generic [ref=e176]:
+              - generic [ref=e177]:
+                - generic [ref=e178]: "0"
+                - generic [ref=e179]: Generales
+              - generic [ref=e180]:
+                - generic [ref=e181]: "0"
+                - generic [ref=e182]: Por Sucursal
+              - generic [ref=e183]:
+                - generic [ref=e184]: "0"
+                - generic [ref=e185]: Por Categoría
+          - generic [ref=e187]:
+            - img [ref=e189]
+            - generic [ref=e192]:
+              - heading "Sistema de Comunicación Interna" [level=3] [ref=e193]
+              - paragraph [ref=e194]: Las novedades se muestran automáticamente a los empleados según su sucursal y categoría. Las novedades generales son visibles para todo el personal activo.
+          - generic [ref=e197]:
+            - generic [ref=e198]:
+              - generic [ref=e200]:
+                - img [ref=e201]
+                - textbox "Buscar novedades..." [ref=e204]
+              - button "Columnas" [ref=e205]:
+                - text: Columnas
+                - img
+            - table [ref=e209]:
+              - rowgroup [ref=e210]:
+                - row "Título Tipo Publicación Expiración Estado Creador Acciones" [ref=e211]:
+                  - columnheader "Título" [ref=e212]:
+                    - button "Título" [ref=e213]:
+                      - text: Título
+                      - img
+                  - columnheader "Tipo" [ref=e214]:
+                    - button "Tipo" [ref=e215]:
+                      - text: Tipo
+                      - img
+                  - columnheader "Publicación" [ref=e216]:
+                    - button "Publicación" [ref=e217]:
+                      - text: Publicación
+                      - img
+                  - columnheader "Expiración" [ref=e218]:
+                    - button "Expiración" [ref=e219]:
+                      - text: Expiración
+                      - img
+                  - columnheader "Estado" [ref=e220]:
+                    - button "Estado" [ref=e221]:
+                      - text: Estado
+                      - img
+                  - columnheader "Creador" [ref=e222]
+                  - columnheader "Acciones" [ref=e223]
+              - rowgroup [ref=e224]:
+                - row "No se encontraron resultados." [ref=e225]:
+                  - cell "No se encontraron resultados." [ref=e226]
+            - generic [ref=e227]:
+              - generic [ref=e228]: 0 de 0 fila(s) seleccionada(s).
+              - generic [ref=e229]:
+                - button "Anterior" [disabled]
+                - button "Siguiente" [disabled]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e235] [cursor=pointer]:
+    - img [ref=e236]
+  - alert [ref=e239]
+```

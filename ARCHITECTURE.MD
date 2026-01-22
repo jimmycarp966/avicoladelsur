@@ -10,6 +10,7 @@
 - **Inteligencia Artificial**: Integración profunda de Google Gemini (2.5 Flash y 3.0 Pro) para conciliación bancaria, validación de stock y chatbots. Implementación de **Memory Bank Inteligente** para aprendizaje automático de clientes y **Auto-selección inteligente** de zonas y precios.
 - **Logística Autónoma**: Reparto con navegación interactiva, selección de rutas (Google Directions alternatives) y unificación estricta de zonas mediante `zona_id`.
 - **Producción Científica**: Módulo de desposte con control de rendimientos esperados, mermas líquidas/sólidas y trazabilidad total.
+- **Sistema de Remitos**: Generación automática de remitos PDF para entregas, traslados y producción con almacenamiento en Supabase Storage y firma digital.
 - **Tesorería Blindada**: Motor de conciliación automática que cruza extractos bancarios vs movimientos de sistema con IA (Gemini 3.0 Pro) y acreditación atómica mediante RPC SQL para evitar desincronización de saldos.
 - **Planificación Semanal**: Rutas fijas por zona/día/turno con vehículos asignados (Fiorino 600kg, Hilux 1500kg, F-4000 4000kg)
 - **Flujo Automático**: Presupuesto → Turno Auto → Asignación Ruta → Almacén → Optimización → Reparto GPS → Cobro
@@ -246,9 +247,9 @@ Muestra en dashboard → Casa central revisa
 ```
 
 **Características de todos los flujos:**
-- ✅ **Operaciones Atómicas**: RPCs de Postgres garantizan consistencia
-- ✅ **FIFO Automático**: Gestión inteligente de lotes por vencimiento
-- ✅ **Validación Preventiva**: Clientes bloqueados no pueden operar
+- **FIFO Automático**: Gestión inteligente de lotes por vencimiento
+- **Remitos Automatizados**: Generación de PDFs legales/internos con snapshots de datos para garantizar la inmutabilidad documental.
+- **Validación Preventiva**: Clientes bloqueados no pueden operar
 - ✅ **Trazabilidad Completa**: Desde reserva hasta conciliación financiera
 - ✅ **Server-Side First**: Toda lógica crítica en Server Actions
 - ✅ **Realtime**: Actualizaciones automáticas vía Supabase Realtime
@@ -350,6 +351,7 @@ Para optimizar la logística y la facturación, el sistema implementa un modelo 
 - **Sincronización Monitor-Repartidor**: Vista del repartidor muestra el mismo orden optimizado que el monitor admin
 - **Estados de Pago Simplificados**: "Pagará después" removido, solo queda "Pendiente de pago"
 - **Upload de Comprobante**: Input de archivo para subir fotos desde el teléfono (cambiado de URL)
+- **Generación de Remitos**: Botón dinámico para emitir remitos de entrega firmados digitalmente.
 
 ### 6️⃣ Dominio: Tesorería y Finanzas ✅ COMPLETO
 
@@ -504,6 +506,19 @@ Para optimizar la logística y la facturación, el sistema implementa un modelo 
 - ✅ **Visibilidad Total**: Casa central ve stock, valor y márgenes en tiempo real
 - ✅ **UX Mejorada**: Identificación clara de sucursal y navegación intuitiva para admins
 - ✅ **Robustez**: Manejo elegante de casos edge (admin sin sucursal, sin sucursales activas)
+
+### 9️⃣ Dominio: Sistema de Remitos (Documentación Legal e Interna) ✅ NUEVO (Enero 2026)
+
+**Funcionalidades Implementadas:**
+- **Snapshots de Datos**: El remito guarda una copia exacta de los items, precios y pesos al momento de la emisión, garantizando integridad frente a ediciones posteriores del pedido.
+- **Numeración Secuencial**: Correlativa por tipo de remito (Externo/Interno).
+- **Almacenamiento en Nube**: Persistencia automática de PDFs en Supabase Storage (bucket `documentos`).
+- **Validación de Duplicados**: El sistema evita la regeneración innecesaria de documentos detectando registros existentes en la tabla `remitos`.
+- **Integración con Firma Digital**: Captura de la firma del receptor para remitos de entrega.
+- **Multimodalidad**:
+  - **Remito de Entrega**: Comprobante para el cliente final (Ventas).
+  - **Remito de Traslado**: Para transferencias entre sucursales (Logística).
+  - **Remito de Producción**: Certificación de ingreso de stock tras proceso de desposte (Almacén).
 
 ### 5️⃣ Dominio: Bot de WhatsApp (Interfaz de Cliente) ✅ FUNCIONANDO
 

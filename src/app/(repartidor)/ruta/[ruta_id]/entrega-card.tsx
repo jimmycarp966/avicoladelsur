@@ -299,7 +299,7 @@ export function EntregaCard({ entrega, rutaId, rutaEstado }: EntregaCardProps) {
           {entrega.estado_entrega === 'entregado' && (
             <>
               <Separator />
-              <div className="flex items-center justify-center">
+              <div className="flex flex-col items-center justify-center gap-3">
                 <Badge variant="default" className="bg-green-600">
                   <CheckCircle className="mr-2 h-4 w-4" />
                   Entregado {entrega.fecha_hora_entrega &&
@@ -309,6 +309,30 @@ export function EntregaCard({ entrega, rutaId, rutaEstado }: EntregaCardProps) {
                     })
                   }
                 </Badge>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full h-9 flex items-center justify-center gap-2 font-medium border-primary/20 hover:border-primary/40 hover:bg-primary/5"
+                  onClick={async () => {
+                    const { generarRemitoEntregaAction } = await import('@/actions/remitos.actions')
+                    const toastId = toast.loading('Generando remito PDF...')
+                    try {
+                      const res = await generarRemitoEntregaAction(entrega.id)
+                      if (res.success && res.data?.archivo_url) {
+                        toast.success('Remito generado correctamente', { id: toastId })
+                        window.open(res.data.archivo_url, '_blank')
+                      } else {
+                        toast.error(res.error || 'Error al generar remito', { id: toastId })
+                      }
+                    } catch (error) {
+                      toast.error('Error al procesar el remito', { id: toastId })
+                    }
+                  }}
+                >
+                  <FileText className="h-4 w-4 text-primary" />
+                  Ver Remito de Entrega
+                </Button>
               </div>
             </>
           )}
