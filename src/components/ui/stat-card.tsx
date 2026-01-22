@@ -54,7 +54,7 @@ interface StatCardProps
     extends React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof statCardVariants> {
     title: string
-    value: string | number
+    value: React.ReactNode
     subtitle?: string
     icon?: LucideIcon
     trend?: {

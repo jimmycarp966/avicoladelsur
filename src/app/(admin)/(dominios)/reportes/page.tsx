@@ -1,4 +1,4 @@
-import { getTodayArgentina } from '@/lib/utils'
+import { getTodayArgentina, formatCurrency } from '@/lib/utils'
 import { obtenerKpisVentas } from '@/actions/reportes.actions'
 import { obtenerKpisStock } from '@/actions/reportes-stock.actions'
 import { obtenerKpisReparto } from '@/actions/reportes-reparto.actions'
@@ -18,6 +18,8 @@ import {
   TrendingUp,
   AlertTriangle,
 } from 'lucide-react'
+import { PageHeader } from '@/components/ui/page-header'
+import { StatCard } from '@/components/ui/stat-card'
 
 export const revalidate = 60 // Revalida cada minuto (dashboard ejecutivo)
 
@@ -51,340 +53,218 @@ export default async function ReportesPage() {
   const kpisVentas = kpisVentasResult.data || {}
   const kpisStock = kpisStockResult.data || {}
   const kpisReparto = kpisRepartoResult.data || {}
-  const kpisTesoreria = kpisTesoreriaResult.data || {}
 
   return (
-    <div className="space-y-6 relative">
-      {/* Background Pattern */}
-      <div className="fixed inset-0 -z-50 overflow-hidden">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-primary/3 rounded-full blur-3xl" />
-        <div className="absolute top-40 right-20 w-96 h-96 bg-secondary/2 rounded-full blur-3xl" />
-        <div className="absolute bottom-20 left-1/3 w-80 h-80 bg-accent/2 rounded-full blur-3xl" />
+    <div className="space-y-10 relative">
+      {/* Background Decorativo */}
+      <div className="fixed inset-0 -z-50 overflow-hidden pointer-events-none">
+        <div className="absolute top-20 left-10 w-96 h-96 bg-primary/5 rounded-full blur-[100px]" />
+        <div className="absolute bottom-20 right-10 w-[500px] h-[500px] bg-secondary/3 rounded-full blur-[120px]" />
       </div>
 
-      {/* Header */}
-      <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-primary via-primary/90 to-secondary p-8 shadow-2xl border border-primary/20">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -z-10" />
-        <div className="absolute -top-4 -right-4 w-32 h-32 bg-accent/20 rounded-full blur-2xl" />
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-secondary/20 rounded-full blur-3xl" />
-        <div className="flex items-center justify-between relative z-10">
-          <div>
-            <h1 className="text-4xl font-bold tracking-tight text-white drop-shadow-lg">
-              Dashboard Ejecutivo
+      {/* Header Ejecutivo Premium */}
+      <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-primary via-[#2F7058] to-[#1a4d3a] p-10 shadow-2xl border border-white/10">
+        <div className="absolute top-0 right-0 w-full h-full bg-[url('/grid.svg')] opacity-10" />
+        <div className="absolute -top-24 -right-24 w-96 h-96 bg-secondary/10 rounded-full blur-3xl" />
+        <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-white/5 rounded-full blur-3xl" />
+
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-white/80 text-xs font-bold uppercase tracking-widest backdrop-blur-md mb-2">
+              <span className="flex h-2 w-2 rounded-full bg-secondary animate-pulse" />
+              Reportes en Vivo
+            </div>
+            <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-white">
+              Dashboard <span className="text-secondary font-black">Ejecutivo</span>
             </h1>
-            <p className="text-white/90 mt-2 text-lg drop-shadow">
-              Visión general del negocio en tiempo real
+            <p className="text-white/70 text-lg font-medium max-w-lg">
+              Analítica inteligente y control operativo centralizado para la gestión gerencial.
             </p>
           </div>
-          <div className="hidden md:block">
-            <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-              <BarChart3 className="h-10 w-10 text-white" />
-            </div>
+          <div className="hidden lg:flex items-center justify-center w-24 h-24 bg-white/10 rounded-3xl backdrop-blur-xl border border-white/10 shadow-inner">
+            <BarChart3 className="h-12 w-12 text-secondary" />
           </div>
         </div>
       </div>
 
-      {/* KPIs Principales */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="relative overflow-hidden border-0 shadow-xl bg-gradient-to-br from-primary/10 via-primary/5 to-white hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-primary/60" />
-          <div className="absolute top-4 right-4 w-16 h-16 bg-primary/10 rounded-full blur-xl" />
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-primary/80">Ventas del Día</CardTitle>
-          </CardHeader>
-          <CardContent className="relative z-10">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-3xl font-bold text-primary mb-1">
-                  ${Number(kpisVentas.ventas_totales || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {kpisVentas.transacciones || 0} transacciones
-                </p>
-              </div>
-              <div className="p-3 bg-primary/15 rounded-full">
-                <ShoppingCart className="h-6 w-6 text-primary" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* KPIs Principales con StatCard */}
+      <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          title="Ventas del Día"
+          value={formatCurrency(kpisVentas.ventas_totales || 0)}
+          subtitle={`${kpisVentas.transacciones || 0} transacciones registradas`}
+          icon={ShoppingCart}
+          variant="primary"
+        />
 
-        <Card className="relative overflow-hidden border-0 shadow-xl bg-gradient-to-br from-info/10 via-info/5 to-white hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-info to-info/60" />
-          <div className="absolute top-4 right-4 w-16 h-16 bg-info/10 rounded-full blur-xl" />
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-info/80">Caja Actual</CardTitle>
-          </CardHeader>
-          <CardContent className="relative z-10">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-3xl font-bold text-info mb-1">
-                  ${Number(resumenTesoreriaResult.data?.saldoTotal || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                </p>
-                <p className="text-sm text-muted-foreground">Saldo consolidado</p>
-              </div>
-              <div className="p-3 bg-info/15 rounded-full">
-                <DollarSign className="h-6 w-6 text-info" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Caja Actual"
+          value={formatCurrency(resumenTesoreriaResult.data?.saldoTotal || 0)}
+          subtitle="Saldo consolidado total"
+          icon={DollarSign}
+          variant="info"
+        />
 
-        <Card className="relative overflow-hidden border-0 shadow-xl bg-gradient-to-br from-success/10 via-success/5 to-white hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-success to-success/60" />
-          <div className="absolute top-4 right-4 w-16 h-16 bg-success/10 rounded-full blur-xl" />
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-success/80">Entregas Hoy</CardTitle>
-          </CardHeader>
-          <CardContent className="relative z-10">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-3xl font-bold text-success mb-1">{kpisReparto.entregasExitosas || 0}</p>
-                <p className="text-sm text-muted-foreground">
-                  {kpisReparto.tasaExito ? `${kpisReparto.tasaExito.toFixed(1)}% éxito` : '0% éxito'}
-                </p>
-              </div>
-              <div className="p-3 bg-success/15 rounded-full">
-                <Truck className="h-6 w-6 text-success" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Entregas Hoy"
+          value={kpisReparto.entregasExitosas || 0}
+          subtitle={kpisReparto.tasaExito ? `${kpisReparto.tasaExito.toFixed(1)}% de efectividad` : '0% tasa de éxito'}
+          icon={Truck}
+          variant="success"
+        />
 
-        <Card className="relative overflow-hidden border-0 shadow-xl bg-gradient-to-br from-warning/10 via-warning/5 to-white hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-warning to-warning/60" />
-          <div className="absolute top-4 right-4 w-16 h-16 bg-warning/10 rounded-full blur-xl" />
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-warning/80">Stock Crítico</CardTitle>
-          </CardHeader>
-          <CardContent className="relative z-10">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-3xl font-bold text-warning mb-1">{kpisStock.stockCritico || 0}</p>
-                <p className="text-sm text-muted-foreground">Productos bajo mínimo</p>
-              </div>
-              <div className="p-3 bg-warning/15 rounded-full">
-                <AlertTriangle className="h-6 w-6 text-warning" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Stock Crítico"
+          value={kpisStock.stockCritico || 0}
+          subtitle="Productos bajo el mínimo"
+          icon={AlertTriangle}
+          variant="warning"
+        />
       </div>
 
-      {/* Enlaces a Reportes */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Link href="/reportes/ventas">
-          <Card className="group relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-primary/5 via-white to-primary/10 hover:shadow-2xl transition-all duration-500 cursor-pointer h-full hover:-translate-y-2">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-secondary opacity-0 group-hover:opacity-100 transition-opacity" />
-            <div className="absolute top-4 right-4 w-12 h-12 bg-primary/10 rounded-full blur-lg group-hover:bg-primary/20 transition-colors" />
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary/15 rounded-lg group-hover:bg-primary/25 transition-colors">
-                  <BarChart3 className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <CardTitle className="text-lg font-semibold text-primary group-hover:text-primary/80 transition-colors">
-                    Reporte de Ventas
-                  </CardTitle>
-                  <CardDescription className="text-sm">KPIs, gráficos y análisis detallado</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-          </Card>
-        </Link>
+      {/* Navegación de Reportes con Cards Bento */}
+      <div className="space-y-6">
+        <div className="flex items-center gap-3 px-2">
+          <div className="h-8 w-1.5 bg-primary rounded-full" />
+          <h2 className="text-2xl font-black tracking-tight text-foreground uppercase">Módulos de Reporte</h2>
+        </div>
 
-        <Link href="/reportes/pedidos">
-          <Card className="group relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-secondary/5 via-white to-secondary/10 hover:shadow-2xl transition-all duration-500 cursor-pointer h-full hover:-translate-y-2">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-secondary to-primary opacity-0 group-hover:opacity-100 transition-opacity" />
-            <div className="absolute top-4 right-4 w-12 h-12 bg-secondary/10 rounded-full blur-lg group-hover:bg-secondary/20 transition-colors" />
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-secondary/15 rounded-lg group-hover:bg-secondary/25 transition-colors">
-                  <ShoppingCart className="h-6 w-6 text-secondary" />
-                </div>
-                <div>
-                  <CardTitle className="text-lg font-semibold text-secondary group-hover:text-secondary/80 transition-colors">
-                    Reporte de Pedidos
-                  </CardTitle>
-                  <CardDescription className="text-sm">Conversión y métricas de pedidos</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-          </Card>
-        </Link>
-
-        <Link href="/reportes/stock">
-          <Card className="group relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-accent/5 via-white to-accent/10 hover:shadow-2xl transition-all duration-500 cursor-pointer h-full hover:-translate-y-2">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-accent to-secondary opacity-0 group-hover:opacity-100 transition-opacity" />
-            <div className="absolute top-4 right-4 w-12 h-12 bg-accent/10 rounded-full blur-lg group-hover:bg-accent/20 transition-colors" />
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-accent/15 rounded-lg group-hover:bg-accent/25 transition-colors">
-                  <Package className="h-6 w-6 text-accent" />
-                </div>
-                <div>
-                  <CardTitle className="text-lg font-semibold text-accent group-hover:text-accent/80 transition-colors">
-                    Reporte de Stock
-                  </CardTitle>
-                  <CardDescription className="text-sm">Inventario y proyecciones</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-          </Card>
-        </Link>
-
-        <Link href="/reportes/almacen">
-          <Card className="group relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-warning/5 via-white to-warning/10 hover:shadow-2xl transition-all duration-500 cursor-pointer h-full hover:-translate-y-2">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-warning to-accent opacity-0 group-hover:opacity-100 transition-opacity" />
-            <div className="absolute top-4 right-4 w-12 h-12 bg-warning/10 rounded-full blur-lg group-hover:bg-warning/20 transition-colors" />
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-warning/15 rounded-lg group-hover:bg-warning/25 transition-colors">
-                  <Package className="h-6 w-6 text-warning" />
-                </div>
-                <div>
-                  <CardTitle className="text-lg font-semibold text-warning group-hover:text-warning/80 transition-colors">
-                    Reporte de Almacén
-                  </CardTitle>
-                  <CardDescription className="text-sm">Preparación y control de peso</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-          </Card>
-        </Link>
-
-        <Link href="/reportes/reparto">
-          <Card className="group relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-success/5 via-white to-success/10 hover:shadow-2xl transition-all duration-500 cursor-pointer h-full hover:-translate-y-2">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-success to-primary opacity-0 group-hover:opacity-100 transition-opacity" />
-            <div className="absolute top-4 right-4 w-12 h-12 bg-success/10 rounded-full blur-lg group-hover:bg-success/20 transition-colors" />
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-success/15 rounded-lg group-hover:bg-success/25 transition-colors">
-                  <Truck className="h-6 w-6 text-success" />
-                </div>
-                <div>
-                  <CardTitle className="text-lg font-semibold text-success group-hover:text-success/80 transition-colors">
-                    Reporte de Reparto
-                  </CardTitle>
-                  <CardDescription className="text-sm">Eficiencia y rendimiento</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-          </Card>
-        </Link>
-
-        <Link href="/reportes/tesoreria">
-          <Card className="group relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-info/5 via-white to-info/10 hover:shadow-2xl transition-all duration-500 cursor-pointer h-full hover:-translate-y-2">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-info to-secondary opacity-0 group-hover:opacity-100 transition-opacity" />
-            <div className="absolute top-4 right-4 w-12 h-12 bg-info/10 rounded-full blur-lg group-hover:bg-info/20 transition-colors" />
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-info/15 rounded-lg group-hover:bg-info/25 transition-colors">
-                  <DollarSign className="h-6 w-6 text-info" />
-                </div>
-                <div>
-                  <CardTitle className="text-lg font-semibold text-info group-hover:text-info/80 transition-colors">
-                    Reporte de Tesorería
-                  </CardTitle>
-                  <CardDescription className="text-sm">Recaudación y finanzas</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-          </Card>
-        </Link>
-
-        <Link href="/reportes/clientes">
-          <Card className="group relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-primary/5 via-white to-primary/10 hover:shadow-2xl transition-all duration-500 cursor-pointer h-full hover:-translate-y-2">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-info opacity-0 group-hover:opacity-100 transition-opacity" />
-            <div className="absolute top-4 right-4 w-12 h-12 bg-primary/10 rounded-full blur-lg group-hover:bg-primary/20 transition-colors" />
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary/15 rounded-lg group-hover:bg-primary/25 transition-colors">
-                  <Users className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <CardTitle className="text-lg font-semibold text-primary group-hover:text-primary/80 transition-colors">
-                    Reporte de Clientes
-                  </CardTitle>
-                  <CardDescription className="text-sm">Análisis y segmentación</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-          </Card>
-        </Link>
-
-        <Link href="/reportes/empleados">
-          <Card className="group relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-secondary/5 via-white to-secondary/10 hover:shadow-2xl transition-all duration-500 cursor-pointer h-full hover:-translate-y-2">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-secondary to-accent opacity-0 group-hover:opacity-100 transition-opacity" />
-            <div className="absolute top-4 right-4 w-12 h-12 bg-secondary/10 rounded-full blur-lg group-hover:bg-secondary/20 transition-colors" />
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-secondary/15 rounded-lg group-hover:bg-secondary/25 transition-colors">
-                  <TrendingUp className="h-6 w-6 text-secondary" />
-                </div>
-                <div>
-                  <CardTitle className="text-lg font-semibold text-secondary group-hover:text-secondary/80 transition-colors">
-                    Reporte de Empleados
-                  </CardTitle>
-                  <CardDescription className="text-sm">Productividad y asistencia</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-          </Card>
-        </Link>
+        <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          <ReportCard
+            href="/reportes/ventas"
+            title="Ventas"
+            desc="KPIs, ingresos y tendencias"
+            icon={BarChart3}
+            color="primary"
+          />
+          <ReportCard
+            href="/reportes/pedidos"
+            title="Pedidos"
+            desc="Conversión y seguimiento"
+            icon={ShoppingCart}
+            color="secondary"
+          />
+          <ReportCard
+            href="/reportes/stock"
+            title="Stock"
+            desc="Inventario y proyecciones"
+            icon={Package}
+            color="accent"
+          />
+          <ReportCard
+            href="/reportes/almacen"
+            title="Almacén"
+            desc="Pesajes y producción"
+            icon={Package}
+            color="warning"
+          />
+          <ReportCard
+            href="/reportes/reparto"
+            title="Reparto"
+            desc="Logística y eficiencia"
+            icon={Truck}
+            color="success"
+          />
+          <ReportCard
+            href="/reportes/tesoreria"
+            title="Tesorería"
+            desc="Finanzas y recaudación"
+            icon={DollarSign}
+            color="info"
+          />
+          <ReportCard
+            href="/reportes/clientes"
+            title="Clientes"
+            desc="Comportamiento y deuda"
+            icon={Users}
+            color="primary"
+          />
+          <ReportCard
+            href="/reportes/empleados"
+            title="Empleados"
+            desc="Productividad y asistencia"
+            icon={TrendingUp}
+            color="secondary"
+          />
+        </div>
       </div>
 
-      {/* Alertas Críticas */}
+      {/* Alertas Críticas Estandarizadas */}
       {(kpisStock.stockCritico > 0 || kpisReparto.entregasFallidas > 0) && (
-        <Card className="relative overflow-hidden border-0 shadow-xl bg-gradient-to-br from-destructive/10 via-destructive/5 to-white">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-destructive to-destructive/60" />
-          <div className="absolute top-4 right-4 w-16 h-16 bg-destructive/10 rounded-full blur-xl" />
-          <CardHeader>
-            <CardTitle className="flex items-center gap-3 text-destructive relative z-10">
-              <div className="p-2 bg-destructive/15 rounded-full">
-                <AlertTriangle className="h-6 w-6" />
-              </div>
-              Alertas Críticas Requeridas
+        <Card className="overflow-hidden border-destructive/20 shadow-2xl bg-destructive/[0.02] rounded-3xl">
+          <CardHeader className="bg-destructive/5 border-b border-destructive/10 p-6">
+            <CardTitle className="flex items-center gap-3 text-destructive font-black text-xl uppercase tracking-tighter">
+              <AlertTriangle className="h-7 w-7" />
+              Alertas de Atención Inmediata
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4 relative z-10">
+          <CardContent className="p-8 space-y-4">
             {kpisStock.stockCritico > 0 && (
-              <div className="flex items-center justify-between p-4 bg-gradient-to-r from-destructive/15 to-destructive/5 rounded-xl border border-destructive/20 hover:border-destructive/30 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-destructive/20 rounded-full">
-                    <Package className="h-4 w-4 text-destructive" />
-                  </div>
-                  <span className="text-sm font-semibold text-destructive">
-                    {kpisStock.stockCritico} productos con stock crítico
-                  </span>
-                </div>
-                <Link href="/reportes/stock" className="flex items-center gap-2 text-sm font-medium text-destructive hover:text-destructive/80 transition-colors">
-                  Ver detalles
-                  <TrendingUp className="h-4 w-4" />
-                </Link>
-              </div>
+              <AlertItem
+                href="/reportes/stock"
+                icon={Package}
+                label={`${kpisStock.stockCritico} productos con stock insuficiente.`}
+              />
             )}
             {kpisReparto.entregasFallidas > 0 && (
-              <div className="flex items-center justify-between p-4 bg-gradient-to-r from-destructive/15 to-destructive/5 rounded-xl border border-destructive/20 hover:border-destructive/30 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-destructive/20 rounded-full">
-                    <Truck className="h-4 w-4 text-destructive" />
-                  </div>
-                  <span className="text-sm font-semibold text-destructive">
-                    {kpisReparto.entregasFallidas} entregas fallidas
-                  </span>
-                </div>
-                <Link href="/reportes/reparto" className="flex items-center gap-2 text-sm font-medium text-destructive hover:text-destructive/80 transition-colors">
-                  Ver detalles
-                  <TrendingUp className="h-4 w-4" />
-                </Link>
-              </div>
+              <AlertItem
+                href="/reportes/reparto"
+                icon={Truck}
+                label={`${kpisReparto.entregasFallidas} entregas fallidas en el día de hoy.`}
+              />
             )}
           </CardContent>
         </Card>
       )}
 
-      <div className="text-right text-xs text-muted-foreground">DaniR</div>
+      <div className="text-right text-xs text-muted-foreground opacity-30 pb-10 uppercase tracking-widest font-bold">Avicola del Sur v4.0</div>
     </div>
+  )
+}
+
+function ReportCard({ href, title, desc, icon: Icon, color }: any) {
+  const colorMap: any = {
+    primary: 'text-primary bg-primary/10 border-primary/20',
+    secondary: 'text-[#8b6d1a] bg-secondary/10 border-secondary/20',
+    accent: 'text-accent bg-accent/10 border-accent/20',
+    warning: 'text-warning-foreground bg-warning/10 border-warning/20',
+    success: 'text-success bg-success/10 border-success/20',
+    info: 'text-info-foreground bg-info/10 border-info/20',
+  }
+
+  return (
+    <Link href={href} className="group">
+      <Card className="h-full border-border/40 shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 overflow-hidden bg-card/60 backdrop-blur-md rounded-2xl">
+        <div className="absolute top-0 left-0 w-1.5 h-full bg-current opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: `var(--${color})` }} />
+        <CardHeader className="p-6">
+          <div className="flex items-start gap-4">
+            <div className={`p-3 rounded-xl transition-all duration-500 group-hover:scale-110 shadow-sm ${colorMap[color]}`}>
+              <Icon className="h-6 w-6" />
+            </div>
+            <div className="space-y-1">
+              <CardTitle className="text-lg font-black group-hover:text-primary transition-colors tracking-tight">{title}</CardTitle>
+              <CardDescription className="text-sm font-semibold leading-tight text-muted-foreground/80">{desc}</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+      </Card>
+    </Link>
+  )
+}
+
+function AlertItem({ href, icon: Icon, label }: any) {
+  return (
+    <Link href={href} className="flex items-center justify-between p-5 bg-white rounded-2xl border border-destructive/10 hover:border-destructive/30 hover:bg-destructive/[0.02] transition-all group shadow-sm">
+      <div className="flex items-center gap-4">
+        <div className="p-2.5 bg-destructive/10 rounded-xl group-hover:scale-110 transition-transform shadow-sm">
+          <Icon className="h-5 w-5 text-destructive" />
+        </div>
+        <span className="text-base font-black text-destructive/80 tracking-tight">{label}</span>
+      </div>
+      <div className="flex items-center gap-2 text-destructive font-black text-sm group-hover:translate-x-1 transition-transform">
+        GESTIONAR
+        <TrendingUp className="h-5 w-5" />
+      </div>
+    </Link>
   )
 }

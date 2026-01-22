@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { PiggyBank, Wallet, TrendingUp, TrendingDown, CheckCircle2, Building2, AlertTriangle, Users, Vault } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
+import { PageHeader } from '@/components/ui/page-header'
+import { StatCard } from '@/components/ui/stat-card'
 
 export const revalidate = 300 // Revalida cada 5 minutos
 
@@ -31,158 +33,115 @@ export default async function TesoreriaPage() {
     : 0
 
   return (
-    <div className="space-y-6">
-      {/* Header - Responsivo */}
-      <div className="bg-white rounded-lg border border-border p-4 md:p-6 shadow-sm">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">Tesorería</h1>
-            <p className="text-muted-foreground mt-1 md:mt-2 text-sm md:text-base">
-              Control de cajas, egresos, proveedores y flujo de efectivo
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
+    <div className="space-y-8">
+      {/* Header Estandarizado */}
+      <PageHeader
+        title="Tesorería"
+        description="Control de cajas, egresos, proveedores y flujo de efectivo"
+        actions={
+          <div className="flex flex-wrap items-center gap-3">
             {rutasPendientesCount > 0 && (
-              <Button asChild variant="default" size="sm" className="bg-yellow-600 hover:bg-yellow-700 shadow-sm">
+              <Button asChild variant="default" size="sm" className="bg-yellow-600 hover:bg-yellow-700 shadow-sm md:h-10">
                 <Link href="/tesoreria/validar-rutas" className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4" />
                   Validar Rutas ({rutasPendientesCount})
                 </Link>
               </Button>
             )}
-            <Button asChild size="sm" className="bg-primary hover:bg-primary/90 shadow-sm">
+            <Button asChild size="sm" className="bg-primary hover:bg-primary/90 shadow-sm md:h-10">
               <Link href="/tesoreria/cajas">Gestionar cajas</Link>
             </Button>
           </div>
-        </div>
-      </div>
+        }
+      />
 
-      {/* Stats Principales - Responsivo */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        <Card className="border-t-[4px] border-t-primary hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <CardTitle className="text-base font-semibold text-foreground">Saldo total</CardTitle>
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-              <PiggyBank className="h-6 w-6 text-primary" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-bold text-primary mb-2">
-              {formatCurrency(resumen.data?.saldoTotal ?? 0)}
-            </div>
-            <p className="text-sm text-muted-foreground font-medium">{(Array.isArray(resumen.data?.cajas) ? resumen.data.cajas.length : resumen.data?.cajas ?? 0)} cajas activas</p>
-          </CardContent>
-        </Card>
+      {/* Stats Principales Estandarizados */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          title="Saldo total"
+          value={formatCurrency(resumen.data?.saldoTotal ?? 0)}
+          subtitle={`${(Array.isArray(resumen.data?.cajas) ? resumen.data.cajas.length : resumen.data?.cajas ?? 0)} cajas activas`}
+          icon={PiggyBank}
+          variant="primary"
+        />
 
-        <Card className="border-t-[4px] border-t-success hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <CardTitle className="text-base font-semibold text-foreground">Ingresos hoy</CardTitle>
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-success/10">
-              <TrendingUp className="h-6 w-6 text-success" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-bold text-success mb-2">
-              {formatCurrency(resumen.data?.totalIngresos ?? 0)}
-            </div>
-            <p className="text-sm text-muted-foreground font-medium">Cobros registrados en el día</p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Ingresos hoy"
+          value={formatCurrency(resumen.data?.totalIngresos ?? 0)}
+          subtitle="Cobros registrados"
+          icon={TrendingUp}
+          variant="success"
+        />
 
-        <Card className="border-t-[4px] border-t-destructive hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <CardTitle className="text-base font-semibold text-foreground">Egresos hoy</CardTitle>
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-destructive/10">
-              <TrendingDown className="h-6 w-6 text-destructive" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-bold text-destructive mb-2">
-              {formatCurrency(resumen.data?.totalEgresos ?? 0)}
-            </div>
-            <p className="text-sm text-muted-foreground font-medium">Gastos que afectan caja</p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Egresos hoy"
+          value={formatCurrency(resumen.data?.totalEgresos ?? 0)}
+          subtitle="Gastos pagados"
+          icon={TrendingDown}
+          variant="danger"
+        />
 
-        <Card className="border-t-[4px] border-t-amber-500 hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <CardTitle className="text-base font-semibold text-foreground">Tesoro</CardTitle>
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-amber-500/10">
-              <Vault className="h-6 w-6 text-amber-500" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-bold text-amber-600 mb-2">{formatCurrency(tesoroResult.total)}</div>
-            <Link href="/tesoreria/tesoro" className="text-sm text-amber-600 hover:underline font-medium">
+        <StatCard
+          title="Tesoro"
+          value={formatCurrency(tesoroResult.total)}
+          subtitle="Fondo de reserva"
+          icon={Vault}
+          variant="info"
+          action={
+            <Link href="/tesoreria/tesoro" className="text-sm text-info hover:underline font-medium inline-flex items-center gap-1">
               Ver detalle →
             </Link>
-          </CardContent>
-        </Card>
+          }
+        />
       </div>
 
-      {/* Stats Secundarios - Deuda Proveedores y Clientes Morosos */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
-        <Card className={`hover:shadow-md transition-shadow ${(proveedoresData?.deuda_total || 0) > 0 ? 'border-orange-200 bg-orange-50/50' : ''}`}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Deuda con Proveedores</CardTitle>
-            <Building2 className="h-4 w-4 text-orange-600" />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${(proveedoresData?.deuda_total || 0) > 0 ? 'text-orange-600' : 'text-green-600'}`}>
-              {formatCurrency(proveedoresData?.deuda_total || 0)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {proveedoresData?.facturas_pendientes || 0} facturas pendientes
-              {(proveedoresData?.facturas_vencidas || 0) > 0 && (
-                <span className="text-red-600 ml-1">({proveedoresData?.facturas_vencidas} vencidas)</span>
-              )}
-            </p>
-            <Link href="/tesoreria/proveedores" className="text-xs text-blue-600 hover:underline">
+      {/* Stats Secundarios Estandarizados */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <StatCard
+          title="Deuda Proveedores"
+          value={formatCurrency(proveedoresData?.deuda_total || 0)}
+          subtitle={`${proveedoresData?.facturas_pendientes || 0} facturas pendientes`}
+          icon={Building2}
+          variant={(proveedoresData?.deuda_total || 0) > 0 ? 'warning' : 'default'}
+          action={
+            <Link href="/tesoreria/proveedores" className="text-sm font-medium hover:underline text-muted-foreground">
               Ver proveedores →
             </Link>
-          </CardContent>
-        </Card>
+          }
+        />
 
-        <Card className={`hover:shadow-md transition-shadow ${clientesMorososCount > 0 ? 'border-red-200 bg-red-50/50' : ''}`}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Clientes Morosos</CardTitle>
-            <Users className="h-4 w-4 text-red-600" />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${clientesMorososCount > 0 ? 'text-red-600' : 'text-green-600'}`}>
-              {clientesMorososCount} clientes
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Deuda total: {formatCurrency(clientesMorososMonto)}
-            </p>
-            <Link href="/tesoreria/cuentas-corrientes" className="text-xs text-blue-600 hover:underline">
+        <StatCard
+          title="Clientes Morosos"
+          value={`${clientesMorososCount} clientes`}
+          subtitle={`Total: ${formatCurrency(clientesMorososMonto)}`}
+          icon={Users}
+          variant={clientesMorososCount > 0 ? 'danger' : 'default'}
+          action={
+            <Link href="/tesoreria/cuentas-corrientes" className="text-sm font-medium hover:underline text-muted-foreground">
               Ver cuentas corrientes →
             </Link>
-          </CardContent>
-        </Card>
+          }
+        />
 
-        <Card className="hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Cajas Activas</CardTitle>
-            <Wallet className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{cajas?.length ?? 0}</div>
-            <p className="text-xs text-muted-foreground">
-              Incluye cajas físicas y virtuales
-            </p>
-            <Link href="/tesoreria/cajas" className="text-xs text-blue-600 hover:underline">
+        <StatCard
+          title="Cajas Activas"
+          value={cajas?.length ?? 0}
+          subtitle="Físicas y virtuales"
+          icon={Wallet}
+          variant="default"
+          action={
+            <Link href="/tesoreria/cajas" className="text-sm font-medium hover:underline text-muted-foreground">
               Gestionar cajas →
             </Link>
-          </CardContent>
-        </Card>
+          }
+        />
       </div>
 
-      {/* Alertas */}
+      {/* Alertas Financieras */}
       {((proveedoresData?.facturas_vencidas || 0) > 0 || clientesMorososCount > 0) && (
-        <Card className="border-amber-200 bg-amber-50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold flex items-center gap-2 text-amber-800">
+        <Card className="border-amber-200 bg-amber-50/50 shadow-md">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg font-bold flex items-center gap-2 text-amber-800">
               <AlertTriangle className="h-5 w-5" />
               Alertas Financieras
             </CardTitle>
@@ -192,18 +151,18 @@ export default async function TesoreriaPage() {
               {(proveedoresData?.facturas_vencidas || 0) > 0 && (
                 <Link
                   href="/tesoreria/proveedores"
-                  className="flex items-center gap-2 px-3 py-2 bg-orange-100 rounded-lg text-orange-800 text-sm hover:bg-orange-200 transition-colors"
+                  className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-xl text-orange-800 text-sm font-semibold border border-orange-200 shadow-sm hover:bg-orange-50 transition-colors"
                 >
-                  <Building2 className="h-4 w-4" />
+                  <Building2 className="h-5 w-5 text-orange-500" />
                   {proveedoresData?.facturas_vencidas} facturas de proveedores vencidas
                 </Link>
               )}
               {clientesMorososCount > 0 && (
                 <Link
                   href="/tesoreria/cuentas-corrientes"
-                  className="flex items-center gap-2 px-3 py-2 bg-red-100 rounded-lg text-red-800 text-sm hover:bg-red-200 transition-colors"
+                  className="flex items-center gap-3 px-4 py-2.5 bg-white rounded-xl text-red-800 text-sm font-semibold border border-red-200 shadow-sm hover:bg-red-50 transition-colors"
                 >
-                  <Users className="h-4 w-4" />
+                  <Users className="h-5 w-5 text-red-500" />
                   {clientesMorososCount} clientes con deuda pendiente
                 </Link>
               )}
@@ -212,34 +171,39 @@ export default async function TesoreriaPage() {
         </Card>
       )}
 
-      <Card>
-        <CardHeader className="pb-4">
-          <CardTitle className="text-xl font-bold">Cajas recientes</CardTitle>
-          <CardDescription className="text-base mt-1">Resumen ejecutivo de las últimas cajas creadas</CardDescription>
+      {/* Tabla de cajas recientes - Card Dashboard style */}
+      <Card className="overflow-hidden border-border/60">
+        <CardHeader className="pb-4 border-b border-border/50">
+          <CardTitle className="text-xl font-bold">Resumen de Cajas</CardTitle>
+          <CardDescription className="text-base mt-1">Saldos actuales por caja registrada</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="min-w-full text-base">
               <thead>
-                <tr className="text-left bg-muted/50">
-                  <th className="pb-3 px-4 font-semibold text-sm">Nombre</th>
-                  <th className="pb-3 px-4 font-semibold text-sm">Saldo actual</th>
-                  <th className="pb-3 px-4 font-semibold text-sm">Moneda</th>
+                <tr className="text-left bg-muted/30">
+                  <th className="py-4 px-6 font-semibold text-sm uppercase tracking-wider text-muted-foreground">Nombre</th>
+                  <th className="py-4 px-6 font-semibold text-sm uppercase tracking-wider text-muted-foreground">Saldo actual</th>
+                  <th className="py-4 px-6 font-semibold text-sm uppercase tracking-wider text-muted-foreground text-right">Moneda</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-border/40">
                 {(cajas ?? []).map((caja) => (
-                  <tr key={caja.id} className="border-t border-muted/50">
-                    <td className="py-3 px-4 font-semibold text-foreground">{caja.nombre}</td>
-                    <td className="py-3 px-4 font-bold text-foreground">
+                  <tr key={caja.id} className="hover:bg-muted/10 transition-colors">
+                    <td className="py-4 px-6 font-bold text-foreground">{caja.nombre}</td>
+                    <td className="py-4 px-6 font-black text-primary text-lg">
                       {formatCurrency(caja.saldo_actual)}
                     </td>
-                    <td className="py-3 px-4 font-medium text-foreground">{caja.moneda}</td>
+                    <td className="py-4 px-6 font-medium text-muted-foreground text-right">
+                      <span className="bg-primary/5 text-primary px-2.5 py-1 rounded-full text-xs font-bold">
+                        {caja.moneda}
+                      </span>
+                    </td>
                   </tr>
                 ))}
                 {cajas?.length === 0 && (
                   <tr>
-                    <td colSpan={3} className="py-6 text-center text-muted-foreground">
+                    <td colSpan={3} className="py-12 text-center text-muted-foreground">
                       No hay cajas registradas aún.
                     </td>
                   </tr>
@@ -250,7 +214,7 @@ export default async function TesoreriaPage() {
         </CardContent>
       </Card>
 
-      <div className="text-right text-xs text-muted-foreground">DaniR</div>
+      <div className="text-right text-xs text-muted-foreground opacity-50">DaniR</div>
     </div>
   )
 }

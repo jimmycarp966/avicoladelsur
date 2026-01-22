@@ -1,11 +1,12 @@
 import { Suspense } from 'react'
-import { createClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Building2, AlertTriangle, Package, TrendingUp, Plus, Eye, Settings } from 'lucide-react'
 import Link from 'next/link'
 import { obtenerSucursalesAction } from '@/actions/sucursales.actions'
+import { PageHeader } from '@/components/ui/page-header'
+import { StatCard } from '@/components/ui/stat-card'
 
 async function getSucursales() {
   const result = await obtenerSucursalesAction()
@@ -14,20 +15,9 @@ async function getSucursales() {
 
 function SucursalesSkeleton() {
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
       {[...Array(6)].map((_, i) => (
-        <Card key={i} className="animate-pulse">
-          <CardHeader>
-            <div className="h-4 bg-muted rounded w-3/4"></div>
-            <div className="h-3 bg-muted rounded w-1/2"></div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <div className="h-3 bg-muted rounded"></div>
-              <div className="h-3 bg-muted rounded w-2/3"></div>
-            </div>
-          </CardContent>
-        </Card>
+        <div key={i} className="h-48 rounded-2xl bg-muted animate-pulse border border-border/50" />
       ))}
     </div>
   )
@@ -43,130 +33,101 @@ export default async function SucursalesPage() {
   const totalInventarioCritico = sucursales.reduce((sum, s) => sum + s.inventarioCritico, 0)
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <Building2 className="w-8 h-8" />
-            Sucursales
-          </h1>
-          <p className="text-muted-foreground">
-            Gestión de sucursales y monitoreo de inventario
-          </p>
-        </div>
-        <Button asChild>
-          <Link href="/sucursales/nueva">
-            <Plus className="w-4 h-4 mr-2" />
-            Nueva Sucursal
-          </Link>
-        </Button>
+    <div className="space-y-8">
+      {/* Header Estandarizado */}
+      <PageHeader
+        title="Sucursales"
+        description="Gestión de sucursales y monitoreo de inventario por ubicación"
+        icon={Building2}
+        actions={
+          <Button asChild size="sm" className="bg-primary hover:bg-primary/90 shadow-sm md:h-10">
+            <Link href="/sucursales/nueva">
+              <Plus className="w-4 h-4 mr-2" />
+              Nueva Sucursal
+            </Link>
+          </Button>
+        }
+      />
+
+      {/* Estadísticas Globales Estandarizadas */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          title="Total Sucursales"
+          value={totalSucursales}
+          subtitle={`${sucursalesActivas} sucursales activas`}
+          icon={Building2}
+          variant="primary"
+        />
+
+        <StatCard
+          title="Alertas Activas"
+          value={totalAlertas}
+          subtitle="Requieren atención"
+          icon={AlertTriangle}
+          variant={totalAlertas > 0 ? 'danger' : 'default'}
+        />
+
+        <StatCard
+          title="Stock Crítico"
+          value={totalInventarioCritico}
+          subtitle="Productos bajo umbral"
+          icon={Package}
+          variant={totalInventarioCritico > 0 ? 'warning' : 'default'}
+        />
+
+        <StatCard
+          title="Estado General"
+          value={totalAlertas === 0 ? 'Excelente' : totalAlertas < 5 ? 'Bueno' : 'Atención'}
+          subtitle="Basado en alertas"
+          icon={TrendingUp}
+          variant={totalAlertas === 0 ? 'success' : 'default'}
+        />
       </div>
 
-      {/* Estadísticas Globales */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Sucursales</CardTitle>
-            <Building2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalSucursales}</div>
-            <p className="text-xs text-muted-foreground">
-              {sucursalesActivas} activas
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Alertas Pendientes</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{totalAlertas}</div>
-            <p className="text-xs text-muted-foreground">
-              Requieren atención
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Inventario Crítico</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{totalInventarioCritico}</div>
-            <p className="text-xs text-muted-foreground">
-              Productos bajo umbral
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Estado General</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {totalAlertas === 0 ? 'Excelente' : totalAlertas < 5 ? 'Bueno' : 'Requiere Atención'}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Basado en alertas activas
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Lista de Sucursales */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Sucursales</CardTitle>
-          <CardDescription>
-            Lista de todas las sucursales con indicadores de estado
+      {/* Lista de Sucursales Estilo Dashboard */}
+      <Card className="overflow-hidden border-border/60">
+        <CardHeader className="pb-6 border-b border-border/50">
+          <CardTitle className="text-xl font-bold">Listado de Sucursales</CardTitle>
+          <CardDescription className="text-base mt-1">
+            Monitoreo en tiempo real de indicadores por ubicación
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-6">
           <Suspense fallback={<SucursalesSkeleton />}>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {sucursales.map((sucursal) => (
-                <Card key={sucursal.id} className="hover:shadow-md transition-shadow">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">{sucursal.nombre}</CardTitle>
-                      <Badge variant={sucursal.active ? "default" : "secondary"}>
-                        {sucursal.active ? 'Activa' : 'Inactiva'}
-                      </Badge>
-                    </div>
+                <Card key={sucursal.id} className="group hover:border-primary/40 shadow-md">
+                  <CardHeader className="pb-3 px-6 pt-6 flex flex-row items-center justify-between border-b border-border/40 mb-4 bg-muted/10">
+                    <CardTitle className="text-lg font-bold group-hover:text-primary transition-colors">{sucursal.nombre}</CardTitle>
+                    <Badge variant={sucursal.active ? "default" : "secondary"} className={sucursal.active ? "bg-success hover:bg-success/90" : ""}>
+                      {sucursal.active ? 'Activa' : 'Inactiva'}
+                    </Badge>
                   </CardHeader>
-                  <CardContent className="space-y-3">
-                    {/* Alertas */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Alertas pendientes</span>
-                      <Badge variant={sucursal.alertasPendientes > 0 ? "destructive" : "secondary"}>
-                        {sucursal.alertasPendientes}
-                      </Badge>
+                  <CardContent className="space-y-4 px-6 pb-6">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-2 rounded-xl bg-muted/30">
+                        <span className="text-sm font-medium text-muted-foreground">Alertas</span>
+                        <Badge variant={sucursal.alertasPendientes > 0 ? "destructive" : "secondary"} className="font-bold">
+                          {sucursal.alertasPendientes}
+                        </Badge>
+                      </div>
+
+                      <div className="flex items-center justify-between p-2 rounded-xl bg-muted/30">
+                        <span className="text-sm font-medium text-muted-foreground">Stock Crítico</span>
+                        <Badge variant={sucursal.inventarioCritico > 0 ? "warning" : "secondary"} className="font-bold">
+                          {sucursal.inventarioCritico}
+                        </Badge>
+                      </div>
                     </div>
 
-                    {/* Inventario crítico */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Inventario crítico</span>
-                      <Badge variant={sucursal.inventarioCritico > 0 ? "destructive" : "secondary"}>
-                        {sucursal.inventarioCritico}
-                      </Badge>
-                    </div>
-
-                    {/* Acciones */}
                     <div className="flex gap-2 pt-2">
-                      <Button variant="outline" size="sm" asChild className="flex-1">
+                      <Button variant="outline" size="sm" asChild className="flex-1 rounded-xl font-bold uppercase text-xs tracking-wider">
                         <Link href={`/sucursales/${sucursal.id}`}>
                           <Eye className="w-4 h-4 mr-2" />
-                          Ver
+                          Detalles
                         </Link>
                       </Button>
-                      <Button variant="outline" size="sm" asChild>
+                      <Button variant="outline" size="sm" asChild className="rounded-xl">
                         <Link href={`/sucursales/${sucursal.id}/settings`}>
                           <Settings className="w-4 h-4" />
                         </Link>
@@ -178,16 +139,16 @@ export default async function SucursalesPage() {
             </div>
 
             {sucursales.length === 0 && (
-              <div className="text-center py-12">
-                <Building2 className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                <h3 className="text-lg font-semibold mb-2">No hay sucursales</h3>
-                <p className="text-muted-foreground mb-4">
-                  Crea tu primera sucursal para comenzar a gestionar inventario por ubicación
+              <div className="text-center py-20 bg-muted/10 rounded-3xl border-2 border-dashed border-border/40">
+                <Building2 className="w-16 h-16 mx-auto mb-6 text-muted-foreground/40" />
+                <h3 className="text-2xl font-black text-foreground mb-3 uppercase tracking-tight">Sin sucursales registradas</h3>
+                <p className="text-muted-foreground mb-8 text-lg max-w-md mx-auto">
+                  Comience por crear su primera ubicación física para el control de stock.
                 </p>
-                <Button asChild>
+                <Button asChild size="lg" className="rounded-2xl px-10 font-black shadow-xl">
                   <Link href="/sucursales/nueva">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Crear Primera Sucursal
+                    <Plus className="w-5 h-5 mr-3" />
+                    Crear primera sucursal
                   </Link>
                 </Button>
               </div>
@@ -195,6 +156,8 @@ export default async function SucursalesPage() {
           </Suspense>
         </CardContent>
       </Card>
+
+      <div className="text-right text-xs text-muted-foreground opacity-30 pt-4 font-bold uppercase">DaniR</div>
     </div>
   )
 }
