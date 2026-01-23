@@ -25,6 +25,15 @@
 *.pem
 /.agent/*
 !/.agent/skills/
+.windsurf/skills/
+.windsurf/plans/
+.claude/
+.cursor/
+.gemini/
+.opencode/
+.agents/
+supabase/.temp/
+scripts/reset_data.sql
 
 
 /.venv
