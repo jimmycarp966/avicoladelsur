@@ -20,6 +20,7 @@ import { PresupuestosDiaRealtime } from '@/components/almacen/PresupuestosDiaRea
 import { obtenerPresupuestosDiaAction, esItemPesable, calcularKgItem } from '@/actions/presupuestos-dia.actions'
 import { esVentaMayorista } from '@/lib/utils'
 import { PrintPreparacionParcial } from '@/components/almacen/PrintPreparacionParcial'
+import { ProductoPreparacionCard } from '@/components/almacen/ProductoPreparacionCard'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 60 // Revalida cada 60 segundos
@@ -371,17 +372,15 @@ async function PresupuestosDiaContent({
 
               <div className="mt-4 space-y-3">
                 {grupo.productos.map((producto) => (
-                  <div key={`${grupo.key}-${producto.nombre}`} className="flex items-start justify-between rounded-md border border-slate-100 bg-white/80 px-3 py-2 text-sm">
-                    <div>
-                      <p className="font-medium">{producto.nombre}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {producto.presupuestos} presupuesto(s) • {producto.pesable ? 'Pesable' : 'Unidad'}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-base font-semibold">{formatearCantidad(producto.totalCantidad, producto.pesable)}</p>
-                    </div>
-                  </div>
+                  <ProductoPreparacionCard
+                    key={`${grupo.key}-${producto.nombre}`}
+                    nombre={producto.nombre}
+                    pesable={producto.pesable}
+                    totalCantidad={producto.totalCantidad}
+                    presupuestos={producto.presupuestos}
+                    presupuestosIds={producto.presupuestosIds}
+                    presupuestosData={producto.presupuestosData}
+                  />
                 ))}
               </div>
             </div>

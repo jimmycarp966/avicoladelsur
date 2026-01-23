@@ -166,6 +166,7 @@ export async function obtenerPresupuestosDiaAction(fecha: string, zonaId?: strin
                 pesable: boolean
                 totalCantidad: number
                 presupuestosIds: Set<string>
+                presupuestosData: Array<{ id: string; numero: string; cliente?: string }>
               }
             >
             totalKgPesables: number
@@ -208,11 +209,17 @@ export async function obtenerPresupuestosDiaAction(fecha: string, zonaId?: strin
               pesable: esPesable,
               totalCantidad: 0,
               presupuestosIds: new Set<string>(),
+              presupuestosData: [],
             }
           }
 
           acc[key].productos[productoKey].totalCantidad += cantidad
           acc[key].productos[productoKey].presupuestosIds.add(presupuesto.id)
+          acc[key].productos[productoKey].presupuestosData.push({
+            id: presupuesto.id,
+            numero: presupuesto.numero_presupuesto,
+            cliente: presupuesto.cliente?.nombre,
+          })
         })
 
         return acc
@@ -230,6 +237,8 @@ export async function obtenerPresupuestosDiaAction(fecha: string, zonaId?: strin
         pesable: producto.pesable,
         totalCantidad: producto.totalCantidad,
         presupuestos: producto.presupuestosIds.size,
+        presupuestosIds: producto.presupuestosIds,
+        presupuestosData: producto.presupuestosData,
       }))
       .sort((a, b) => b.totalCantidad - a.totalCantidad),
   }))
