@@ -65,15 +65,27 @@ export async function obtenerPresupuestosDiaAction(fecha: string, zonaId?: strin
     .range(offset, offset + pageSize - 1)
 
   // Obtener total de presupuestos para paginación (con los mismos filtros pero sin range)
-  const { count: totalCount } = await supabase
+  let totalCountQuery = supabase
     .from('presupuestos')
     .select('*', { count: 'exact', head: true })
     .eq('estado', 'en_almacen')
     .eq('fecha_entrega_estimada', fecha)
     .or('tipo_venta.eq.reparto,tipo_venta.is.null')
-    .ilike('zona_id', zonaId || '%')
-    .ilike('turno', turno || '%')
-    .or(buscar && buscar.trim() ? `numero_presupuesto.ilike.%${buscar.trim()}%,cliente.nombre.ilike.%${buscar.trim()}%` : 'numero_presupuesto.ilike.%%')
+
+  if (zonaId) {
+    totalCountQuery = totalCountQuery.eq('zona_id', zonaId)
+  }
+
+  if (turno) {
+    totalCountQuery = totalCountQuery.eq('turno', turno)
+  }
+
+  if (buscar && buscar.trim()) {
+    const busqueda = buscar.trim()
+    totalCountQuery = totalCountQuery.or(`numero_presupuesto.ilike.%${busqueda}%,cliente.nombre.ilike.%${busqueda}%`)
+  }
+
+  const { count: totalCount } = await totalCountQuery
 
 
 
