@@ -97,9 +97,9 @@ function StatCard({
                 <div className="flex-1 space-y-1">
                     <p className="text-sm font-medium text-muted-foreground">{title}</p>
                     <div className="flex items-baseline gap-2">
-                        <p className="text-3xl font-bold tracking-tight text-foreground">
+                        <div className="text-3xl font-bold tracking-tight text-foreground">
                             {value}
-                        </p>
+                        </div>
                         {trend && (
                             <div className={cn('flex items-center gap-0.5 text-sm font-medium', trendColor)}>
                                 <TrendIcon className="h-4 w-4" />

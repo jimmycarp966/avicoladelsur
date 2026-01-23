@@ -1,6 +1,6 @@
 # 🏗️ Arquitectura del Sistema - Avícola del Sur ERP
 
-**Última Actualización:** 17 de Enero 2026 (14:45)  
+**Última Actualización:** 23 de Enero 2026 (17:00)  
 **Estado:** ✅ PRODUCCIÓN  
 **Docs relacionadas:** [README](./README.md) · [Architecture Deep-Dive](./ARCHITECTURE.md) · [Supabase Setup](./SUPABASE_SETUP.md)
 
@@ -337,6 +337,11 @@ Endpoints que operan sin interfaz gráfica:
 ## 📝 Cambios Recientes (Últimos 5)
 
 > Histórico completo disponible en [ARCHITECTURE.md#📝-cambios-recientes](./ARCHITECTURE.md#📝-cambios-recientes).
+
+### 2026-01-23 · Selección Elite de Skills del Agente
+- **Optimización de IA**: Curación de 36 skills de alta prioridad (23 trending de skills.sh + 13 custom de dominio) reemplazando 69 skills genéricas.
+- **Eficiencia**: Reducción de ruido y mayor precisión en las respuestas del agente Antigravity.
+- **Estructura**: Migración de skills a `.agent/skills/` para mejor visibilidad y control de versiones.
 
 ### 2026-01-22 · Sistema Integral de Remitos (Internos y Externos)
 - **Nueva Estructura**: Tabla `remitos` con numeración secuencial (`seq_remito_numero`) para documentar movimientos de mercadería.

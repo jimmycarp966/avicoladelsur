@@ -1,6 +1,6 @@
 # 🚀 Avícola del Sur ERP - Sistema Integral de Gestión
 
-**Versión:** Enero 2026 (v2.1)  
+**Versión:** Enero 2026 (v2.2)  
 **Estado:** ✅ PRODUCCIÓN  
 **Docs relacionadas:** [Architecture Summary](./ARCHITECTURE_SUMMARY.md) · [Architecture Deep-Dive](./ARCHITECTURE.md) · [Supabase Setup](./SUPABASE_SETUP.md)
 
