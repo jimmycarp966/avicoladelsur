@@ -1,14 +1,14 @@
 import { createClient } from '@/lib/supabase/server'
 import { getTodayArgentina, esVentaMayorista } from '@/lib/utils'
-import { esItemPesable, calcularKgItem } from '@/lib/utils/pesaje'
+import { esItemPesable, calcularKgItem, calcularUnidadesItem } from '@/lib/utils/pesaje'
 
 // Re-exportar para mantener compatibilidad con componentes que ya usen esto
-export { esVentaMayorista, esItemPesable, calcularKgItem }
+export { esVentaMayorista, esItemPesable, calcularKgItem, calcularUnidadesItem }
 
 // Las funciones esItemPesable y calcularKgItem se han movido a @/lib/utils/pesaje
 // para evitar importar dependencias de servidor en componentes de cliente.
 
-export async function obtenerPresupuestosDiaAction(fecha: string, zonaId?: string, turno?: string) {
+export async function obtenerPresupuestosDiaAction(fecha: string, zonaId?: string, turno?: string, buscar?: string, page: number = 1, pageSize: number = 50) {
   const supabase = await createClient()
   const presupuestoSelect = `
     *,
@@ -50,7 +50,30 @@ export async function obtenerPresupuestosDiaAction(fecha: string, zonaId?: strin
     query = query.eq('turno', turno)
   }
 
-  const { data: presupuestos, error } = await query.order('fecha_entrega_estimada', { ascending: true })
+  // Filtrar por texto de búsqueda (número de presupuesto o nombre de cliente)
+  if (buscar && buscar.trim()) {
+    const busqueda = buscar.trim()
+    query = query.or(`numero_presupuesto.ilike.%${busqueda}%,cliente.nombre.ilike.%${busqueda}%`)
+  }
+
+  // Calcular offset para paginación
+  const offset = (page - 1) * pageSize
+
+  // Obtener presupuestos con paginación
+  const { data: presupuestos, error } = await query
+    .order('fecha_entrega_estimada', { ascending: true })
+    .range(offset, offset + pageSize - 1)
+
+  // Obtener total de presupuestos para paginación (con los mismos filtros pero sin range)
+  const { count: totalCount } = await supabase
+    .from('presupuestos')
+    .select('*', { count: 'exact', head: true })
+    .eq('estado', 'en_almacen')
+    .eq('fecha_entrega_estimada', fecha)
+    .or('tipo_venta.eq.reparto,tipo_venta.is.null')
+    .ilike('zona_id', zonaId || '%')
+    .ilike('turno', turno || '%')
+    .or(buscar && buscar.trim() ? `numero_presupuesto.ilike.%${buscar.trim()}%,cliente.nombre.ilike.%${buscar.trim()}%` : 'numero_presupuesto.ilike.%%')
 
 
 
@@ -169,17 +192,20 @@ export async function obtenerPresupuestosDiaAction(fecha: string, zonaId?: strin
 
         ; (presupuesto.items || []).forEach((item: any) => {
           const productoKey = item.producto?.codigo || `${item.producto?.nombre || 'producto'}-${item.id}`
-          const cantidad = calcularKgItem(presupuesto, item)
-
           const esMayorista = esVentaMayorista(presupuesto, item)
-          if (esItemPesable(item, esMayorista)) {
+          const esPesable = esItemPesable(item, esMayorista)
+
+          // Usar calcularKgItem para pesables, calcularUnidadesItem para NO pesables
+          const cantidad = esPesable ? calcularKgItem(presupuesto, item) : calcularUnidadesItem(presupuesto, item)
+
+          if (esPesable) {
             acc[key].totalKgPesables += cantidad
           }
 
           if (!acc[key].productos[productoKey]) {
             acc[key].productos[productoKey] = {
               nombre: item.producto?.nombre || 'Producto sin nombre',
-              pesable: esItemPesable(item, esMayorista),
+              pesable: esPesable,
               totalCantidad: 0,
               presupuestosIds: new Set<string>(),
             }
@@ -311,6 +337,8 @@ export async function obtenerPresupuestosDiaAction(fecha: string, zonaId?: strin
   return {
     zonas: zonas || [],
     presupuestos: presupuestos || [],
+    totalCount: totalCount || 0,
+    pageSize,
     resumenDia: {
       totalPresupuestosDia,
       totalKgDia,

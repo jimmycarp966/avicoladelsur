@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Calendar, MapPin, Clock } from 'lucide-react'
+import { Calendar, MapPin, Clock, Search } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -37,11 +37,11 @@ export function PresupuestosDiaFiltros({ zonas, fecha, zonaId, turno }: Presupue
           Filtros
         </CardTitle>
         <CardDescription>
-          Filtra presupuestos por fecha, zona y turno
+          Filtra presupuestos por fecha, zona, turno y búsqueda de texto
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-5">
           <div className="space-y-2">
             <Label htmlFor="fecha">Fecha</Label>
             <Input
@@ -87,6 +87,20 @@ export function PresupuestosDiaFiltros({ zonas, fecha, zonaId, turno }: Presupue
                 <SelectItem value="tarde">Tarde</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="buscar" className="flex items-center gap-2">
+              <Search className="h-4 w-4" />
+              Buscar
+            </Label>
+            <Input
+              id="buscar"
+              type="text"
+              placeholder="N° o cliente..."
+              defaultValue={searchParams?.get('buscar') || ''}
+              onChange={(e) => handleFilterChange('buscar', e.target.value)}
+            />
           </div>
 
           <div className="flex items-end">

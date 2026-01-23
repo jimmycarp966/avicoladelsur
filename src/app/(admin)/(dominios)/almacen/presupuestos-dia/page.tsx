@@ -32,24 +32,32 @@ export const metadata = {
 async function PresupuestosDiaContent({
   searchParams,
 }: {
-  searchParams?: { fecha?: string; zona_id?: string; turno?: string }
+  searchParams?: { fecha?: string; zona_id?: string; turno?: string; buscar?: string; page?: string }
 }) {
   // Obtener parámetros de filtro
   const fecha = searchParams?.fecha || getTodayArgentina()
   const zonaId = searchParams?.zona_id
   const turno = searchParams?.turno
+  const buscar = searchParams?.buscar
+  const page = parseInt(searchParams?.page || '1', 10)
+  const pageSize = 50
 
   // Obtener datos usando el Server Action
   const {
     zonas,
     presupuestos,
+    totalCount,
+    pageSize: returnedPageSize,
     resumenDia,
     listaPreparacion,
     asignacionesResumen,
     asignacionPorPresupuesto,
     presupuestosPorZonaTurno,
     estadisticas,
-  } = await obtenerPresupuestosDiaAction(fecha, zonaId, turno)
+  } = await obtenerPresupuestosDiaAction(fecha, zonaId, turno, buscar, page, pageSize)
+
+  // Calcular total de páginas
+  const totalPages = Math.ceil((totalCount || 0) / pageSize)
 
 
 
@@ -260,8 +268,8 @@ async function PresupuestosDiaContent({
         </Card>
       )}
 
-      {/* Sugerencias de asignación automática */}
-      {asignacionesResumen.length > 0 && (
+      {/* Sugerencias de asignación automática - OCULTADO POR SOLICITUD DEL USUARIO */}
+      {/*asignacionesResumen.length > 0 && (
         <Card className="border-l-4 border-l-primary/50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -313,7 +321,7 @@ async function PresupuestosDiaContent({
             })}
           </CardContent>
         </Card>
-      )}
+      )*/}
 
       {/* Filtros */}
       <PresupuestosDiaFiltros zonas={zonas || []} fecha={fecha} zonaId={zonaId} turno={turno} />
@@ -865,6 +873,74 @@ async function PresupuestosDiaContent({
                 })}
               </div>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Controles de paginación */}
+      {totalPages > 1 && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="text-sm text-muted-foreground">
+                Página {page} de {totalPages} • {totalCount} presupuesto(s) total
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page === 1}
+                  onClick={() => {
+                    const params = new URLSearchParams(searchParams?.toString() || '')
+                    params.set('page', String(page - 1))
+                    router.push(`?${params.toString()}`)
+                  }}
+                >
+                  Anterior
+                </Button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum
+                    if (totalPages <= 5) {
+                      pageNum = i + 1
+                    } else if (page <= 3) {
+                      pageNum = i + 1
+                    } else if (page >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i
+                    } else {
+                      pageNum = page - 2 + i
+                    }
+
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={page === pageNum ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => {
+                          const params = new URLSearchParams(searchParams?.toString() || '')
+                          params.set('page', String(pageNum))
+                          router.push(`?${params.toString()}`)
+                        }}
+                      >
+                        {pageNum}
+                      </Button>
+                    )
+                  })}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page === totalPages}
+                  onClick={() => {
+                    const params = new URLSearchParams(searchParams?.toString() || '')
+                    params.set('page', String(page + 1))
+                    router.push(`?${params.toString()}`)
+                  }}
+                >
+                  Siguiente
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}

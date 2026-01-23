@@ -50,3 +50,18 @@ export function calcularKgItem(presupuesto: any, item: any): number {
     }
     return item.cantidad_solicitada || 0
 }
+
+// Calcula unidades para productos NO pesables (para mostrar en lista de preparación)
+export function calcularUnidadesItem(presupuesto: any, item: any): number {
+    if (!item) return 0
+    const esMayorista = esVentaMayorista(presupuesto, item)
+    const kgPorUnidadMayor = item.producto?.kg_por_unidad_mayor
+
+    if (esMayorista && kgPorUnidadMayor) {
+        // Venta mayorista: mostrar cantidad en unidades mayores (cajones)
+        return item.cantidad_solicitada || 0
+    }
+
+    // Venta normal: mostrar cantidad en unidades individuales
+    return item.cantidad_solicitada || 0
+}
