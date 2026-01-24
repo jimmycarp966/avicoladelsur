@@ -434,3 +434,56 @@
 3. Se integró con el sistema de estado para que si el usuario dice "sí", se agregue automáticamente al presupuesto.
 4. Mejorada la extracción de productos para incluir nombres descriptivos.
 
+
+## [2026-01-24T18:30:00] Tarea 10 Completada
+
+**Migración creada**: 20260124_notificaciones_programadas.sql
+**Commit**: feat(bot): add notification scheduling tables (2d9ad05)
+
+**Tablas creadas**:
+1. **cliente_preferencias_notificaciones**: Preferencias por cliente y tipo
+   - Fields: id, cliente_id, tipo, habilitado, frecuencia_maxima
+   - Defaults: habilitado=true, frecuencia_maxima=3
+   - Validaciones: tipos específicos, frecuencia entre 1-10
+   - Unique constraint: (cliente_id, tipo)
+
+2. **notificaciones_programadas**: Cola de notificaciones pendientes
+   - Fields: id, cliente_id, tipo, mensaje, datos (JSONB), programada_para, enviada, enviada_at, error_envio
+   - Indexes: cliente_id, tipo, programada_para, enviada, pendientes (partial)
+   - Validaciones: tipos específicos
+
+**Funciones RPC creadas (8 total)**:
+1. upsert_cliente_preferencia_notificacion - Inserta/actualiza preferencia
+2. get_cliente_preferencias_notificaciones - Obtiene todas las preferencias de un cliente
+3. programar_notificacion - Programa notificación respetando horarios 8am-8pm
+4. obtener_notificaciones_pendientes - Obtiene notificaciones listas para enviar
+5. marcar_notificacion_enviada - Marca como enviada o fallida
+6. obtener_historial_notificaciones - Historial de últimos N días
+7. contar_notificaciones_hoy - Cuenta notificaciones de un tipo hoy
+8. cleanup_notificaciones_antiguas - Limpia notificaciones >90 días
+
+**Tipos de notificación**:
+- estado_pedido: Estado actual de pedidos
+- recordatorio_compra: Recordatorio de re-stock
+- promocion: Ofertas y promociones
+- entrega_cercana: Alerta de entrega inminente
+- alerta_pago: Alertas de pago pendiente
+
+**Lógica de horarios**:
+- Validación automática en programar_notificacion
+- Antes de 8am: envío a las 8am del mismo día
+- Después de 8pm: envío a las 8am del día siguiente
+- Entre 8am-8pm: envío al horario programado
+
+**Políticas RLS**:
+- Tablas habilitadas con RLS
+- Solo service_role puede acceder (bot usa service role key)
+- Políticas restrictivas para SELECT/INSERT/UPDATE/DELETE
+
+**Patrón seguido**:
+- BEGIN/COMMIT para transacción
+- IF NOT EXISTS en CREATE TABLE
+- SECURITY DEFINER en funciones RPC
+- Retorno JSONB con success/error/data
+- COMMENT ON para documentación
+- Bloque de verificación al final con DO $$

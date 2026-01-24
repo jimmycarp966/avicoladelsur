@@ -373,7 +373,7 @@ FASE 4 (Notificaciones) → FASE 5 (Dashboard)
 
 ### FASE 4: Notificaciones Proactivas
 
-- [ ] 10. Crear sistema de notificaciones en BD
+- [x] 10. Crear sistema de notificaciones en BD
 
   **What to do**:
   - Crear tabla `notificaciones_programadas`: `id`, `cliente_id`, `tipo`, `mensaje`, `datos` (JSONB), `programada_para`, `enviada`, `created_at`
@@ -391,12 +391,12 @@ FASE 4 (Notificaciones) → FASE 5 (Dashboard)
   - Tabla `clientes` - Datos de clientes
 
   **Acceptance Criteria**:
-  - [ ] Tablas creadas y con políticas RLS
-  - [ ] Por defecto, nuevo cliente tiene todas las notificaciones habilitadas
+  - [x] Tablas creadas y con políticas RLS
+  - [x] Por defecto, nuevo cliente tiene todas las notificaciones habilitadas
 
-  **Commit**: YES
+  **Commit**: YES (2d9ad05)
   - Message: `feat(bot): add notification scheduling tables`
-  - Files: `supabase/migrations/YYYYMMDD_notificaciones_programadas.sql`
+  - Files: `supabase/migrations/20260124_notificaciones_programadas.sql`
 
 ---
 
