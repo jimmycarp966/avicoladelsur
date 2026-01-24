@@ -492,7 +492,7 @@ export async function extractAndSaveFactsInBackground(
   try {
     // Importar dinámicamente para evitar dependencias circulares
     const { extractFactsFromConversation, mergeLearnedFacts } = await import('./memory-extractor')
-    const { getOrCreateSession, updateCustomerContext } = await import('./session-manager')
+    const { getOrCreateSession, updateCustomerContext, saveCustomerMemory } = await import('./session-manager')
 
     const session = await getOrCreateSession(phoneNumber)
 
@@ -526,10 +526,15 @@ export async function extractAndSaveFactsInBackground(
         ultima_extraccion: new Date().toISOString()
       }
 
-      // Guardar
+      // Guardar en sesión (expira en 24h)
       await updateCustomerContext(phoneNumber, {
         learned_facts: factsWithTimestamp
       })
+
+      // Guardar en memoria persistente (no expira) si tenemos cliente_id
+      if (session.customerContext?.cliente_id) {
+        await saveCustomerMemory(session.customerContext.cliente_id, factsWithTimestamp)
+      }
 
       console.log(`[Memory Bank] Hechos extraídos para ${phoneNumber}:`, factsWithTimestamp)
     }

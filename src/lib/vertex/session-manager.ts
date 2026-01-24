@@ -68,11 +68,16 @@ export async function getOrCreateSession(phoneNumber: string): Promise<SessionCo
     // Verificar si expiró (24 horas)
     const expiresAt = new Date(existingSession.expires_at)
     if (expiresAt > new Date()) {
+      const customerContext = existingSession.context as CustomerContext || {}
+
+      // Cargar memoria persistente del cliente
+      await loadMemoryIntoSession(phoneNumber, customerContext)
+
       return {
         phoneNumber,
         sessionId: existingSession.session_id,
         history: existingSession.messages || [],
-        customerContext: existingSession.context as CustomerContext || {}
+        customerContext
       }
     }
   }
@@ -248,3 +253,86 @@ export async function cleanupExpiredSessions(): Promise<void> {
     .delete()
     .lt('expires_at', new Date().toISOString())
 }
+
+/**
+ * Guarda hechos aprendidos de un cliente en memoria persistente
+ * Los hechos NO expiran con las sesiones
+ */
+export async function saveCustomerMemory(
+  clienteId: string,
+  learnedFacts: CustomerContext['learned_facts']
+): Promise<boolean> {
+  try {
+    const supabase = createAdminClient()
+
+    const { data, error } = await supabase.rpc('upsert_cliente_memoria', {
+      p_cliente_id: clienteId,
+      p_learned_facts: learnedFacts || {}
+    })
+
+    if (error) {
+      console.error('[Session Manager] Error guardando memoria del cliente:', error)
+      return false
+    }
+
+    console.log(`[Session Manager] Memoria guardada para cliente ${clienteId}`)
+    return data?.success || false
+  } catch (error) {
+    console.error('[Session Manager] Error crítico guardando memoria:', error)
+    return false
+  }
+}
+
+/**
+ * Obtiene los hechos aprendidos de un cliente desde memoria persistente
+ */
+export async function getCustomerMemory(
+  clienteId: string
+): Promise<CustomerContext['learned_facts'] | null> {
+  try {
+    const supabase = createAdminClient()
+
+    const { data, error } = await supabase.rpc('get_cliente_memoria', {
+      p_cliente_id: clienteId
+    })
+
+    if (error) {
+      console.error('[Session Manager] Error obteniendo memoria del cliente:', error)
+      return null
+    }
+
+    if (!data || !data.success) {
+      return null
+    }
+
+    return data.learned_facts || null
+  } catch (error) {
+    console.error('[Session Manager] Error crítico obteniendo memoria:', error)
+    return null
+  }
+}
+
+/**
+ * Carga la memoria persistente del cliente al contexto de la sesión
+ * Se llama cuando se crea/recupera una sesión
+ */
+export async function loadMemoryIntoSession(
+  phoneNumber: string,
+  customerContext: CustomerContext
+): Promise<void> {
+  // Solo cargar si tenemos cliente_id
+  if (!customerContext.cliente_id) {
+    return
+  }
+
+  try {
+    const memory = await getCustomerMemory(customerContext.cliente_id)
+    if (memory) {
+      customerContext.learned_facts = memory
+      console.log(`[Session Manager] Memoria cargada para cliente ${customerContext.cliente_id}`)
+    }
+  } catch (error) {
+    console.error('[Session Manager] Error cargando memoria:', error)
+  }
+}
+
