@@ -161,13 +161,20 @@ Responde SOLO con el nombre de la intención (ej: "pedido", "consulta_precio", "
             })
 
             if (result.success) {
+              let responseText = `¡Perfecto! Creé tu presupuesto ${result.numero_presupuesto} por un total de $${result.total_estimado}.
+
+¿Para cuándo lo querés (hoy/mañana) y en qué turno (mañana/tarde)?`
+
+              if (result.upselling_suggestion) {
+                responseText += `\n\n${result.upselling_suggestion.mensaje}`
+              }
+
               return {
-                text: `¡Perfecto! Creé tu presupuesto ${result.numero_presupuesto} por un total de $${result.total_estimado}.
-
-¿Para cuándo lo querés (hoy/mañana) y en qué turno (mañana/tarde)?
-
-Si querés, te sugiero 1 opción para aprovechar el envío.`,
-                context: { presupuesto_id: result.presupuesto_id }
+                text: responseText,
+                context: { 
+                  presupuesto_id: result.presupuesto_id,
+                  upselling_product_id: result.upselling_suggestion?.producto_id
+                }
               }
             } else {
               return {
@@ -327,7 +334,7 @@ Escribí "lista de precios" para ver todos los productos disponibles.`
  */
 async function extraerProductosDelMensaje(
   message: string
-): Promise<Array<{ producto_id: string; cantidad: number }>> {
+): Promise<Array<{ producto_id: string; nombre: string; cantidad: number }>> {
   try {
     const supabase = createAdminClient()
 
@@ -390,7 +397,7 @@ Si no mencionan productos claramente, devuelve un array vacío []`
     if (!Array.isArray(parsed) || parsed.length === 0) return []
 
     // Resolver productos por código o nombre
-    const resolved: Array<{ producto_id: string; cantidad: number }> = []
+    const resolved: Array<{ producto_id: string; nombre: string; cantidad: number }> = []
 
     for (const item of parsed) {
       const codigo = (item?.codigo || '').toString().trim().toUpperCase()
@@ -411,7 +418,11 @@ Si no mencionan productos claramente, devuelve un array vacío []`
       }
 
       if (producto) {
-        resolved.push({ producto_id: producto.id, cantidad })
+        resolved.push({
+          producto_id: producto.id,
+          nombre: producto.nombre,
+          cantidad: cantidad
+        })
       }
     }
 

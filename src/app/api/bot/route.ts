@@ -6,7 +6,7 @@ import { obtenerListasClienteAction, obtenerPrecioProductoAction } from '@/actio
 import { sendWhatsAppMessage, getWhatsAppProvider, isWhatsAppMetaAvailable } from '@/lib/services/whatsapp-meta'
 import { interpretarMensajeConIA } from '@/lib/services/whatsapp-ia-interpreter'
 import { processMessageWithTools, extractAndSaveFactsInBackground } from '@/lib/vertex/agent'
-import { updateCustomerContext } from '@/lib/vertex/session-manager'
+import { updateCustomerContext, getOrCreateSession } from '@/lib/vertex/session-manager'
 import { crearPresupuestoTool } from '@/lib/vertex/tools/crear-presupuesto'
 import type { MetaListSection } from '@/types/whatsapp-meta'
 import { getPendingState, setPendingState, deletePendingState } from '@/lib/bot/state-manager'
@@ -1160,10 +1160,20 @@ async function handleTwilioWebhook(formData: FormData) {
   try {
     const bodyLower = body.toLowerCase()
 
-    function mapMessageForVertex(raw: string): string {
+    async function mapMessageForVertex(raw: string): Promise<string> {
       const v = (raw || '').trim()
       if (!v) return v
       const vLower = v.toLowerCase()
+
+      // Manejar respuesta a upselling (Tarea 9)
+      if (vLower === 'si' || vLower === 'sí' || vLower === 'dale' || vLower === 'bueno' || vLower === 'agregalo' || vLower === 'sumalo') {
+        const session = await getOrCreateSession(phoneNumber)
+        if (session.customerContext?.upselling_product_id) {
+          // Limpiar el upselling_product_id para no procesarlo dos veces
+          await updateCustomerContext(phoneNumber, { upselling_product_id: undefined })
+          return 'Sí, agregá el producto que me sugeriste al presupuesto'
+        }
+      }
 
       // Compatibilidad con el viejo menú numérico
       if (v === '1' || vLower === 'opcion 1') return 'Quiero ver productos disponibles'
@@ -1304,9 +1314,17 @@ async function handleTwilioWebhook(formData: FormData) {
 
     if (!shouldSkipVertex) {
       try {
-        const vertexInput = mapMessageForVertex(body)
+        const vertexInput = await mapMessageForVertex(body)
         const vertexResponse = await processMessageWithTools(phoneNumber, vertexInput, clienteId)
         responseMessage = vertexResponse.text || '[Vertex AI devolvió respuesta vacía]'
+        
+        // Guardar contexto de upselling si existe (Tarea 9)
+        if (vertexResponse.context?.upselling_product_id) {
+          await updateCustomerContext(phoneNumber, {
+            upselling_product_id: vertexResponse.context.upselling_product_id
+          })
+        }
+        
         vertexHandled = true
       } catch (vertexError) {
         console.error('[Vertex AI] Error, usando fallback:', vertexError)

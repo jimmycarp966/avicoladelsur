@@ -10,6 +10,7 @@ export interface CrearPresupuestoParams {
   productos: Array<{
     producto_id: string
     cantidad: number
+    nombre?: string
     precio_unitario?: number
   }>
   observaciones?: string
@@ -25,6 +26,13 @@ export interface CrearPresupuestoResult {
   total_estimado?: number
   error?: string
   message?: string // Para compatibilidad con ApiResponse
+  upselling_suggestion?: {
+    producto_id: string
+    nombre: string
+    precio: number
+    unidad: string
+    mensaje: string
+  }
 }
 
 /**
@@ -70,13 +78,49 @@ export async function crearPresupuestoTool(
       }
     }
 
-    return {
+    const response: CrearPresupuestoResult = {
       success: true,
       presupuesto_id: result.presupuesto_id,
       numero_presupuesto: result.numero_presupuesto,
       total_estimado: result.total_estimado,
       message: `Presupuesto ${result.numero_presupuesto} creado exitosamente`
     }
+
+    // Lógica de Upselling sutil (Tarea 9)
+    // No sugerir si el pedido ya tiene muchos items (máx 5 sugerido en el plan)
+    if (params.productos.length <= 5) {
+      try {
+        // Tomar el primer producto para buscar complementarios
+        const baseProductoId = params.productos[0].producto_id
+
+        const { data: upsellingData } = await supabase.rpc('get_productos_complementarios', {
+          p_producto_id: baseProductoId
+        })
+
+        if (upsellingData?.success && upsellingData.sugerencias?.length > 0) {
+          // Tomar la primera sugerencia (la más frecuente)
+          const suggestion = upsellingData.sugerencias[0]
+          
+          // Verificar que el producto sugerido no esté ya en el pedido
+          const yaEstaEnPedido = params.productos.some(p => p.producto_id === suggestion.producto_id)
+          
+          if (!yaEstaEnPedido) {
+            response.upselling_suggestion = {
+              producto_id: suggestion.producto_id,
+              nombre: suggestion.nombre,
+              precio: suggestion.precio,
+              unidad: suggestion.unidad,
+              mensaje: `💡 *Sugerencia:* Muchos clientes que llevan ${params.productos[0].nombre || 'esto'} también agregan *${suggestion.nombre}*. ¿Querés sumar 1 ${suggestion.unidad} por $${suggestion.precio}?`
+            }
+          }
+        }
+      } catch (upsellError) {
+        console.error('[Tool: Crear Presupuesto] Error en upselling (ignorado):', upsellError)
+        // No fallamos la creación del presupuesto por un error en upselling
+      }
+    }
+
+    return response
   } catch (error) {
     console.error('[Tool: Crear Presupuesto] Error:', error)
     return {
@@ -108,6 +152,10 @@ export const crearPresupuestoToolDefinition = {
             producto_id: {
               type: 'string',
               description: 'ID del producto'
+            },
+            nombre: {
+              type: 'string',
+              description: 'Nombre descriptivo del producto (ej: Ala, Pechuga)'
             },
             cantidad: {
               type: 'number',

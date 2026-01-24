@@ -27,6 +27,8 @@ export interface CustomerContext {
     total_pedidos?: number
     total_gastado?: number
   }
+  // Upselling sugerido (Tarea 9)
+  upselling_product_id?: string
   // Intent pendiente para retomar después del registro
   pending_intent?: {
     type: 'pedido' | 'consulta_precio' | 'consulta_estado'
