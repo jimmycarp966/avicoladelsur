@@ -1163,19 +1163,59 @@ async function handleTwilioWebhook(formData: FormData) {
     function mapMessageForVertex(raw: string): string {
       const v = (raw || '').trim()
       if (!v) return v
+      const vLower = v.toLowerCase()
 
       // Compatibilidad con el viejo menú numérico
-      if (v === '1' || v.toLowerCase() === 'opcion 1') return 'Quiero ver productos disponibles'
-      if (v === '2' || v.toLowerCase() === 'opcion 2') return 'Quiero hacer un pedido / presupuesto'
-      if (v === '3' || v.toLowerCase() === 'opcion 3') return 'Quiero ver el estado de mis pedidos'
-      if (v === '4' || v.toLowerCase() === 'opcion 4') return 'Quiero hacer un reclamo'
-      if (v === '5' || v.toLowerCase() === 'opcion 5') return 'Quiero consultar mi saldo'
+      if (v === '1' || vLower === 'opcion 1') return 'Quiero ver productos disponibles'
+      if (v === '2' || vLower === 'opcion 2') return 'Quiero hacer un pedido / presupuesto'
+      if (v === '3' || vLower === 'opcion 3') return 'Quiero ver el estado de mis pedidos'
+      if (v === '4' || vLower === 'opcion 4') return 'Quiero hacer un reclamo'
+      if (v === '5' || vLower === 'opcion 5') return 'Quiero consultar mi saldo'
 
-      // Compatibilidad con IDs de botones (por si quedaran conversaciones viejas)
-      if (v === 'btn_menu') return 'menu'
-      if (v === 'btn_productos') return 'productos'
-      if (v === 'btn_presupuesto') return 'presupuesto'
-      if (v === 'btn_estado') return 'estado'
+      // Compatibilidad con IDs de botones
+      if (v === 'btn_menu') return 'Muéstrame el menú principal con todas las opciones disponibles'
+      if (v === 'btn_productos') return 'Quiero ver productos disponibles'
+      if (v === 'btn_presupuesto') return 'Quiero hacer un presupuesto'
+      if (v === 'btn_estado') return 'Quiero consultar el estado de mis pedidos'
+      if (v === 'btn_confirmar_si') return 'Sí, confirmo el presupuesto'
+      if (v === 'btn_confirmar_no') return 'No, cancelo el presupuesto'
+
+      // Comandos de menú y ayuda
+      if (vLower.includes('hola') || vLower.includes('ayuda') || vLower.includes('menu') || vLower.includes('inicio')) {
+        return 'Muéstrame el menú principal con todas las opciones disponibles'
+      }
+
+      // Comandos de productos/catálogo
+      if (vLower.includes('productos') || vLower.includes('catalogo') || vLower.includes('lista')) {
+        return 'Quiero ver el catálogo completo de productos disponibles'
+      }
+
+      // Comandos de saldo/deuda
+      if (vLower.includes('deuda') || vLower.includes('saldo pendiente') || vLower.includes('cuanto debo')) {
+        return 'Quiero consultar mi saldo pendiente'
+      }
+
+      // Comandos de estado de pedidos
+      if (vLower.includes('estado') && !vLower.includes('estado de mi pedido')) {
+        return 'Quiero consultar el estado de mis pedidos'
+      }
+
+      // Comandos de reclamos
+      if (vLower.includes('mis reclamos') || vLower === 'reclamos') {
+        return 'Quiero ver mis reclamos registrados'
+      }
+
+      // Selección de producto desde lista (prod_CODIGO)
+      if (v.startsWith('prod_')) {
+        const codigo = v.replace('prod_', '').toUpperCase()
+        return `Quiero información sobre el producto ${codigo}`
+      }
+
+      // Selección de pedido desde lista (pedido_NUMERO)
+      if (v.startsWith('pedido_')) {
+        const numeroPedido = v.replace('pedido_', '').toUpperCase()
+        return `Quiero consultar el estado del pedido ${numeroPedido}`
+      }
 
       return v
     }
