@@ -1042,3 +1042,161 @@ export async function obtenerEstadisticasProduccionAction(
         return { success: false, message: 'Error al obtener estadísticas de producción' }
     }
 }
+
+// ===========================================
+// PRODUCCIÓN INCREMENTAL (MEMORY BANK)
+// ===========================================
+
+export interface ProgresoProduccion {
+    producto_id: string
+    producto_nombre: string
+    producto_codigo: string
+    destino_id: string
+    destino_nombre: string
+    cantidad_objetivo: number
+    cantidad_producida: number
+    peso_objetivo_kg: number
+    peso_producido_kg: number
+    porcentaje_completado: number
+    completado: boolean
+}
+
+/**
+ * Establecer objetivo de producción para un producto
+ * Permite definir cuántas unidades se planean producir (ej: 30 cajones)
+ */
+export async function establecerObjetivoProduccionAction(
+    ordenId: string,
+    productoId: string,
+    destinoId: string,
+    cantidadObjetivo: number,
+    pesoObjetivoKg?: number
+): Promise<FormResponse<{ progreso_id: string }>> {
+    try {
+        const supabase = await createClient()
+
+        const { data, error } = await supabase.rpc('fn_establecer_objetivo_produccion', {
+            p_orden_id: ordenId,
+            p_producto_id: productoId,
+            p_destino_id: destinoId,
+            p_cantidad_objetivo: cantidadObjetivo,
+            p_peso_objetivo_kg: pesoObjetivoKg || null
+        })
+
+        if (error) {
+            console.error('Error estableciendo objetivo:', error)
+            return { success: false, message: error.message }
+        }
+
+        if (!data.success) {
+            return { success: false, message: data.error }
+        }
+
+        revalidatePath(`/almacen/produccion/${ordenId}`)
+
+        return { success: true, data: { progreso_id: data.progreso_id } }
+    } catch (error) {
+        console.error('Error en establecerObjetivoProduccionAction:', error)
+        return { success: false, message: 'Error al establecer objetivo de producción' }
+    }
+}
+
+/**
+ * Obtener progreso de producción para una orden
+ * Devuelve el estado actual de cada producto: objetivo vs producido
+ */
+export async function obtenerProgresoProduccionAction(
+    ordenId: string
+): Promise<FormResponse<ProgresoProduccion[]>> {
+    try {
+        const supabase = await createClient()
+
+        const { data, error } = await supabase.rpc('fn_obtener_progreso_produccion', {
+            p_orden_id: ordenId
+        })
+
+        if (error) {
+            console.error('Error obteniendo progreso:', error)
+            return { success: false, message: error.message }
+        }
+
+        return { success: true, data: data as ProgresoProduccion[] }
+    } catch (error) {
+        console.error('Error en obtenerProgresoProduccionAction:', error)
+        return { success: false, message: 'Error al obtener progreso de producción' }
+    }
+}
+
+/**
+ * Obtener datos completos para impresión de orden de producción
+ */
+export async function obtenerDatosImpresionProduccionAction(
+    ordenId: string
+): Promise<FormResponse<{
+    orden: OrdenProduccion
+    salidas: OrdenProduccionSalida[]
+    entradas: OrdenProduccionEntrada[]
+    progreso: ProgresoProduccion[]
+    totales: {
+        pesoConsumido: number
+        pesoGenerado: number
+        mermaTotalKg: number
+        mermaTotalPct: number
+        desperdicioSolidoKg: number
+    }
+}>> {
+    try {
+        const supabase = await createClient()
+
+        // Obtener orden completa
+        const ordenResult = await obtenerOrdenProduccionAction(ordenId)
+        if (!ordenResult.success || !ordenResult.data) {
+            return { success: false, message: ordenResult.message || 'Orden no encontrada' }
+        }
+
+        const orden = ordenResult.data
+
+        // Obtener progreso
+        const progresoResult = await obtenerProgresoProduccionAction(ordenId)
+        const progreso = progresoResult.data || []
+
+        // Calcular totales
+        const salidas = (orden as any).salidas || []
+        const entradas = (orden as any).entradas || []
+
+        const pesoConsumido = salidas.reduce((sum: number, s: any) =>
+            sum + (s.cantidad * (s.peso_kg || 0)), 0)
+
+        const pesoGenerado = entradas
+            .filter((e: any) => !e.es_desperdicio_solido)
+            .reduce((sum: number, e: any) => sum + (e.peso_kg || 0), 0)
+
+        const desperdicioSolidoKg = entradas
+            .filter((e: any) => e.es_desperdicio_solido)
+            .reduce((sum: number, e: any) => sum + (e.peso_kg || 0), 0)
+
+        const mermaTotalKg = pesoConsumido - pesoGenerado - desperdicioSolidoKg
+        const mermaTotalPct = pesoConsumido > 0 ? (mermaTotalKg / pesoConsumido) * 100 : 0
+
+        return {
+            success: true,
+            data: {
+                orden,
+                salidas,
+                entradas,
+                progreso,
+                totales: {
+                    pesoConsumido,
+                    pesoGenerado,
+                    mermaTotalKg,
+                    mermaTotalPct,
+                    desperdicioSolidoKg
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error en obtenerDatosImpresionProduccionAction:', error)
+        return { success: false, message: 'Error al obtener datos de impresión' }
+    }
+}
+

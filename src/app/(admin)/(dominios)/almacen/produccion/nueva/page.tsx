@@ -27,7 +27,8 @@ import {
     Factory,
     AlertCircle,
     Target,
-    Droplets
+    Droplets,
+    Printer
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -44,6 +45,7 @@ import { obtenerPrediccionRendimientoAction, type PrediccionRendimiento } from '
 import { ScanButton } from '@/components/barcode/BarcodeScanner'
 import { parseBarcodeEAN13 } from '@/lib/barcode-parser'
 import type { Producto, DestinoProduccion } from '@/types/domain.types'
+import PrintDetalleProduccion from '@/components/almacen/PrintDetalleProduccion'
 
 // Tipos locales para el formulario
 // NOTA: "Salida" = producto que SALE del stock (consumido)
@@ -188,10 +190,16 @@ export default function NuevaOrdenProduccionPage() {
         if (pesoSalidaManual) return
         const producto = productos.find(p => p.id === productoSalidaId)
         if (!producto?.venta_mayor_habilitada) return
+
+        // Si el campo está vacío o es 0, limpiar peso y salir
+        const cantidadNum = parseFloat(cantidadSalida)
+        if (!cantidadSalida || isNaN(cantidadNum) || cantidadNum <= 0) {
+            setPesoSalida('')
+            return
+        }
+
         const kgUnidad = (producto as any).kg_por_unidad_mayor ?? 20
-        const cantidad = parseFloat(cantidadSalida)
-        const qty = isNaN(cantidad) || cantidad <= 0 ? 1 : cantidad
-        const pesoAuto = qty * kgUnidad
+        const pesoAuto = cantidadNum * kgUnidad
         setPesoSalida(pesoAuto.toFixed(3))
     }, [productoSalidaId, cantidadSalida, pesoSalidaManual, productos])
 
@@ -757,10 +765,17 @@ export default function NuevaOrdenProduccionPage() {
                             <div>
                                 <Label>Cantidad (unidades)</Label>
                                 <Input
-                                    type="number"
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
                                     placeholder="Ej: 10"
                                     value={cantidadSalida}
-                                    onChange={(e) => setCantidadSalida(e.target.value)}
+                                    onChange={(e) => {
+                                        // Solo permitir números
+                                        const val = e.target.value.replace(/[^0-9]/g, '')
+                                        setCantidadSalida(val)
+                                    }}
+                                    onFocus={(e) => e.target.select()}
                                 />
                             </div>
 
@@ -1202,6 +1217,10 @@ export default function NuevaOrdenProduccionPage() {
                             Volver
                         </Button>
                         <div className="flex gap-2">
+                            <Button variant="outline" onClick={() => window.print()} disabled={loading}>
+                                <Printer className="mr-2 h-4 w-4" />
+                                Imprimir Resumen
+                            </Button>
                             <Button variant="destructive" onClick={handleCancelarOrden} disabled={loading}>
                                 Cancelar Orden
                             </Button>

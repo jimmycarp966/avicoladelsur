@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Store } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { PresupuestoForm } from './presupuesto-form'
@@ -7,12 +7,11 @@ import { createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
-export const metadata = {
-  title: 'Nuevo Presupuesto - Avícola del Sur ERP',
-  description: 'Crear un nuevo presupuesto',
+interface PageProps {
+  searchParams?: Promise<{ tipo?: string }>
 }
 
-async function NuevoPresupuestoContent() {
+async function NuevoPresupuestoContent({ tipoVenta }: { tipoVenta?: 'reparto' | 'retira_casa_central' }) {
   const supabase = await createClient()
 
   // Obtener clientes
@@ -33,6 +32,8 @@ async function NuevoPresupuestoContent() {
     .eq('activo', true)
     .order('nombre')
 
+  const esVentaDirecta = tipoVenta === 'retira_casa_central'
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -43,25 +44,48 @@ async function NuevoPresupuestoContent() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Nuevo Presupuesto</h1>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            {esVentaDirecta ? (
+              <>
+                <Store className="h-8 w-8 text-primary" />
+                Nueva Venta Directa
+              </>
+            ) : (
+              'Nuevo Presupuesto'
+            )}
+          </h1>
           <p className="text-muted-foreground mt-1">
-            Crea un nuevo presupuesto para un cliente
+            {esVentaDirecta
+              ? 'Venta para cliente que retira en casa central (sin reparto)'
+              : 'Crea un nuevo presupuesto para un cliente'}
           </p>
         </div>
       </div>
 
       <Suspense fallback={<div>Cargando formulario...</div>}>
         <PresupuestoForm
-          clientes={clientes || []}
+          clientes={(clientes || []).map(c => ({
+            ...c,
+            localidad: Array.isArray(c.localidad) ? c.localidad[0] : c.localidad
+          }))}
           productos={productos || []}
           zonas={zonas || []}
+          tipoVentaInicial={tipoVenta}
         />
       </Suspense>
     </div>
   )
 }
 
-export default function NuevoPresupuestoPage() {
-  return <NuevoPresupuestoContent />
+export default async function NuevoPresupuestoPage({ searchParams }: PageProps) {
+  const params = await searchParams
+  // Si viene ?tipo=venta, preseleccionar retira_casa_central
+  const tipoVenta = params?.tipo === 'venta' ? 'retira_casa_central' as const : undefined
+
+  return <NuevoPresupuestoContent tipoVenta={tipoVenta} />
 }
 
+export const metadata = {
+  title: 'Nuevo Presupuesto - Avícola del Sur ERP',
+  description: 'Crear un nuevo presupuesto',
+}

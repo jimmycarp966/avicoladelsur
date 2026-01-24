@@ -1,10 +1,12 @@
 # 🚀 Avícola del Sur ERP - Sistema Integral de Gestión
 
-**Versión:** Enero 2026 (v2.2)  
+**Versión:** Enero 2026 (v2.3)  
 **Estado:** ✅ PRODUCCIÓN  
 **Docs relacionadas:** [Architecture Summary](./ARCHITECTURE_SUMMARY.md) · [Architecture Deep-Dive](./ARCHITECTURE.md) · [Supabase Setup](./SUPABASE_SETUP.md)
 
-**Plataforma unificada** de gestión avícola que integra WMS (Almacén), TMS (Reparto), CRM (Ventas) y ERP (Finanzas/RRHH). Potenciada por **Google Gemini AI** para decisiones inteligentes en tiempo real dentro de una arquitectura **server-authoritative** sobre Supabase.
+**Plataforma unificada** de gestión avícola que integra WMS (Almacén), TMS (Reparto), CRM (Ventas), Carrito Web Público y ERP (Finanzas/RRHH). Potenciada por **Google Gemini AI** para decisiones inteligentes en tiempo real dentro de una arquitectura **server-authoritative** sobre Supabase.
+
+📅 **Acceso Rápido al Catálogo**: [avicoladelsur.vercel.app/catalogo](https://avicoladelsur.vercel.app/catalogo) (Carrito sincronizado con WhatsApp)
 
 ---
 
@@ -23,8 +25,9 @@
 ### 🧠 Inteligencia Artificial Aplicada (Gemini)
 - **Validación de Peso**: Gemini 2.5 Flash detecta errores de tipeo en balanzas en tiempo real.
 - **Conciliación Bancaria**: Gemini 3.0 Pro analiza extractos bancarios y sugiere matchings contables complejos.
-- **Chatbot de Ventas**: Intérprete de lenguaje natural para toma de pedidos vía WhatsApp.
+- **Chatbot de Ventas**: Intérprete de lenguaje natural para toma de pedidos vía WhatsApp e integración con Carritos Web.
 - **Memory Bank Inteligente**: Extracción automática de hechos y preferencias con Gemini 2.5 Flash para atención personalizada.
+- **Catálogo Web Público**: Sincronización automática de carritos web con el bot de WhatsApp vía códigos únicos (`carritos_pendientes`).
 - **Optimización Logística**: Algoritmos híbridos (Google Optimization + Heurística local) para reparto eficiente.
 
 ### 🚛 Logística Avanzada (TMS)
@@ -38,6 +41,8 @@
 - **Gestión de Mermas**: Diferenciación precisa entre Merma de Proceso (líquida) y Desperdicio Sólido.
 - **Trazabilidad Total**: Seguimiento de lote desde materia prima hasta producto terminado (FIFO).
 - **Inventario Distribuido**: Gestión multi-sucursal con transferencias y alertas de stock bajo.
+- **Producción Incremental**: Registro parcial de productos terminados (Memory Bank) con barra de progreso y resumen de impresión.
+- **Control de Stock por Turnos**: Auditoría física Mañana/Noche con timer de 1 hora y detección de producción activa.
 
 ### 💰 Finanzas y Control
 - **Conciliación Automatizada**: Motor de ingesta de extractos bancarios con matching inteligente y parser robusto multiformato.

@@ -1,6 +1,6 @@
 # 🏗️ Arquitectura del Sistema - Avícola del Sur ERP
 
-**Última Actualización:** 23 de Enero 2026 (17:00)  
+**Última Actualización:** 24 de Enero 2026 (09:30)  
 **Estado:** ✅ PRODUCCIÓN  
 **Docs relacionadas:** [README](./README.md) · [Architecture Deep-Dive](./ARCHITECTURE.md) · [Supabase Setup](./SUPABASE_SETUP.md)
 
@@ -33,8 +33,9 @@ Sistema ERP modular completo para Avícola del Sur que unifica **Almacén (WMS)*
 1.  **IA Omnipresente**: Google Gemini integrado en validación de stock (pesaje), conciliación bancaria inteligente, chatbot de ventas y optimización de rutas.
 2.  **Reparto Autónomo**: Navegación interactiva con selección de rutas (Google Directions), decisión inteligente del próximo cliente y GPS tracking en tiempo real.
 3.  **Conciliación Bancaria AI**: Motor que ingesta extractos PDF/Excel y matchea transacciones automáticamente con movimientos de caja.
-4.  **Producción Científica**: Módulo de desposte con análisis de rendimientos esperados vs reales y control estricto de mermas.
+4.  **Producción Científica**: Módulo de desposte con análisis de rendimientos esperados vs reales, control estricto de mermas y **Producción Incremental (Memory Bank)** con impresión de resúmenes.
 5.  **Memory Bank Inteligente**: El bot de WhatsApp aprende de cada conversación, extrayendo hechos y preferencias automáticamente para personalizar la atención.
+6.  **Catálogo Público y Carrito**: Sincronización automática entre catálogo web y WhatsApp mediante códigos únicos de carrito.
 
 ---
 
@@ -85,7 +86,9 @@ Sistema ERP modular completo para Avícola del Sur que unifica **Almacén (WMS)*
 - **Features 2.0**:
   - Control de Merma Líquida vs Sólida.
   - Validación de Peso IA (Detección de outliers en balanza).
-  - **Sistema de Remitos Internos**: Generación de remitos de producción tras el desposte para certificar el ingreso de stock.
+  - **Sistema de Remitos Internos**: Generación de remitos de producción tras el desposte.
+  - **Producción Incremental**: Registro parcial de kilos terminados con barra de progreso visual (Memory Bank) e impresión de resumen final detallado.
+  - **Control de Stock por Turnos**: Auditoría física de inventario (Mañana/Noche) con timer de 1 hora y detección de producción activa.
 
 ### 4. 🛒 Ventas & Clientes
 *Scope: CRM, facturación y toma de pedidos.*
@@ -95,9 +98,10 @@ Sistema ERP modular completo para Avícola del Sur que unifica **Almacén (WMS)*
 - **Features 2.0**:
   - Chatbot NLU para toma de pedidos natural.
   - Listas de precios dinámicas con vigencia y auditoría de cambios.
-  - **Memory Bank Inteligente**: Aprendizaje automático de preferencias por cliente (tipo de negocio, productos favoritos, días de pedido).
-  - **Persistencia de Intenciones**: Capacidad de retomar un pedido pendiente después del registro del cliente.
-  - **Remitos de Entrega**: Generación de documentos PDF con firma digital para certificar la recepción del cliente.
+  - **Memory Bank Inteligente**: Aprendizaje automático de preferencias por cliente.
+  - **Catálogo Web Público**: `/catalogo` para navegación sin login con carrito persistente.
+  - **Carritos Compartidos**: Sincronización de pedidos web -> WhatsApp mediante `carritos_pendientes`.
+  - **Remitos de Entrega**: Generación de documentos PDF con firma digital.
 
 ### 5. 👥 RRHH (Human Resources)
 *Scope: Gestión de personal, asistencia, pagos y comunicación interna.*

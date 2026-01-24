@@ -61,9 +61,10 @@ interface PresupuestoFormProps {
     stock_disponible?: number;
   }>
   zonas: Array<{ id: string; nombre: string }>
+  tipoVentaInicial?: 'reparto' | 'retira_casa_central'
 }
 
-export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormProps) {
+export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }: PresupuestoFormProps) {
   const router = useRouter()
   const { showToast } = useNotificationStore()
   const [isLoading, setIsLoading] = useState(false)
@@ -95,7 +96,7 @@ export function PresupuestoForm({ clientes, productos, zonas }: PresupuestoFormP
       zona_id: '', // Inicializar como string vacío para evitar warning uncontrolled/controlled
       fecha_entrega_estimada: new Date().toISOString().split('T')[0], // Fecha de hoy por defecto
       observaciones: '',
-      tipo_venta: 'reparto',
+      tipo_venta: tipoVentaInicial || 'reparto',
       items: [{ producto_id: '', cantidad_solicitada: 1, precio_unit_est: 0, lista_precio_id: undefined }],
     },
   })

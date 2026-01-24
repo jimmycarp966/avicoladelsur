@@ -16,6 +16,7 @@ import { buscarClientesPorDNIBatch } from '@/lib/conciliacion/cliente-lookup'
 import { acreditarPagosBatch } from '@/lib/conciliacion/acreditacion'
 import { generarReporteConciliacion } from '@/lib/conciliacion/reporte-conciliacion'
 import { format } from 'date-fns'
+import { getTodayArgentina, getNowArgentina } from '@/lib/utils'
 
 // ===========================================
 // ACTION PRINCIPAL: Procesar Conciliación Completa
@@ -607,7 +608,8 @@ export async function obtenerEstadisticasConciliacionAction(): Promise<{
     const supabase = await createClient()
 
     try {
-        const hoy = format(new Date(), 'yyyy-MM-dd')
+        // Usar timezone de Argentina para comparaciones de "hoy"
+        const hoy = getTodayArgentina()
 
         // Total sesiones
         const { count: totalSesiones } = await supabase

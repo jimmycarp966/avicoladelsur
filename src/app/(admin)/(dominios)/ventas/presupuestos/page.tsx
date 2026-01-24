@@ -1,7 +1,7 @@
 'use client'
 
 import { Suspense, useEffect, useState } from 'react'
-import { Plus, FileText, Clock, Package, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react'
+import { Plus, FileText, Clock, Package, CheckCircle, AlertTriangle, Loader2, Store } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -55,12 +55,20 @@ export default function PresupuestosPage() {
               Gestiona todos los presupuestos del sistema
             </p>
           </div>
-          <Button asChild size="sm" className="bg-primary hover:bg-primary/90 shadow-sm md:h-10 md:px-6 w-fit">
-            <Link href="/ventas/presupuestos/nuevo">
-              <Plus className="mr-2 h-4 w-4" />
-              Nuevo Presupuesto
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline" size="sm" className="md:h-10 md:px-4 w-fit">
+              <Link href="/ventas/presupuestos/nuevo?tipo=venta">
+                <Store className="mr-2 h-4 w-4" />
+                Nueva Venta
+              </Link>
+            </Button>
+            <Button asChild size="sm" className="bg-primary hover:bg-primary/90 shadow-sm md:h-10 md:px-6 w-fit">
+              <Link href="/ventas/presupuestos/nuevo">
+                <Plus className="mr-2 h-4 w-4" />
+                Nuevo Presupuesto
+              </Link>
+            </Button>
+          </div>
         </div>
       </div>
 

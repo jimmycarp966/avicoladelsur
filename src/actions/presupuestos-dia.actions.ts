@@ -252,7 +252,12 @@ export async function obtenerPresupuestosDiaAction(fecha: string, zonaId?: strin
         presupuestosIds: producto.presupuestosIds,
         presupuestosData: producto.presupuestosData,
       }))
-      .sort((a, b) => b.totalCantidad - a.totalCantidad),
+      .sort((a, b) => {
+        // Pesables primero, luego cajas (no pesables)
+        if (a.pesable !== b.pesable) return a.pesable ? -1 : 1
+        // Dentro de cada grupo, ordenar por cantidad descendente
+        return b.totalCantidad - a.totalCantidad
+      }),
   }))
 
   // Obtener sugerencias de vehículos

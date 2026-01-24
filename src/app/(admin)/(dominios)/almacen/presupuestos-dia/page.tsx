@@ -466,12 +466,25 @@ async function PresupuestosDiaContent({
                                   Ver
                                 </Link>
                               </Button>
-                              <Button asChild size="sm" className="bg-blue-600 hover:bg-blue-700">
-                                <Link href={`/almacen/presupuesto/${presupuesto.id}/pesaje`}>
+                              {/* Botón Pesaje: deshabilitar si no hay items pesables pendientes */}
+                              {itemsPesables.length > 0 && itemsPesados.length < itemsPesables.length ? (
+                                <Button asChild size="sm" className="bg-blue-600 hover:bg-blue-700">
+                                  <Link href={`/almacen/presupuesto/${presupuesto.id}/pesaje`}>
+                                    <Scale className="mr-1 h-4 w-4" />
+                                    Pesaje ({itemsPesables.length - itemsPesados.length})
+                                  </Link>
+                                </Button>
+                              ) : itemsPesables.length === 0 ? (
+                                <Button size="sm" variant="secondary" disabled title="Sin productos pesables">
                                   <Scale className="mr-1 h-4 w-4" />
-                                  Pesaje
-                                </Link>
-                              </Button>
+                                  Sin pesables
+                                </Button>
+                              ) : (
+                                <Button size="sm" className="bg-green-600 hover:bg-green-700" disabled>
+                                  <Scale className="mr-1 h-4 w-4" />
+                                  ✓ Pesado
+                                </Button>
+                              )}
                               <PresupuestoIndividualAccion presupuesto={presupuesto} />
                             </div>
                           </div>
@@ -712,12 +725,25 @@ async function PresupuestosDiaContent({
                                 Ver
                               </Link>
                             </Button>
-                            <Button asChild size="sm" className="bg-blue-600 hover:bg-blue-700">
-                              <Link href={`/almacen/presupuesto/${presupuesto.id}/pesaje`}>
+                            {/* Botón Pesaje: deshabilitar si no hay items pesables pendientes */}
+                            {itemsPesables.length > 0 && itemsPesados.length < itemsPesables.length ? (
+                              <Button asChild size="sm" className="bg-blue-600 hover:bg-blue-700">
+                                <Link href={`/almacen/presupuesto/${presupuesto.id}/pesaje`}>
+                                  <Scale className="mr-1 h-4 w-4" />
+                                  Pesaje ({itemsPesables.length - itemsPesados.length})
+                                </Link>
+                              </Button>
+                            ) : itemsPesables.length === 0 ? (
+                              <Button size="sm" variant="secondary" disabled title="Sin productos pesables">
                                 <Scale className="mr-1 h-4 w-4" />
-                                Pesaje
-                              </Link>
-                            </Button>
+                                Sin pesables
+                              </Button>
+                            ) : (
+                              <Button size="sm" className="bg-green-600 hover:bg-green-700" disabled>
+                                <Scale className="mr-1 h-4 w-4" />
+                                ✓ Pesado
+                              </Button>
+                            )}
                             <PresupuestoIndividualAccion presupuesto={presupuesto} />
                           </div>
                         </div>
