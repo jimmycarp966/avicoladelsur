@@ -9,6 +9,8 @@ import { processMessageWithTools, extractAndSaveFactsInBackground } from '@/lib/
 import { updateCustomerContext } from '@/lib/vertex/session-manager'
 import { crearPresupuestoTool } from '@/lib/vertex/tools/crear-presupuesto'
 import type { MetaListSection } from '@/types/whatsapp-meta'
+import { getPendingState, setPendingState, deletePendingState } from '@/lib/bot/state-manager'
+import type { ConfirmacionEstado as ConfirmacionEstadoImport } from '@/lib/bot/state-manager'
 
 // Tipos para las llamadas de Botpress
 interface BotpressWebhookPayload {
@@ -279,23 +281,8 @@ interface ReclamoEstado {
 
 const reclamosPendientes = new Map<string, ReclamoEstado>()
 
-// Limpiar estados expirados (10 minutos)
-function limpiarEstadosExpirados() {
-  const ahora = Date.now()
-  const timeout = 10 * 60 * 1000 // 10 minutos
-
-  for (const [phone, estado] of registroClientesPendientes.entries()) {
-    if (ahora - estado.timestamp > timeout) {
-      registroClientesPendientes.delete(phone)
-    }
-  }
-
-  for (const [phone, estado] of reclamosPendientes.entries()) {
-    if (ahora - estado.timestamp > timeout) {
-      reclamosPendientes.delete(phone)
-    }
-  }
-}
+// NOTA: Maps mantenidos como fallback (state-manager ya tiene lógica de fallback)
+// La limpieza de estados expirados ahora se maneja en Supabase con expires_at
 
 // Mapeo de localidades para zonas (usado si no hay data en BD)
 const LOCALIDADES_POR_ZONA: Record<string, string[]> = {
@@ -350,12 +337,14 @@ async function obtenerZonasActivas() {
 }
 
 // Función para iniciar flujo de registro de cliente
-function iniciarRegistroCliente(phoneNumber: string, productos: Array<{ codigo: string; cantidad: number }>) {
-  registroClientesPendientes.set(phoneNumber, {
+async function iniciarRegistroCliente(phoneNumber: string, productos: Array<{ codigo: string; cantidad: number }>) {
+  const estadoInicial: RegistroClienteEstado = {
     estado: 'esperando_nombre',
     productos_pendientes: productos,
     timestamp: Date.now()
-  })
+  }
+  
+  await setPendingState(phoneNumber, 'registro', estadoInicial, 60)
 
   return `👋 *¡Bienvenido a Avícola del Sur!*
 
@@ -369,16 +358,15 @@ Ejemplo: *Juan Pérez*`
 
 // Función para procesar respuesta del flujo de registro
 async function procesarRegistroCliente(phoneNumber: string, mensaje: string): Promise<string | null> {
-  limpiarEstadosExpirados()
-
-  const estado = registroClientesPendientes.get(phoneNumber)
+  // Obtener estado desde Supabase (con fallback automático a memoria)
+  const estado = await getPendingState<RegistroClienteEstado>(phoneNumber, 'registro')
   if (!estado) return null
 
   const bodyLower = mensaje.toLowerCase().trim()
 
   // Permitir cancelar en cualquier momento
   if (bodyLower === 'cancelar' || bodyLower === 'cancel') {
-    registroClientesPendientes.delete(phoneNumber)
+    await deletePendingState(phoneNumber, 'registro')
     return '❌ Registro cancelado.\n\nEscribe *menu* para volver al inicio.'
   }
 
@@ -389,6 +377,7 @@ async function procesarRegistroCliente(phoneNumber: string, mensaje: string): Pr
         // Ahora sí iniciar el registro
         estado.estado = 'esperando_nombre'
         estado.timestamp = Date.now()
+        await setPendingState(phoneNumber, 'registro', estado, 60)
 
         return `👋 *¡Excelente! Para completar tu pedido necesitamos algunos datos.*
 
@@ -397,11 +386,11 @@ Por favor, envía tu *nombre y apellido*:
 
 Ejemplo: *Juan Pérez*`
       } else if (bodyLower === 'no' || bodyLower === 'cancelar' || bodyLower === 'cancel') {
-        registroClientesPendientes.delete(phoneNumber)
+        await deletePendingState(phoneNumber, 'registro')
         return `👍 Sin problema. Si querés consultar algo más, escribí *precios* para ver la lista o *menu* para ver las opciones.`
       } else {
         // Probablemente quiere modificar el pedido - dejar que Vertex AI procese
-        registroClientesPendientes.delete(phoneNumber)
+        await deletePendingState(phoneNumber, 'registro')
         return null // Devolver null para que se procese normalmente
       }
     }
@@ -417,6 +406,7 @@ Ejemplo: *Juan Pérez*`
       estado.apellido = palabras.slice(1).join(' ')
       estado.estado = 'esperando_direccion'
       estado.timestamp = Date.now()
+      await setPendingState(phoneNumber, 'registro', estado, 60)
 
       return `✅ Nombre registrado: *${estado.nombre} ${estado.apellido}*
 
@@ -439,12 +429,13 @@ Ejemplo: *Av. Corrientes 1234*`
       const zonas = await obtenerZonasActivas()
 
       if (zonas.length === 0) {
-        registroClientesPendientes.delete(phoneNumber)
+        await deletePendingState(phoneNumber, 'registro')
         return '❌ No hay zonas disponibles en este momento. Por favor contacta con ventas.'
       }
 
       // Guardar zonas en el estado para validación posterior
       ; (estado as any).zonas = zonas
+      await setPendingState(phoneNumber, 'registro', estado, 60)
 
       let mensajeZonas = `✅ Dirección registrada: *${estado.direccion}*
 
@@ -480,12 +471,12 @@ Selecciona tu *zona* (responde con el número):
       })
 
       if (!resultado.success || !resultado.data) {
-        registroClientesPendientes.delete(phoneNumber)
+        await deletePendingState(phoneNumber, 'registro')
         return `❌ Error al crear tu cuenta: ${resultado.error}\n\nPor favor contacta con ventas.`
       }
 
       const clienteId = resultado.data.clienteId
-      registroClientesPendientes.delete(phoneNumber)
+      await deletePendingState(phoneNumber, 'registro')
 
       // Crear presupuesto con los productos pendientes
       const items = []
@@ -600,12 +591,12 @@ Por favor intenta crear un nuevo presupuesto escribiendo el código y cantidad.`
 
 // Función para procesar respuesta del flujo de creación de reclamo
 async function procesarReclamo(phoneNumber: string, mensaje: string): Promise<string | null> {
-  const estado = reclamosPendientes.get(phoneNumber)
+  const estado = await getPendingState<ReclamoEstado>(phoneNumber, 'reclamo')
   if (!estado) return null
 
   const cliente = await findClienteByPhone(phoneNumber)
   if (!cliente) {
-    reclamosPendientes.delete(phoneNumber)
+    await deletePendingState(phoneNumber, 'reclamo')
     return '❌ No se encontró tu perfil. Por favor contacta con ventas.'
   }
 
@@ -630,6 +621,7 @@ async function procesarReclamo(phoneNumber: string, mensaje: string): Promise<st
       estado.tipo_reclamo = tipoSeleccionado
       estado.estado = 'esperando_descripcion'
       estado.timestamp = Date.now()
+      await setPendingState(phoneNumber, 'reclamo', estado, 60)
 
       return `📝 *Paso 2 de 3*
 
@@ -646,6 +638,7 @@ Ejemplo: *"El producto llegó en mal estado, con el empaque roto y algunos produ
       estado.descripcion = mensaje.trim()
       estado.estado = 'esperando_pedido'
       estado.timestamp = Date.now()
+      await setPendingState(phoneNumber, 'reclamo', estado, 60)
 
       return `📦 *Paso 3 de 3* (Opcional)
 
@@ -690,7 +683,7 @@ Responde con el número de pedido (ej: *PED-20250101-000001*) o escribe *no* par
 
       const result = await crearReclamoBotAction(params)
 
-      reclamosPendientes.delete(phoneNumber)
+      await deletePendingState(phoneNumber, 'reclamo')
 
       if (result.success && result.data) {
         // Obtener número de reclamo creado
@@ -1187,7 +1180,7 @@ async function handleTwilioWebhook(formData: FormData) {
       return v
     }
 
-    const pending = pendingConfirmations.get(phoneNumber)
+    const pending = await getPendingState<ConfirmacionEstadoImport>(phoneNumber, 'confirmacion')
     const isPendingConfirmationReply = Boolean(
       pending &&
       (
@@ -1714,14 +1707,14 @@ Para ver los productos disponibles, escribe *1* o *productos*`
     }
     // Confirmación de pedido (acepta respuestas de botones también)
     else if (bodyLower === 'si' || bodyLower === 'sí' || bodyLower === 'confirmar' || bodyLower === 'confirmo' || body === 'btn_confirmar_si') {
-      const pending = pendingConfirmations.get(phoneNumber)
+      const pending = await getPendingState<ConfirmacionEstadoImport>(phoneNumber, 'confirmacion')
 
       if (!pending) {
         responseMessage = 'No tienes ningún presupuesto pendiente de confirmación.\n\nEscribe el código y cantidad para crear un presupuesto.'
       } else {
-        // Verificar que no haya expirado (5 minutos)
+        // Verificar que no haya expirado (5 minutos) - aunque Supabase ya maneja expiración
         if (Date.now() - pending.timestamp > 5 * 60 * 1000) {
-          pendingConfirmations.delete(phoneNumber)
+          await deletePendingState(phoneNumber, 'confirmacion')
           responseMessage = '⏰ La confirmación ha expirado.\n\nVuelve a hacer tu pedido.'
         } else {
           const cliente = await findClienteByPhone(phoneNumber)
@@ -1826,7 +1819,7 @@ ${detalleProductos}
 
 💬 Escribe *menu* para volver al inicio o *estado ${numeroPresupuesto}* para consultar el estado.`
 
-              pendingConfirmations.delete(phoneNumber)
+              await deletePendingState(phoneNumber, 'confirmacion')
             } else {
               responseMessage = `❌ Error al crear presupuesto: ${result.message}`
             }
@@ -1836,8 +1829,9 @@ ${detalleProductos}
     }
     // Cancelar pedido (acepta respuestas de botones también)
     else if (bodyLower === 'no' || bodyLower === 'cancelar' || body === 'btn_confirmar_no') {
-      if (pendingConfirmations.has(phoneNumber)) {
-        pendingConfirmations.delete(phoneNumber)
+      const hasPending = await getPendingState<ConfirmacionEstadoImport>(phoneNumber, 'confirmacion')
+      if (hasPending) {
+        await deletePendingState(phoneNumber, 'confirmacion')
         responseMessage = '❌ Pedido cancelado.\n\nEscribe *menu* para volver a empezar.'
       } else {
         responseMessage = 'No tienes ningún pedido pendiente.'
@@ -1929,13 +1923,14 @@ POLLO003 3*`
           const cliente = await findClienteByPhone(phoneNumber)
           if (!cliente) {
             // Iniciar flujo de registro
-            responseMessage = iniciarRegistroCliente(phoneNumber, productos.map(p => ({ codigo: p.codigo, cantidad: p.cantidad })))
+            responseMessage = await iniciarRegistroCliente(phoneNumber, productos.map(p => ({ codigo: p.codigo, cantidad: p.cantidad })))
           } else {
             // Guardar para confirmación
-            pendingConfirmations.set(phoneNumber, {
+            const confirmacionEstado: ConfirmacionEstadoImport = {
               productos: productos.map(p => ({ codigo: p.codigo, cantidad: p.cantidad })),
               timestamp: Date.now()
-            })
+            }
+            await setPendingState(phoneNumber, 'confirmacion', confirmacionEstado, 5)
 
             const resumenText = `📦 *Resumen de tu pedido:*\n\n`
             let resumenDetalle = ''
@@ -1969,7 +1964,7 @@ POLLO003 3*`
       const cliente = await findClienteByPhone(phoneNumber)
       if (!cliente) {
         // Iniciar flujo de registro
-        responseMessage = iniciarRegistroCliente(phoneNumber, [{ codigo, cantidad }])
+        responseMessage = await iniciarRegistroCliente(phoneNumber, [{ codigo, cantidad }])
       } else {
         const producto = await findProductoByCode(codigo)
         if (!producto) {
@@ -2009,10 +2004,11 @@ POLLO003 3*`
    • Contacta a tu vendedor para más opciones`
           } else {
             // Guardar para confirmación
-            pendingConfirmations.set(phoneNumber, {
+            const confirmacionEstado: ConfirmacionEstadoImport = {
               productos: [{ codigo, cantidad }],
               timestamp: Date.now()
-            })
+            }
+            await setPendingState(phoneNumber, 'confirmacion', confirmacionEstado, 5)
 
             const total = cantidad * producto!.precio_venta
             const resumenText = `📦 *Resumen de tu pedido:*
@@ -2120,7 +2116,7 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
           const cliente = await findClienteByPhone(phoneNumber)
           if (!cliente) {
             // Iniciar flujo de registro
-            responseMessage = iniciarRegistroCliente(phoneNumber, [{ codigo, cantidad }])
+            responseMessage = await iniciarRegistroCliente(phoneNumber, [{ codigo, cantidad }])
           } else {
             // Buscar producto
             const producto = await findProductoByCode(codigo)
