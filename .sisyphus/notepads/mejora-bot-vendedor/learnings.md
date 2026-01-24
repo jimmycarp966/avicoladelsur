@@ -487,3 +487,72 @@
 - Retorno JSONB con success/error/data
 - COMMENT ON para documentación
 - Bloque de verificación al final con DO $$
+
+
+## [2026-01-24T19:00:00] Tarea 11 Completada
+
+**Archivos creados**:
+- src/lib/services/notificaciones-proactivas.ts (nuevo, ~250 líneas)
+- src/app/api/cron/notificaciones/route.ts (nuevo, ~100 líneas)
+
+**Commit**: feat(bot): add proactive notification service with Twilio (9f7df21)
+
+**Cambios realizados**:
+
+1. **Servicio notificaciones-proactivas.ts**:
+   - enviarNotificacionProgramada(): Envío individual con validaciones
+   - procesarNotificacionesPendientes(): Procesamiento en lote
+   - marcarNotificacionEnviada(): Helper para actualizar estado en BD
+   - obtenerHistorialNotificaciones(): Historial por cliente
+   - limpiarNotificacionesAntiguas(): Limpieza programada
+
+2. **Validaciones implementadas**:
+   - Cliente tiene WhatsApp (campo whatsapp en tabla clientes)
+   - Cliente está activo (campo activo)
+   - Preferencias del cliente (habilitado/deshabilitado por tipo)
+   - Rate limiting: respeta frecuencia_maxima (default: 3/día)
+   - Horarios 8am-8pm: la RPC programar_notificación ya ajusta
+
+3. **Integración con Twilio**:
+   - Usa sendWhatsAppTwilioMessage(to, body)
+   - Formato de teléfono: whatsapp:+549... (la función normaliza)
+   - Manejo de errores Twilio (timeout, rate limit, etc.)
+
+4. **Endpoint /api/cron/notificaciones**:
+   - GET: Procesa notificaciones pendientes (para cron jobs)
+   - POST: Testing manual de notificaciones
+   - Auth via header Authorization: Bearer CRON_SECRET
+   - Parámetros: limit (default 50), cleanup (boolean)
+
+5. **Logs detallados**:
+   - Cada envío loguea: cliente_id, tipo, resultado, mensaje_id
+   - Errores loguean con contexto completo
+   - Lote loguea resumen: procesadas, exitosas, fallidas
+
+**Patrón aplicado**:
+- 'use server' para server actions
+- createClient() para cliente Supabase
+- RPC calls con await supabase.rpc()
+- Manejo de errores try/catch con logs
+- Retorno consistente: { success, error?, messageId?, ... }
+
+**Flujo de envío**:
+1. Obtener notificación pendiente
+2. Verificar cliente tiene WhatsApp y está activo
+3. Verificar preferencias (habilitado/deshabilitado)
+4. Verificar rate limiting (count hoy vs frecuencia_maxima)
+5. Enviar por Twilio (sendWhatsAppTwilioMessage)
+6. Marcar como enviada o fallida en BD
+
+**Uso en Vercel Cron**:
+```bash
+# vercel.json
+{
+  "crons": [
+    {
+      "path": "/api/cron/notificaciones",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}
+```

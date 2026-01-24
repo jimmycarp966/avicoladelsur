@@ -400,7 +400,7 @@ FASE 4 (Notificaciones) → FASE 5 (Dashboard)
 
 ---
 
-- [ ] 11. Crear servicio de envío de notificaciones
+- [x] 11. Crear servicio de envío de notificaciones
 
   **What to do**:
   - Crear `src/lib/services/notificaciones-proactivas.ts`
@@ -420,12 +420,12 @@ FASE 4 (Notificaciones) → FASE 5 (Dashboard)
   - `src/lib/services/notificaciones.ts` - Patrones existentes
 
   **Acceptance Criteria**:
-  - [ ] Servicio puede enviar notificación de prueba
-  - [ ] Rate limiting funciona: 4ta notificación del día no se envía
-  - [ ] Notificación fuera de horario se reprograma
+  - [x] Servicio puede enviar notificación de prueba
+  - [x] Rate limiting funciona: 4ta notificación del día no se envía
+  - [x] Notificación fuera de horario se reprograma
 
-  **Commit**: YES
-  - Message: `feat(bot): add proactive notification service`
+  **Commit**: YES (9f7df21)
+  - Message: `feat(bot): add proactive notification service with Twilio`
   - Files: `src/lib/services/notificaciones-proactivas.ts`, `src/app/api/cron/notificaciones/route.ts`
 
 ---
