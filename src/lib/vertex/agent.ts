@@ -491,8 +491,9 @@ export async function extractAndSaveFactsInBackground(
 ): Promise<void> {
   try {
     // Importar dinámicamente para evitar dependencias circulares
-    const { extractFactsFromConversation, mergeLearnedFacts } = await import('./memory-extractor')
+    const { extractFactsFromConversation, mergeLearnedFacts, generateConfirmationMessage } = await import('./memory-extractor')
     const { getOrCreateSession, updateCustomerContext, saveCustomerMemory } = await import('./session-manager')
+    const { sendWhatsAppMessage } = await import('@/lib/services/whatsapp-meta')
 
     const session = await getOrCreateSession(phoneNumber)
 
@@ -515,7 +516,7 @@ export async function extractAndSaveFactsInBackground(
 
     if (newFacts && newFacts.confianza >= 30) {
       // Combinar con hechos existentes
-      const mergedFacts = mergeLearnedFacts(
+      const { merged: mergedFacts, changes } = mergeLearnedFacts(
         session.customerContext?.learned_facts,
         newFacts
       )
@@ -534,6 +535,16 @@ export async function extractAndSaveFactsInBackground(
       // Guardar en memoria persistente (no expira) si tenemos cliente_id
       if (session.customerContext?.cliente_id) {
         await saveCustomerMemory(session.customerContext.cliente_id, factsWithTimestamp)
+      }
+
+      // Generar y enviar mensaje de confirmación si hubo cambios importantes
+      const confirmationMessage = generateConfirmationMessage(factsWithTimestamp, changes)
+      if (confirmationMessage) {
+        await sendWhatsAppMessage({
+          to: phoneNumber,
+          text: confirmationMessage
+        })
+        console.log(`[Memory Bank] Confirmación enviada a ${phoneNumber}: ${confirmationMessage}`)
       }
 
       console.log(`[Memory Bank] Hechos extraídos para ${phoneNumber}:`, factsWithTimestamp)

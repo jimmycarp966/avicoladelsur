@@ -101,13 +101,33 @@ Si no hay información clara para extraer, responde: {"confianza": 0}`
 /**
  * Combina hechos nuevos con hechos existentes
  * Los nuevos tienen prioridad si contradicen los anteriores
+ * Retorna los hechos combinados y una lista de campos importantes que cambiaron
  */
 export function mergeLearnedFacts(
     existing: Partial<ExtractedFacts> | undefined,
     newFacts: ExtractedFacts
-): ExtractedFacts {
+): { merged: ExtractedFacts, changes: string[] } {
     if (!existing) {
-        return newFacts
+        // Si no había nada previo, todo es un cambio si tiene confianza alta
+        const changes = []
+        if (newFacts.tipo_negocio) changes.push('tipo_negocio')
+        if (newFacts.dia_preferido) changes.push('dia_preferido')
+        if (newFacts.horario_preferido) changes.push('horario_preferido')
+        
+        return { merged: newFacts, changes }
+    }
+
+    const changes: string[] = []
+    
+    // Detectar cambios en campos importantes
+    if (newFacts.tipo_negocio && newFacts.tipo_negocio !== existing.tipo_negocio) {
+        changes.push('tipo_negocio')
+    }
+    if (newFacts.dia_preferido && newFacts.dia_preferido !== existing.dia_preferido) {
+        changes.push('dia_preferido')
+    }
+    if (newFacts.horario_preferido && newFacts.horario_preferido !== existing.horario_preferido) {
+        changes.push('horario_preferido')
     }
 
     // Combinar productos favoritos (sin duplicados)
@@ -122,7 +142,7 @@ export function mergeLearnedFacts(
         .filter(Boolean)
         .join('. ')
 
-    return {
+    const merged: ExtractedFacts = {
         tipo_negocio: newFacts.tipo_negocio || existing.tipo_negocio,
         dia_preferido: newFacts.dia_preferido || existing.dia_preferido,
         horario_preferido: newFacts.horario_preferido || existing.horario_preferido,
@@ -132,4 +152,36 @@ export function mergeLearnedFacts(
         observaciones: observacionesCombinadas || undefined,
         confianza: Math.max(existing.confianza || 0, newFacts.confianza)
     }
+
+    return { merged, changes }
 }
+
+/**
+ * Genera un mensaje de confirmación amigable para los hechos aprendidos
+ */
+export function generateConfirmationMessage(facts: ExtractedFacts, changes: string[]): string | null {
+    if (changes.length === 0) return null
+
+    const messages: string[] = []
+
+    if (changes.includes('dia_preferido') && facts.dia_preferido) {
+        messages.push(`que preferís las entregas los *${facts.dia_preferido}*`)
+    }
+    
+    if (changes.includes('tipo_negocio') && facts.tipo_negocio) {
+        const tipo = facts.tipo_negocio === 'familia' ? 'para tu hogar' : `para tu *${facts.tipo_negocio}*`
+        messages.push(`que tus pedidos son ${tipo}`)
+    }
+
+    if (changes.includes('horario_preferido') && facts.horario_preferido) {
+        messages.push(`que te queda mejor recibir por la *${facts.horario_preferido}*`)
+    }
+
+    if (messages.length === 0) return null
+
+    let text = `📝 *Anotado:* Me guardo ${messages.join(' y ')} para tenerlo en cuenta en tus próximos pedidos.`
+    text += `\n\n_(Si algo está mal, avisame y lo corrijo)_`
+
+    return text
+}
+
