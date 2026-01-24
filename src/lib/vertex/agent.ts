@@ -118,10 +118,10 @@ export async function processMessageWithTools(
       systemInstruction: SYSTEM_PROMPT + personalizedContext
     })
 
-    // Construir contexto de historial reciente (últimos 3 mensajes)
+    // Construir contexto de historial reciente (últimos 8 mensajes)
     const historialReciente = session.history.length > 0
-      ? session.history.slice(-3)
-        .map(m => `${m.role === 'user' ? 'Cliente' : 'Bot'}: ${m.content.substring(0, 100)}`)
+      ? session.history.slice(-8)
+        .map(m => `${m.role === 'user' ? 'Cliente' : 'Bot'}: ${m.content.substring(0, 200)}`)
         .join('\n')
       : ''
 
