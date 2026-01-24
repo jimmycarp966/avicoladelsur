@@ -13,7 +13,8 @@
     "lint": "eslint",
     "verificar-bot": "node verificar-datos-bot.js",
     "test:sucursales": "npx tsx scripts/test-sucursales-robot.ts",
-    "test:bot:webhook": "npx tsx scripts/test-bot-webhook.ts"
+    "test:bot:webhook": "npx tsx scripts/test-bot-webhook.ts",
+    "test:bot:e2e": "playwright test tests/bot-webhook.spec.ts"
   },
   "dependencies": {
     "@google-cloud/storage-mcp": "^0.3.2",
