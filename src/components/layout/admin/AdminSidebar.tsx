@@ -25,6 +25,7 @@ import {
   Brain,
   FileSearch,
   Bell,
+  MessageSquare,
 } from 'lucide-react'
 import type { Usuario } from '@/types/domain.types'
 
@@ -34,9 +35,18 @@ interface AdminSidebarProps {
 }
 
 // Función para obtener badges dinámicos - versión cliente
-function getBadges(): { [key: string]: number } {
+async function getBadges(): Promise<{ [key: string]: number }> {
   // En producción, esto debería venir de una API route
-  return {}
+  // Por ahora, solo traemos mensajes de hoy del bot
+  try {
+    const { obtenerMensajesHoyAction } = await import('@/actions/bot-mensajes.actions')
+    const result = await obtenerMensajesHoyAction()
+    return {
+      bot_mensajes_hoy: result.data || 0
+    }
+  } catch {
+    return {}
+  }
 }
 
 const navigation = [
@@ -174,6 +184,7 @@ const navigation = [
       { name: 'Clientes', href: '/reportes/clientes' },
       { name: 'Empleados', href: '/reportes/empleados' },
       { name: 'Sucursales', href: '/reportes/sucursales' },
+      { name: 'Métricas Bot', href: '/reportes/bot', badge: 'bot_mensajes_hoy' },
     ],
   },
 ]
@@ -280,7 +291,21 @@ export function AdminSidebar({ onClose, user }: AdminSidebarProps) {
   const [badges, setBadges] = useState<{ [key: string]: number }>({})
 
   useEffect(() => {
-    setBadges(getBadges())
+    const loadBadges = async () => {
+      try {
+        const { obtenerMensajesHoyAction } = await import('@/actions/bot-mensajes.actions')
+        const result = await obtenerMensajesHoyAction()
+        const botHoy = result.data || 0
+        setBadges({
+          notificaciones_unread: 0, // En producción esto vendrá de la API
+          sucursales_alerts: 0, // En producción esto vendrá de la API
+          bot_mensajes_hoy: botHoy,
+        })
+      } catch (error) {
+        console.error('[AdminSidebar] Error cargando badges:', error)
+      }
+    }
+    loadBadges()
   }, [])
 
   return (
