@@ -11,6 +11,7 @@ import { consultarEstadoTool } from './tools/consultar-estado'
 import { consultarSaldoTool } from './tools/consultar-saldo'
 import { crearReclamoTool } from './tools/crear-reclamo'
 import { consultarPreciosTool } from './tools/consultar-precios'
+import { gestionarNotificacionesTool, detectarIntencionNotificaciones } from './tools/gestionar-notificaciones'
 import { SYSTEM_PROMPT, generatePersonalizedContext } from './prompts/system-prompt'
 import { createAdminClient } from '@/lib/supabase/server'
 import { ensureGoogleApplicationCredentials } from './ensure-google-credentials'
@@ -127,22 +128,23 @@ export async function processMessageWithTools(
 
     // Prompt para detectar intención CON contexto conversacional
     const intentPrompt = `Analiza el siguiente mensaje de WhatsApp y determina la intención del usuario.
-${historialReciente ? `\nContexto de la conversación:\n${historialReciente}\n` : ''}
-Mensaje actual: "${message}"
+ ${historialReciente ? `\nContexto de la conversación:\n${historialReciente}\n` : ''}
+ Mensaje actual: "${message}"
 
-Posibles intenciones:
-- pedido: El cliente quiere hacer un pedido o menciona productos con cantidades
-- consulta_precio: El cliente pregunta por precios, lista de precios, cuánto cuesta algo, o responde "completa/todos" a una pregunta sobre precios
-- consulta_stock: El cliente pregunta por productos disponibles o stock
-- consulta_estado: El cliente pregunta por el estado de un pedido
-- consulta_saldo: El cliente pregunta por su saldo pendiente
-- reclamo: El cliente quiere hacer un reclamo
-- saludo: El cliente está saludando
-- otro: Cualquier otra intención
+ Posibles intenciones:
+ - pedido: El cliente quiere hacer un pedido o menciona productos con cantidades
+ - consulta_precio: El cliente pregunta por precios, lista de precios, cuánto cuesta algo, o responde "completa/todos" a una pregunta sobre precios
+ - consulta_stock: El cliente pregunta por productos disponibles o stock
+ - consulta_estado: El cliente pregunta por el estado de un pedido
+ - consulta_saldo: El cliente pregunta por su saldo pendiente
+ - reclamo: El cliente quiere hacer un reclamo
+ - notificaciones: El cliente quiere ver o configurar sus preferencias de notificaciones
+ - saludo: El cliente está saludando
+ - otro: Cualquier otra intención
 
-IMPORTANTE: Si el mensaje es una respuesta corta como "completa", "todos", "si", "dale", etc., usa el CONTEXTO de la conversación para determinar la intención real.
+ IMPORTANTE: Si el mensaje es una respuesta corta como "completa", "todos", "si", "dale", etc., usa el CONTEXTO de la conversación para determinar la intención real.
 
-Responde SOLO con el nombre de la intención (ej: "pedido", "consulta_precio", "consulta_stock", etc.)`
+ Responde SOLO con el nombre de la intención (ej: "pedido", "consulta_precio", "consulta_stock", etc.)`
 
     const intentResult = await model.generateContent(intentPrompt)
     const intent = extractTextFromResponse(intentResult.response).trim().toLowerCase()
@@ -316,6 +318,19 @@ Escribí "lista de precios" para ver todos los productos disponibles.`
                 text: `Hubo un error creando el reclamo: ${result.error}. ¿Podés intentarlo de otra forma?`
               }
             }
+          }
+        }
+        break
+
+      case 'notificaciones':
+        if (clienteId) {
+          const notificacionesParams = detectarIntencionNotificaciones(message) || { accion: 'ver' }
+          const notificacionesResult = await gestionarNotificacionesTool(
+            notificacionesParams,
+            { cliente_id: clienteId }
+          )
+          return {
+            text: notificacionesResult.message
           }
         }
         break

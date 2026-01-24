@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { sendWhatsAppTwilioMessage } from '@/lib/services/whatsapp-twilio'
+import { generarMensajeOptOut } from '@/lib/vertex/tools/gestionar-notificaciones'
 
 /**
  * Servicio de Notificaciones Proactivas
@@ -138,7 +139,9 @@ export async function enviarNotificacionProgramada(
       mensaje: notificacion.mensaje.substring(0, 50) + '...',
     })
 
-    const result = await sendWhatsAppTwilioMessage(cliente.whatsapp, notificacion.mensaje)
+    // Agregar mensaje de opt-out
+    const mensajeFinal = notificacion.mensaje + generarMensajeOptOut()
+    const result = await sendWhatsAppTwilioMessage(cliente.whatsapp, mensajeFinal)
 
     if (!result.success) {
       console.error(`[Notificación Proactiva] Error Twilio: ${result.error}`)
