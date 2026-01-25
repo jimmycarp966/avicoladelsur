@@ -42,6 +42,8 @@ import { formatDate } from '@/lib/utils'
 
 const TIEMPO_LIMITE_MINUTOS = 60
 
+export const dynamic = 'force-dynamic'
+
 export default function ControlStockPage() {
     const [loading, setLoading] = useState(true)
     const [conteoActivo, setConteoActivo] = useState<ConteoStock | null>(null)

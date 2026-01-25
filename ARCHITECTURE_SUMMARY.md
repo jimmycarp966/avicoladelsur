@@ -86,6 +86,7 @@ Sistema ERP modular completo para Avícola del Sur que unifica **Almacén (WMS)*
 - **Features 2.0**:
   - Control de Merma Líquida vs Sólida.
   - Validación de Peso IA (Detección de outliers en balanza).
+  - **Control de Stock por Turnos**: Conteo físico de inventario (Mañana/Noche) con conciliación automática.
   - **Sistema de Remitos Internos**: Generación de remitos de producción tras el desposte.
   - **Producción Incremental**: Registro parcial de kilos terminados con barra de progreso visual (Memory Bank) e impresión de resumen final detallado.
   - **Control de Stock por Turnos**: Auditoría física de inventario (Mañana/Noche) con timer de 1 hora y detección de producción activa.

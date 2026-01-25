@@ -76,6 +76,7 @@ const navigation = [
       { name: 'Productos', href: '/almacen/productos' },
       { name: 'Lotes', href: '/almacen/lotes' },
       { name: 'Producción', href: '/almacen/produccion' },
+      { name: 'Control de Stock', href: '/almacen/control-stock' }, // Re-añadido con comentario para forzar mtime
       { name: 'Presupuestos del Día', href: '/almacen/presupuestos-dia' },
       { name: 'Pedidos', href: '/almacen/pedidos' },
       { name: 'Transferencias', href: '/sucursales/transferencias' },

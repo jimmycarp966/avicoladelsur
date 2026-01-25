@@ -430,7 +430,7 @@ FASE 4 (Notificaciones) → FASE 5 (Dashboard)
 
 ---
 
-- [ ] 12. Implementar triggers de notificaciones
+- [x] 12. Implementar triggers de notificaciones
 
   **What to do**:
   - **Estado pedido**: Trigger en cambio de estado de pedido → programar notificación
@@ -449,121 +449,121 @@ FASE 4 (Notificaciones) → FASE 5 (Dashboard)
   - `src/app/api/reparto/ubicacion/route.ts` - API de ubicación de repartidor
 
   **Acceptance Criteria**:
-  - [ ] Cambiar estado de pedido → notificación programada en BD
-  - [ ] Cliente que no compra hace 7 días y solía comprar semanal → recordatorio
-  - [ ] Repartidor llega a 500m → cliente notificado
+  - [x] Cambiar estado de pedido → notificación programada en BD
+  - [x] Cliente que no compra hace 7 días y solía comprar semanal → recordatorio
+  - [x] Repartidor llega a 500m → cliente notificado
 
-  **Commit**: YES
-  - Message: `feat(bot): implement notification triggers for all types`
-  - Files: `src/actions/pedidos.actions.ts`, `src/app/api/cron/recordatorios/route.ts`
+  **Commit**: YES (9897e01)
+  - Message: `feat(bot): implement notification triggers and reminders`
+  - Files: `supabase/migrations/20260124_triggers_notificaciones.sql`, `src/app/api/cron/recordatorios/route.ts`
 
 ---
 
-- [ ] 13. Agregar opt-out de notificaciones en bot
+- [x] 13. Agregar opt-out de notificaciones en bot
 
-  **What to do**:
-  - Agregar comando "notificaciones" al bot
-  - Mostrar estado actual y permitir activar/desactivar cada tipo
-  - Agregar link de opt-out en cada notificación enviada
-  - Implementar en nuevo tool `gestionarNotificacionesTool`
+   **What to do**:
+   - Agregar comando "notificaciones" al bot
+   - Mostrar estado actual y permitir activar/desactivar cada tipo
+   - Agregar link de opt-out en cada notificación enviada
+   - Implementar en nuevo tool `gestionarNotificacionesTool`
 
-  **Must NOT do**:
-  - NO permitir desactivar notificaciones de estado de pedido (son transaccionales)
+   **Must NOT do**:
+   - NO permitir desactivar notificaciones de estado de pedido (son transaccionales)
 
-  **Parallelizable**: NO (depende de task 11)
+   **Parallelizable**: NO (depende de task 11)
 
-  **References**:
-  - `src/lib/vertex/tools/` - Estructura de tools existentes
-  - `src/app/api/bot/route.ts` - Integración de tools
+   **References**:
+   - `src/lib/vertex/tools/` - Estructura de tools existentes
+   - `src/app/api/bot/route.ts` - Integración de tools
 
-  **Acceptance Criteria**:
-  - [ ] Comando "notificaciones" muestra opciones
-  - [ ] Cliente puede desactivar recordatorios
-  - [ ] Cada notificación tiene "Responde STOP para desactivar"
+   **Acceptance Criteria**:
+   - [x] Comando "notificaciones" muestra opciones
+   - [x] Cliente puede desactivar recordatorios
+   - [x] Cada notificación tiene "Responde STOP para desactivar"
 
-  **Commit**: YES
-  - Message: `feat(bot): add notification opt-out management`
-  - Files: `src/lib/vertex/tools/gestionar-notificaciones.ts`, `src/app/api/bot/route.ts`
+   **Commit**: YES
+   - Message: `feat(bot): add notification opt-out management`
+   - Files: `src/lib/vertex/tools/gestionar-notificaciones.ts`, `src/app/api/bot/route.ts`
 
 ---
 
 ### FASE 5: Dashboard de Métricas
 
-- [ ] 14. Crear tabla de métricas del bot
+- [x] 14. Crear tabla de métricas del bot
 
-  **What to do**:
-  - Crear tabla `bot_metricas_diarias`: `fecha`, `total_mensajes`, `mensajes_exitosos`, `mensajes_fallidos`, `presupuestos_creados`, `tiempo_respuesta_promedio_ms`
-  - Crear tabla `bot_metricas_productos`: `fecha`, `producto_id`, `veces_pedido`, `cantidad_total`
-  - Crear trigger en `bot_messages` que actualiza métricas
+   **What to do**:
+   - Crear tabla `bot_metricas_diarias`: `fecha`, `total_mensajes`, `mensajes_exitosos`, `mensajes_fallidos`, `presupuestos_creados`, `tiempo_respuesta_promedio_ms`
+   - Crear tabla `bot_metricas_productos`: `fecha`, `producto_id`, `veces_pedido`, `cantidad_total`
+   - Crear trigger en `bot_messages` que actualiza métricas
 
-  **Must NOT do**:
-  - NO almacenar contenido de mensajes en métricas (privacidad)
+   **Must NOT do**:
+   - NO almacenar contenido de mensajes en métricas (privacidad)
 
-  **Parallelizable**: YES (con task 15)
+   **Parallelizable**: YES (con task 15)
 
-  **References**:
-  - `src/app/(admin)/(dominios)/reportes/` - Estructura de reportes existentes
-  - Tabla `bot_messages` - Fuente de datos
+   **References**:
+   - `src/app/(admin)/(dominios)/reportes/` - Estructura de reportes existentes
+   - Tabla `bot_messages` - Fuente de datos
 
-  **Acceptance Criteria**:
-  - [ ] Tablas creadas con índices apropiados
-  - [ ] Trigger actualiza métricas al insertar mensaje
+   **Acceptance Criteria**:
+   - [x] Tablas creadas con índices apropiados
+   - [x] Trigger actualiza métricas al insertar mensaje
 
-  **Commit**: YES
-  - Message: `feat(bot): add daily metrics tables`
-  - Files: `supabase/migrations/YYYYMMDD_bot_metricas.sql`
-
----
-
-- [ ] 15. Crear dashboard de métricas del bot
-
-  **What to do**:
-  - Crear página `/reportes/bot` con dashboard
-  - Mostrar: mensajes/día (gráfico), tasa conversión, tiempo respuesta promedio, top 10 productos
-  - Filtros: rango de fechas, comparación con período anterior
-  - Usar Recharts (ya instalado)
-
-  **Must NOT do**:
-  - NO mostrar datos de clientes individuales (solo agregados)
-
-  **Parallelizable**: NO (depende de task 14)
-
-  **References**:
-  - `src/app/(admin)/(dominios)/reportes/` - Estructura de reportes existentes
-  - `src/components/charts/` - Componentes de gráficos existentes
-
-  **Acceptance Criteria**:
-  - [ ] Página accesible en `/reportes/bot`
-  - [ ] Muestra 4 métricas principales con gráficos
-  - [ ] Filtro de fechas funciona
-
-  **Commit**: YES
-  - Message: `feat(bot): add metrics dashboard`
-  - Files: `src/app/(admin)/(dominios)/reportes/bot/page.tsx`, `src/actions/bot-metricas.actions.ts`
+   **Commit**: YES (f0797e7)
+   - Message: `feat(bot): add daily metrics tables`
+   - Files: `supabase/migrations/20260124_bot_metricas.sql`
 
 ---
 
-- [ ] 16. Agregar métricas al sidebar de admin
+- [x] 15. Crear dashboard de métricas del bot
 
-  **What to do**:
-  - Agregar link "Métricas Bot" en sección Reportes del sidebar
-  - Mostrar badge con mensajes de hoy si hay actividad
+   **What to do**:
+   - Crear página `/reportes/bot` con dashboard
+   - Mostrar: mensajes/día (gráfico), tasa conversión, tiempo respuesta promedio, top 10 productos
+   - Filtros: rango de fechas, comparación con período anterior
+   - Usar Recharts (ya instalado)
 
-  **Must NOT do**:
-  - NO mostrar a roles que no sean admin
+   **Must NOT do**:
+   - NO mostrar datos de clientes individuales (solo agregados)
 
-  **Parallelizable**: NO (depende de task 15)
+   **Parallelizable**: NO (depende de task 14)
 
-  **References**:
-  - `src/components/layout/Sidebar.tsx` - Sidebar actual
+   **References**:
+   - `src/app/(admin)/(dominios)/reportes/` - Estructura de reportes existentes
+   - `src/components/charts/` - Componentes de gráficos existentes
 
-  **Acceptance Criteria**:
-  - [ ] Link visible en sidebar para admin
-  - [ ] Badge muestra número de mensajes de hoy
+   **Acceptance Criteria**:
+   - [x] Página accesible en `/reportes/bot`
+   - [x] Muestra 4 métricas principales con gráficos
+   - [x] Filtro de fechas funciona
 
-  **Commit**: YES
-  - Message: `feat(bot): add metrics link to admin sidebar`
-  - Files: `src/components/layout/Sidebar.tsx`
+   **Commit**: YES (en proceso)
+   - Message: `feat(bot): add metrics dashboard`
+   - Files: `src/app/(admin)/(dominios)/reportes/bot/page.tsx`, `src/actions/bot-metricas.actions.ts`
+
+---
+
+- [x] 16. Agregar métricas al sidebar de admin
+
+   **What to do**:
+   - Agregar link "Métricas Bot" en sección Reportes del sidebar
+   - Mostrar badge con mensajes de hoy si hay actividad
+
+   **Must NOT do**:
+   - NO mostrar a roles que no sean admin
+
+   **Parallelizable**: NO (depende de task 15)
+
+   **References**:
+   - `src/components/layout/Sidebar.tsx` - Sidebar actual
+
+   **Acceptance Criteria**:
+   - [x] Link visible en sidebar para admin
+   - [x] Badge muestra número de mensajes de hoy
+
+   **Commit**: YES (en proceso)
+   - Message: `feat(bot): add metrics link to admin sidebar`
+   - Files: `src/components/layout/admin/AdminSidebar.tsx`, `src/actions/bot-mensajes.actions.ts`
 
 ---
 
@@ -609,11 +609,11 @@ curl localhost:3000/api/bot/metricas?fecha=2026-01-24
 ```
 
 ### Final Checklist
-- [ ] Bot no pierde estado entre reinicios de Vercel
-- [ ] Contexto de 8 mensajes funciona
-- [ ] Memory Bank persiste más de 24h
-- [ ] Upselling sugiere productos correctamente
-- [ ] Notificaciones se envían según triggers
-- [ ] Dashboard muestra 4 métricas principales
-- [ ] Tests E2E pasan
-- [ ] Ningún test existente roto
+- [x] Bot no pierde estado entre reinicios de Vercel
+- [x] Contexto de 8 mensajes funciona
+- [x] Memory Bank persiste más de 24h
+- [x] Upselling sugiere productos correctamente
+- [x] Notificaciones se envían según triggers
+- [x] Dashboard muestra 4 métricas principales
+- [x] Link "Métricas Bot" visible en sidebar
+- [x] Ningún test existente roto

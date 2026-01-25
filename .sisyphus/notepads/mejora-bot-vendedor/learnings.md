@@ -529,6 +529,88 @@
    - Errores loguean con contexto completo
    - Lote loguea resumen: procesadas, exitosas, fallidas
 
+
+## [2026-01-24T20:00:00] Tarea 12 Completada
+
+**Archivos creados/modificados**:
+- supabase/migrations/20260124_triggers_notificaciones.sql (nuevo, ~200 líneas)
+- src/app/api/cron/recordatorios/route.ts (nuevo, ~250 líneas)
+
+**Commit**: feat(bot): implement notification triggers and reminders (9897e01)
+
+**Cambios realizados**:
+
+1. **Triggers SQL para pedidos**:
+   - `programar_notificacion_estado_pedido()`: Trigger en UPDATE de estado
+   - Estados notificados:
+     * confirmado → mensaje en 5 minutos
+     * preparando → mensaje instantáneo
+     * enviado → mensaje en 5 minutos
+     * entregado → mensaje en 30 minutos
+     * cancelado → mensaje instantáneo
+   - Trigger: `tr_pedido_estado_cambiado` en tabla pedidos
+
+2. **Trigger SQL para rutas**:
+   - `programar_notificacion_entrega_cercana()`: Detecta inicio de ruta
+   - Trigger: `tr_ruta_estado_cambiado` en tabla rutas_reparto
+   - Notifica cuando estado cambia a 'en_curso'
+   - Envío programado 30 minutos después (dar tiempo a repartidor a salir)
+
+3. **Función SQL para alertas de pago**:
+   - `programar_alerta_pago_pendiente()`: Detecta clientes con deuda
+   - Criterios:
+     * Saldo pendiente > $1000
+     * Último pago hace > 7 días
+     * Cliente activo y tiene WhatsApp
+   - Envío programado para 9am del día siguiente
+
+4. **Cron: /api/cron/recordatorios**:
+   - Analiza patrones de compra de clientes
+   - Frecuencias detectadas:
+     * Semanal: ciclo promedio <= 7 días
+     * Quincenal: ciclo promedio 8-20 días
+     * Mensual: ciclo promedio > 20 días
+   - Programación:
+     * Envío a las 9am (respeta horarios 8am-8pm)
+     * Solo si pasaron >= 70% del ciclo promedio
+   - Configuración:
+     * offset_dias (default: 2, rango: 2-X)
+     * max_dias (default: 7, rango: X-30)
+
+**Lógica de análisis de patrones**:
+1. Obtener pedidos de últimos 90 días
+2. Agrupar por cliente y calcular ciclo promedio
+3. Filtrar clientes con mínimo 2 compras distintas
+4. Calcular días desde última compra
+5. Programar si:
+   - Ciclo está en rango configurado
+   - Días desde última compra >= 70% del ciclo
+
+**Validaciones implementadas**:
+- Cliente tiene WhatsApp
+- Cliente está activo
+- Mínimo 2 compras distintas para análisis
+- Solo programar si está en rango de días configurado
+
+**Patrón de triggers**:
+- AFTER UPDATE OF estado en pedidos/rutas
+- Solo proceder si el estado cambió realmente (NEW.estado != OLD.estado)
+- Lógica CASE para diferentes mensajes según estado
+- Mensajes personalizados con datos del cliente/pedido
+
+**Patrón de cron jobs**:
+- Auth via CRON_SECRET header
+- GET: ejecución programada (vercel cron)
+- POST: testing manual
+- Parámetros configurables via query params
+- Logs detallados de cada ejecución
+
+**Mensajes de notificación**:
+- Estado pedido: confirmado, preparando, enviado, entregado, cancelado
+- Ruta en curso: "Tu pedido está en camino y llegará pronto"
+- Recordatorio compra: Personalizado por frecuencia (semanal/quincenal/mensual)
+- Alerta pago: "Tienes saldo pendiente de $X hace Y días"
+
 **Patrón aplicado**:
 - 'use server' para server actions
 - createClient() para cliente Supabase
