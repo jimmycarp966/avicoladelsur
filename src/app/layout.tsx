@@ -10,7 +10,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Avícola del Sur ERP",
+  title: "Hola matias",
   description: "Sistema de Gestión Integral para Avícola del Sur",
   manifest: "/manifest.json",
   icons: {
