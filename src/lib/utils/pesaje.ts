@@ -23,7 +23,15 @@ export function esItemPesable(item: any, esMayorista: boolean = false): boolean 
     const categoria = item.producto?.categoria
     if (categoria) {
         const categoriaUpper = categoria.toUpperCase().trim()
-        return categoriaUpper === 'BALANZA'
+        if (categoriaUpper === 'BALANZA') {
+            return true
+        }
+    }
+
+    // 3. Verificar si el nombre contiene "xkg" sin número previo (ej: "Pechuga xkg" = pesable, "2xkg" = NO pesable)
+    const nombre = item.producto?.nombre || ''
+    if (/(?<!\d)xkg/i.test(nombre)) {
+        return true
     }
 
     return false

@@ -1,8 +1,8 @@
 import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, Package, User, MapPin, Calendar, DollarSign, Scale, Clock, History, FileText, CreditCard } from 'lucide-react'
-import Link from 'next/link'
+import { Package, User, MapPin, Calendar, DollarSign, Scale, Clock, History, FileText, CreditCard } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { BackButton } from '@/components/ui/back-button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { obtenerPresupuestoAction } from '@/actions/presupuestos.actions'
@@ -24,7 +24,7 @@ async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) 
   console.log('[SERVER] PresupuestoDetalle - ID recibido:', presupuestoId)
   const supabase = await createClient()
   const result = await obtenerPresupuestoAction(presupuestoId)
-  
+
   console.log('[SERVER] Resultado de obtenerPresupuestoAction:', {
     success: result.success,
     hasData: !!result.data,
@@ -96,12 +96,7 @@ async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) 
     <div className="space-y-6">
       {/* Header con navegación */}
       <div className="flex items-center gap-4">
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/ventas/presupuestos">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Volver a Presupuestos
-          </Link>
-        </Button>
+        <BackButton>Volver</BackButton>
         <div className="flex-1">
           <h1 className="text-2xl font-bold">Presupuesto {presupuesto.numero_presupuesto}</h1>
           <p className="text-muted-foreground">Detalle completo del presupuesto</p>
@@ -211,32 +206,32 @@ async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) 
               <p className="text-lg text-blue-600">${presupuesto.recargo_total.toFixed(2)}</p>
             </div>
           )}
-        {Array.isArray(presupuesto.metodos_pago) && presupuesto.metodos_pago.length > 0 && (
-          <div className="md:col-span-2 space-y-2">
-            <label className="text-sm font-medium flex items-center gap-2">
-              <CreditCard className="h-4 w-4" />
-              Métodos de pago admitidos
-            </label>
-            <div className="space-y-2">
-              {presupuesto.metodos_pago.map((metodo: any, index: number) => {
-                const etiqueta = (metodo.metodo || metodo.tipo || 'sin definir').replace('_', ' ')
-                const recargoValue = Number(metodo.recargo || 0)
-                const mostrarRecargo = Number.isFinite(recargoValue) && recargoValue > 0
+          {Array.isArray(presupuesto.metodos_pago) && presupuesto.metodos_pago.length > 0 && (
+            <div className="md:col-span-2 space-y-2">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <CreditCard className="h-4 w-4" />
+                Métodos de pago admitidos
+              </label>
+              <div className="space-y-2">
+                {presupuesto.metodos_pago.map((metodo: any, index: number) => {
+                  const etiqueta = (metodo.metodo || metodo.tipo || 'sin definir').replace('_', ' ')
+                  const recargoValue = Number(metodo.recargo || 0)
+                  const mostrarRecargo = Number.isFinite(recargoValue) && recargoValue > 0
 
-                return (
-                  <div key={`${etiqueta}-${index}`} className="flex items-center justify-between rounded-md border p-3 text-sm">
-                    <span className="font-medium capitalize">{etiqueta}</span>
-                    {mostrarRecargo && (
-                      <span className="text-primary font-medium">
-                        +${recargoValue.toFixed(2)}
-                      </span>
-                    )}
-                  </div>
-                )
-              })}
+                  return (
+                    <div key={`${etiqueta}-${index}`} className="flex items-center justify-between rounded-md border p-3 text-sm">
+                      <span className="font-medium capitalize">{etiqueta}</span>
+                      {mostrarRecargo && (
+                        <span className="text-primary font-medium">
+                          +${recargoValue.toFixed(2)}
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
             </div>
-          </div>
-        )}
+          )}
         </CardContent>
       </Card>
 
@@ -276,50 +271,51 @@ async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) 
               })
 
               return (
-              <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h4 className="font-medium">{item.producto?.nombre || 'Producto'}</h4>
-                    <span className="text-sm text-muted-foreground">
-                      #{item.producto?.codigo || 'N/A'}
-                    </span>
-                    {pesableUI && (
-                      <Badge variant="outline" className="text-xs">
-                        <Scale className="h-3 w-3 mr-1" />
-                        BALANZA
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                    <span>
-                      Solicitado: {esMayorista && unidadMayorNombre && kgPorUnidadMayor ? `${item.cantidad_solicitada} ${unidadMayorNombre}${item.cantidad_solicitada !== 1 ? '(s)' : ''} ≈ ${solicitadoKg?.toFixed(1)} kg` : `${item.cantidad_solicitada} kg`}
-                    </span>
-                    {item.cantidad_reservada > 0 && (
-                      <span className="text-green-600">
-                        Reservado: {esMayorista && unidadMayorNombre && kgPorUnidadMayor ? `${item.cantidad_reservada} ${unidadMayorNombre}${item.cantidad_reservada !== 1 ? '(s)' : ''} ≈ ${reservadoKg?.toFixed(1)} kg` : `${item.cantidad_reservada} kg`}
+                <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-medium">{item.producto?.nombre || 'Producto'}</h4>
+                      <span className="text-sm text-muted-foreground">
+                        #{item.producto?.codigo || 'N/A'}
                       </span>
-                    )}
-                    {item.peso_final && (
-                      <span className="text-blue-600">
-                        Pesado: {item.peso_final} kg
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="font-medium">
-                    ${item.subtotal_est?.toFixed(2) || '0.00'}
-                  </div>
-                  {item.subtotal_final && (
-                    <div className="text-sm text-muted-foreground">
-                      Final: ${item.subtotal_final.toFixed(2)}
+                      {pesableUI && (
+                        <Badge variant="outline" className="text-xs">
+                          <Scale className="h-3 w-3 mr-1" />
+                          BALANZA
+                        </Badge>
+                      )}
                     </div>
-                  )}
+                    <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                      <span>
+                        Solicitado: {esMayorista && unidadMayorNombre && kgPorUnidadMayor ? `${item.cantidad_solicitada} ${unidadMayorNombre}${item.cantidad_solicitada !== 1 ? '(s)' : ''} ≈ ${solicitadoKg?.toFixed(1)} kg` : `${item.cantidad_solicitada} kg`}
+                      </span>
+                      {item.cantidad_reservada > 0 && (
+                        <span className="text-green-600">
+                          Reservado: {esMayorista && unidadMayorNombre && kgPorUnidadMayor ? `${item.cantidad_reservada} ${unidadMayorNombre}${item.cantidad_reservada !== 1 ? '(s)' : ''} ≈ ${reservadoKg?.toFixed(1)} kg` : `${item.cantidad_reservada} kg`}
+                        </span>
+                      )}
+                      {item.peso_final && (
+                        <span className="text-blue-600">
+                          Pesado: {item.peso_final} kg
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-medium">
+                      ${item.subtotal_est?.toFixed(2) || '0.00'}
+                    </div>
+                    {item.subtotal_final && (
+                      <div className="text-sm text-muted-foreground">
+                        Final: ${item.subtotal_final.toFixed(2)}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}) || (
-              <p className="text-muted-foreground">No hay items en este presupuesto</p>
-            )}
+              )
+            }) || (
+                <p className="text-muted-foreground">No hay items en este presupuesto</p>
+              )}
           </div>
         </CardContent>
       </Card>
@@ -379,9 +375,9 @@ async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) 
                     <span className="text-sm text-muted-foreground">
                       {presupuesto.updated_at && presupuesto.updated_at !== presupuesto.created_at
                         ? new Date(presupuesto.updated_at).toLocaleString('es-AR', {
-                            dateStyle: 'short',
-                            timeStyle: 'short'
-                          })
+                          dateStyle: 'short',
+                          timeStyle: 'short'
+                        })
                         : 'N/A'}
                     </span>
                   </div>
@@ -411,9 +407,9 @@ async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) 
                     <span className="text-sm text-muted-foreground">
                       {presupuesto.updated_at
                         ? new Date(presupuesto.updated_at).toLocaleString('es-AR', {
-                            dateStyle: 'short',
-                            timeStyle: 'short'
-                          })
+                          dateStyle: 'short',
+                          timeStyle: 'short'
+                        })
                         : 'N/A'}
                     </span>
                   </div>

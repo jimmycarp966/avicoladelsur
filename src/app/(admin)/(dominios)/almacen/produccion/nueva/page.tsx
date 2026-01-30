@@ -140,11 +140,13 @@ export default function NuevaOrdenProduccionPage() {
     // Productos disponibles para el destino actual
     const productosDisponiblesActual = productosPorDestino[currentDestinoId] || []
 
-    // Productos filtrados para salidas 
-    const productosFiltradosSalida = productos.filter(p =>
-        p.nombre.toLowerCase().includes(busquedaSalida.toLowerCase()) ||
-        p.codigo.toLowerCase().includes(busquedaSalida.toLowerCase())
-    )
+    // Productos filtrados para salidas (solo productos con venta por mayor - cajones)
+    const productosFiltradosSalida = productos
+        .filter(p => p.venta_mayor_habilitada === true)  // Solo productos de venta por mayor (cajones, etc.)
+        .filter(p =>
+            p.nombre.toLowerCase().includes(busquedaSalida.toLowerCase()) ||
+            p.codigo.toLowerCase().includes(busquedaSalida.toLowerCase())
+        )
 
     // Productos filtrados para entradas (del destino actual)
     const productosFiltradosEntrada = productosDisponiblesActual.filter(p =>
@@ -366,6 +368,23 @@ export default function NuevaOrdenProduccionPage() {
 
     // Calcular si la orden está lista para finalizar
     const { esValido: ordenCompleta, destinosSinProductos } = validarDestinosCompletos()
+
+    // Validación: Verificar que todas las salidas tengan peso > 0
+    const validarPesosSalida = useCallback(() => {
+        const salidasSinPeso = salidas.filter(s => s.peso_kg <= 0)
+        if (salidasSinPeso.length > 0) {
+            const nombres = salidasSinPeso.map(s => s.producto_nombre).join(', ')
+            toast.error(`Faltan kilos en: ${nombres}`)
+            return false
+        }
+        return true
+    }, [salidas])
+
+    // Handler para avanzar del paso 2 al 3 con validación
+    const handleAvanzarPaso3 = useCallback(() => {
+        if (!validarPesosSalida()) return
+        setStep(3)
+    }, [validarPesosSalida])
 
 
     // Crear orden al avanzar del paso 1 al 2
@@ -846,7 +865,7 @@ export default function NuevaOrdenProduccionPage() {
                             Cancelar Orden
                         </Button>
                         <Button
-                            onClick={() => setStep(3)}
+                            onClick={handleAvanzarPaso3}
                             disabled={salidas.length === 0}
                         >
                             Siguiente: Productos Generados
