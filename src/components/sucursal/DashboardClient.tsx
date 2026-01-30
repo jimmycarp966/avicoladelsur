@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { useState } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { DollarSign, AlertTriangle, Package, Truck, Building2, ExternalLink, MapPin, Phone } from 'lucide-react'
+import { DollarSign, AlertTriangle, Package, Truck, Building2, ShoppingCart } from 'lucide-react'
 import Link from 'next/link'
 import { DashboardRealtime } from './DashboardRealtime'
 
@@ -41,11 +41,13 @@ export function DashboardClient({
   const [transferencias, setTransferencias] = useState(transferenciasInicial)
 
   const totalVentasDia = ventasDia.reduce((sum, venta) => sum + (venta.total || 0), 0)
-  const transferenciasPendientes = transferencias.filter(t => t.estado === 'pendiente').length
+  const transferenciasPendientes = transferencias.filter(
+    t => ['pendiente', 'en_transito', 'en_ruta', 'entregado'].includes(t.estado)
+  ).length
 
   return (
     <>
-      {/* Componente Realtime que actualiza el estado */}
+      {/* Componente Realtime */}
       {sucursal.id && (
         <DashboardRealtime
           sucursalId={sucursal.id}
@@ -57,291 +59,171 @@ export function DashboardClient({
       )}
 
       <div className="space-y-6">
-        {/* Banner de Identificación de Sucursal */}
-        <Card className="border-primary/50 bg-primary/5">
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                  <Building2 className="w-6 h-6 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Sucursal Actual</p>
-                  <p className="text-xl font-bold">{sucursal.nombre}</p>
-                </div>
-              </div>
-              {esAdmin && (
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/sucursales">
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    Ver Todas las Sucursales
-                  </Link>
-                </Button>
-              )}
+        {/* Banner de Sucursal (compacto) */}
+        <div className="flex items-center justify-between bg-primary/5 rounded-lg p-4 border border-primary/20">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+              <Building2 className="w-5 h-5 text-primary" />
             </div>
-          </CardContent>
-        </Card>
+            <div>
+              <p className="font-bold text-lg">{sucursal.nombre}</p>
+              <p className="text-sm text-muted-foreground">Panel de sucursal</p>
+            </div>
+          </div>
+          {esAdmin && (
+            <Badge variant="outline">Admin</Badge>
+          )}
+        </div>
 
-        {/* Mensaje para admin sin sucursal asignada */}
+        {/* Sin sucursal */}
         {sinSucursal && (
           <Card className="border-amber-200 bg-amber-50">
-            <CardContent className="pt-6">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
-                <div className="flex-1">
-                  <h3 className="font-semibold text-amber-900 mb-2">
-                    No hay sucursales activas en el sistema
-                  </h3>
-                  <p className="text-amber-800 mb-4">
-                    Como administrador, puedes crear nuevas sucursales desde la sección de gestión.
-                  </p>
-                  <Button asChild>
-                    <Link href="/sucursales/nueva">
-                      <Building2 className="w-4 h-4 mr-2" />
-                      Crear Primera Sucursal
-                    </Link>
-                  </Button>
-                </div>
-              </div>
+            <CardContent className="pt-6 text-center">
+              <AlertTriangle className="w-12 h-12 text-amber-600 mx-auto mb-4" />
+              <h3 className="font-semibold text-amber-900 mb-2">No hay sucursales activas</h3>
+              <p className="text-amber-800 mb-4">Crear una sucursal para comenzar.</p>
+              <Button asChild>
+                <Link href="/sucursales/nueva">
+                  <Building2 className="w-4 h-4 mr-2" />
+                  Crear Sucursal
+                </Link>
+              </Button>
             </CardContent>
           </Card>
         )}
 
-        {/* Header */}
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex-1">
-            <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-                <Building2 className="w-8 h-8" />
-                {sucursal.nombre}
-              </h1>
-              <Badge variant={sucursal.active ? "default" : "secondary"} className="text-sm">
-                {sucursal.active ? 'Activa' : 'Inactiva'}
-              </Badge>
-              {esAdmin && (
-                <Badge variant="outline" className="text-xs">
-                  Vista Admin
+        {/* ============================================ */}
+        {/* BOTONES DE ACCIÓN GRANDES */}
+        {/* ============================================ */}
+
+        {/* BOTÓN PRINCIPAL: VENDER */}
+        <Button
+          asChild
+          className="w-full h-20 text-xl font-bold bg-green-600 hover:bg-green-700 shadow-lg"
+        >
+          <Link href="/sucursal/ventas" className="flex items-center justify-center gap-3">
+            <ShoppingCart className="w-8 h-8" />
+            VENDER
+          </Link>
+        </Button>
+
+        {/* BOTONES SECUNDARIOS */}
+        <div className="grid grid-cols-2 gap-4">
+          {/* RECIBIR MERCADERÍA */}
+          <Button
+            asChild
+            variant="outline"
+            className="h-16 text-base font-medium relative"
+          >
+            <Link href="/sucursal/transferencias" className="flex flex-col items-center justify-center gap-1">
+              <Truck className="w-6 h-6" />
+              <span>Recibir Mercadería</span>
+              {transferenciasPendientes > 0 && (
+                <Badge
+                  variant="destructive"
+                  className="absolute -top-2 -right-2 h-6 w-6 p-0 flex items-center justify-center animate-pulse"
+                >
+                  {transferenciasPendientes}
                 </Badge>
               )}
+            </Link>
+          </Button>
+
+          {/* VER STOCK */}
+          <Button
+            asChild
+            variant="outline"
+            className="h-16 text-base font-medium"
+          >
+            <Link href="/sucursal/inventario" className="flex flex-col items-center justify-center gap-1">
+              <Package className="w-6 h-6" />
+              <span>Ver Stock</span>
+            </Link>
+          </Button>
+        </div>
+
+        {/* ============================================ */}
+        {/* RESUMEN DEL DÍA (compacto) */}
+        {/* ============================================ */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Resumen del Día</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {/* Ventas */}
+              <div className="text-center p-3 bg-green-50 rounded-lg">
+                <DollarSign className="w-5 h-5 mx-auto text-green-600 mb-1" />
+                <p className="text-xl font-bold text-green-700">${totalVentasDia.toFixed(0)}</p>
+                <p className="text-xs text-muted-foreground">{ventasDia.length} ventas</p>
+              </div>
+
+              {/* Caja */}
+              <div className="text-center p-3 bg-blue-50 rounded-lg">
+                <DollarSign className="w-5 h-5 mx-auto text-blue-600 mb-1" />
+                <p className="text-xl font-bold text-blue-700">${caja?.saldo_actual?.toFixed(0) || '0'}</p>
+                <p className="text-xs text-muted-foreground">En caja</p>
+              </div>
+
+              {/* Transferencias */}
+              <div className="text-center p-3 bg-orange-50 rounded-lg">
+                <Truck className="w-5 h-5 mx-auto text-orange-600 mb-1" />
+                <p className="text-xl font-bold text-orange-700">{transferenciasPendientes}</p>
+                <p className="text-xs text-muted-foreground">Pendientes</p>
+              </div>
+
+              {/* Alertas */}
+              <div className={`text-center p-3 rounded-lg ${alertas.length > 0 ? 'bg-red-50' : 'bg-gray-50'}`}>
+                <AlertTriangle className={`w-5 h-5 mx-auto mb-1 ${alertas.length > 0 ? 'text-red-600' : 'text-gray-400'}`} />
+                <p className={`text-xl font-bold ${alertas.length > 0 ? 'text-red-700' : 'text-gray-500'}`}>{alertas.length}</p>
+                <p className="text-xs text-muted-foreground">Alertas</p>
+              </div>
             </div>
-            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-              {sucursal.direccion && (
-                <div className="flex items-center gap-1">
-                  <MapPin className="w-4 h-4" />
-                  <span>{sucursal.direccion}</span>
-                </div>
-              )}
-              {sucursal.telefono && (
-                <div className="flex items-center gap-1">
-                  <Phone className="w-4 h-4" />
-                  <span>{sucursal.telefono}</span>
-                </div>
-              )}
-            </div>
-            {esAdmin && todasLasSucursales.length > 0 && (
-              <div className="mt-3">
-                <p className="text-xs text-muted-foreground mb-1">
-                  {todasLasSucursales.length > 1 ? 'Cambiar sucursal:' : 'Sucursales disponibles:'}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {todasLasSucursales.map((s) => (
-                    <Button
-                      key={s.id}
-                      variant={s.id === sucursal.id ? "default" : "outline"}
-                      size="sm"
-                      asChild
-                    >
-                      <Link href={`/sucursal/dashboard?sid=${s.id}`}>
-                        {s.nombre}
-                      </Link>
-                    </Button>
-                  ))}
-                  <Button variant="outline" size="sm" asChild>
-                    <Link href="/sucursales">
-                      <ExternalLink className="w-3 h-3 mr-1" />
-                      Ver Todas
-                    </Link>
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-          <div className="flex gap-2">
-            {esAdmin && (
-              <Button variant="outline" asChild>
-                <Link href="/sucursales">
-                  <Building2 className="w-4 h-4 mr-2" />
-                  Gestión Sucursales
-                </Link>
-              </Button>
-            )}
-            <Button variant="outline" asChild>
-              <Link href="/sucursal/alerts">
-                <AlertTriangle className="w-4 h-4 mr-2" />
-                Ver Alertas ({alertas.length})
-              </Link>
-            </Button>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        {/* Estadísticas */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {/* Ventas del Día */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Ventas del Día</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">${totalVentasDia.toFixed(2)}</div>
-              <p className="text-xs text-muted-foreground">
-                {ventasDia.length} pedidos completados
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Alertas Activas */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Alertas de Stock</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">{alertas.length}</div>
-              <p className="text-xs text-muted-foreground">
-                Productos con stock bajo
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Estado de Caja */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Saldo en Caja</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                ${caja?.saldo_actual?.toFixed(2) || '0.00'}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Saldo actual
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Transferencias */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Transferencias</CardTitle>
-              <Truck className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">
-                {transferencias.length}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {transferenciasPendientes} pendientes
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Acciones Rápidas */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <Card className="hover:shadow-md transition-shadow">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Package className="w-5 h-5" />
-                Registrar Venta
-              </CardTitle>
-              <CardDescription>
-                Registra una nueva venta en la sucursal
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild className="w-full">
-                <Link href="/sucursal/ventas">
-                  Ir a Ventas
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="hover:shadow-md transition-shadow">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Truck className="w-5 h-5" />
-                Ver Inventario
-              </CardTitle>
-              <CardDescription>
-                Consulta el stock disponible en la sucursal
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="outline" asChild className="w-full">
-                <Link href="/sucursal/inventario">
-                  Ver Inventario
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="hover:shadow-md transition-shadow">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Truck className="w-5 h-5" />
-                Gestionar Transferencias
-              </CardTitle>
-              <CardDescription>
-                Solicita o recibe transferencias de stock
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="outline" asChild className="w-full">
-                <Link href="/sucursal/transferencias">
-                  Ver Transferencias
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Alertas Recientes */}
+        {/* Alertas activas (si hay) */}
         {alertas.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-red-500" />
-                Alertas de Stock Activas
+          <Card className="border-red-200 bg-red-50/50">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2 text-red-700">
+                <AlertTriangle className="w-4 h-4" />
+                Stock Bajo
               </CardTitle>
-              <CardDescription>
-                Productos que requieren atención inmediata
-              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {alertas.slice(0, 3).map((alerta) => (
-                  <div key={alerta.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <AlertTriangle className="w-4 h-4 text-red-500" />
-                      <div>
-                        <p className="font-medium">Producto #{alerta.producto_id}</p>
-                        <p className="text-sm text-muted-foreground">
-                          Stock: {alerta.cantidad_actual} | Umbral: {alerta.umbral}
-                        </p>
-                      </div>
-                    </div>
-                    <Badge variant="destructive">Crítico</Badge>
-                  </div>
-                ))}
-                {alertas.length > 3 && (
-                  <Button variant="outline" asChild className="w-full">
-                    <Link href="/sucursal/alerts">
-                      Ver todas las alertas ({alertas.length})
+              <p className="text-sm text-red-600 mb-3">
+                Hay {alertas.length} producto(s) con stock bajo.
+              </p>
+              <Button variant="outline" size="sm" asChild className="border-red-300 text-red-700 hover:bg-red-100">
+                <Link href="/sucursal/alerts">
+                  Ver Alertas
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Selector de sucursal para admin */}
+        {esAdmin && todasLasSucursales.length > 1 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-muted-foreground">Cambiar Sucursal</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {todasLasSucursales.map((s) => (
+                  <Button
+                    key={s.id}
+                    variant={s.id === sucursal.id ? "default" : "outline"}
+                    size="sm"
+                    asChild
+                  >
+                    <Link href={`/sucursal/dashboard?sid=${s.id}`}>
+                      {s.nombre}
                     </Link>
                   </Button>
-                )}
+                ))}
               </div>
             </CardContent>
           </Card>
@@ -350,4 +232,3 @@ export function DashboardClient({
     </>
   )
 }
-

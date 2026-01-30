@@ -45,6 +45,7 @@ import {
 import { buscarProductoPorCodigoBarrasAction } from '@/actions/almacen.actions'
 import { ScanButton } from '@/components/barcode/BarcodeScanner'
 import { parseBarcodeEAN13 } from '@/lib/barcode-parser'
+import { ProductosFrecuentes } from '@/components/sucursales/ProductosFrecuentes'
 
 // ===========================================
 // TIPOS
@@ -104,11 +105,15 @@ export function POSSucursal({
 }: POSSucursalProps) {
   // Estado
   const [busquedaProducto, setBusquedaProducto] = useState('')
+  // Cliente opcional - vacío significa "Consumidor Final"
   const [clienteSeleccionado, setClienteSeleccionado] = useState<string>('')
   const [carrito, setCarrito] = useState<ItemCarrito[]>([])
   const [cantidadInput, setCantidadInput] = useState<Record<string, string>>({})
   const [cargandoPrecio, setCargandoPrecio] = useState<string | null>(null)
   const [procesandoVenta, setProcesandoVenta] = useState(false)
+
+  // MODO SIMPLE: Sin listas de precio complicadas
+  const MODO_VENTA_RAPIDA = true
 
   // Productos filtrados con priorización: primero coincidencias exactas, luego por longitud
   const productosFiltrados = (() => {
@@ -418,11 +423,7 @@ export function POSSucursal({
 
   // Procesar venta
   const procesarVenta = async () => {
-    if (!clienteSeleccionado) {
-      toast.error('Selecciona un cliente')
-      return
-    }
-
+    // Cliente es opcional - Consumidor Final por defecto
     if (carrito.length === 0) {
       toast.error('El carrito está vacío')
       return
@@ -431,15 +432,20 @@ export function POSSucursal({
     setProcesandoVenta(true)
 
     try {
+      // Cliente opcional: si no hay seleccionado o es "consumidor_final", enviar undefined
+      const clienteIdFinal = clienteSeleccionado && clienteSeleccionado !== 'consumidor_final'
+        ? clienteSeleccionado
+        : undefined
+
       const result = await registrarVentaSucursalConControlAction({
         sucursalId,
-        clienteId: clienteSeleccionado,
-        listaPrecioId: undefined, // Ya no se usa lista global
+        clienteId: clienteIdFinal,
+        listaPrecioId: undefined,
         items: carrito.map((item) => ({
           productoId: item.productoId,
           cantidad: item.cantidad,
           precioUnitario: item.precioUnitario,
-          listaPrecioId: item.listaPrecioId, // Lista individual por producto
+          listaPrecioId: MODO_VENTA_RAPIDA ? undefined : item.listaPrecioId,
         })),
         pago: {
           pagos: [{
@@ -511,6 +517,61 @@ export function POSSucursal({
             </div>
           </CardContent>
         </Card>
+
+        {/* Productos Frecuentes - Acceso Rápido */}
+        {!busquedaProducto && (
+          <ProductosFrecuentes
+            productos={productos.slice(0, 8).map(p => ({
+              id: p.id,
+              nombre: p.nombre,
+              codigo: p.codigo,
+              precio_base: p.precioVenta,
+              stock_disponible: p.stockDisponible
+            }))}
+            onAgregar={(prod) => {
+              const productoCompleto = productos.find(p => p.id === prod.id)
+              if (productoCompleto) {
+                // Verificar si ya existe en el carrito
+                const existente = carrito.find((item) => item.productoId === productoCompleto.id)
+                const cantidad = 1
+                const cantidadTotal = existente ? existente.cantidad + cantidad : cantidad
+
+                if (cantidadTotal > productoCompleto.stockDisponible) {
+                  toast.error(`Stock insuficiente. Disponible: ${productoCompleto.stockDisponible}`)
+                  return
+                }
+
+                const precioUnitario = productoCompleto.precioVenta
+
+                if (existente) {
+                  setCarrito(
+                    carrito.map((item) =>
+                      item.productoId === productoCompleto.id
+                        ? {
+                          ...item,
+                          cantidad: cantidadTotal,
+                          subtotal: cantidadTotal * item.precioUnitario,
+                        }
+                        : item
+                    )
+                  )
+                } else {
+                  setCarrito([
+                    ...carrito,
+                    {
+                      productoId: productoCompleto.id,
+                      producto: productoCompleto,
+                      cantidad,
+                      precioUnitario,
+                      subtotal: cantidad * precioUnitario,
+                    },
+                  ])
+                }
+                toast.success(`${productoCompleto.nombre} agregado`)
+              }
+            }}
+          />
+        )}
 
         {/* Lista de productos */}
         <Card>
@@ -605,33 +666,36 @@ export function POSSucursal({
 
       {/* Panel derecho: Carrito */}
       <div className="space-y-4">
-        {/* Selección de cliente */}
+        {/* Selección de cliente - SIMPLIFICADA */}
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <User className="w-5 h-5" />
-              Cliente
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <User className="w-4 h-4" />
+              Cliente (opcional)
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             <Select
               value={clienteSeleccionado}
               onValueChange={setClienteSeleccionado}
             >
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar cliente" />
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder="Consumidor Final" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="consumidor_final">
+                  Consumidor Final
+                </SelectItem>
                 {clientes.map((cliente) => (
                   <SelectItem key={cliente.id} value={cliente.id}>
-                    {cliente.nombre}{' '}
-                    <span className="text-muted-foreground">
-                      ({cliente.codigo})
-                    </span>
+                    {cliente.nombre}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            <p className="text-xs text-muted-foreground mt-1">
+              Dejar vacío para venta sin factura
+            </p>
           </CardContent>
         </Card>
 
@@ -682,48 +746,30 @@ export function POSSucursal({
                             </p>
                           </div>
                         </div>
-                        {/* Selector de lista de precio por producto */}
-                        <div className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">Lista de precio:</Label>
-                          <Select
-                            value={item.listaPrecioId || 'none'}
-                            onValueChange={(listaId) => {
-                              actualizarPrecioItem(item.productoId, listaId)
-                            }}
-                          >
-                            <SelectTrigger className="h-8 text-xs">
-                              <SelectValue placeholder="Sin lista (precio base)" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">Sin lista (precio base)</SelectItem>
-                              {listasPrecio.map((lista) => (
-                                <SelectItem key={lista.id} value={lista.id}>
-                                  <div className="flex items-center gap-2">
-                                    <Badge
-                                      variant={
-                                        lista.tipo === 'mayorista'
-                                          ? 'default'
-                                          : lista.tipo === 'minorista'
-                                            ? 'secondary'
-                                            : 'outline'
-                                      }
-                                      className="text-xs"
-                                    >
-                                      {lista.tipo}
-                                    </Badge>
+                        {/* Selector de lista - OCULTO EN MODO SIMPLE */}
+                        {!MODO_VENTA_RAPIDA && (
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">Lista de precio:</Label>
+                            <Select
+                              value={item.listaPrecioId || 'none'}
+                              onValueChange={(listaId) => {
+                                actualizarPrecioItem(item.productoId, listaId)
+                              }}
+                            >
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder="Sin lista (precio base)" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">Sin lista (precio base)</SelectItem>
+                                {listasPrecio.map((lista) => (
+                                  <SelectItem key={lista.id} value={lista.id}>
                                     {lista.nombre}
-                                    {lista.margenGanancia && ` (${lista.margenGanancia}%)`}
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {listaActual && (
-                            <p className="text-xs text-muted-foreground">
-                              Margen: {listaActual.margenGanancia || 0}%
-                            </p>
-                          )}
-                        </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-1">
                             <Button
@@ -793,33 +839,29 @@ export function POSSucursal({
 
                 <Separator className="my-4" />
 
-                {/* Botón de cobrar */}
+                {/* Botón de cobrar - GRANDE Y VERDE */}
                 <Button
-                  className="w-full h-12 text-lg"
+                  className="w-full h-14 text-xl font-bold bg-green-600 hover:bg-green-700"
                   onClick={procesarVenta}
-                  disabled={
-                    procesandoVenta ||
-                    !clienteSeleccionado
-                  }
+                  disabled={procesandoVenta || carrito.length === 0}
                 >
                   {procesandoVenta ? (
                     <>
-                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      <Loader2 className="w-6 h-6 mr-2 animate-spin" />
                       Procesando...
                     </>
                   ) : (
                     <>
-                      <CheckCircle className="w-5 h-5 mr-2" />
-                      Cobrar ${totalCarrito.toFixed(2)}
+                      <CheckCircle className="w-6 h-6 mr-2" />
+                      COBRAR ${totalCarrito.toFixed(2)}
                     </>
                   )}
                 </Button>
 
-                {/* Advertencias */}
+                {/* Info de cliente (no bloquea) */}
                 {!clienteSeleccionado && (
-                  <p className="text-xs text-amber-600 flex items-center gap-1 mt-2">
-                    <AlertCircle className="w-3 h-3" />
-                    Selecciona un cliente para continuar
+                  <p className="text-xs text-muted-foreground text-center mt-2">
+                    Venta como Consumidor Final
                   </p>
                 )}
               </div>

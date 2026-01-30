@@ -7,112 +7,90 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Separator } from '@/components/ui/separator'
 import {
   Home,
   Package,
   ShoppingCart,
-  AlertTriangle,
+  DollarSign,
+  Truck,
+  ChevronDown,
   Settings,
+  MoreHorizontal,
+  ClipboardList,
+  Scale,
+  AlertTriangle,
   BarChart3,
   Megaphone,
-  Truck,
-  CreditCard,
-  ChevronDown,
-  ClipboardList,
-  FileBarChart,
-  Scale,
 } from 'lucide-react'
 
-const navigation = [
+// ============================================
+// ESTRUCTURA SIMPLIFICADA - 3 SECCIONES
+// ============================================
+
+// Sección 1: Acciones Principales (siempre visible, destacada)
+const accionesPrincipales = [
   {
-    name: 'Dashboard',
+    name: 'Inicio',
     href: '/sucursal/dashboard',
     icon: Home,
+    description: 'Panel principal',
   },
   {
-    name: 'Gestión Local',
-    href: '#',
-    icon: Package,
-    children: [
-      { name: 'Inventario', href: '/sucursal/inventario', icon: Package },
-      { name: 'Stock Mínimo', href: '/sucursal/inventario/stock-minimo', icon: Scale },
-      { name: 'Conteos de Stock', href: '/sucursal/inventario/conteos', icon: ClipboardList },
-      { name: 'Ventas (POS)', href: '/sucursal/ventas', icon: ShoppingCart },
-      { name: 'Alertas de Stock', href: '/sucursal/alerts', icon: AlertTriangle, badge: 'alerts' },
-    ],
+    name: 'Vender',
+    href: '/sucursal/ventas',
+    icon: ShoppingCart,
+    description: 'Registrar venta',
+    highlight: true, // Destacar este botón
   },
   {
-    name: 'Operaciones',
-    href: '#',
+    name: 'Recibir Mercadería',
+    href: '/sucursal/transferencias',
     icon: Truck,
-    children: [
-      { name: 'Transferencias', href: '/sucursal/transferencias', icon: Truck },
-      { name: 'Tesorería', href: '/sucursal/tesoreria', icon: CreditCard },
-    ],
+    description: 'Transferencias pendientes',
+    badge: 'transferencias', // Badge dinámico
+  },
+]
+
+// Sección 2: Consultas (siempre visible)
+const consultas = [
+  {
+    name: 'Ver Stock',
+    href: '/sucursal/inventario',
+    icon: Package,
+    description: 'Consultar inventario',
   },
   {
-    name: 'Comunicación',
-    href: '#',
-    icon: Megaphone,
-    children: [
-      { name: 'Novedades', href: '/sucursal/novedades', icon: Megaphone },
-    ],
+    name: 'Ver Caja',
+    href: '/sucursal/tesoreria',
+    icon: DollarSign,
+    description: 'Saldo y movimientos',
   },
-  {
-    name: 'Reportes',
-    href: '#',
-    icon: BarChart3,
-    children: [
-      { name: 'General', href: '/sucursal/reportes', icon: BarChart3 },
-      { name: 'Auditoría Precios', href: '/sucursal/reportes/auditoria', icon: FileBarChart },
-    ],
-  },
-  {
-    name: 'Configuración',
-    href: '/sucursal/configuracion',
-    icon: Settings,
-  },
+]
+
+// Sección 3: Más Opciones (colapsada por defecto)
+const masOpciones = [
+  { name: 'Conteos de Stock', href: '/sucursal/inventario/conteos', icon: ClipboardList },
+  { name: 'Stock Mínimo', href: '/sucursal/inventario/stock-minimo', icon: Scale },
+  { name: 'Alertas de Stock', href: '/sucursal/alerts', icon: AlertTriangle, badge: 'alerts' },
+  { name: 'Reportes', href: '/sucursal/reportes', icon: BarChart3 },
+  { name: 'Novedades', href: '/sucursal/novedades', icon: Megaphone },
+  { name: 'Configuración', href: '/sucursal/configuracion', icon: Settings },
 ]
 
 interface SucursalSidebarProps {
   className?: string
 }
 
-type NavigationItemType = {
-  name: string
-  href: string
-  icon: React.ComponentType<{ className?: string }>
-  children?: Array<{
-    name: string
-    href: string
-    icon: React.ComponentType<{ className?: string }>
-    badge?: string
-  }>
-  badge?: string
-}
-
-interface NavigationItemProps {
-  item: NavigationItemType
-  pathname: string
-}
-
-function NavigationItem({ item, pathname }: NavigationItemProps) {
-  const [isOpen, setIsOpen] = useState(false)
-  const [alertsCount] = useState(3) // TODO: Obtener dinámicamente
+export function SucursalSidebar({ className }: SucursalSidebarProps) {
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   const sid = searchParams.get('sid')
 
-  const getBadgeCount = (badgeType: string) => {
-    switch (badgeType) {
-      case 'alerts':
-        return alertsCount
-      default:
-        return 0
-    }
-  }
+  const [masOpcionesAbierto, setMasOpcionesAbierto] = useState(false)
+  const [alertasCount] = useState(3) // TODO: Obtener dinámicamente
+  const [transferenciasCount] = useState(0) // TODO: Obtener dinámicamente
 
-  // Función para agregar sid a la URL si existe
+  // Agregar sid a la URL si existe
   const getHrefWithSid = (href: string) => {
     if (sid && href !== '#') {
       return `${href}${href.includes('?') ? '&' : '?'}sid=${sid}`
@@ -120,93 +98,16 @@ function NavigationItem({ item, pathname }: NavigationItemProps) {
     return href
   }
 
-  // Check if current item or any child is active
-  const isActive = pathname === item.href ||
-    (item.children && item.children.some(child => pathname === child.href))
-
-  // Auto-expand if any child is active
-  const shouldBeOpen = isActive || isOpen
-
-  if (item.children) {
-    return (
-      <div className="space-y-1">
-        <Button
-          variant="ghost"
-          onClick={() => setIsOpen(!isOpen)}
-          className={cn(
-            'w-full justify-between gap-3 h-10 px-3 font-medium',
-            isActive && 'bg-secondary'
-          )}
-        >
-          <div className="flex items-center gap-3">
-            <item.icon className="w-4 h-4" />
-            <span className="flex-1 text-left">{item.name}</span>
-          </div>
-          <ChevronDown className={cn(
-            "w-4 h-4 transition-transform duration-200",
-            shouldBeOpen && "rotate-180"
-          )} />
-        </Button>
-
-        {shouldBeOpen && (
-          <div className="ml-4 pl-4 border-l border-border space-y-1">
-            {item.children.map((child) => {
-              const childIsActive = pathname === child.href
-              const badgeCount = child.badge ? getBadgeCount(child.badge) : 0
-
-              return (
-                <Link key={child.href} href={getHrefWithSid(child.href)}>
-                  <Button
-                    variant={childIsActive ? 'secondary' : 'ghost'}
-                    size="sm"
-                    className={cn(
-                      'w-full justify-start gap-3 h-8 px-3',
-                      childIsActive && 'bg-secondary'
-                    )}
-                  >
-                    <child.icon className="w-3 h-3" />
-                    <span className="flex-1 text-left text-sm">{child.name}</span>
-                    {badgeCount > 0 && (
-                      <Badge variant="destructive" className="ml-auto h-4 px-1 text-xs">
-                        {badgeCount}
-                      </Badge>
-                    )}
-                  </Button>
-                </Link>
-              )
-            })}
-          </div>
-        )}
-      </div>
-    )
+  const getBadgeCount = (badgeType: string) => {
+    switch (badgeType) {
+      case 'alerts':
+        return alertasCount
+      case 'transferencias':
+        return transferenciasCount
+      default:
+        return 0
+    }
   }
-
-  // Regular item without children
-  const badgeCount = item.badge ? getBadgeCount(item.badge) : 0
-
-  return (
-    <Link href={getHrefWithSid(item.href)}>
-      <Button
-        variant={isActive ? 'secondary' : 'ghost'}
-        className={cn(
-          'w-full justify-start gap-3 h-10 px-3',
-          isActive && 'bg-secondary'
-        )}
-      >
-        <item.icon className="w-4 h-4" />
-        <span className="flex-1 text-left">{item.name}</span>
-        {badgeCount > 0 && (
-          <Badge variant="destructive" className="ml-auto h-5 px-1.5 text-xs">
-            {badgeCount}
-          </Badge>
-        )}
-      </Button>
-    </Link>
-  )
-}
-
-export function SucursalSidebar({ className }: SucursalSidebarProps) {
-  const pathname = usePathname()
 
   return (
     <div className={cn('fixed inset-y-0 left-0 z-50 w-64 bg-card border-r', className)}>
@@ -224,24 +125,126 @@ export function SucursalSidebar({ className }: SucursalSidebarProps) {
           </Link>
         </div>
 
-        {/* Navigation */}
         <ScrollArea className="flex-1 px-3 py-4">
-          <nav className="space-y-1">
-            {navigation.map((item) => (
-              <NavigationItem key={item.name} item={item} pathname={pathname} />
-            ))}
+          <nav className="space-y-6">
+            {/* SECCIÓN 1: ACCIONES PRINCIPALES */}
+            <div className="space-y-1">
+              <p className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                Acciones
+              </p>
+              {accionesPrincipales.map((item) => {
+                const isActive = pathname === item.href
+                const badgeCount = item.badge ? getBadgeCount(item.badge) : 0
+
+                return (
+                  <Link key={item.href} href={getHrefWithSid(item.href)}>
+                    <Button
+                      variant={item.highlight && !isActive ? 'default' : isActive ? 'secondary' : 'ghost'}
+                      className={cn(
+                        'w-full justify-start gap-3 h-12 px-3',
+                        item.highlight && !isActive && 'bg-primary text-primary-foreground hover:bg-primary/90',
+                        isActive && 'bg-secondary'
+                      )}
+                    >
+                      <item.icon className="w-5 h-5" />
+                      <div className="flex-1 text-left">
+                        <span className="font-medium">{item.name}</span>
+                      </div>
+                      {badgeCount > 0 && (
+                        <Badge variant="destructive" className="ml-auto h-5 px-1.5 text-xs animate-pulse">
+                          {badgeCount}
+                        </Badge>
+                      )}
+                    </Button>
+                  </Link>
+                )
+              })}
+            </div>
+
+            {/* SECCIÓN 2: CONSULTAS */}
+            <div className="space-y-1">
+              <p className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                Consultas
+              </p>
+              {consultas.map((item) => {
+                const isActive = pathname === item.href
+
+                return (
+                  <Link key={item.href} href={getHrefWithSid(item.href)}>
+                    <Button
+                      variant={isActive ? 'secondary' : 'ghost'}
+                      className={cn(
+                        'w-full justify-start gap-3 h-10 px-3',
+                        isActive && 'bg-secondary'
+                      )}
+                    >
+                      <item.icon className="w-4 h-4" />
+                      <span className="flex-1 text-left">{item.name}</span>
+                    </Button>
+                  </Link>
+                )
+              })}
+            </div>
+
+            {/* SECCIÓN 3: MÁS OPCIONES (colapsada) */}
+            <div className="space-y-1">
+              <Button
+                variant="ghost"
+                onClick={() => setMasOpcionesAbierto(!masOpcionesAbierto)}
+                className="w-full justify-between gap-3 h-10 px-3 text-muted-foreground"
+              >
+                <div className="flex items-center gap-3">
+                  <MoreHorizontal className="w-4 h-4" />
+                  <span className="text-sm">Más opciones</span>
+                </div>
+                <ChevronDown className={cn(
+                  "w-4 h-4 transition-transform duration-200",
+                  masOpcionesAbierto && "rotate-180"
+                )} />
+              </Button>
+
+              {masOpcionesAbierto && (
+                <div className="ml-4 pl-4 border-l border-border space-y-1 pt-1">
+                  {masOpciones.map((item) => {
+                    const isActive = pathname === item.href
+                    const badgeCount = item.badge ? getBadgeCount(item.badge) : 0
+
+                    return (
+                      <Link key={item.href} href={getHrefWithSid(item.href)}>
+                        <Button
+                          variant={isActive ? 'secondary' : 'ghost'}
+                          size="sm"
+                          className={cn(
+                            'w-full justify-start gap-3 h-8 px-3',
+                            isActive && 'bg-secondary'
+                          )}
+                        >
+                          <item.icon className="w-3 h-3" />
+                          <span className="flex-1 text-left text-sm">{item.name}</span>
+                          {badgeCount > 0 && (
+                            <Badge variant="destructive" className="ml-auto h-4 px-1 text-xs">
+                              {badgeCount}
+                            </Badge>
+                          )}
+                        </Button>
+                      </Link>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </nav>
         </ScrollArea>
 
-        {/* Footer */}
+        {/* Footer simplificado */}
         <div className="border-t p-4">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
-              <Settings className="w-4 h-4" />
+              <Package className="w-4 h-4" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">Sucursal Manager</p>
-              <p className="text-xs text-muted-foreground">v1.0.0</p>
+              <p className="text-sm font-medium truncate">Panel Sucursal</p>
+              <p className="text-xs text-muted-foreground">Versión simplificada</p>
             </div>
           </div>
         </div>

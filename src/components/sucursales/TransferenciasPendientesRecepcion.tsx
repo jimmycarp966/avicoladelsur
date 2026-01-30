@@ -61,9 +61,9 @@ interface TransferenciasPendientesRecepcionProps {
     sucursalId: string
 }
 
-export function TransferenciasPendientesRecepcion({ 
-    transferencias, 
-    sucursalId 
+export function TransferenciasPendientesRecepcion({
+    transferencias,
+    sucursalId
 }: TransferenciasPendientesRecepcionProps) {
     const router = useRouter()
     const [loadingId, setLoadingId] = useState<string | null>(null)
@@ -85,7 +85,7 @@ export function TransferenciasPendientesRecepcion({
             }
 
             const result = await confirmarRecepcionTransferenciaAction(transferenciaId, itemsRecibidos)
-            
+
             if (result.success) {
                 toast.success(result.message || 'Transferencia recibida exitosamente')
                 setDialogOpen(null)
@@ -146,8 +146,8 @@ export function TransferenciasPendientesRecepcion({
                 const esEntregado = transferencia.estado === 'entregado'
 
                 return (
-                    <Card key={transferencia.id} className="border-orange-200 hover:shadow-md transition-shadow">
-                        <CardContent className="p-6">
+                    <Card key={transferencia.id} className={`border-2 transition-shadow hover:shadow-lg ${esEntregado ? 'border-orange-400 bg-orange-50/50' : 'border-blue-200'}`}>
+                        <CardContent className="p-4">
                             <div className="flex items-start justify-between">
                                 <div className="flex-1">
                                     <div className="flex items-center gap-3 mb-2">
@@ -177,23 +177,23 @@ export function TransferenciasPendientesRecepcion({
                                 <div className="flex items-center gap-2">
                                     {esEntregado ? (
                                         <>
-                                            {/* Botón de confirmación rápida */}
+                                            {/* Botón de confirmación rápida - GRANDE Y PROMINENTE */}
                                             <Button
                                                 onClick={() => handleConfirmarRecepcion(transferencia.id)}
                                                 disabled={loadingId === transferencia.id}
-                                                className="bg-green-600 hover:bg-green-700"
+                                                className="bg-green-600 hover:bg-green-700 h-12 px-6 text-base font-bold"
                                             >
                                                 {loadingId === transferencia.id ? (
-                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                                                 ) : (
-                                                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                                                    <CheckCircle2 className="mr-2 h-5 w-5" />
                                                 )}
-                                                Confirmar Recepción
+                                                CONFIRMAR RECEPCIÓN
                                             </Button>
 
                                             {/* Diálogo para reportar diferencias */}
-                                            <Dialog 
-                                                open={dialogOpen === transferencia.id} 
+                                            <Dialog
+                                                open={dialogOpen === transferencia.id}
                                                 onOpenChange={(open) => {
                                                     if (open) {
                                                         inicializarCantidades(transferencia.items)
