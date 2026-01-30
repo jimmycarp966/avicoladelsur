@@ -17,10 +17,10 @@ interface PageProps {
 function getEstadoStock(cantidad: number, minimo?: number) {
   const umbral = minimo || 10 // Umbral por defecto si no hay stock mínimo definido
 
-  if (cantidad <= 0) return { nivel: 'sin_stock', color: 'bg-gray-200', emoji: '⚫', texto: 'Sin stock' }
-  if (cantidad < umbral) return { nivel: 'critico', color: 'bg-red-100 border-red-300', emoji: '🔴', texto: 'Crítico' }
-  if (cantidad < umbral * 2) return { nivel: 'bajo', color: 'bg-yellow-100 border-yellow-300', emoji: '🟡', texto: 'Bajo' }
-  return { nivel: 'ok', color: 'bg-green-100 border-green-300', emoji: '🟢', texto: 'OK' }
+  if (cantidad <= 0) return { nivel: 'sin_stock', color: 'bg-slate-200', dot: 'bg-slate-400', texto: 'Agotado' }
+  if (cantidad < umbral) return { nivel: 'critico', color: 'bg-red-50 border-red-200', dot: 'bg-red-500', texto: 'Crítico' }
+  if (cantidad < umbral * 2) return { nivel: 'bajo', color: 'bg-amber-50 border-amber-200', dot: 'bg-amber-500', texto: 'Bajo' }
+  return { nivel: 'ok', color: 'bg-emerald-50 border-emerald-200', dot: 'bg-emerald-500', texto: 'Normal' }
 }
 
 async function getInventarioSucursal(sidParam?: string) {
@@ -127,10 +127,10 @@ export default async function SucursalInventarioPage({ searchParams }: PageProps
 
     // Determinar estado general
     const estadoGeneral = data.stockCritico > 0
-      ? { texto: 'Atención Requerida', color: 'text-red-600', emoji: '🔴' }
+      ? { texto: 'Atención Requerida', color: 'text-red-600', dot: 'bg-red-600' }
       : data.stockBajo > 0
-        ? { texto: 'Revisar Stock', color: 'text-yellow-600', emoji: '🟡' }
-        : { texto: 'Normal', color: 'text-green-600', emoji: '🟢' }
+        ? { texto: 'Revisar Stock', color: 'text-amber-600', dot: 'bg-amber-600' }
+        : { texto: 'Operación Normal', color: 'text-emerald-600', dot: 'bg-emerald-600' }
 
     return (
       <div className="space-y-6">
@@ -160,33 +160,33 @@ export default async function SucursalInventarioPage({ searchParams }: PageProps
           {/* Estado General */}
           <Card>
             <CardContent className="pt-4 pb-3">
-              <div className="text-center">
-                <p className="text-2xl">{estadoGeneral.emoji}</p>
-                <p className={cn("text-xs font-medium", estadoGeneral.color)}>{estadoGeneral.texto}</p>
+              <div className="text-center flex flex-col items-center justify-center gap-1">
+                <div className={cn("w-3 h-3 rounded-full animate-pulse", estadoGeneral.dot)} />
+                <p className={cn("text-xs font-black uppercase tracking-tighter", estadoGeneral.color)}>{estadoGeneral.texto}</p>
               </div>
             </CardContent>
           </Card>
 
           {/* Stock Bajo */}
-          <Card className={data.stockBajo > 0 ? "border-yellow-300 bg-yellow-50" : ""}>
+          <Card className={data.stockBajo > 0 ? "border-amber-200 bg-amber-50" : ""}>
             <CardContent className="pt-4 pb-3">
               <div className="text-center">
-                <p className={cn("text-2xl font-bold", data.stockBajo > 0 ? "text-yellow-600" : "")}>
+                <p className={cn("text-2xl font-black", data.stockBajo > 0 ? "text-amber-600" : "text-slate-300")}>
                   {data.stockBajo}
                 </p>
-                <p className="text-xs text-muted-foreground">🟡 Stock Bajo</p>
+                <p className="text-[10px] text-slate-400 font-bold uppercase">Stock Bajo</p>
               </div>
             </CardContent>
           </Card>
 
           {/* Stock Crítico */}
-          <Card className={data.stockCritico > 0 ? "border-red-300 bg-red-50" : ""}>
+          <Card className={data.stockCritico > 0 ? "border-red-200 bg-red-50" : ""}>
             <CardContent className="pt-4 pb-3">
               <div className="text-center">
-                <p className={cn("text-2xl font-bold", data.stockCritico > 0 ? "text-red-600" : "")}>
+                <p className={cn("text-2xl font-black", data.stockCritico > 0 ? "text-red-600" : "text-slate-300")}>
                   {data.stockCritico}
                 </p>
-                <p className="text-xs text-muted-foreground">🔴 Crítico</p>
+                <p className="text-[10px] text-slate-400 font-bold uppercase">Stock Crítico</p>
               </div>
             </CardContent>
           </Card>
@@ -231,8 +231,8 @@ export default async function SucursalInventarioPage({ searchParams }: PageProps
                       )}
                     >
                       <div className="flex items-center gap-3 flex-1 min-w-0">
-                        {/* Emoji semáforo */}
-                        <span className="text-xl">{estado.emoji}</span>
+                        {/* Indicador de estado */}
+                        <div className={cn("w-3 h-3 rounded-full shrink-0", estado.dot)} />
 
                         <div className="flex-1 min-w-0">
                           <h4 className="font-medium truncate">

@@ -30,7 +30,6 @@ import {
     registrarVentaSucursalConControlAction,
 } from '@/actions/ventas-sucursal.actions'
 import { cn } from '@/lib/utils'
-import { ProductosFrecuentes } from './ProductosFrecuentes'
 
 // ===========================================
 // TIPOS
@@ -69,7 +68,6 @@ export function POSPremium({
     const [busqueda, setBusqueda] = useState('')
     const [carrito, setCarrito] = useState<ItemCarrito[]>([])
     const [procesando, setProcesando] = useState(false)
-    const [clienteId, setClienteId] = useState<string>('consumidor_final')
 
     // Filtrado de productos inteligente
     const productosFiltrados = useMemo(() => {
@@ -134,7 +132,6 @@ export function POSPremium({
         try {
             const result = await registrarVentaSucursalConControlAction({
                 sucursalId,
-                clienteId: clienteId === 'consumidor_final' ? undefined : clienteId,
                 items: carrito.map(i => ({
                     productoId: i.productoId,
                     cantidad: i.cantidad,
@@ -146,7 +143,7 @@ export function POSPremium({
             })
 
             if (result.success) {
-                toast.success('¡Venta realizada con éxito!')
+                toast.success('Venta realizada con éxito')
                 setCarrito([])
                 setBusqueda('')
                 onVentaCompletada?.()
@@ -177,77 +174,53 @@ export function POSPremium({
                         onChange={(e) => setBusqueda(e.target.value)}
                     />
 
-                    {/* Resultados flotantes */}
-                    {productosFiltrados.length > 0 && (
-                        <Card className="absolute top-full left-0 right-0 z-50 mt-2 shadow-2xl rounded-2xl overflow-hidden border-emerald-100">
-                            <div className="p-2 space-y-1">
-                                {productosFiltrados.map(p => (
-                                    <button
-                                        key={p.id}
-                                        onClick={() => agregarAlCarrito(p)}
-                                        className="w-full flex items-center justify-between p-4 hover:bg-emerald-50 rounded-xl transition-colors group/item"
-                                    >
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 font-bold">
-                                                {p.nombre[0]}
-                                            </div>
-                                            <div className="text-left">
-                                                <p className="font-bold text-slate-800">{p.nombre}</p>
-                                                <p className="text-xs text-slate-500">{p.codigo}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-4">
-                                            <div className="text-right">
-                                                <p className="font-black text-emerald-600 text-lg">${p.precioVenta.toFixed(2)}</p>
-                                                <p className="text-[10px] text-slate-400 uppercase font-bold">{p.stockDisponible} {p.unidadMedida} disp.</p>
-                                            </div>
-                                            <Plus className="w-6 h-6 text-emerald-300 group-hover/item:text-emerald-500 transition-colors" />
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        </Card>
-                    )}
                 </div>
 
-                {/* Productos Frecuentes (Grid de Botones) */}
+                {/* Resultados de búsqueda o Placeholder */}
                 {!busqueda && (
-                    <div className="flex-1 space-y-4">
-                        <div className="flex items-center gap-2 px-2">
-                            <Sparkles className="w-5 h-5 text-amber-500 fill-amber-500" />
-                            <h3 className="font-bold text-slate-700 uppercase tracking-wider text-sm">Productos Frecuentes</h3>
-                        </div>
-
-                        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
-                            {productos.filter(p => p.stockDisponible > 0).slice(0, 12).map(p => (
-                                <Button
-                                    key={p.id}
-                                    variant="outline"
-                                    className="h-auto p-4 flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-slate-100 hover:border-emerald-400 hover:bg-emerald-50/50 hover:shadow-md transition-all active:scale-95 group relative overflow-hidden"
-                                    onClick={() => agregarAlCarrito(p)}
-                                >
-                                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <Plus className="w-4 h-4 text-emerald-600" />
-                                    </div>
-                                    <Package className="w-8 h-8 text-slate-400 group-hover:text-emerald-500 transition-colors" />
-                                    <div className="text-center">
-                                        <p className="font-bold text-slate-700 text-sm leading-tight line-clamp-2">{p.nombre}</p>
-                                        <p className="font-black text-emerald-600 mt-1">${p.precioVenta.toFixed(0)}</p>
-                                    </div>
-                                    <Badge variant="secondary" className="text-[9px] bg-slate-100 text-slate-500 border-none">
-                                        {p.stockDisponible.toFixed(0)} {p.unidadMedida}
-                                    </Badge>
-                                </Button>
-                            ))}
-                        </div>
+                    <div className="flex-1 flex flex-col items-center justify-center bg-slate-50/50 rounded-3xl border-2 border-dashed border-slate-200 text-slate-400">
+                        <Package className="w-16 h-16 mb-4 opacity-20" />
+                        <p className="text-lg font-bold uppercase tracking-widest text-slate-300">Esperando búsqueda</p>
+                        <p className="text-sm">Escribe el nombre o escanea el producto para comenzar</p>
                     </div>
                 )}
 
                 {busqueda && productosFiltrados.length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                    <div className="flex-1 flex flex-col items-center justify-center py-20 text-slate-400 bg-white rounded-3xl border border-slate-100">
                         <Search className="w-16 h-16 mb-4 opacity-20" />
                         <p className="text-lg font-medium">No se encontraron productos</p>
                         <p className="text-sm">Intenta con otro nombre o código</p>
+                    </div>
+                )}
+
+                {busqueda && productosFiltrados.length > 0 && (
+                    <div className="flex-1 space-y-2 overflow-y-auto pr-2">
+                        {productosFiltrados.map(p => (
+                            <button
+                                key={p.id}
+                                onClick={() => agregarAlCarrito(p)}
+                                className="w-full flex items-center justify-between p-5 bg-white border border-slate-100 rounded-2xl hover:border-emerald-400 hover:shadow-md transition-all active:scale-[0.99] group/item"
+                            >
+                                <div className="flex items-center gap-4 text-left">
+                                    <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center text-slate-500 font-bold group-hover/item:bg-emerald-100 group-hover/item:text-emerald-600 transition-colors">
+                                        {p.nombre[0].toUpperCase()}
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-slate-900 text-lg leading-tight">{p.nombre}</p>
+                                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-wider mt-1">{p.codigo}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-6">
+                                    <div className="text-right">
+                                        <p className="text-2xl font-black text-slate-900 tracking-tighter">${p.precioVenta.toFixed(2)}</p>
+                                        <p className="text-[10px] text-emerald-600 font-black uppercase tracking-widest">{p.stockDisponible} {p.unidadMedida} DISP.</p>
+                                    </div>
+                                    <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center opacity-0 group-hover/item:opacity-100 transition-all">
+                                        <Plus className="w-6 h-6" />
+                                    </div>
+                                </div>
+                            </button>
+                        ))}
                     </div>
                 )}
             </div>
@@ -359,21 +332,12 @@ export function POSPremium({
                             </div>
 
                             {/* Selector de Cliente Minimalista */}
-                            <div className="flex items-center justify-between px-2 pt-2 bg-slate-100/50 p-2 rounded-2xl">
+                            <div className="flex items-center justify-between px-3 py-3 bg-slate-900 rounded-2xl shadow-inner">
                                 <div className="flex items-center gap-2">
-                                    <User className="w-4 h-4 text-slate-400" />
-                                    <span className="text-xs font-bold text-slate-600">CLIENTE:</span>
+                                    <User className="w-4 h-4 text-slate-500" />
+                                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Cliente</span>
                                 </div>
-                                <select
-                                    className="bg-transparent text-xs font-black text-emerald-600 outline-none cursor-pointer uppercase"
-                                    value={clienteId}
-                                    onChange={(e) => setClienteId(e.target.value)}
-                                >
-                                    <option value="consumidor_final">Consumidor Final</option>
-                                    {clientes.map(c => (
-                                        <option key={c.id} value={c.id}>{c.nombre}</option>
-                                    ))}
-                                </select>
+                                <span className="text-xs font-black text-white uppercase">Consumidor Final</span>
                             </div>
                         </div>
                     </CardContent>

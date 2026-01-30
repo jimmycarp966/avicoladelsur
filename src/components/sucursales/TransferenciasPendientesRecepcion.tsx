@@ -28,7 +28,8 @@ import {
     Loader2,
     MapPin,
     AlertTriangle,
-    CheckCircle2
+    CheckCircle2,
+    Clock
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { confirmarRecepcionTransferenciaAction } from '@/actions/sucursales-transferencias.actions'
@@ -162,9 +163,15 @@ export function TransferenciasPendientesRecepcion({
                                         <span>Desde: <strong>{transferencia.sucursal_origen.nombre}</strong></span>
                                     </div>
 
-                                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                        <span>📦 {totalItems} productos</span>
-                                        <span>📅 {new Date(transferencia.fecha_solicitud).toLocaleDateString('es-AR')}</span>
+                                    <div className="flex items-center gap-4 text-sm text-muted-foreground font-bold uppercase tracking-wider">
+                                        <div className="flex items-center gap-1.5">
+                                            <PackageCheck className="h-4 w-4 text-blue-500" />
+                                            <span>{totalItems} PRODUCTOS</span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                            <Clock className="h-4 w-4 text-slate-400" />
+                                            <span>{new Date(transferencia.fecha_solicitud).toLocaleDateString('es-AR')}</span>
+                                        </div>
                                     </div>
 
                                     {transferencia.motivo && (

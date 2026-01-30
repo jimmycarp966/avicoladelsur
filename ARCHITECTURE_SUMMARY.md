@@ -343,6 +343,12 @@ Endpoints que operan sin interfaz gráfica:
 
 > Histórico completo disponible en [ARCHITECTURE.md#📝-cambios-recientes](./ARCHITECTURE.md#📝-cambios-recientes).
 
+### 2026-01-30 · Refinamiento POS Premium y Estética Sobria (Sucursales)
+- **POS Ultra-Simplificado**: Eliminación de la sección "Productos Frecuentes" y el selector de cliente (ahora default "Consumidor Final") para un flujo de venta 100% directo.
+- **Limpieza de Emojis**: Remoción total de emojis (🔴🟡🟢📦📅) en los componentes de Inventario, Dashboard y Transferencias, sustituyéndolos por indicadores visuales minimalistas (badges, dots, iconos Lucide).
+- **Consistencia Visual**: Ajuste de colores y tipografía para una estética más sobria, profesional y táctil en el entorno de sucursal.
+- **Fiabilidad**: Verificación de build de producción exitosa tras los cambios de diseño.
+
 ### 2026-01-23 · Selección Elite de Skills del Agente
 - **Optimización de IA**: Curación de 36 skills de alta prioridad (23 trending de skills.sh + 13 custom de dominio) reemplazando 69 skills genéricas.
 - **Eficiencia**: Reducción de ruido y mayor precisión en las respuestas del agente Antigravity.
