@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ShoppingCart, DollarSign, User, Clock, Printer, RotateCcw, Loader2 } from 'lucide-react'
+import { ShoppingCart, DollarSign, User, Clock, Printer, RotateCcw, Loader2, CheckCircle } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { generarFacturaAction, generarTicketTermicoAction, obtenerProductosPedidoAction } from '@/actions/pos-sucursal.actions'
 import { DevolucionVentaDialog } from './DevolucionVentaDialog'
@@ -76,42 +77,29 @@ export function VentasTable({ ventas }: VentasTableProps) {
   }
 
   const getMetodoPagoBadge = (metodosPago: any) => {
-    // metodos_pago es un JSONB, puede ser un array o un objeto
-    if (!metodosPago) {
-      return <Badge variant="secondary">Sin método</Badge>
-    }
+    if (!metodosPago) return <Badge variant="secondary">Sin método</Badge>
 
-    // Si es un array, mostrar el primero
     if (Array.isArray(metodosPago) && metodosPago.length > 0) {
       const metodo = metodosPago[0].metodoPago || metodosPago[0].metodo_pago || metodosPago[0]
-      const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-        efectivo: "default",
-        transferencia: "secondary",
-        tarjeta_debito: "outline",
-        tarjeta_credito: "outline",
-        cuenta_corriente: "destructive",
+      const configs: Record<string, { color: string, label: string }> = {
+        efectivo: { color: "bg-emerald-100 text-emerald-700 border-emerald-200", label: "Efectivo" },
+        transferencia: { color: "bg-blue-100 text-blue-700 border-blue-200", label: "Transf." },
+        tarjeta_debito: { color: "bg-purple-100 text-purple-700 border-purple-200", label: "Débito" },
+        tarjeta_credito: { color: "bg-indigo-100 text-indigo-700 border-indigo-200", label: "Crédito" },
+        cuenta_corriente: { color: "bg-amber-100 text-amber-700 border-amber-200", label: "Cta. Cte." },
       }
 
-      const labels: Record<string, string> = {
-        efectivo: "Efectivo",
-        transferencia: "Transf.", // Sin recargo en sucursales
-        tarjeta_debito: "Débito (+15%)",
-        tarjeta_credito: "Crédito (+20%)",
-        mercado_pago: "Mercado Pago",
-        cuenta_corriente: "Cta. Cte.",
-      }
+      const config = configs[metodo] || { color: "bg-slate-100 text-slate-700 border-slate-200", label: metodo }
 
       return (
-        <Badge variant={variants[metodo] || "secondary"}>
-          {labels[metodo] || metodo}
+        <Badge variant="outline" className={cn("px-2 py-0.5 rounded-full font-bold text-[10px] uppercase tracking-wider shadow-sm", config.color)}>
+          {config.label}
           {metodosPago.length > 1 && ` +${metodosPago.length - 1}`}
         </Badge>
       )
     }
 
-    // Si es un objeto o string, intentar parsearlo
-    const metodoStr = typeof metodosPago === 'string' ? metodosPago : JSON.stringify(metodosPago)
-    return <Badge variant="secondary">{metodoStr}</Badge>
+    return <Badge variant="secondary">Otros</Badge>
   }
 
   if (ventas.length === 0) {
@@ -130,68 +118,74 @@ export function VentasTable({ ventas }: VentasTableProps) {
     <>
       <div className="space-y-4">
         {ventas.map((venta) => (
-          <Card key={venta.id} className="hover:shadow-md transition-shadow">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4 flex-1">
-                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                    <ShoppingCart className="w-6 h-6 text-green-600" />
+          <Card key={venta.id} className="hover:shadow-xl hover:scale-[1.01] transition-all border-slate-100 rounded-2xl overflow-hidden group">
+            <CardContent className="p-0">
+              <div className="flex items-stretch min-h-[80px]">
+                {/* Indicador lateral de color según método */}
+                <div className={cn(
+                  "w-2",
+                  venta.metodos_pago?.[0]?.metodo_pago === 'efectivo' ? "bg-emerald-500" : "bg-blue-500"
+                )} />
+
+                <div className="flex-1 flex items-center justify-between p-4 gap-4">
+                  <div className="flex items-center gap-4 flex-1">
+                    <div className="w-12 h-12 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center group-hover:bg-white transition-colors">
+                      <ShoppingCart className="w-6 h-6 text-slate-400 group-hover:text-emerald-500 transition-colors" />
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-black text-slate-800 tracking-tight truncate">
+                          {venta.numero_pedido || venta.numeroPedido ? (
+                            (venta.numero_pedido || venta.numeroPedido)?.startsWith('VTA-SUC') || (venta.numero_pedido || venta.numeroPedido)?.length === 11
+                              ? `Ticket ${venta.numero_pedido || venta.numeroPedido}`
+                              : `Pedido #${venta.numero_pedido || venta.numeroPedido}`
+                          ) : `Ticket ${venta.id.slice(-8)}`}
+                        </h4>
+                        <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold uppercase">
+                          <CheckCircle className="w-3 h-3" />
+                          Pagado
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-4 text-[10px] uppercase font-bold text-slate-400 tracking-wide">
+                        <div className="flex items-center gap-1">
+                          <User className="w-3 h-3" />
+                          <span className="truncate max-w-[120px]">
+                            {venta.clientes ? venta.clientes.nombre : 'Consumidor Final'}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {new Date(venta.created_at).toLocaleTimeString('es-ES', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h4 className="font-semibold">
-                        {venta.numero_pedido || venta.numeroPedido ? (
-                          (venta.numero_pedido || venta.numeroPedido)?.startsWith('VTA-SUC') || (venta.numero_pedido || venta.numeroPedido)?.length === 11
-                            ? `Ticket ${venta.numero_pedido || venta.numeroPedido}`
-                            : `Pedido #${venta.numero_pedido || venta.numeroPedido}`
-                        ) : `Ticket ${venta.id.slice(-8)}`}
-                      </h4>
-                      <Badge variant="default" className="text-xs">
-                        Completado
-                      </Badge>
+                  <div className="flex items-center gap-6">
+                    <div className="flex flex-col items-center">
+                      {getMetodoPagoBadge(venta.metodos_pago)}
                     </div>
 
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <User className="w-3 h-3" />
-                        {venta.clientes
-                          ? venta.clientes.nombre
-                          : 'Cliente desconocido'
-                        }
-                      </div>
-
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {new Date(venta.created_at).toLocaleTimeString('es-ES', {
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </div>
-
-                      <div className="flex items-center gap-1">
-                        <DollarSign className="w-3 h-3" />
+                    <div className="text-right min-w-[100px]">
+                      <div className="text-xl font-black text-slate-900 leading-none">
                         ${venta.total?.toFixed(2) || '0.00'}
                       </div>
+                      <div className="text-[10px] text-slate-400 font-bold uppercase mt-1">
+                        Total Final
+                      </div>
                     </div>
-                  </div>
-                </div>
 
-                <div className="flex items-center gap-3">
-                  {getMetodoPagoBadge(venta.metodos_pago)}
-                  <div className="flex flex-col gap-2">
-                    <div className="text-right">
-                      <div className="text-lg font-bold text-green-600">
-                        ${venta.total?.toFixed(2) || '0.00'}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Total pagado
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                       <Button
-                        variant="outline"
-                        size="sm"
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 bg-slate-100 hover:bg-emerald-500 hover:text-white rounded-xl transition-all"
                         onClick={() => handleImprimir(venta.id, 'ticket')}
                         disabled={imprimiendo === venta.id}
                       >
@@ -202,10 +196,10 @@ export function VentasTable({ ventas }: VentasTableProps) {
                         )}
                       </Button>
                       <Button
-                        variant="outline"
-                        size="sm"
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 bg-slate-100 hover:bg-red-500 hover:text-white rounded-xl transition-all"
                         onClick={async () => {
-                          // Obtener productos del pedido antes de abrir diálogo
                           const result = await obtenerProductosPedidoAction(venta.id)
                           if (result.success && result.data) {
                             setProductosPedido(result.data)
@@ -214,7 +208,6 @@ export function VentasTable({ ventas }: VentasTableProps) {
                             toast.error('Error al cargar productos del pedido')
                           }
                         }}
-                        title="Devolver venta"
                       >
                         <RotateCcw className="w-4 h-4" />
                       </Button>

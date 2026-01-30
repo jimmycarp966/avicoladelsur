@@ -3,9 +3,11 @@
 import { Suspense } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ShoppingCart, Plus, DollarSign } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
+import { Plus, ShoppingCart, DollarSign, LayoutDashboard, Sparkles, Zap, Package, Users } from 'lucide-react'
 import Link from 'next/link'
-import { NuevaVentaForm } from '@/components/sucursales/NuevaVentaForm'
+import { POSPremium } from '@/components/sucursales/POSPremium'
 import { VentasTable } from '@/components/sucursales/VentasTable'
 
 interface ProductoDisponible {
@@ -73,100 +75,70 @@ interface VentasData {
 export function SucursalVentasContent({ data }: { data: VentasData }) {
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <ShoppingCart className="w-8 h-8" />
-            Ventas de Sucursal
-          </h1>
-          <p className="text-muted-foreground">
-            Registra ventas locales y controla el flujo de caja
-          </p>
+      {/* Header Premium */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between bg-white p-6 rounded-3xl border border-slate-100 shadow-sm transition-all hover:shadow-md">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 bg-emerald-500 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20 rotate-3 group-hover:rotate-0 transition-transform">
+            <ShoppingCart className="w-8 h-8 text-white" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-black text-slate-900 tracking-tight">
+              Ventas de Sucursal
+            </h1>
+            <p className="text-slate-400 font-medium text-sm flex items-center gap-1">
+              <Sparkles className="w-3 h-3 text-amber-500" />
+              Punto de venta inteligente y rápido
+            </p>
+          </div>
         </div>
 
-        <Button asChild>
-          <Link href="#nueva-venta">
-            <Plus className="w-4 h-4 mr-2" />
-            Nueva Venta
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="bg-slate-50 text-slate-500 border-slate-200 px-3 py-1 font-bold">
+            ESTADO: ONLINE
+          </Badge>
+          <Button asChild className="rounded-2xl shadow-lg shadow-primary/20 font-bold px-6">
+            <Link href="#nueva-venta">
+              <Zap className="w-4 h-4 mr-2" />
+              ACCESO RÁPIDO
+            </Link>
+          </Button>
+        </div>
       </div>
 
-      {/* Estadísticas del Día */}
+      {/* Estadísticas del Día Premium */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Ventas del Día</CardTitle>
-            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{data.estadisticas.ventasDia}</div>
-            <p className="text-xs text-muted-foreground">
-              Pedidos completados hoy
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total del Día</CardTitle>
-            <DollarSign className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              ${data.estadisticas.totalVentasDia.toFixed(2)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Ingresos generados hoy
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Productos Disponibles</CardTitle>
-            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{data.estadisticas.productosDisponibles}</div>
-            <p className="text-xs text-muted-foreground">
-              Productos en stock
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Clientes Activos</CardTitle>
-            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{data.estadisticas.clientesDisponibles}</div>
-            <p className="text-xs text-muted-foreground">
-              Clientes registrados
-            </p>
-          </CardContent>
-        </Card>
+        {[
+          { label: "Ventas del Día", val: data.estadisticas.ventasDia, sub: "Pedidos hoy", icon: ShoppingCart, color: "text-blue-500", bg: "bg-blue-50" },
+          { label: "Total del Día", val: `$${data.estadisticas.totalVentasDia.toFixed(0)}`, sub: "Ingresos netos", icon: DollarSign, color: "text-emerald-500", bg: "bg-emerald-50" },
+          { label: "Stock Disponible", val: data.estadisticas.productosDisponibles, sub: "Items en local", icon: Package, color: "text-amber-500", bg: "bg-amber-50" },
+          { label: "Clientes Activos", val: data.estadisticas.clientesDisponibles, sub: "Base de datos", icon: Users, color: "text-purple-500", bg: "bg-purple-50" },
+        ].map((item, idx) => (
+          <Card key={idx} className="border-none shadow-sm hover:shadow-md transition-all group rounded-3xl overflow-hidden bg-white">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 group-hover:text-slate-600 transition-colors">{item.label}</span>
+                <div className={cn("p-2 rounded-xl transition-transform group-hover:scale-110", item.bg)}>
+                  <item.icon className={cn("h-4 w-4", item.color)} />
+                </div>
+              </div>
+              <div>
+                <div className="text-2xl font-black text-slate-900 tracking-tighter">{item.val}</div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase mt-0.5">
+                  {item.sub}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
-      {/* Formulario Nueva Venta */}
-      <Card id="nueva-venta">
-        <CardHeader>
-          <CardTitle>Nueva Venta</CardTitle>
-          <CardDescription>
-            Registra una nueva venta en la sucursal
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <NuevaVentaForm
-            productos={data.productosDisponibles}
-            clientes={data.clientes}
-            cajas={data.cajas}
-            listasPrecios={data.listasPrecios || []}
-            sucursalId={data.sucursalId}
-          />
-        </CardContent>
+      {/* POS Premium (Punto de Venta) */}
+      <Card id="nueva-venta" className="border-none shadow-xl bg-gradient-to-br from-white to-slate-50/50 rounded-3xl overflow-hidden">
+        <POSPremium
+          productos={data.productosDisponibles}
+          clientes={data.clientes}
+          sucursalId={data.sucursalId}
+        />
       </Card>
 
       {/* Ventas del Día */}
