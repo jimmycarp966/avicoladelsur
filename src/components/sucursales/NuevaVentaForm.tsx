@@ -47,6 +47,8 @@ import {
   User,
   X,
   Printer,
+  Settings,
+  ChevronDown,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -880,154 +882,166 @@ export function NuevaVentaForm({
           </div>
         </div>
 
-        {/* Información básica */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {/* Cliente (opcional) */}
-          <FormField
-            control={form.control}
-            name="clienteId"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="flex items-center gap-2">
-                  <User className="w-4 h-4" />
-                  Cliente (Opcional)
-                </FormLabel>
-                <Select onValueChange={(value) => field.onChange(value === 'none' ? undefined : value)} value={field.value || 'none'}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Venta genérica (sin cliente)" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="none">Venta genérica</SelectItem>
-                    {clientes.map((cliente) => (
-                      <SelectItem key={cliente.id} value={cliente.id}>
-                        {cliente.nombre}
-                        {cliente.codigo && ` (${cliente.codigo})`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-                {saldoCliente && (
-                  <div className="text-xs text-muted-foreground">
-                    Saldo: ${saldoCliente.saldo.toFixed(2)} / Límite: ${saldoCliente.limite.toFixed(2)}
-                  </div>
+        {/* Opciones avanzadas - colapsadas por defecto */}
+        <details className="group border rounded-lg">
+          <summary className="flex items-center justify-between p-3 cursor-pointer text-sm text-muted-foreground hover:text-foreground">
+            <span className="flex items-center gap-2">
+              <Settings className="w-4 h-4" />
+              Opciones Avanzadas (Cliente, Lista de Precios, Comprobante)
+            </span>
+            <ChevronDown className="w-4 h-4 transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="p-4 pt-0 border-t">
+            {/* Información básica */}
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              {/* Cliente (opcional) */}
+              <FormField
+                control={form.control}
+                name="clienteId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                      <User className="w-4 h-4" />
+                      Cliente (Opcional)
+                    </FormLabel>
+                    <Select onValueChange={(value) => field.onChange(value === 'none' ? undefined : value)} value={field.value || 'none'}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Venta genérica (sin cliente)" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Venta genérica</SelectItem>
+                        {clientes.map((cliente) => (
+                          <SelectItem key={cliente.id} value={cliente.id}>
+                            {cliente.nombre}
+                            {cliente.codigo && ` (${cliente.codigo})`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                    {saldoCliente && (
+                      <div className="text-xs text-muted-foreground">
+                        Saldo: ${saldoCliente.saldo.toFixed(2)} / Límite: ${saldoCliente.limite.toFixed(2)}
+                      </div>
+                    )}
+                  </FormItem>
                 )}
-              </FormItem>
-            )}
-          />
+              />
 
 
-          {/* Caja */}
-          <FormField
-            control={form.control}
-            name="cajaId"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Caja</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar caja" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {cajas.map((caja) => (
-                      <SelectItem key={caja.id} value={caja.id}>
-                        {caja.nombre} - ${caja.saldo_actual?.toFixed(2) || '0.00'}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+              {/* Caja */}
+              <FormField
+                control={form.control}
+                name="cajaId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Caja</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar caja" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {cajas.map((caja) => (
+                          <SelectItem key={caja.id} value={caja.id}>
+                            {caja.nombre} - ${caja.saldo_actual?.toFixed(2) || '0.00'}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-          {/* Lista de precios global (obligatoria, por defecto para todos los productos) */}
-          <FormField
-            control={form.control}
-            name="listaPrecioGlobal"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Lista de Precios (Global) *</FormLabel>
-                <Select
-                  value={field.value || ''}
-                  onValueChange={async (value) => {
-                    // Guardar el valor anterior ANTES de actualizar el formulario
-                    const listaGlobalAnterior = field.value
-                    console.log('🔄 Cambiando lista global:', {
-                      anterior: listaGlobalAnterior,
-                      nueva: value,
-                      listaAnteriorNombre: todasListas.find(l => l.id === listaGlobalAnterior)?.nombre,
-                      listaNuevaNombre: todasListas.find(l => l.id === value)?.nombre
-                    })
-                    field.onChange(value)
-                    await aplicarListaGlobal(value, listaGlobalAnterior)
-                  }}
-                  disabled={cargandoListas || todasListas.length === 0}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder={cargandoListas ? "Cargando listas..." : "Selecciona una lista"} />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {todasListas.map((lista) => (
-                      <SelectItem key={lista.id} value={lista.id}>
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            variant={
-                              lista.tipo === 'mayorista'
-                                ? 'default'
-                                : lista.tipo === 'minorista'
-                                  ? 'secondary'
-                                  : 'outline'
-                            }
-                            className="text-xs"
-                          >
-                            {lista.tipo}
-                          </Badge>
-                          {lista.nombre}
-                          {lista.margen_ganancia && ` (${lista.margen_ganancia}% margen)`}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-                <p className="text-xs text-muted-foreground">
-                  Se aplicará a todos los productos que no tengan lista individual. La lista individual siempre tiene prioridad.
-                </p>
-              </FormItem>
-            )}
-          />
+              {/* Lista de precios global (obligatoria, por defecto para todos los productos) */}
+              <FormField
+                control={form.control}
+                name="listaPrecioGlobal"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Lista de Precios (Global) *</FormLabel>
+                    <Select
+                      value={field.value || ''}
+                      onValueChange={async (value) => {
+                        // Guardar el valor anterior ANTES de actualizar el formulario
+                        const listaGlobalAnterior = field.value
+                        console.log('🔄 Cambiando lista global:', {
+                          anterior: listaGlobalAnterior,
+                          nueva: value,
+                          listaAnteriorNombre: todasListas.find(l => l.id === listaGlobalAnterior)?.nombre,
+                          listaNuevaNombre: todasListas.find(l => l.id === value)?.nombre
+                        })
+                        field.onChange(value)
+                        await aplicarListaGlobal(value, listaGlobalAnterior)
+                      }}
+                      disabled={cargandoListas || todasListas.length === 0}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={cargandoListas ? "Cargando listas..." : "Selecciona una lista"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {todasListas.map((lista) => (
+                          <SelectItem key={lista.id} value={lista.id}>
+                            <div className="flex items-center gap-2">
+                              <Badge
+                                variant={
+                                  lista.tipo === 'mayorista'
+                                    ? 'default'
+                                    : lista.tipo === 'minorista'
+                                      ? 'secondary'
+                                      : 'outline'
+                                }
+                                className="text-xs"
+                              >
+                                {lista.tipo}
+                              </Badge>
+                              {lista.nombre}
+                              {lista.margen_ganancia && ` (${lista.margen_ganancia}% margen)`}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                    <p className="text-xs text-muted-foreground">
+                      Se aplicará a todos los productos que no tengan lista individual. La lista individual siempre tiene prioridad.
+                    </p>
+                  </FormItem>
+                )}
+              />
 
-          {/* Tipo de comprobante */}
-          <FormField
-            control={form.control}
-            name="tipoComprobante"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Tipo de Comprobante</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="ticket">Ticket</SelectItem>
-                    <SelectItem value="factura_a">Factura A</SelectItem>
-                    <SelectItem value="factura_b">Factura B</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
+              {/* Tipo de comprobante */}
+              <FormField
+                control={form.control}
+                name="tipoComprobante"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tipo de Comprobante</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="ticket">Ticket</SelectItem>
+                        <SelectItem value="factura_a">Factura A</SelectItem>
+                        <SelectItem value="factura_b">Factura B</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
+        </details>
 
         {/* Carrito de productos */}
         <Card>
@@ -1436,6 +1450,6 @@ export function NuevaVentaForm({
           </div>
         )}
       </form>
-    </Form>
+    </Form >
   )
 }

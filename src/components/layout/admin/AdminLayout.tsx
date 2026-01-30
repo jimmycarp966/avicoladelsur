@@ -1,45 +1,24 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { AdminSidebar } from './AdminSidebar'
 import { AdminHeader } from './AdminHeader'
 import { KeyboardShortcutsProvider } from '@/components/providers/KeyboardShortcutsProvider'
-import { createClient } from '@/lib/supabase/client'
-import { useUserStore } from '@/store/userStore'
-import { useNotificationStore } from '@/store/notificationStore'
+import { performLogout } from '@/lib/auth/logout'
 import { cn } from '@/lib/utils'
 import type { Usuario } from '@/types/domain.types'
 
 interface AdminLayoutProps {
   children: React.ReactNode
-  user: Usuario | null // Usuario pasado desde Server Component
+  user: Usuario | null
 }
 
 export function AdminLayout({ children, user }: AdminLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const router = useRouter()
-  const { logout: storeLogout } = useUserStore()
-  const { showToast } = useNotificationStore()
 
-  // Función logout local que no depende del AuthProvider
+  // Usar función centralizada de logout
   const handleLogout = async () => {
-    console.log('[AdminLayout] Iniciando logout...')
-    try {
-      const supabase = createClient()
-      console.log('[AdminLayout] SignOut de Supabase...')
-      await supabase.auth.signOut()
-      console.log('[AdminLayout] Store logout...')
-      storeLogout()
-      showToast('success', 'Sesión cerrada exitosamente')
-    } catch (error) {
-      console.error('[AdminLayout] Error al cerrar sesión:', error)
-      showToast('error', 'Error al cerrar sesión')
-    } finally {
-      // Siempre redirigir al login, incluso si hay error
-      console.log('[AdminLayout] Redirigiendo a /login...')
-      window.location.href = '/login'
-    }
+    await performLogout({ reason: 'AdminLayout - Usuario' })
   }
 
   return (

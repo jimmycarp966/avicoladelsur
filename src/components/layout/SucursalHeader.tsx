@@ -12,10 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Bell, Settings, LogOut, User } from 'lucide-react'
-import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-import { useUserStore } from '@/store/userStore'
-import { useNotificationStore } from '@/store/notificationStore'
+import { performLogout } from '@/lib/auth/logout'
 
 interface Sucursal {
   id: string
@@ -28,28 +25,11 @@ interface SucursalHeaderProps {
 }
 
 export function SucursalHeader({ sucursal }: SucursalHeaderProps) {
-  const router = useRouter()
-  const { logout: storeLogout } = useUserStore()
-  const { showToast } = useNotificationStore()
-
+  // Usar función centralizada de logout
   const handleLogout = async () => {
-    console.log('[SucursalHeader] Iniciando logout...')
-    try {
-      const supabase = createClient()
-      console.log('[SucursalHeader] SignOut de Supabase...')
-      await supabase.auth.signOut()
-      console.log('[SucursalHeader] Store logout...')
-      storeLogout()
-      showToast('success', 'Sesión cerrada exitosamente')
-    } catch (error) {
-      console.error('[SucursalHeader] Error al cerrar sesión:', error)
-      showToast('error', 'Error al cerrar sesión')
-    } finally {
-      // Siempre redirigir al login, incluso si hay error
-      console.log('[SucursalHeader] Redirigiendo a /login...')
-      window.location.href = '/login'
-    }
+    await performLogout({ reason: 'SucursalHeader - Usuario' })
   }
+
   return (
     <header className="fixed top-0 left-64 right-0 z-40 h-16 bg-background border-b">
       <div className="flex h-full items-center justify-between px-6">

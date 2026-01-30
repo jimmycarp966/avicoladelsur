@@ -27,7 +27,19 @@ export const useUserStore = create<UserState>()(
 
       setLoading: (loading) => set({ loading }),
 
-      logout: () => set({ user: null, session: null }),
+      logout: () => {
+        // Limpiar estado
+        set({ user: null, session: null, loading: false })
+
+        // Limpiar localStorage manualmente para asegurar que no quede estado zombie
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.removeItem('user-storage')
+          } catch (e) {
+            console.error('Error limpiando localStorage:', e)
+          }
+        }
+      },
 
       isAuthenticated: () => {
         const { user, session } = get()

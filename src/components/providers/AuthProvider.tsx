@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useUserStore } from '@/store/userStore'
 import { useNotificationStore } from '@/store/notificationStore'
+import { performLogout } from '@/lib/auth/logout'
 import type { Usuario } from '@/types/domain.types'
 
 interface AuthContextType {
@@ -347,33 +348,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
-  // Función de logout
+  // Función de logout - Usa la función centralizada
   const logout = async (reason?: string) => {
-    try {
-      const timestamp = new Date().toISOString()
-      console.log(`[AUTH LOG ${timestamp}] Iniciando logout:`, {
-        userId: user?.id || 'N/A',
-        userEmail: user?.email || 'N/A',
-        reason: reason || 'Logout manual',
-        activo: user?.activo ?? 'N/A',
-      })
-
-      setLoading(true)
-      await supabase.auth.signOut()
-      storeLogout()
-
-      console.log(`[AUTH LOG ${timestamp}] Logout completado exitosamente`)
-      showToast('info', 'Sesión cerrada exitosamente')
-      window.location.href = '/login'
-    } catch (error: any) {
-      console.error(`[AUTH LOG ${new Date().toISOString()}] Error en logout:`, {
-        error: error?.message || String(error),
-        reason: reason || 'Error desconocido',
-      })
-      showToast('error', 'Error al cerrar sesión')
-    } finally {
-      setLoading(false)
-    }
+    await performLogout({ reason: reason || 'AuthProvider' })
   }
 
   // Escuchar cambios en el estado de autenticación
@@ -509,117 +486,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [supabase.auth])
 
-  // Efecto para verificar usuario activo periódicamente
-  useEffect(() => {
-    if (!user) {
-      console.log(`[AUTH LOG ${new Date().toISOString()}] Verificación periódica no iniciada - No hay usuario`)
-      return
-    }
-
-    const userId = user.id
-    console.log(`[AUTH LOG ${new Date().toISOString()}] Iniciando verificación periódica de usuario:`, {
-      userId,
-      intervalo: '30 segundos',
-    })
-
-    const interval = setInterval(async () => {
-      const timestamp = new Date().toISOString()
-
-      // Verificar primero que el usuario todavía existe en el estado local
-      // Esto evita ejecutar verificaciones si ya se cerró la sesión
-      const currentUser = user
-      if (!currentUser) {
-        console.log(`[AUTH LOG ${timestamp}] Verificación periódica cancelada - Usuario ya no existe en estado local`)
-        return
-      }
-
-      console.log(`[AUTH LOG ${timestamp}] Verificación periódica de usuario...`)
-
-      // Verificar también el estado de la sesión
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-
-      if (sessionError) {
-        console.error(`[AUTH LOG ${timestamp}] Error al obtener sesión en verificación periódica:`, {
-          error: sessionError.message,
-          code: sessionError.status || 'N/A',
-          reason: 'Error al verificar sesión',
-        })
-        await logout('Error al verificar sesión')
-        return
-      }
-
-      if (!session) {
-        console.warn(`[AUTH LOG ${timestamp}] No hay sesión activa en verificación periódica`)
-        await logout('Sesión no encontrada')
-        return
-      }
-
-      // Verificar que el usuario de la sesión coincida con el usuario local
-      if (session.user?.id !== currentUser.id) {
-        console.warn(`[AUTH LOG ${timestamp}] Usuario de sesión no coincide con usuario local:`, {
-          sessionUserId: session.user?.id || 'N/A',
-          localUserId: currentUser.id,
-          reason: 'Usuario de sesión cambiado',
-        })
-        await logout('Usuario de sesión no coincide')
-        return
-      }
-
-      // Verificar expiración del token
-      if (session.expires_at) {
-        const expiresAt = new Date(session.expires_at * 1000)
-        const now = new Date()
-        const minutesUntilExpiry = Math.round((expiresAt.getTime() - now.getTime()) / 1000 / 60)
-
-        console.log(`[AUTH LOG ${timestamp}] Estado del token en verificación periódica:`, {
-          expiresAt: expiresAt.toISOString(),
-          minutesUntilExpiry,
-          isExpired: expiresAt < now,
-        })
-
-        if (expiresAt < now) {
-          console.warn(`[AUTH LOG ${timestamp}] Token expirado en verificación periódica`)
-          await logout('Token expirado')
-          return
-        }
-      }
-
-      // Verificar datos del usuario en BD (solo si todavía tenemos usuario local)
-      try {
-        const currentUserData = await fetchUserData(currentUser.id)
-        if (!currentUserData || !currentUserData.activo) {
-          // Usuario desactivado, cerrar sesión
-          console.warn(`[AUTH LOG ${timestamp}] Usuario desactivado o no encontrado en verificación periódica:`, {
-            userId: currentUser.id,
-            encontrado: !!currentUserData,
-            activo: currentUserData?.activo ?? false,
-            reason: 'Usuario desactivado en BD o no encontrado',
-          })
-          await logout('Usuario desactivado o no encontrado')
-        } else {
-          console.log(`[AUTH LOG ${timestamp}] Verificación periódica OK:`, {
-            userId: currentUserData.id,
-            activo: currentUserData.activo,
-          })
-        }
-      } catch (error) {
-        // Si hay un error al obtener datos del usuario, no cerrar sesión automáticamente
-        // Solo loguear el error para diagnóstico
-        console.error(`[AUTH LOG ${timestamp}] Error en verificación periódica (no se cierra sesión):`, {
-          userId: currentUser.id,
-          error: error instanceof Error ? error.message : String(error),
-          reason: 'Error al consultar BD, pero sesión sigue activa',
-        })
-      }
-    }, 30000) // Verificar cada 30 segundos
-
-    return () => {
-      console.log(`[AUTH LOG ${new Date().toISOString()}] Deteniendo verificación periódica de usuario:`, {
-        userId: userId || 'N/A',
-      })
-      clearInterval(interval)
-    }
-  }, [user])
+  // NOTA: Verificación periódica agresiva ELIMINADA
+  // La verificación periódica de 30s causaba logouts inesperados por:
+  // - Errores de red temporales
+  // - Latencia en consultas a BD
+  // - Race conditions con el token refresh
+  // 
+  // El logout ahora es controlado únicamente por:
+  // 1. Evento SIGNED_OUT de Supabase
+  // 2. Acción explícita del usuario
+  // 3. Token refresh fallido (manejado por Supabase automáticamente)
 
   const value: AuthContextType = {
     user,
