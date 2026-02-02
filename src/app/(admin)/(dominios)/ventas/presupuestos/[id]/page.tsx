@@ -253,7 +253,8 @@ async function PresupuestoDetalle({ presupuestoId }: { presupuestoId: string }) 
               const unidadMayorNombre = item.producto?.unidad_mayor_nombre
               const solicitadoKg = esMayorista && kgPorUnidadMayor ? (item.cantidad_solicitada || 0) * kgPorUnidadMayor : item.cantidad_solicitada
               const reservadoKg = esMayorista && kgPorUnidadMayor ? (item.cantidad_reservada || 0) * kgPorUnidadMayor : item.cantidad_reservada
-              const pesableUI = esMayorista ? false : item.pesable
+              // Usar la función esItemPesable para consistencia con Presupuestos del Día
+              const pesableUI = esItemPesable(item, esMayorista)
 
               logDetalle({
                 presupuestoId,
