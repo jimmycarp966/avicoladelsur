@@ -343,6 +343,13 @@ Endpoints que operan sin interfaz gráfica:
 
 > Histórico completo disponible en [ARCHITECTURE.md#📝-cambios-recientes](./ARCHITECTURE.md#📝-cambios-recientes).
 
+### 2026-02-02 · Pesaje Acumulativo de Múltiples Bolsas
+- **Nueva Funcionalidad**: Sistema de escaneo acumulativo en `PesajeItemCard.tsx` para productos que requieren múltiples bolsas.
+- **UI Mejorada**: Lista detallada de bolsas escaneadas con peso individual y total acumulado.
+- **Barra de Progreso**: Indicador visual de avance hacia el objetivo (ej: 15/20 kg = 75%).
+- **Gestión Flexible**: Botones para eliminar bolsas individuales o reiniciar todos los escaneos.
+- **Feedback Inmediato**: Toast con información de cada escaneo (ej: "Bolsa 2: 10.250 kg → Total: 20.050 kg").
+
 ### 2026-01-23 · Selección Elite de Skills del Agente
 - **Optimización de IA**: Curación de 36 skills de alta prioridad (23 trending de skills.sh + 13 custom de dominio) reemplazando 69 skills genéricas.
 - **Eficiencia**: Reducción de ruido y mayor precisión en las respuestas del agente Antigravity.
