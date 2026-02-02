@@ -7,11 +7,8 @@ import { SucursalSidebar } from '@/components/layout/SucursalSidebar'
 import { NotificationBell } from '@/components/layout/NotificationBell'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
-import { Menu, LogOut, Loader2 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
-import { useUserStore } from '@/store/userStore'
+import { Menu, Loader2 } from 'lucide-react'
+import { LogoutButton } from '@/components/auth/LogoutButton'
 
 // Fallback para el sidebar mientras carga
 function SidebarSkeleton() {
@@ -36,28 +33,12 @@ interface SucursalLayoutProps {
 
 export default function SucursalLayout({ children }: SucursalLayoutProps) {
   const pathname = usePathname()
-  const router = useRouter()
-  const { logout: storeLogout } = useUserStore()
   const [mounted, setMounted] = useState(false)
 
   // Evitar problemas de hidratación renderizando componentes con Radix UI solo en el cliente
   useEffect(() => {
     setMounted(true)
   }, [])
-
-  const handleLogout = async () => {
-    try {
-      const supabase = createClient()
-      await supabase.auth.signOut()
-      storeLogout()
-      toast.success('Sesión cerrada exitosamente')
-      // Usar window.location.href para forzar recarga completa y limpiar todo el estado
-      window.location.href = '/login'
-    } catch (error) {
-      console.error('Error al cerrar sesión:', error)
-      toast.error('Error al cerrar sesión')
-    }
-  }
 
   return (
     <div className="flex h-screen bg-background">
@@ -102,14 +83,7 @@ export default function SucursalLayout({ children }: SucursalLayoutProps) {
           {/* Actions */}
           <div className="flex items-center gap-2">
             {mounted && <NotificationBell />}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleLogout}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <LogOut className="h-5 w-5" />
-            </Button>
+            <LogoutButton variant="icon" className="text-muted-foreground hover:text-foreground" />
           </div>
         </header>
 

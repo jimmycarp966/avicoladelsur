@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { AdminSidebar } from './AdminSidebar'
 import { AdminHeader } from './AdminHeader'
 import { KeyboardShortcutsProvider } from '@/components/providers/KeyboardShortcutsProvider'
-import { performLogout } from '@/lib/auth/logout'
 import { cn } from '@/lib/utils'
 import type { Usuario } from '@/types/domain.types'
 
@@ -15,11 +14,6 @@ interface AdminLayoutProps {
 
 export function AdminLayout({ children, user }: AdminLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-
-  // Usar función centralizada de logout
-  const handleLogout = async () => {
-    await performLogout({ reason: 'AdminLayout - Usuario' })
-  }
 
   return (
     <KeyboardShortcutsProvider>
@@ -53,7 +47,6 @@ export function AdminLayout({ children, user }: AdminLayoutProps) {
           <AdminHeader
             user={user}
             onMenuClick={() => setSidebarOpen(true)}
-            onLogout={handleLogout}
           />
 
           <main className="py-10">

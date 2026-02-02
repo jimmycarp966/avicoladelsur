@@ -6,13 +6,12 @@ import { Badge } from '@/components/ui/badge'
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Bell, Settings, LogOut, User } from 'lucide-react'
-import { performLogout } from '@/lib/auth/logout'
+import { Bell, Settings, User } from 'lucide-react'
+import { LogoutButton } from '@/components/auth/LogoutButton'
 
 interface Sucursal {
   id: string
@@ -25,11 +24,6 @@ interface SucursalHeaderProps {
 }
 
 export function SucursalHeader({ sucursal }: SucursalHeaderProps) {
-  // Usar función centralizada de logout
-  const handleLogout = async () => {
-    await performLogout({ reason: 'SucursalHeader - Usuario' })
-  }
-
   return (
     <header className="fixed top-0 left-64 right-0 z-40 h-16 bg-background border-b">
       <div className="flex h-full items-center justify-between px-6">
@@ -84,16 +78,7 @@ export function SucursalHeader({ sucursal }: SucursalHeaderProps) {
                 <span>Configuración</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={(e) => {
-                  e.preventDefault()
-                  handleLogout()
-                }}
-                className="text-destructive focus:text-destructive cursor-pointer"
-              >
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Cerrar Sesión</span>
-              </DropdownMenuItem>
+              <LogoutButton variant="menuItem" />
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

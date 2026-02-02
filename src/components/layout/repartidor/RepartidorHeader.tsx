@@ -1,20 +1,19 @@
 'use client'
 
-import { useAuth } from '@/components/providers/AuthProvider'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Logo } from '@/components/ui/logo'
-import { Bell, LogOut, Wifi, WifiOff } from 'lucide-react'
+import { Bell, Wifi, WifiOff } from 'lucide-react'
 import { useState, useEffect } from 'react'
+import { LogoutButton } from '@/components/auth/LogoutButton'
 import type { Usuario } from '@/types/domain.types'
 
 interface RepartidorHeaderProps {
@@ -22,20 +21,7 @@ interface RepartidorHeaderProps {
 }
 
 export function RepartidorHeader({ user }: RepartidorHeaderProps) {
-  const { logout } = useAuth()
   const [isOnline, setIsOnline] = useState(true)
-
-  const handleLogout = async () => {
-    console.log('[RepartidorHeader] Iniciando logout...')
-    try {
-      await logout()
-      console.log('[RepartidorHeader] Logout completado')
-    } catch (error) {
-      console.error('[RepartidorHeader] Error al cerrar sesión:', error)
-      // Forzar redirección incluso con error
-      window.location.href = '/login'
-    }
-  }
 
   // Detectar estado de conexión
   useEffect(() => {
@@ -118,16 +104,7 @@ export function RepartidorHeader({ user }: RepartidorHeaderProps) {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={(e) => {
-                  e.preventDefault()
-                  handleLogout()
-                }}
-                className="text-destructive focus:text-destructive cursor-pointer"
-              >
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Cerrar Sesión</span>
-              </DropdownMenuItem>
+              <LogoutButton variant="menuItem" />
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

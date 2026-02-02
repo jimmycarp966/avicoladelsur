@@ -5,7 +5,6 @@ import { Badge } from '@/components/ui/badge'
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -13,24 +12,16 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Logo } from '@/components/ui/logo'
 import { NotificationBell } from '@/components/layout/NotificationBell'
-import { Menu, LogOut, HelpCircle } from 'lucide-react'
+import { Menu, HelpCircle } from 'lucide-react'
+import { LogoutButton } from '@/components/auth/LogoutButton'
 import type { Usuario } from '@/types/domain.types'
 
 interface AdminHeaderProps {
   user: Usuario | null
   onMenuClick: () => void
-  onLogout: () => Promise<void>
 }
 
-export function AdminHeader({ user, onMenuClick, onLogout }: AdminHeaderProps) {
-  const handleLogout = async () => {
-    try {
-      await onLogout()
-    } catch (error) {
-      console.error('Error al cerrar sesión:', error)
-    }
-  }
-
+export function AdminHeader({ user, onMenuClick }: AdminHeaderProps) {
   return (
     <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-white/10 bg-gradient-header px-6 shadow-sm">
       {/* Botón menú móvil */}
@@ -104,16 +95,7 @@ export function AdminHeader({ user, onMenuClick, onLogout }: AdminHeaderProps) {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={(e) => {
-                  e.preventDefault()
-                  handleLogout()
-                }}
-                className="text-destructive focus:text-destructive cursor-pointer"
-              >
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Cerrar Sesión</span>
-              </DropdownMenuItem>
+              <LogoutButton variant="menuItem" />
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
