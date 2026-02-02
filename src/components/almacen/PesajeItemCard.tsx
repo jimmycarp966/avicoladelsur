@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Scale, CheckCircle, AlertTriangle, TrendingUp } from 'lucide-react'
+import { Scale, CheckCircle, AlertTriangle, TrendingUp, X, Package, RotateCcw } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -26,6 +26,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Progress } from '@/components/ui/progress'
+
+// Tipo para representar un escaneo individual (una bolsa)
+interface ScanEntry {
+  id: string
+  peso: number
+  timestamp: Date
+}
 
 interface ItemPesable {
   id: string
@@ -66,6 +74,8 @@ export function PesajeItemCard({
   onSimularPeso,
   onAplicarPeso,
 }: PesajeItemCardProps) {
+  // Estado para escaneos acumulativos (múltiples bolsas)
+  const [scanEntries, setScanEntries] = useState<ScanEntry[]>([])
   const [pesoInput, setPesoInput] = useState<string>(item.peso_final?.toString() || '')
   const [showAnomalyDialog, setShowAnomalyDialog] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -78,6 +88,16 @@ export function PesajeItemCard({
     usandoIA: boolean
   } | null>(null)
   const [estadisticasProducto, setEstadisticasProducto] = useState<ProductoEstadisticas | null>(null)
+
+  // Calcular peso total acumulado de todas las bolsas escaneadas
+  const pesoTotalAcumulado = scanEntries.reduce((sum, entry) => sum + entry.peso, 0)
+
+  // Sincronizar pesoInput con el total acumulado cuando hay escaneos
+  useEffect(() => {
+    if (scanEntries.length > 0) {
+      setPesoInput(pesoTotalAcumulado.toFixed(3))
+    }
+  }, [pesoTotalAcumulado, scanEntries.length])
 
   // Cargar estadísticas del producto al montar
   useEffect(() => {
@@ -100,6 +120,9 @@ export function PesajeItemCard({
   const pesoSolicitadoKg = esMayorista && kgPorUnidadMayor
     ? item.cantidad_solicitada * kgPorUnidadMayor
     : item.cantidad_solicitada
+
+  // Calcular progreso hacia el objetivo
+  const progresoPercent = Math.min((pesoTotalAcumulado / pesoSolicitadoKg) * 100, 100)
 
   /**
    * Analiza el peso usando Google Gemini AI
@@ -346,7 +369,7 @@ export function PesajeItemCard({
     }
   }, [item.id])
 
-  // Manejar escaneo de código de barras (optimizado para velocidad)
+  // Manejar escaneo de código de barras (ACUMULATIVO - múltiples bolsas)
   const handleScan = useCallback((code: string) => {
     const parsed = parseBarcodeEAN13(code)
 
@@ -366,17 +389,47 @@ export function PesajeItemCard({
       }
     }
 
-    // Aplicar peso inmediatamente si el código es válido
+    // ACUMULATIVO: Agregar peso a la lista de bolsas escaneadas
     if (parsed.isWeightCode && parsed.weight) {
-      const peso = parsed.weight.toFixed(3)
-      setPesoInput(peso)
-      toast.success(`Peso escaneado: ${peso} kg`)
+      const nuevaBolsa: ScanEntry = {
+        id: crypto.randomUUID(),
+        peso: parsed.weight,
+        timestamp: new Date()
+      }
+      setScanEntries(prev => [...prev, nuevaBolsa])
+
+      const nuevoTotal = pesoTotalAcumulado + parsed.weight
+      const bolsasCount = scanEntries.length + 1
+
+      toast.success(
+        `Bolsa ${bolsasCount}: ${parsed.weight.toFixed(3)} kg → Total: ${nuevoTotal.toFixed(3)} kg`,
+        { duration: 3000 }
+      )
     } else if (parsed.plu) {
       toast.info(`Código PLU: ${parsed.plu} (sin peso embebido)`)
     } else {
       toast.error('Código no válido: ' + (parsed.error || 'formato desconocido'))
     }
-  }, [item.producto?.codigo, item.producto?.nombre])
+  }, [item.producto?.codigo, item.producto?.nombre, pesoTotalAcumulado, scanEntries.length])
+
+  // Eliminar una bolsa individual del listado
+  const handleRemoveScan = useCallback((scanId: string) => {
+    setScanEntries(prev => {
+      const bolsaEliminada = prev.find(e => e.id === scanId)
+      const nuevaLista = prev.filter(e => e.id !== scanId)
+      if (bolsaEliminada) {
+        toast.info(`Bolsa de ${bolsaEliminada.peso.toFixed(3)} kg eliminada`)
+      }
+      return nuevaLista
+    })
+  }, [])
+
+  // Resetear todos los escaneos
+  const handleResetScans = useCallback(() => {
+    setScanEntries([])
+    setPesoInput('')
+    toast.info('Todos los escaneos fueron eliminados')
+  }, [])
 
 
   return (
@@ -433,7 +486,13 @@ export function PesajeItemCard({
                   step="0.01"
                   placeholder="0.00"
                   value={pesoInput}
-                  onChange={(e) => setPesoInput(e.target.value)}
+                  onChange={(e) => {
+                    // Si el usuario edita manualmente, limpiar escaneos
+                    if (scanEntries.length > 0) {
+                      setScanEntries([])
+                    }
+                    setPesoInput(e.target.value)
+                  }}
                   className="text-lg"
                   disabled={estaActualizando}
                 />
@@ -449,6 +508,80 @@ export function PesajeItemCard({
                 </div>
               </div>
             </div>
+
+            {/* Sección de Bolsas Escaneadas (Pesaje Acumulativo) */}
+            {scanEntries.length > 0 && (
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Package className="h-4 w-4 text-blue-600" />
+                    <span className="font-medium text-blue-800">
+                      {scanEntries.length} bolsa{scanEntries.length !== 1 ? 's' : ''} escaneada{scanEntries.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleResetScans}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    disabled={estaActualizando}
+                  >
+                    <RotateCcw className="h-3 w-3 mr-1" />
+                    Reiniciar
+                  </Button>
+                </div>
+
+                {/* Barra de progreso hacia el objetivo */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Progreso: {pesoTotalAcumulado.toFixed(3)} kg</span>
+                    <span>Objetivo: {pesoSolicitadoKg.toFixed(1)} kg</span>
+                  </div>
+                  <Progress
+                    value={progresoPercent}
+                    className={`h-2 ${progresoPercent >= 100 ? '[&>div]:bg-green-500' : '[&>div]:bg-blue-500'}`}
+                  />
+                  {progresoPercent >= 95 && progresoPercent < 100 && (
+                    <p className="text-xs text-yellow-600">Casi listo, falta poco</p>
+                  )}
+                  {progresoPercent >= 100 && (
+                    <p className="text-xs text-green-600 font-medium">Objetivo alcanzado</p>
+                  )}
+                </div>
+
+                {/* Lista de bolsas individuales */}
+                <div className="grid gap-1 max-h-32 overflow-y-auto">
+                  {scanEntries.map((entry, index) => (
+                    <div
+                      key={entry.id}
+                      className="flex items-center justify-between bg-white rounded px-3 py-1.5 text-sm border border-blue-100"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">#{index + 1}</span>
+                        <span className="font-mono font-medium">{entry.peso.toFixed(3)} kg</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveScan(entry.id)}
+                        className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                        disabled={estaActualizando}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Total acumulado */}
+                <div className="flex justify-between items-center pt-2 border-t border-blue-200">
+                  <span className="text-sm text-blue-800">Total Acumulado:</span>
+                  <span className="font-bold text-lg text-blue-900">
+                    {pesoTotalAcumulado.toFixed(3)} kg
+                  </span>
+                </div>
+              </div>
+            )}
 
             <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
               <div className="text-sm w-full md:w-auto">
