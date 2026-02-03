@@ -33,8 +33,8 @@ export function AdminHeader({ user, onMenuClick }: AdminHeaderProps) {
         <Menu className="h-6 w-6" />
       </button>
 
-      {/* Logo - visible en desktop */}
-      <div className="hidden lg:flex items-center gap-3">
+      {/* Logo - visible en desktop y tablet */}
+      <div className="hidden md:flex items-center gap-2 sm:gap-3">
         <Logo size="md" variant="full" light />
         {user && (
           <Badge className="bg-[#FCDE8D] text-[#2F7058] border-0 text-xs font-semibold px-2.5 py-0.5">

@@ -288,35 +288,35 @@ export default function CatalogoClient({ productos, categorias }: CatalogoClient
         <div className="min-h-screen bg-slate-50">
             {/* Header */}
             <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200/50">
-                <div className="container mx-auto px-4 py-4">
+                <div className="container mx-auto px-3 sm:px-4 py-3">
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2 sm:gap-4">
                             <motion.div
                                 whileHover={{ rotate: [0, -10, 10, -10, 0] }}
                                 transition={{ duration: 0.5 }}
-                                className="relative"
+                                className="relative shrink-0"
                             >
-                                <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/25">
-                                    <Package className="h-6 w-6 text-white" />
+                                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/25">
+                                    <Package className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                                 </div>
-                                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-amber-400 rounded-full border-2 border-white" />
+                                <div className="absolute -bottom-1 -right-1 w-3 h-3 sm:w-4 sm:h-4 bg-amber-400 rounded-full border-2 border-white" />
                             </motion.div>
                             <div>
-                                <h1 className="text-xl font-bold text-slate-900 tracking-tight">Avícola del Sur</h1>
-                                <p className="text-xs text-slate-500">Productos frescos de calidad</p>
+                                <h1 className="text-base sm:text-xl font-bold text-slate-900 tracking-tight">Avícola del Sur</h1>
+                                <p className="text-[10px] sm:text-xs text-slate-500 hidden sm:block">Productos frescos de calidad</p>
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 sm:gap-2">
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                className={`relative ${soloFavoritos ? 'bg-rose-50 text-rose-600 hover:bg-rose-100' : ''}`}
+                                className={`relative h-9 w-9 sm:h-auto sm:w-auto sm:px-3 ${soloFavoritos ? 'bg-rose-50 text-rose-600 hover:bg-rose-100' : ''}`}
                                 onClick={() => setSoloFavoritos(!soloFavoritos)}
                             >
-                                <Heart className={`h-5 w-5 ${soloFavoritos ? 'fill-rose-500' : ''}`} />
+                                <Heart className={`h-4 w-4 sm:h-5 sm:w-5 ${soloFavoritos ? 'fill-rose-500' : ''}`} />
                                 {favoritos.size > 0 && !soloFavoritos && (
-                                    <Badge className="absolute -top-1 -right-1 h-5 min-w-5 px-1 flex items-center justify-center bg-rose-500 border-rose-500">
+                                    <Badge className="absolute -top-1 -right-1 h-4 w-4 sm:h-5 sm:w-5 min-w-4 sm:min-w-5 px-0 sm:px-1 flex items-center justify-center bg-rose-500 border-rose-500 text-[10px] sm:text-xs">
                                         {favoritos.size}
                                     </Badge>
                                 )}
@@ -324,12 +324,12 @@ export default function CatalogoClient({ productos, categorias }: CatalogoClient
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                className="relative hover:bg-emerald-50"
+                                className="relative h-9 w-9 sm:h-auto sm:w-auto sm:px-3 hover:bg-emerald-50"
                                 onClick={() => setCarritoAbierto(!carritoAbierto)}
                             >
-                                <ShoppingCart className="h-5 w-5" />
+                                <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />
                                 {cantidadItems > 0 && (
-                                    <Badge className="absolute -top-1 -right-1 h-5 min-w-5 px-1 flex items-center justify-center bg-emerald-500 border-emerald-500">
+                                    <Badge className="absolute -top-1 -right-1 h-4 w-4 sm:h-5 sm:w-5 min-w-4 sm:min-w-5 px-0 sm:px-1 flex items-center justify-center bg-emerald-500 border-emerald-500 text-[10px] sm:text-xs">
                                         {cantidadItems}
                                     </Badge>
                                 )}
@@ -339,27 +339,27 @@ export default function CatalogoClient({ productos, categorias }: CatalogoClient
                 </div>
             </header>
 
-            <div className="container mx-auto px-4 py-6 pb-24 flex flex-col xl:flex-row gap-6">
+            <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 pb-24 flex flex-col xl:flex-row gap-4 sm:gap-6">
                 {/* Catálogo */}
                 <main className="flex-1 min-w-0">
                     {/* Barra de búsqueda y filtros */}
                     <div className="mb-6 space-y-4">
                         <div className="relative">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                            <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-slate-400" />
                             <Input
                                 placeholder="Buscar productos..."
                                 value={busqueda}
                                 onChange={(e) => setBusqueda(e.target.value)}
-                                className="pl-12 pr-12 h-12 bg-white border-slate-200 focus:border-emerald-500 focus:ring-emerald-500 rounded-2xl shadow-sm"
+                                className="pl-10 sm:pl-12 pr-10 sm:pr-12 h-10 sm:h-12 text-sm bg-white border-slate-200 focus:border-emerald-500 focus:ring-emerald-500 rounded-xl sm:rounded-2xl shadow-sm"
                             />
                             {busqueda && (
                                 <motion.button
                                     initial={{ scale: 0 }}
                                     animate={{ scale: 1 }}
                                     onClick={() => setBusqueda('')}
-                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                    className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                                 >
-                                    <XCircle className="h-5 w-5" />
+                                    <XCircle className="h-4 w-4 sm:h-5 sm:w-5" />
                                 </motion.button>
                             )}
                         </div>
@@ -627,15 +627,15 @@ export default function CatalogoClient({ productos, categorias }: CatalogoClient
                         initial={{ scale: 0, y: 100 }}
                         animate={{ scale: 1, y: 0 }}
                         exit={{ scale: 0, y: 100 }}
-                        className="xl:hidden fixed bottom-6 right-6 z-30"
+                        className="xl:hidden fixed bottom-4 sm:bottom-6 right-4 sm:right-6 z-30"
                     >
                         <Button
                             size="lg"
-                            className="rounded-full h-16 w-16 bg-gradient-to-br from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-xl shadow-emerald-500/30"
+                            className="rounded-full h-14 w-14 sm:h-16 sm:w-16 bg-gradient-to-br from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-xl shadow-emerald-500/30"
                             onClick={() => setCarritoAbierto(true)}
                         >
-                            <ShoppingCart className="h-6 w-6" />
-                            <Badge className="absolute -top-1 -right-1 h-7 w-7 flex items-center justify-center p-0 bg-white text-emerald-600 border-0 font-bold">
+                            <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6" />
+                            <Badge className="absolute -top-1 -right-1 h-6 w-6 sm:h-7 sm:w-7 flex items-center justify-center p-0 bg-white text-emerald-600 border-0 font-bold text-xs">
                                 {cantidadItems > 9 ? '9+' : cantidadItems}
                             </Badge>
                         </Button>
@@ -968,20 +968,20 @@ function ProductoCard({
                     </motion.button>
 
                     {/* Imagen o placeholder */}
-                    <div className="relative bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 p-6">
+                    <div className="relative bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 p-4 sm:p-6">
                         {producto.imagen_url ? (
                             <img
                                 src={producto.imagen_url}
                                 alt={producto.nombre}
-                                className="w-full h-32 object-contain"
+                                className="w-full h-24 sm:h-32 object-contain"
                             />
                         ) : (
-                            <div className="w-full h-32 flex items-center justify-center">
+                            <div className="w-full h-24 sm:h-32 flex items-center justify-center">
                                 <motion.div
                                     whileHover={{ scale: 1.1, rotate: 5 }}
                                     transition={{ type: 'spring', stiffness: 300 }}
                                 >
-                                    <Package className="h-16 w-16 text-emerald-300" />
+                                    <Package className="h-12 w-12 sm:h-16 sm:w-16 text-emerald-300" />
                                 </motion.div>
                             </div>
                         )}
@@ -1004,20 +1004,20 @@ function ProductoCard({
                 </div>
 
                 {/* Info del producto */}
-                <CardContent className="p-4 space-y-3">
+                <CardContent className="p-3 sm:p-4 space-y-2 sm:space-y-3">
                     <div>
-                        <h3 className="font-semibold text-slate-900 leading-tight">{producto.nombre}</h3>
+                        <h3 className="font-semibold text-slate-900 leading-tight text-sm sm:text-base">{producto.nombre}</h3>
                         {producto.descripcion && (
-                            <p className="text-xs text-slate-500 mt-1 line-clamp-2">{producto.descripcion}</p>
+                            <p className="text-xs text-slate-500 mt-1 line-clamp-2 hidden sm:block">{producto.descripcion}</p>
                         )}
                     </div>
 
                     <div className="flex items-baseline justify-between">
                         <div>
-                            <span className="text-2xl font-bold text-slate-900">
+                            <span className="text-xl sm:text-2xl font-bold text-slate-900">
                                 ${producto.precio_minorista.toLocaleString('es-AR')}
                             </span>
-                            <span className="text-sm text-slate-500 ml-1">/{producto.unidad}</span>
+                            <span className="text-xs sm:text-sm text-slate-500 ml-1">/{producto.unidad}</span>
                         </div>
                         {expandido && (
                             <motion.div
@@ -1100,10 +1100,10 @@ function ProductoCard({
                 </CardContent>
 
                 {/* Botón de acción */}
-                <div className="p-4 pt-0">
+                <div className="p-3 sm:p-4 pt-0">
                     {!expandido ? (
                         <Button
-                            className={`w-full h-11 font-semibold rounded-xl transition-all ${
+                            className={`w-full h-10 sm:h-11 font-semibold rounded-xl transition-all text-sm sm:text-base ${
                                 enCarrito
                                     ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
                                     : 'bg-slate-900 text-white hover:bg-slate-800'
@@ -1112,12 +1112,13 @@ function ProductoCard({
                         >
                             {enCarrito ? (
                                 <>
-                                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                                    En carrito
+                                    <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                                    <span className="hidden sm:inline">En carrito</span>
+                                    <span className="sm:hidden">Carrito</span>
                                 </>
                             ) : (
                                 <>
-                                    <Plus className="h-4 w-4 mr-2" />
+                                    <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                                     Agregar
                                 </>
                             )}
@@ -1126,18 +1127,19 @@ function ProductoCard({
                         <div className="flex gap-2">
                             <Button
                                 variant="outline"
-                                className="h-11 px-4 rounded-xl"
+                                className="h-10 sm:h-11 w-10 sm:w-auto sm:px-4 rounded-xl"
                                 onClick={onToggleExpand}
                             >
                                 <X className="h-4 w-4" />
                             </Button>
                             <Button
-                                className="flex-1 h-11 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-semibold rounded-xl"
+                                className="flex-1 h-10 sm:h-11 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-semibold rounded-xl text-sm"
                                 onClick={handleAgregar}
                                 disabled={producto.es_pesable && (!pesoAprox || pesoAprox <= 0)}
                             >
-                                <ShoppingCart className="h-4 w-4 mr-2" />
-                                Confirmar
+                                <ShoppingCart className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                                <span className="hidden sm:inline">Confirmar</span>
+                                <span className="sm:hidden">OK</span>
                             </Button>
                         </div>
                     )}
