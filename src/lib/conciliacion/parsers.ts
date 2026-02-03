@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx'
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { config } from "@/lib/config"
 import { GEMINI_MODEL_PRO, GEMINI_MODEL_FLASH } from "@/lib/constants/gemini-models"
+import { geminiConReintentos } from "./retry-utils"
 
 // Instancia de Gemini para parseo visual de documentos
 const apiKey = config.googleCloud.gemini.apiKey || process.env.GOOGLE_GEMINI_API_KEY
@@ -119,18 +120,20 @@ export async function parsearSabanaBancaria(file: File): Promise<MovimientoBanca
     Si no encuentras movimientos, devuelve un array vacío: []
     `
 
-    console.log('[Parsers] Enviando petición a Gemini...')
+    console.log('[Parsers] Enviando petición a Gemini (con reintentos)...')
     const tiempoInicio = Date.now()
 
     let result
     try {
-        result = await model.generateContent([
-            prompt,
-            { inlineData: { data: base64Data, mimeType } }
-        ])
+        result = await geminiConReintentos(async () => {
+            return await model.generateContent([
+                prompt,
+                { inlineData: { data: base64Data, mimeType } }
+            ])
+        }, 3)
         console.log('[Parsers] Respuesta recibida en', Date.now() - tiempoInicio, 'ms')
     } catch (geminiError) {
-        console.error('[Parsers] ERROR en llamada a Gemini:', geminiError)
+        console.error('[Parsers] ERROR en llamada a Gemini (agotados reintentos):', geminiError)
         throw new Error(`Error en Gemini API: ${geminiError instanceof Error ? geminiError.message : 'Error desconocido'}`)
     }
 
@@ -161,6 +164,16 @@ export async function parsearSabanaBancaria(file: File): Promise<MovimientoBanca
         console.error('[Parsers] Respuesta completa:', text)
         throw new Error("La IA no pudo estructurar los datos de la sábana bancaria correctamente.")
     }
+}
+
+/**
+ * Wrapper con reintentos para parsear sábana bancaria
+ */
+export async function parsearSabanaBancariaConReintentos(file: File): Promise<MovimientoBancarioInput[]> {
+    return geminiConReintentos(
+        () => parsearSabanaBancaria(file),
+        3
+    )
 }
 
 // ===========================================
@@ -220,18 +233,20 @@ export async function parsearComprobante(file: File): Promise<DatosComprobante> 
     }
     `
 
-    console.log('[Parsers] Enviando petición a Gemini...')
+    console.log('[Parsers] Enviando petición a Gemini (con reintentos)...')
     const tiempoInicio = Date.now()
 
     let result
     try {
-        result = await model.generateContent([
-            prompt,
-            { inlineData: { data: base64Data, mimeType } }
-        ])
+        result = await geminiConReintentos(async () => {
+            return await model.generateContent([
+                prompt,
+                { inlineData: { data: base64Data, mimeType } }
+            ])
+        }, 3)
         console.log('[Parsers] Respuesta recibida en', Date.now() - tiempoInicio, 'ms')
     } catch (geminiError) {
-        console.error('[Parsers] ERROR en llamada a Gemini:', geminiError)
+        console.error('[Parsers] ERROR en llamada a Gemini (agotados reintentos):', geminiError)
         throw new Error(`Error en Gemini API: ${geminiError instanceof Error ? geminiError.message : 'Error desconocido'}`)
     }
 
@@ -261,8 +276,20 @@ export async function parsearComprobante(file: File): Promise<DatosComprobante> 
 }
 
 /**
+ * Wrapper con reintentos para parsear un comprobante
+ */
+export async function parsearComprobanteConReintentos(file: File): Promise<DatosComprobante> {
+    return geminiConReintentos(
+        () => parsearComprobante(file),
+        3
+    )
+}
+
+/**
  * Parsea múltiples imágenes de comprobantes en lotes.
  * Procesa en lotes de 5 para evitar límites de rate de Gemini.
+ * 
+ * NUEVO: Usa reintentos automáticos para cada comprobante
  */
 export async function parsearComprobantesEnLote(
     files: File[],
@@ -278,14 +305,15 @@ export async function parsearComprobantesEnLote(
         const batch = files.slice(i, Math.min(i + BATCH_SIZE, files.length))
         console.log(`[Parsers] Procesando batch ${Math.floor(i / BATCH_SIZE) + 1}: ${batch.length} archivos (${i + 1}-${Math.min(i + BATCH_SIZE, files.length)} de ${files.length})`)
 
-        // Procesar batch en paralelo
+        // Procesar batch en paralelo (con reintentos automáticos)
         const promesas = batch.map(async (file) => {
             try {
-                const datos = await parsearComprobante(file)
+                // Usar versión con reintentos
+                const datos = await parsearComprobanteConReintentos(file)
                 console.log(`[Parsers] ✅ ${file.name}: $${datos.monto} - DNI: ${datos.dni_cuit}`)
                 return { datos, archivo: file.name }
             } catch (e) {
-                console.error(`[Parsers] ❌ ${file.name}:`, e)
+                console.error(`[Parsers] ❌ ${file.name} (agotados reintentos):`, e)
                 return {
                     datos: { monto: 0, archivo_origen: file.name } as DatosComprobante,
                     archivo: file.name,
