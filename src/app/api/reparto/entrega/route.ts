@@ -115,197 +115,42 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Actualizar detalle de ruta con información de pago (SIN crear movimientos de caja)
-    // Los movimientos de caja se crearán cuando el tesorero valide la ruta
-    const updateData: any = {
-      notas_entrega: data.notas_entrega,
-      updated_at: new Date().toISOString()
+    // ============================================
+    // Usar RPC unificada para registro de entrega
+    // Centraliza toda la lógica de actualización en una transacción atómica
+    // ============================================
+    const { data: resultadoEntrega, error: errorEntrega } = await supabase.rpc('fn_registrar_entrega_completa', {
+      p_pedido_id: data.pedido_id,
+      p_repartidor_id: user.id,
+      p_entrega_id: data.entrega_id,
+      p_facturas_pagadas: data.facturas_pagadas || [],
+      p_estado_entrega: data.estado_entrega || 'entregado',
+      p_metodo_pago: data.metodo_pago,
+      p_monto_cobrado: data.monto_cobrado || 0,
+      p_monto_cuenta_corriente: data.monto_cuenta_corriente || 0,
+      p_es_cuenta_corriente: data.es_cuenta_corriente || false,
+      p_es_pago_parcial: data.es_pago_parcial || false,
+      p_motivo_rechazo: data.motivo_rechazo,
+      p_notas_entrega: data.notas_entrega,
+      p_comprobante_url: data.comprobante_url,
+      p_numero_transaccion: data.numero_transaccion,
+      p_firma_url: data.firma_url,
+      p_qr_verificacion: data.qr_verificacion
+    })
+
+    if (errorEntrega || !resultadoEntrega?.success) {
+      console.error('[API/entrega] Error en RPC fn_registrar_entrega_completa:', errorEntrega || resultadoEntrega?.error)
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Error al registrar entrega',
+          error: errorEntrega?.message || resultadoEntrega?.error || 'Error desconocido'
+        },
+        { status: 500 }
+      )
     }
 
-    // Registrar información de pago según el caso:
-    // - Si es_cuenta_corriente: Todo a cuenta corriente del cliente
-    // - Si es_pago_parcial: Pagó parcialmente
-    // - Si motivo_rechazo: Rechazó el pedido
-    // - Si monto_cobrado > 0: Ya pagó
-    // - Si monto_cobrado = 0 pero hay metodo_pago: Pendiente de pago
-    // - Si monto_cobrado = 0 y no hay metodo_pago: Pagará después (solo notas)
-
-    if (data.es_cuenta_corriente) {
-      // Todo a cuenta corriente - marcar como registrado (a crédito)
-      updateData.pago_registrado = true
-      updateData.metodo_pago_registrado = 'cuenta_corriente'
-      updateData.monto_cobrado_registrado = 0
-      updateData.notas_pago = data.notas_entrega || 'Cargado a cuenta corriente'
-    } else if (data.motivo_rechazo) {
-      // Pedido rechazado
-      updateData.pago_registrado = true // Marcamos como "registrado" para que se pueda ver el estado
-      updateData.metodo_pago_registrado = null
-      updateData.monto_cobrado_registrado = 0
-      updateData.notas_pago = `Rechazado: ${data.motivo_rechazo}. ${data.notas_entrega || ''}`
-      updateData.estado_entrega = 'rechazado'
-    } else if (data.es_pago_parcial && data.monto_cobrado !== undefined && data.monto_cobrado > 0) {
-      // Pago parcial
-      updateData.pago_registrado = true
-      updateData.metodo_pago_registrado = data.metodo_pago || 'efectivo'
-      updateData.monto_cobrado_registrado = data.monto_cobrado
-      updateData.numero_transaccion_registrado = data.numero_transaccion || null
-      updateData.notas_pago = `Pago parcial. ${data.notas_entrega || ''}`
-    } else if (data.monto_cobrado && data.monto_cobrado > 0) {
-      // Ya pagó - registrar monto y método
-      updateData.pago_registrado = true
-      updateData.metodo_pago_registrado = data.metodo_pago || 'efectivo'
-      updateData.monto_cobrado_registrado = data.monto_cobrado
-      updateData.numero_transaccion_registrado = data.numero_transaccion || null
-      updateData.comprobante_url_registrado = data.comprobante_url || null
-      updateData.notas_pago = data.notas_entrega || null
-    } else if (data.metodo_pago && data.monto_cobrado === 0) {
-      // Pendiente de pago - registrar método futuro pero sin monto
-      updateData.pago_registrado = false
-      updateData.metodo_pago_registrado = data.metodo_pago
-      updateData.monto_cobrado_registrado = null
-      updateData.notas_pago = data.notas_entrega || 'Pendiente de pago'
-    } else if (data.monto_cobrado === 0) {
-      // Pagará después - solo registrar notas
-      updateData.pago_registrado = false
-      updateData.metodo_pago_registrado = null
-      updateData.monto_cobrado_registrado = null
-      updateData.notas_pago = data.notas_entrega || 'Pagará después'
-    }
-
-    // Actualizar detalles_ruta
-    await supabase
-      .from('detalles_ruta')
-      .update(updateData)
-      .eq('id', detalleRuta.id)
-
-    // Si es una entrega individual (pedido agrupado), también actualizar la tabla entregas
-    if (data.entrega_id) {
-      const entregaUpdateData: any = {
-        updated_at: new Date().toISOString(),
-        notas_pago: data.notas_entrega,
-      }
-
-      if (data.motivo_rechazo) {
-        entregaUpdateData.estado_pago = 'rechazado'
-        entregaUpdateData.estado_entrega = 'rechazado'
-        entregaUpdateData.notas_pago = `Rechazado: ${data.motivo_rechazo}. ${data.notas_entrega || ''}`
-      } else if (data.es_cuenta_corriente) {
-        // Todo a cuenta corriente - marcar como pagado (a crédito)
-        entregaUpdateData.estado_pago = 'cuenta_corriente'
-        entregaUpdateData.metodo_pago = 'cuenta_corriente'
-        entregaUpdateData.monto_cobrado = 0
-      } else if (data.es_pago_parcial && data.monto_cobrado !== undefined) {
-        // Pago parcial - parte pagada + resto a cuenta corriente
-        entregaUpdateData.estado_pago = 'parcial'
-        entregaUpdateData.metodo_pago = data.metodo_pago || 'efectivo'
-        entregaUpdateData.monto_cobrado = data.monto_cobrado
-        entregaUpdateData.numero_transaccion = data.numero_transaccion || null
-      } else if (data.monto_cobrado && data.monto_cobrado > 0) {
-        entregaUpdateData.estado_pago = 'pagado'
-        entregaUpdateData.metodo_pago = data.metodo_pago || 'efectivo'
-        entregaUpdateData.monto_cobrado = data.monto_cobrado
-        entregaUpdateData.numero_transaccion = data.numero_transaccion || null
-        entregaUpdateData.comprobante_url = data.comprobante_url || null
-      } else if (data.metodo_pago && data.monto_cobrado === 0) {
-        entregaUpdateData.estado_pago = 'pendiente'
-        entregaUpdateData.metodo_pago = data.metodo_pago
-      }
-
-      await supabase
-        .from('entregas')
-        .update(entregaUpdateData)
-        .eq('id', data.entrega_id)
-
-      console.log('[API/entrega] Actualizada tabla entregas:', {
-        entrega_id: data.entrega_id,
-        estado_pago: entregaUpdateData.estado_pago,
-        monto: entregaUpdateData.monto_cobrado
-      })
-
-      // Si hay monto a cuenta corriente, registrar en la cuenta del cliente
-      if (data.monto_cuenta_corriente && data.monto_cuenta_corriente > 0) {
-        // Obtener cliente_id de la entrega
-        const { data: entregaData } = await supabase
-          .from('entregas')
-          .select('cliente_id')
-          .eq('id', data.entrega_id)
-          .single()
-
-        if (entregaData?.cliente_id) {
-          // Registrar movimiento en cuenta corriente
-          await supabase.from('movimientos_cuenta_corriente').insert({
-            cliente_id: entregaData.cliente_id,
-            tipo: 'cargo',
-            monto: data.monto_cuenta_corriente,
-            descripcion: `Pedido ${data.pedido_id.slice(0, 8)} - Cargado a cuenta`,
-            referencia_tipo: 'entrega',
-            referencia_id: data.entrega_id,
-          })
-
-          console.log('[API/entrega] Registrado en cuenta corriente:', {
-            cliente_id: entregaData.cliente_id,
-            monto: data.monto_cuenta_corriente
-          })
-        }
-      }
-
-      // Actualizar estado de la factura según el pago
-      const { data: factura } = await supabase
-        .from('facturas')
-        .select('id')
-        .eq('entrega_id', data.entrega_id)
-        .single()
-
-      if (factura) {
-        let estadoFactura = 'pendiente'
-        if (data.es_cuenta_corriente) {
-          estadoFactura = 'pendiente' // Todo a cuenta corriente = factura pendiente
-        } else if (data.es_pago_parcial) {
-          estadoFactura = 'parcial' // Pago parcial = factura parcialmente pagada
-        } else if (data.monto_cobrado && data.monto_cobrado > 0) {
-          estadoFactura = 'pagada' // Pagó todo = factura pagada
-        }
-
-        await supabase
-          .from('facturas')
-          .update({ estado: estadoFactura })
-          .eq('id', factura.id)
-
-        console.log('[API/entrega] Estado factura actualizado:', {
-          factura_id: factura.id,
-          estado: estadoFactura
-        })
-      }
-
-      // PROCESAR FACTURAS ADICIONALES (DEUDA ANTERIOR)
-      if (data.facturas_pagadas && data.facturas_pagadas.length > 0) {
-        console.log('[API/entrega] Procesando facturas adicionales:', data.facturas_pagadas)
-
-        for (const facturaId of data.facturas_pagadas) {
-          // Obtener datos de la factura para saber el saldo
-          const { data: facturaData } = await supabase
-            .from('facturas')
-            .select('saldo_pendiente, cliente_id')
-            .eq('id', facturaId)
-            .single()
-
-          if (facturaData) {
-            // Registrar pago en cuenta corriente para esta factura específica
-            // Usando el RPC fn_registrar_pago_cuenta_corriente que es atómico
-            await supabase.rpc('fn_registrar_pago_cuenta_corriente', {
-              p_cliente_id: facturaData.cliente_id,
-              p_monto: facturaData.saldo_pendiente,
-              p_metodo_pago: data.metodo_pago || 'efectivo',
-              p_descripcion: `Pago factura ${facturaId.slice(0, 8)} vía reparto`,
-              p_usuario_id: user.id,
-              p_factura_id: facturaId
-            })
-
-            console.log(`[API/entrega] Pago registrado para factura ${facturaId}`)
-          }
-        }
-      }
-    }
+    console.log('[API/entrega] Entrega registrada exitosamente:', resultadoEntrega)
 
     // La función trigger actualizará automáticamente recaudacion_total_registrada en rutas_reparto
     // NO actualizamos pago_estado en pedidos hasta que el tesorero valide

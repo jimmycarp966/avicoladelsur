@@ -12,6 +12,7 @@ import { consultarSaldoTool } from './tools/consultar-saldo'
 import { crearReclamoTool } from './tools/crear-reclamo'
 import { consultarPreciosTool } from './tools/consultar-precios'
 import { gestionarNotificacionesTool, detectarIntencionNotificaciones } from './tools/gestionar-notificaciones'
+import { recuperarCarritoTool, carritoAPresupuesto } from './tools/recuperar-carrito'
 import { SYSTEM_PROMPT, generatePersonalizedContext } from './prompts/system-prompt'
 import { createAdminClient } from '@/lib/supabase/server'
 import { ensureGoogleApplicationCredentials } from './ensure-google-credentials'
@@ -133,6 +134,7 @@ export async function processMessageWithTools(
 
  Posibles intenciones:
  - pedido: El cliente quiere hacer un pedido o menciona productos con cantidades
+ - carrito: El cliente menciona un código de carrito (ej: ABC123, XYZ456) o dice que armó carrito en el catálogo
  - consulta_precio: El cliente pregunta por precios, lista de precios, cuánto cuesta algo, o responde "completa/todos" a una pregunta sobre precios
  - consulta_stock: El cliente pregunta por productos disponibles o stock
  - consulta_estado: El cliente pregunta por el estado de un pedido
@@ -144,7 +146,7 @@ export async function processMessageWithTools(
 
  IMPORTANTE: Si el mensaje es una respuesta corta como "completa", "todos", "si", "dale", etc., usa el CONTEXTO de la conversación para determinar la intención real.
 
- Responde SOLO con el nombre de la intención (ej: "pedido", "consulta_precio", "consulta_stock", etc.)`
+ Responde SOLO con el nombre de la intención (ej: "pedido", "carrito", "consulta_precio", "consulta_stock", etc.)`
 
     const intentResult = await model.generateContent(intentPrompt)
     const intent = extractTextFromResponse(intentResult.response).trim().toLowerCase()
@@ -212,6 +214,71 @@ Por ejemplo, podés escribir:
           }
         }
         break
+
+      case 'carrito': {
+        // Extraer código de carrito del mensaje (formato: 6 caracteres alfanuméricos)
+        const codigoMatch = message.match(/([A-Z0-9]{6})/i)
+        const codigo = codigoMatch ? codigoMatch[1].toUpperCase() : null
+
+        if (!codigo) {
+          return {
+            text: `No encontré el código del carrito en tu mensaje.
+El código debe tener 6 letras y números, ejemplo: ABC123
+¿Podés enviarme el código nuevamente?`
+          }
+        }
+
+        // Recuperar carrito
+        const carritoResult = await recuperarCarritoTool({
+          codigo,
+          telefono: phoneNumber
+        })
+
+        if (!carritoResult.success || !carritoResult.carrito) {
+          return {
+            text: carritoResult.error || 'No pude recuperar tu carrito.'
+          }
+        }
+
+        // Convertir carrito a productos y crear presupuesto
+        if (clienteId) {
+          const productos = carritoAPresupuesto(carritoResult.carrito)
+
+          if (productos.length > 0) {
+            const result = await crearPresupuestoTool({
+              cliente_id: clienteId,
+              productos
+            })
+
+            if (result.success) {
+              // Actualizar carrito como convertido
+              const supabase = createAdminClient()
+              await supabase
+                .from('carritos_pendientes')
+                .update({
+                  estado: 'convertido',
+                  presupuesto_id: result.presupuesto_id,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('codigo', codigo)
+
+              return {
+                text: `¡Perfecto! Recuperé tu carrito ${codigo} y creé tu presupuesto ${result.numero_presupuesto} por un total de $${result.total_estimado}.
+
+Tu pedido incluye:
+${carritoResult.carrito.items.map(i => `• ${i.producto_nombre}: ${i.cantidad}${i.peso_aprox ? ` kg (~${i.peso_aprox})` : ''}`).join('\n')}
+
+¿Para cuándo lo querés (hoy/mañana) y en qué turno (mañana/tarde)?`
+              }
+            }
+          }
+        }
+
+        return {
+          text: `Recuperé tu carrito ${codigo} con un total de $${carritoResult.carrito.total_estimado}.
+Para procesar tu pedido, necesito que te identifiques. ¿Podés decirme tu código de cliente o nombre?`
+        }
+      }
 
       case 'consulta_precio': {
         // Extraer posible nombre de producto del mensaje
