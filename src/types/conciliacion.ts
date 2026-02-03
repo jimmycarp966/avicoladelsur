@@ -184,3 +184,14 @@ export const ValidacionManualSchema = z.object({
 })
 
 export type ValidacionManualInput = z.infer<typeof ValidacionManualSchema>
+
+// ===========================================
+// ALERTAS DE VALIDACIÓN
+// ===========================================
+
+export interface AlertaValidacion {
+    tipo: 'error' | 'warning' | 'info'
+    codigo: string
+    mensaje: string
+    detalles?: Record<string, number | string>
+}

@@ -8,6 +8,7 @@ import {
 import { calculateStringSimilarity } from './utils'
 import { differenceInDays, parseISO, format } from 'date-fns'
 import { TOLERANCIA_MONTO_PORCENTAJE } from './parsers'
+import { analizarMatchDudoso } from './gemini-matcher-v2'
 
 // ===========================================
 // CONFIGURACIÓN DE REGLAS
@@ -27,6 +28,8 @@ const REGLAS_PUNTAJE = {
 }
 
 export const UMBRAL_VALIDACION = 80 // Límite exigente para evitar falsos positivos
+export const UMBRAL_REVISION_IA = 40 // Umbral para activar revisión con IA secundaria
+export const UMBRAL_MAXIMO_SIN_IA = 79 // Máximo score que puede tener sin revisión IA
 
 // ===========================================
 // MOTOR DE VALIDACIÓN
@@ -224,22 +227,32 @@ function calcularScoreComprobante(
 /**
  * Valida múltiples comprobantes contra la sábana bancaria.
  * Evita asignar el mismo movimiento a múltiples comprobantes.
+ * 
+ * NUEVO: Usa IA secundaria para matches dudosos (score 40-79)
  */
-export function validarComprobantesContraSabana(
+export async function validarComprobantesContraSabana(
     comprobantes: DatosComprobante[],
     movimientosSabana: MovimientoBancario[]
-): ResultadoValidacion[] {
+): Promise<ResultadoValidacion[]> {
     console.log('[Motor] ========== validarComprobantesContraSabana ==========')
     console.log('[Motor] Total comprobantes:', comprobantes.length)
     console.log('[Motor] Total movimientos sábana:', movimientosSabana.length)
 
     const resultados: ResultadoValidacion[] = []
     const movimientosUsados = new Set<string>()
+    const casosParaRevisionIA: Array<{
+        index: number
+        comprobante: DatosComprobante
+        movimiento: MovimientoBancario
+        score: number
+        detalles: Record<string, number>
+    }> = []
 
     // Ordenar comprobantes por monto (de mayor a menor) para priorizar
     const comprobantesOrdenados = [...comprobantes].sort((a, b) => b.monto - a.monto)
     console.log('[Motor] Comprobantes ordenados por monto (mayor a menor)')
 
+    // PRIMERA PASADA: Calcular scores básicos
     for (let i = 0; i < comprobantesOrdenados.length; i++) {
         const comprobante = comprobantesOrdenados[i]
         console.log(`[Motor] === Procesando comprobante ${i + 1}/${comprobantesOrdenados.length}: $${comprobante.monto} ===`)
@@ -252,13 +265,71 @@ export function validarComprobantesContraSabana(
 
         const resultado = validarComprobanteContraSabana(comprobante, movimientosDisponibles)
 
-        // Si se encontró match, marcar el movimiento como usado
+        // Si está en zona de revisión (40-79), guardar para análisis con IA
+        if (resultado.confianza_score >= UMBRAL_REVISION_IA && 
+            resultado.confianza_score <= UMBRAL_MAXIMO_SIN_IA &&
+            resultado.movimiento_match) {
+            console.log(`[Motor] Score ${resultado.confianza_score} en zona de revisión IA, guardando para análisis`)
+            casosParaRevisionIA.push({
+                index: resultados.length,
+                comprobante,
+                movimiento: resultado.movimiento_match,
+                score: resultado.confianza_score,
+                detalles: resultado.detalles
+            })
+        }
+
+        // Si el score es >= 80, marcar como usado inmediatamente
         if (resultado.movimiento_match && resultado.estado === 'validado') {
             movimientosUsados.add(resultado.movimiento_match.id!)
-            console.log(`[Motor] Movimiento ${resultado.movimiento_match.id} marcado como usado`)
+            console.log(`[Motor] Movimiento ${resultado.movimiento_match.id} marcado como usado (score ${resultado.confianza_score})`)
         }
 
         resultados.push(resultado)
+    }
+
+    // SEGUNDA PASADA: Procesar casos dudosos con IA secundaria
+    if (casosParaRevisionIA.length > 0) {
+        console.log(`[Motor] ========== REVISIÓN CON IA SECUNDARIA ==========`)
+        console.log(`[Motor] ${casosParaRevisionIA.length} casos para revisar`)
+
+        for (const caso of casosParaRevisionIA) {
+            console.log(`[Motor] Revisando caso con IA: comprobante $${caso.comprobante.monto} vs movimiento $${caso.movimiento.monto}`)
+            
+            const decisionIA = await analizarMatchDudoso(
+                caso.comprobante,
+                caso.movimiento,
+                caso.score,
+                caso.detalles
+            )
+
+            console.log(`[Motor] Decisión IA: ${decisionIA.esValido ? 'VALIDAR' : 'RECHAZAR'} (confianza: ${decisionIA.confianzaFinal})`)
+            console.log(`[Motor] Razón: ${decisionIA.razon}`)
+
+            // Actualizar resultado según decisión de IA
+            const resultado = resultados[caso.index]
+            if (decisionIA.esValido) {
+                resultado.estado = 'validado'
+                resultado.confianza_score = Math.round(decisionIA.confianzaFinal * 100)
+                resultado.etiquetas.push('✅ Validado por IA', ...decisionIA.etiquetasExtra)
+                resultado.detalles['revision_ia'] = Math.round(decisionIA.confianzaFinal * 100)
+                resultado.detalles['razon_ia'] = decisionIA.razon
+                
+                // Marcar movimiento como usado
+                if (resultado.movimiento_match) {
+                    movimientosUsados.add(resultado.movimiento_match.id!)
+                }
+            } else {
+                resultado.estado = 'no_encontrado'
+                resultado.confianza_score = Math.round(decisionIA.confianzaFinal * 100)
+                resultado.etiquetas.push('❌ Rechazado por IA', ...decisionIA.etiquetasExtra)
+                resultado.detalles['revision_ia'] = Math.round(decisionIA.confianzaFinal * 100)
+                resultado.detalles['razon_ia'] = decisionIA.razon
+            }
+
+            // Pausa entre llamadas para no saturar la API
+            await new Promise(r => setTimeout(r, 300))
+        }
     }
 
     // Resumen final

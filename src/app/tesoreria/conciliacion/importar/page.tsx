@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -16,11 +16,17 @@ import {
     CheckCircle,
     AlertCircle,
     Loader2,
-    ArrowLeft
+    ArrowLeft,
+    Clock,
+    AlertTriangle,
+    Info
 } from 'lucide-react'
-import { procesarConciliacionCompletaAction } from '@/actions/conciliacion.actions'
-import { ResumenConciliacion } from '@/types/conciliacion'
+import { procesarConciliacionMejoradaAction, obtenerEstadoJobAction } from '@/actions/conciliacion-mejorada.actions'
+import { ResumenConciliacion, AlertaValidacion } from '@/types/conciliacion'
 import Link from 'next/link'
+
+// Intervalo de polling para jobs async (5 segundos)
+const POLLING_INTERVAL = 5000
 
 export default function ImportarConciliacionPage() {
     const router = useRouter()
@@ -31,12 +37,42 @@ export default function ImportarConciliacionPage() {
     const [etapa, setEtapa] = useState('')
     const [resultado, setResultado] = useState<ResumenConciliacion | null>(null)
     const [error, setError] = useState<string | null>(null)
+    const [alertas, setAlertas] = useState<AlertaValidacion[]>([])
+    const [jobId, setJobId] = useState<string | null>(null)
+    const [requiereAsync, setRequiereAsync] = useState(false)
+    const [duplicadosDetectados, setDuplicadosDetectados] = useState<Array<{ comprobante1: number; comprobante2: number; razon: string }> | null>(null)
+
+    // Polling para jobs async
+    useEffect(() => {
+        if (!jobId || !requiereAsync) return
+
+        const interval = setInterval(async () => {
+            const estado = await obtenerEstadoJobAction(jobId)
+            if (estado.success && estado.job) {
+                setProgreso(estado.job.progreso)
+                
+                if (estado.job.estado === 'completado') {
+                    setRequiereAsync(false)
+                    setProcesando(false)
+                    if (estado.job.resultado) {
+                        setResultado(estado.job.resultado)
+                    }
+                    clearInterval(interval)
+                } else if (estado.job.estado === 'error') {
+                    setRequiereAsync(false)
+                    setProcesando(false)
+                    setError(estado.job.error || 'Error en procesamiento')
+                    clearInterval(interval)
+                }
+            }
+        }, POLLING_INTERVAL)
+
+        return () => clearInterval(interval)
+    }, [jobId, requiereAsync])
 
     // Dropzone para el PDF de sábana
     const onDropSabana = useCallback((acceptedFiles: File[]) => {
-        console.log('[DEBUG Conciliación] onDropSabana - Archivos recibidos:', acceptedFiles.map(f => ({ name: f.name, size: f.size, type: f.type })))
         if (acceptedFiles.length > 0) {
-            console.log('[DEBUG Conciliación] Sábana PDF seleccionada:', acceptedFiles[0].name, 'Tamaño:', (acceptedFiles[0].size / 1024).toFixed(2), 'KB')
             setSabanaPdf(acceptedFiles[0])
             setError(null)
         }
@@ -52,12 +88,7 @@ export default function ImportarConciliacionPage() {
 
     // Dropzone para comprobantes (imágenes)
     const onDropComprobantes = useCallback((acceptedFiles: File[]) => {
-        console.log('[DEBUG Conciliación] onDropComprobantes - Nuevos comprobantes:', acceptedFiles.map(f => ({ name: f.name, size: f.size, type: f.type })))
-        setComprobantes(prev => {
-            const nuevaLista = [...prev, ...acceptedFiles]
-            console.log('[DEBUG Conciliación] Total comprobantes ahora:', nuevaLista.length)
-            return nuevaLista
-        })
+        setComprobantes(prev => [...prev, ...acceptedFiles])
         setError(null)
     }, [])
 
@@ -74,14 +105,15 @@ export default function ImportarConciliacionPage() {
         setComprobantes(prev => prev.filter((_, i) => i !== index))
     }
 
+    // Calcular tamaño total
+    const calcularTamañoTotal = () => {
+        if (!sabanaPdf) return 0
+        return sabanaPdf.size + comprobantes.reduce((acc, f) => acc + f.size, 0)
+    }
+
     // Procesar conciliación
     const procesarConciliacion = async () => {
-        console.log('[DEBUG Conciliación] ========== INICIO DE CONCILIACIÓN ==========')
-        console.log('[DEBUG Conciliación] Sábana PDF:', sabanaPdf ? { name: sabanaPdf.name, size: sabanaPdf.size, type: sabanaPdf.type } : null)
-        console.log('[DEBUG Conciliación] Comprobantes:', comprobantes.map(f => ({ name: f.name, size: f.size, type: f.type })))
-
         if (!sabanaPdf || comprobantes.length === 0) {
-            console.error('[DEBUG Conciliación] ERROR: Faltan archivos requeridos')
             setError('Debe subir el PDF de la sábana y al menos un comprobante')
             return
         }
@@ -89,119 +121,157 @@ export default function ImportarConciliacionPage() {
         setProcesando(true)
         setError(null)
         setProgreso(0)
+        setAlertas([])
+        setDuplicadosDetectados(null)
 
-        const tiempoInicio = performance.now()
-        console.log('[DEBUG Conciliación] Tiempo inicio:', new Date().toISOString())
-
-        // Calcular tamaño total
-        const sizeSabana = sabanaPdf.size
-        const sizeComprobantes = comprobantes.reduce((acc, curr) => acc + curr.size, 0)
-        const totalSize = sizeSabana + sizeComprobantes
-        const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(2)
-
-        console.log(`[DEBUG Conciliación] Tamaño total payload: ${totalSizeMB} MB`)
-
-        if (totalSize > 45 * 1024 * 1024) { // 45MB límite seguridad
-            console.error('[DEBUG Conciliación] ERROR: El tamaño total excede el límite seguro (45MB).')
-            setError(`El tamaño total de los archivos (${totalSizeMB} MB) es demasiado grande. Intente subir menos comprobantes a la vez (máx 45MB).`)
-            setProcesando(false)
-            return
-        }
+        const sizeTotal = calcularTamañoTotal()
+        const sizeTotalMB = (sizeTotal / (1024 * 1024)).toFixed(2)
 
         try {
             // Preparar FormData
-            console.log('[DEBUG Conciliación] Paso 1: Preparando FormData...')
             const formData = new FormData()
             formData.append('sabana', sabanaPdf)
-            console.log('[DEBUG Conciliación] - Sábana agregada al FormData')
-
-            comprobantes.forEach((file, idx) => {
+            comprobantes.forEach((file) => {
                 formData.append('comprobantes', file)
-                console.log(`[DEBUG Conciliación] - Comprobante ${idx + 1}/${comprobantes.length} agregado: ${file.name}`)
             })
 
-            const timeouts: NodeJS.Timeout[] = []
-
-            // Simular progreso mientras procesa
-            setEtapa('Extrayendo datos de la sábana bancaria...')
+            // Simular progreso inicial
+            setEtapa('Subiendo archivos y verificando duplicados...')
             setProgreso(10)
-            console.log('[DEBUG Conciliación] Paso 2: Iniciando llamada al servidor...')
 
+            const timeouts: NodeJS.Timeout[] = []
             const intervalo = setInterval(() => {
-                setProgreso(prev => {
-                    if (prev >= 90) {
-                        return 90
-                    }
-                    return prev + 5
-                })
-            }, 1000)
+                setProgreso(prev => Math.min(prev + 2, 85))
+            }, 2000)
 
-            timeouts.push(setTimeout(() => { setEtapa('Procesando comprobantes con IA...'); console.log('[DEBUG Conciliación] Etapa: Procesando comprobantes con IA') }, 3000))
-            timeouts.push(setTimeout(() => { setEtapa('Validando comprobantes contra sábana...'); console.log('[DEBUG Conciliación] Etapa: Validando comprobantes') }, 6000))
-            timeouts.push(setTimeout(() => { setEtapa('Buscando clientes por DNI...'); console.log('[DEBUG Conciliación] Etapa: Buscando clientes') }, 9000))
-            timeouts.push(setTimeout(() => { setEtapa('Acreditando saldos...'); console.log('[DEBUG Conciliación] Etapa: Acreditando saldos') }, 12000))
+            timeouts.push(setTimeout(() => { setEtapa('Extrayendo datos con IA...') }, 3000))
+            timeouts.push(setTimeout(() => { setEtapa('Validando comprobantes contra sábana...') }, 8000))
+            timeouts.push(setTimeout(() => { setEtapa('Analizando matches dudosos con IA...') }, 12000))
 
-            // Ejecutar acción
-            console.log('[DEBUG Conciliación] Llamando a procesarConciliacionCompletaAction...')
+            // Ejecutar acción mejorada
+            const result = await procesarConciliacionMejoradaAction(formData)
 
-            try {
-                const result = await procesarConciliacionCompletaAction(formData)
+            timeouts.forEach(clearTimeout)
+            clearInterval(intervalo)
 
-                // Limpiar timeouts si termina antes
-                timeouts.forEach(clearTimeout)
-                clearInterval(intervalo)
+            if (result.requiereAsync && result.jobId) {
+                // Procesamiento async iniciado
+                setJobId(result.jobId)
+                setRequiereAsync(true)
+                setEtapa('Procesando en segundo plano...')
+                setProgreso(15)
+                return
+            }
 
-                const tiempoFin = performance.now()
-                console.log('[DEBUG Conciliación] ========== RESPUESTA DEL SERVIDOR ==========')
-                console.log('[DEBUG Conciliación] Tiempo de ejecución:', ((tiempoFin - tiempoInicio) / 1000).toFixed(2), 'segundos')
-                console.log('[DEBUG Conciliación] Resultado success:', result.success)
-                console.log('[DEBUG Conciliación] Resultado error:', result.error)
-                console.log('[DEBUG Conciliación] Sesión ID:', result.sesionId)
-                console.log('[DEBUG Conciliación] Resumen completo:', JSON.stringify(result.resumen, null, 2))
+            setProgreso(100)
+            setEtapa('¡Proceso completado!')
 
-                setProgreso(100)
-                setEtapa('¡Proceso completado!')
-
-                if (result.success && result.resumen) {
-                    console.log('[DEBUG Conciliación] ✅ Conciliación exitosa')
-                    console.log('[DEBUG Conciliación] - Total comprobantes:', result.resumen.total_comprobantes)
-                    console.log('[DEBUG Conciliación] - Validados:', result.resumen.validados)
-                    console.log('[DEBUG Conciliación] - No encontrados:', result.resumen.no_encontrados)
-                    console.log('[DEBUG Conciliación] - Sin cliente:', result.resumen.sin_cliente)
-                    console.log('[DEBUG Conciliación] - Errores:', result.resumen.errores)
-                    console.log('[DEBUG Conciliación] - Monto acreditado:', result.resumen.monto_total_acreditado)
-                    console.log('[DEBUG Conciliación] - Detalles:', result.resumen.detalles)
-                    setResultado(result.resumen)
-                } else {
-                    console.error('[DEBUG Conciliación] ❌ Error en conciliación:', result.error)
-                    setError(result.error || 'Error desconocido')
+            if (result.success && result.resumen) {
+                setResultado(result.resumen)
+                if (result.alertas && result.alertas.length > 0) {
+                    setAlertas(result.alertas)
                 }
-            } catch (actionError) {
-                // Capturar error específico de la acción si ocurre
-                throw actionError
-            } finally {
-                timeouts.forEach(clearTimeout)
-                clearInterval(intervalo)
+                if (result.duplicadosDetectados && result.duplicadosDetectados.length > 0) {
+                    setDuplicadosDetectados(result.duplicadosDetectados)
+                }
+            } else {
+                setError(result.error || 'Error desconocido')
+                if (result.alertas && result.alertas.length > 0) {
+                    setAlertas(result.alertas)
+                }
             }
 
         } catch (err) {
-            console.error('[DEBUG Conciliación] ❌ EXCEPCIÓN CAPTURADA:', err)
-            const mensaje = err instanceof Error ? err.message : 'Error al procesar la conciliación'
-
-            if (mensaje.includes('Failed to fetch')) {
-                const msgReinicio = 'Error de conexión (Payload Too Large). Por favor REINICIE EL SERVIDOR (npm run dev) para aplicar el nuevo límite de tamaño de 50MB.'
-                console.error('[DEBUG Conciliación] SUGERENCIA: ' + msgReinicio)
-                setError(msgReinicio)
-            } else {
-                setError(mensaje)
-            }
+            console.error('Error en conciliación:', err)
+            setError(err instanceof Error ? err.message : 'Error al procesar la conciliación')
         } finally {
-            setProcesando(false)
-            console.log('[DEBUG Conciliación] ========== FIN DE CONCILIACIÓN ==========')
+            if (!requiereAsync) {
+                setProcesando(false)
+            }
         }
     }
 
-    // Si hay resultado, mostrar resumen
+    // Renderizar alerta según tipo
+    const renderAlerta = (alerta: AlertaValidacion, index: number) => {
+        const iconos = {
+            error: <AlertCircle className="h-4 w-4" />,
+            warning: <AlertTriangle className="h-4 w-4" />,
+            info: <Info className="h-4 w-4" />
+        }
+
+        const variantes = {
+            error: 'destructive' as const,
+            warning: 'default' as const,
+            info: 'default' as const
+        }
+
+        const clases = {
+            error: 'border-red-200 bg-red-50',
+            warning: 'border-yellow-200 bg-yellow-50',
+            info: 'border-blue-200 bg-blue-50'
+        }
+
+        return (
+            <Alert key={index} variant={variantes[alerta.tipo]} className={clases[alerta.tipo]}>
+                {iconos[alerta.tipo]}
+                <AlertTitle className="capitalize">{alerta.tipo === 'error' ? 'Error' : alerta.tipo === 'warning' ? 'Advertencia' : 'Información'}</AlertTitle>
+                <AlertDescription>{alerta.mensaje}</AlertDescription>
+            </Alert>
+        )
+    }
+
+    // Vista de procesamiento async
+    if (requiereAsync && jobId) {
+        return (
+            <div className="container mx-auto py-6 space-y-6">
+                <div className="flex items-center gap-4">
+                    <Link href="/tesoreria/conciliacion">
+                        <Button variant="ghost" size="icon">
+                            <ArrowLeft className="h-5 w-5" />
+                        </Button>
+                    </Link>
+                    <h1 className="text-2xl font-bold">Procesando Conciliación</h1>
+                </div>
+
+                <Card className="border-blue-200 bg-blue-50">
+                    <CardContent className="pt-6">
+                        <div className="flex items-center gap-4 mb-4">
+                            <Clock className="h-8 w-8 text-blue-600 animate-pulse" />
+                            <div>
+                                <h3 className="font-semibold text-blue-900">Procesamiento en Segundo Plano</h3>
+                                <p className="text-sm text-blue-700">
+                                    Los archivos son grandes. El procesamiento continuará en el servidor.
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                                <span className="text-blue-700">Progreso</span>
+                                <span className="font-medium text-blue-900">{progreso}%</span>
+                            </div>
+                            <Progress value={progreso} className="h-2" />
+                        </div>
+
+                        <p className="text-sm text-blue-600 mt-4">
+                            Puedes cerrar esta página y volver más tarde. La sesión aparecerá en el historial cuando termine.
+                        </p>
+                    </CardContent>
+                </Card>
+
+                <div className="flex gap-4">
+                    <Link href="/tesoreria/conciliacion">
+                        <Button variant="outline">Ir al Dashboard</Button>
+                    </Link>
+                    <Button onClick={() => router.refresh()}>
+                        Actualizar Estado
+                    </Button>
+                </div>
+            </div>
+        )
+    }
+
+    // Vista de resultado
     if (resultado) {
         return (
             <div className="container mx-auto py-6 space-y-6">
@@ -221,6 +291,25 @@ export default function ImportarConciliacionPage() {
                         Se procesaron {resultado.total_comprobantes} comprobantes correctamente.
                     </AlertDescription>
                 </Alert>
+
+                {/* Alertas de validación */}
+                {alertas.length > 0 && (
+                    <div className="space-y-2">
+                        {alertas.map((alerta, idx) => renderAlerta(alerta, idx))}
+                    </div>
+                )}
+
+                {/* Duplicados detectados */}
+                {duplicadosDetectados && duplicadosDetectados.length > 0 && (
+                    <Alert className="border-orange-200 bg-orange-50">
+                        <AlertTriangle className="h-4 w-4 text-orange-600" />
+                        <AlertTitle className="text-orange-800">Comprobantes Duplicados Detectados</AlertTitle>
+                        <AlertDescription className="text-orange-700">
+                            Se encontraron {duplicadosDetectados.length} posibles duplicados en el lote. 
+                            Los duplicados fueron filtrados automáticamente antes del procesamiento.
+                        </AlertDescription>
+                    </Alert>
+                )}
 
                 {/* Cards de resumen */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -264,7 +353,7 @@ export default function ImportarConciliacionPage() {
                 </Card>
 
                 {/* Acciones */}
-                <div className="flex gap-4">
+                <div className="flex flex-wrap gap-4">
                     {resultado.reporte_url && (
                         <a href={resultado.reporte_url} target="_blank" rel="noopener noreferrer">
                             <Button>
@@ -283,6 +372,8 @@ export default function ImportarConciliacionPage() {
                         setSabanaPdf(null)
                         setComprobantes([])
                         setProgreso(0)
+                        setAlertas([])
+                        setDuplicadosDetectados(null)
                     }}>
                         Nueva Conciliación
                     </Button>
@@ -291,6 +382,7 @@ export default function ImportarConciliacionPage() {
         )
     }
 
+    // Vista principal
     return (
         <div className="container mx-auto py-6 space-y-6">
             {/* Header */}
@@ -308,12 +400,35 @@ export default function ImportarConciliacionPage() {
                 </div>
             </div>
 
+            {/* Alertas informativas */}
+            <Alert className="border-blue-200 bg-blue-50">
+                <Info className="h-4 w-4 text-blue-600" />
+                <AlertTitle className="text-blue-800">Nuevas Mejoras Disponibles</AlertTitle>
+                <AlertDescription className="text-blue-700">
+                    El sistema ahora detecta duplicados automáticamente, valida montos cruzados y usa IA secundaria para matches dudosos.
+                    Archivos mayores a 10 MB se procesan en segundo plano.
+                </AlertDescription>
+            </Alert>
+
             {error && (
                 <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle>Error</AlertTitle>
                     <AlertDescription>{error}</AlertDescription>
                 </Alert>
+            )}
+
+            {/* Tamaño total */}
+            {sabanaPdf && comprobantes.length > 0 && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span>Tamaño total:</span>
+                    <Badge variant="secondary">
+                        {((calcularTamañoTotal() / (1024 * 1024))).toFixed(2)} MB
+                    </Badge>
+                    {calcularTamañoTotal() > 10 * 1024 * 1024 && (
+                        <span className="text-yellow-600">(Se procesará en segundo plano)</span>
+                    )}
+                </div>
             )}
 
             <div className="grid md:grid-cols-2 gap-6">
@@ -417,6 +532,9 @@ export default function ImportarConciliacionPage() {
                                         <div className="flex items-center gap-2 overflow-hidden">
                                             <ImageIcon className="h-4 w-4 flex-shrink-0" />
                                             <span className="text-sm truncate">{file.name}</span>
+                                            <span className="text-xs text-muted-foreground">
+                                                ({(file.size / 1024).toFixed(0)} KB)
+                                            </span>
                                         </div>
                                         <Button
                                             variant="ghost"
@@ -446,6 +564,10 @@ export default function ImportarConciliacionPage() {
                             <Progress value={progreso} className="h-2" />
                             <p className="text-sm text-muted-foreground text-center">
                                 {progreso}% completado
+                            </p>
+                            <p className="text-xs text-muted-foreground text-center">
+                                El sistema está verificando duplicados, extrayendo datos con IA,
+                                validando montos cruzados y analizando matches dudosos.
                             </p>
                         </div>
                     </CardContent>
