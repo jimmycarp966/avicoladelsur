@@ -12,10 +12,12 @@ export const revalidate = 300
 async function getProductos() {
     const supabase = await createClient()
 
-    // ID de la lista minorista (según la BD: f1c62e66-7b4c-4c82-b1a5-a7d125e05acd)
-    const LISTA_MINORISTA_ID = 'f1c62e66-7b4c-4c82-b1a5-a7d125e05acd'
-    const MARGEN_MINORISTA = 1.30 // 30% de margen
+    // Lista MAYORISTA (los precios están cargados ahí)
+    const LISTA_MAYORISTA_ID = 'a0d2f9cb-08d2-4c4d-8e87-f2bc39d2b351'
+    // Margen para convertir a precio público (30% sobre mayorista)
+    const MARGEN_MINORISTA = 1.30
 
+    // Obtener productos
     const { data: productos, error } = await supabase
         .from('productos')
         .select(`
@@ -39,13 +41,34 @@ async function getProductos() {
         return []
     }
 
+    // Obtener precios de la lista mayorista
+    const { data: preciosMayorista } = await supabase
+        .from('precios_productos')
+        .select('producto_id, precio')
+        .eq('lista_precio_id', LISTA_MAYORISTA_ID)
+        .eq('activo', true)
+
+    // Crear mapa de precios mayorista por producto_id
+    const preciosMap = new Map()
+    preciosMayorista?.forEach(p => {
+        preciosMap.set(p.producto_id, parseFloat(p.precio))
+    })
+
     // Transformar al formato esperado por el cliente
     return (productos || []).map(p => {
-        let precioMinorista = p.precio_venta || 0
+        let precioMinorista = null
 
-        // Si no tiene precio_venta, intentar calcular desde precio_costo
-        if ((!precioMinorista || precioMinorista === 0) && p.precio_costo) {
-            // Aplicar margen minorista (30%)
+        // 1. Primero intentar usar precio_venta del producto (si tiene valor)
+        if (p.precio_venta && parseFloat(p.precio_venta) > 0) {
+            precioMinorista = parseFloat(p.precio_venta)
+        }
+        // 2. Si no, usar precio de lista mayorista + margen 30%
+        else if (preciosMap.has(p.id)) {
+            const precioMayorista = preciosMap.get(p.id)
+            precioMinorista = precioMayorista * MARGEN_MINORISTA
+        }
+        // 3. Si no, intentar calcular desde precio_costo + margen 30%
+        else if (p.precio_costo && parseFloat(p.precio_costo) > 0) {
             precioMinorista = parseFloat(p.precio_costo) * MARGEN_MINORISTA
         }
 
@@ -54,8 +77,8 @@ async function getProductos() {
             codigo: p.codigo,
             nombre: p.nombre,
             descripcion: p.descripcion,
-            precio_minorista: precioMinorista,
-            precio_mayorista: p.precio_costo,
+            precio_minorista: precioMinorista || 0,
+            precio_mayorista: preciosMap.get(p.id) || (p.precio_costo ? parseFloat(p.precio_costo) : null),
             unidad: p.unidad_medida || 'kg',
             es_pesable: p.pesable || false,
             venta_mayor_habilitada: p.venta_mayor_habilitada || false,
@@ -63,7 +86,7 @@ async function getProductos() {
             imagen_url: null,
             categoria: p.categoria ? { id: p.categoria, nombre: p.categoria } : null
         }
-    })
+    }).filter(p => p.precio_minorista > 0) // Solo mostrar productos con precio
 }
 
 async function getCategorias() {
