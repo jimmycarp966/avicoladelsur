@@ -210,7 +210,7 @@ export default function CatalogoClient({ productos, categorias }: CatalogoClient
         toast.success('Carrito vaciado')
     }
 
-    // Confirmar pedido por WhatsApp
+    // Confirmar pedido - Crea automáticamente el presupuesto
     const confirmarPedido = async () => {
         if (carrito.length === 0) {
             toast.error('El carrito está vacío')
@@ -231,10 +231,8 @@ export default function CatalogoClient({ productos, categorias }: CatalogoClient
                     telefono: telefonoCliente,
                     items: carrito.map(item => ({
                         producto_id: item.producto.id,
-                        producto_nombre: item.producto.nombre,
                         cantidad: item.cantidad,
-                        peso_aprox: item.pesoAprox,
-                        precio_unitario: item.producto.precio_minorista,
+                        peso_aprox: item.producto.es_pesable ? item.pesoAprox : undefined,
                     })),
                     total_estimado: totalCarrito,
                 }),
@@ -243,35 +241,22 @@ export default function CatalogoClient({ productos, categorias }: CatalogoClient
             const result = await response.json()
 
             if (!result.success) {
-                toast.error('Error al guardar el carrito')
+                toast.error(result.error || 'Error al crear el pedido')
                 setEnviando(false)
                 return
             }
 
-            const codigoCarrito = result.codigo
-
-            let mensaje = `🛒 *Nuevo Pedido - Avícola del Sur*\n\n`
-            mensaje += `📱 Cliente: ${telefonoCliente}\n`
-            mensaje += `🛒 Código: *${codigoCarrito}*\n\n`
-            mensaje += `*Productos:*\n`
-            carrito.forEach(item => {
-                const precio = item.producto.precio_minorista
-                if (item.producto.es_pesable && item.pesoAprox) {
-                    mensaje += `• ${item.producto.nombre} - ${item.pesoAprox} kg aprox - $${(precio * item.pesoAprox).toFixed(2)}\n`
-                } else {
-                    mensaje += `• ${item.producto.nombre} x${item.cantidad} - $${(precio * item.cantidad).toFixed(2)}\n`
-                }
-            })
-            mensaje += `\n💰 *Total: $${totalCarrito.toFixed(2)}*`
-
-            const whatsappUrl = `https://wa.me/5493815123456?text=${encodeURIComponent(mensaje)}`
-            window.open(whatsappUrl, '_blank')
+            // Pedido creado exitosamente
+            const codigoPresupuesto = result.codigo
 
             setCarrito([])
             setMostrarFormConfirmar(false)
             setCarritoAbierto(false)
-            toast.success(`¡Pedido enviado! Código: ${codigoCarrito}`, {
-                icon: <Sparkles className="h-5 w-5 text-amber-500" />,
+            setTelefonoCliente('')
+
+            toast.success(`¡Pedido creado! Código: ${codigoPresupuesto}`, {
+                icon: <Sparkles className="h-5 w-5 text-emerald-500" />,
+                duration: 5000,
             })
 
         } catch (error) {
@@ -782,8 +767,8 @@ function CarritoContent({
                             className="w-full h-12 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-semibold rounded-2xl shadow-lg shadow-emerald-500/25"
                             onClick={() => setMostrarFormConfirmar(true)}
                         >
-                            <Send className="h-4 w-4 mr-2" />
-                            Confirmar Pedido
+                            <ShoppingCart className="h-4 w-4 mr-2" />
+                            Crear Pedido
                         </Button>
                     ) : (
                         <div className="space-y-3">
@@ -792,13 +777,16 @@ function CarritoContent({
                                     <Phone className="h-5 w-5 text-emerald-600" />
                                 </div>
                                 <Input
-                                    placeholder="Tu número de WhatsApp"
+                                    placeholder="Tu número de teléfono"
                                     type="tel"
                                     value={telefonoCliente}
                                     onChange={(e) => setTelefonoCliente(e.target.value.replace(/\D/g, ''))}
                                     className="flex-1 border-0 focus-visible:ring-0 px-0"
                                 />
                             </div>
+                            <p className="text-xs text-slate-500 text-center">
+                                Crearemos tu pedido automáticamente. Te contactaremos para coordinar la entrega.
+                            </p>
                             <div className="flex gap-2">
                                 <Button
                                     variant="outline"
@@ -820,12 +808,12 @@ function CarritoContent({
                                                 transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                                                 className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full mr-2"
                                             />
-                                            Enviando...
+                                            Creando...
                                         </>
                                     ) : (
                                         <>
-                                            <Send className="h-4 w-4 mr-2" />
-                                            Enviar
+                                            <ShoppingCart className="h-4 w-4 mr-2" />
+                                            Crear Pedido
                                         </>
                                     )}
                                 </Button>
