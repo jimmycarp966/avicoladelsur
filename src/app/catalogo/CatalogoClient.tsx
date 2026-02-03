@@ -61,6 +61,8 @@ interface ItemCarrito {
 interface CatalogoClientProps {
     productos: Producto[]
     categorias: Categoria[]
+    telefono?: string
+    auth?: string
 }
 
 const CARRITO_KEY = 'avicola_carrito'
@@ -68,8 +70,25 @@ const FAVORITOS_KEY = 'avicola_favoritos'
 
 type VistaType = 'grid' | 'lista'
 type OrdenType = 'nombre' | 'precio_asc' | 'precio_desc'
+type AuthStatus = 'loading' | 'no_auth' | 'auth' | 'invalid_token' | 'not_registered'
 
-export default function CatalogoClient({ productos, categorias }: CatalogoClientProps) {
+// Validar token (misma lógica que en el servidor)
+function validarToken(token: string): { valido: boolean; telefono?: string } {
+    try {
+        const decoded = Buffer.from(token, 'base64').toString()
+        const parts = decoded.split('_')
+        if (parts.length < 2) return { valido: false }
+        const telefono = parts.slice(0, -1).join('_')
+        const timestamp = parseInt(parts[parts.length - 1])
+        const edad = Date.now() - timestamp
+        if (edad > 86400000) return { valido: false }
+        return { valido: true, telefono }
+    } catch {
+        return { valido: false }
+    }
+}
+
+export default function CatalogoClient({ productos, categorias, telefono, auth }: CatalogoClientProps) {
     const [busqueda, setBusqueda] = useState('')
     const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<string>('todas')
     const [carrito, setCarrito] = useState<ItemCarrito[]>([])
@@ -83,6 +102,23 @@ export default function CatalogoClient({ productos, categorias }: CatalogoClient
     const [favoritos, setFavoritos] = useState<Set<string>>(new Set())
     const [soloFavoritos, setSoloFavoritos] = useState(false)
     const [filtrosAbiertos, setFiltrosAbiertos] = useState(false)
+    const [authStatus, setAuthStatus] = useState<AuthStatus>('loading')
+    const [authTelefono, setAuthTelefono] = useState<string>('')
+
+    // Validar autenticación al cargar
+    useEffect(() => {
+        if (auth && telefono) {
+            const validacion = validarToken(auth)
+            if (validacion.valido && validacion.telefono === telefono) {
+                setAuthStatus('auth')
+                setAuthTelefono(telefono)
+            } else {
+                setAuthStatus('invalid_token')
+            }
+        } else {
+            setAuthStatus('no_auth')
+        }
+    }, [auth, telefono])
 
     // Cargar carrito y favoritos de localStorage
     useEffect(() => {
@@ -216,7 +252,12 @@ export default function CatalogoClient({ productos, categorias }: CatalogoClient
             toast.error('El carrito está vacío')
             return
         }
-        if (!telefonoCliente || telefonoCliente.length < 10) {
+
+        // Determinar teléfono y token según el estado de autenticación
+        const telefonoPedido = authStatus === 'auth' ? authTelefono : telefonoCliente
+        const authToken = authStatus === 'auth' ? auth : undefined
+
+        if (!telefonoPedido || telefonoPedido.length < 10) {
             toast.error('Ingresa tu número de teléfono')
             return
         }
@@ -228,7 +269,8 @@ export default function CatalogoClient({ productos, categorias }: CatalogoClient
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    telefono: telefonoCliente,
+                    telefono: telefonoPedido,
+                    token: authToken,
                     items: carrito.map(item => ({
                         producto_id: item.producto.id,
                         cantidad: item.cantidad,
@@ -268,6 +310,55 @@ export default function CatalogoClient({ productos, categorias }: CatalogoClient
     }
 
     const categoriasConTodas = [{ id: 'todas', nombre: 'Todos' }, ...categorias]
+
+    // Pantalla de carga mientras validamos
+    if (authStatus === 'loading') {
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="text-center"
+                >
+                    <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                        className="w-16 h-16 border-4 border-emerald-200 border-t-emerald-500 rounded-full mx-auto mb-4"
+                    />
+                    <p className="text-slate-600">Verificando acceso...</p>
+                </motion.div>
+            </div>
+        )
+    }
+
+    // Pantalla para token inválido
+    if (authStatus === 'invalid_token') {
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8 text-center"
+                >
+                    <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <XCircle className="h-8 w-8 text-red-500" />
+                    </div>
+                    <h2 className="text-xl font-bold text-slate-900 mb-2">Enlace inválido</h2>
+                    <p className="text-slate-600 mb-6">
+                        El enlace que usaste es inválido o ha expirado. Los links son válidos por 24 horas.
+                    </p>
+                    <p className="text-sm text-slate-500 mb-6">
+                        Solicitá un nuevo link al bot de WhatsApp para acceder al catálogo.
+                    </p>
+                    <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
+                        <p className="text-sm text-amber-800">
+                            <strong>¿Primera vez?</strong> Contactanos por WhatsApp para registrarte como cliente.
+                        </p>
+                    </div>
+                </motion.div>
+            </div>
+        )
+    }
 
     return (
         <div className="min-h-screen bg-slate-50">
@@ -577,6 +668,9 @@ export default function CatalogoClient({ productos, categorias }: CatalogoClient
                                     onActualizar={actualizarCantidad}
                                     onConfirmar={confirmarPedido}
                                     enviando={enviando}
+                                    authStatus={authStatus}
+                                    authTelefono={authTelefono}
+                                    authToken={auth}
                                 />
                             </motion.aside>
                         </>
@@ -600,6 +694,9 @@ export default function CatalogoClient({ productos, categorias }: CatalogoClient
                             onActualizar={actualizarCantidad}
                             onConfirmar={confirmarPedido}
                             enviando={enviando}
+                            authStatus={authStatus}
+                            authTelefono={authTelefono}
+                            authToken={auth}
                         />
                     </div>
                 </aside>
@@ -646,6 +743,9 @@ interface CarritoContentProps {
     onActualizar: (id: string, cant: number) => void
     onConfirmar: () => Promise<void>
     enviando: boolean
+    authStatus: AuthStatus
+    authTelefono?: string
+    authToken?: string
 }
 
 function CarritoContent({
@@ -661,7 +761,10 @@ function CarritoContent({
     onQuitar,
     onActualizar,
     onConfirmar,
-    enviando
+    enviando,
+    authStatus,
+    authTelefono,
+    authToken
 }: CarritoContentProps) {
     return (
         <div className="flex flex-col h-full bg-white">
@@ -770,7 +873,75 @@ function CarritoContent({
                             <ShoppingCart className="h-4 w-4 mr-2" />
                             Crear Pedido
                         </Button>
+                    ) : authStatus === 'auth' ? (
+                        // Usuario autenticado - mostrar info y botón directo
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-3 bg-emerald-50 rounded-xl border border-emerald-200 p-3">
+                                <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center shrink-0">
+                                    <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-xs text-emerald-600 font-medium">Autenticado</p>
+                                    <p className="text-sm text-slate-700 truncate">{authTelefono}</p>
+                                </div>
+                            </div>
+                            <p className="text-xs text-slate-500 text-center">
+                                Crearemos tu presupuesto automáticamente. Te contactaremos para coordinar la entrega.
+                            </p>
+                            <div className="flex gap-2">
+                                <Button
+                                    variant="outline"
+                                    className="flex-1 h-12 rounded-xl"
+                                    onClick={() => setMostrarFormConfirmar(false)}
+                                    disabled={enviando}
+                                >
+                                    Cancelar
+                                </Button>
+                                <Button
+                                    className="flex-1 h-12 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 rounded-xl font-semibold"
+                                    onClick={onConfirmar}
+                                    disabled={enviando}
+                                >
+                                    {enviando ? (
+                                        <>
+                                            <motion.div
+                                                animate={{ rotate: 360 }}
+                                                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                                                className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full mr-2"
+                                            />
+                                            Creando...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <ShoppingCart className="h-4 w-4 mr-2" />
+                                            Confirmar
+                                        </>
+                                    )}
+                                </Button>
+                            </div>
+                        </div>
+                    ) : authStatus === 'invalid_token' ? (
+                        // Token inválido
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-3 bg-red-50 rounded-xl border border-red-200 p-3">
+                                <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center shrink-0">
+                                    <XCircle className="h-5 w-5 text-red-600" />
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-sm text-red-700 font-medium">Enlace inválido o expirado</p>
+                                    <p className="text-xs text-red-600">Solicitá un nuevo link al bot</p>
+                                </div>
+                            </div>
+                            <Button
+                                variant="outline"
+                                className="w-full h-12 rounded-xl"
+                                onClick={() => setMostrarFormConfirmar(false)}
+                            >
+                                Cerrar
+                            </Button>
+                        </div>
                     ) : (
+                        // No autenticado - pedir teléfono
                         <div className="space-y-3">
                             <div className="flex items-center gap-3 bg-white rounded-xl border border-slate-200 p-3">
                                 <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center shrink-0">

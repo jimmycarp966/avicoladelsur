@@ -9,6 +9,10 @@ export const metadata = {
 // Revalidar cada 5 minutos
 export const revalidate = 300
 
+interface CatalogoPageProps {
+    searchParams: { telefono?: string; token?: string }
+}
+
 async function getProductos() {
     const supabase = await createClient()
 
@@ -104,12 +108,19 @@ async function getCategorias() {
     }))
 }
 
-export default async function CatalogoPage() {
+export default async function CatalogoPage({ searchParams }: CatalogoPageProps) {
     const [productos, categorias] = await Promise.all([
         getProductos(),
         getCategorias()
     ])
 
-    return <CatalogoClient productos={productos} categorias={categorias} />
+    return (
+        <CatalogoClient
+            productos={productos}
+            categorias={categorias}
+            telefono={searchParams.telefono}
+            token={searchParams.token}
+        />
+    )
 }
 
