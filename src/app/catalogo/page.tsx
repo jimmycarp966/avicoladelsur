@@ -14,8 +14,6 @@ async function getProductos() {
 
     // Lista MAYORISTA (los precios están cargados ahí)
     const LISTA_MAYORISTA_ID = 'a0d2f9cb-08d2-4c4d-8e87-f2bc39d2b351'
-    // Margen para convertir a precio público (30% sobre mayorista)
-    const MARGEN_MINORISTA = 1.30
 
     // Obtener productos
     const { data: productos, error } = await supabase
@@ -56,28 +54,18 @@ async function getProductos() {
 
     // Transformar al formato esperado por el cliente
     return (productos || []).map(p => {
-        let precioMinorista = null
-
-        // 1. Primero intentar usar precio_venta del producto (si tiene valor)
-        if (p.precio_venta && parseFloat(p.precio_venta) > 0) {
-            precioMinorista = parseFloat(p.precio_venta)
-        }
-        // 2. Si no, usar precio de lista mayorista + margen 30%
-        else if (preciosMap.has(p.id)) {
-            const precioMayorista = preciosMap.get(p.id)
-            precioMinorista = precioMayorista * MARGEN_MINORISTA
-        }
-        // 3. Si no, intentar calcular desde precio_costo + margen 30%
-        else if (p.precio_costo && parseFloat(p.precio_costo) > 0) {
-            precioMinorista = parseFloat(p.precio_costo) * MARGEN_MINORISTA
-        }
+        // Usar precio de lista mayorista, si no existe usar precio_venta, si no usar precio_costo
+        let precioMinorista = preciosMap.get(p.id) ||
+                              (p.precio_venta ? parseFloat(p.precio_venta) : null) ||
+                              (p.precio_costo ? parseFloat(p.precio_costo) : null) ||
+                              0
 
         return {
             id: p.id,
             codigo: p.codigo,
             nombre: p.nombre,
             descripcion: p.descripcion,
-            precio_minorista: precioMinorista || 0,
+            precio_minorista: precioMinorista,
             precio_mayorista: preciosMap.get(p.id) || (p.precio_costo ? parseFloat(p.precio_costo) : null),
             unidad: p.unidad_medida || 'kg',
             es_pesable: p.pesable || false,
