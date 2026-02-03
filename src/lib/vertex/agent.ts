@@ -13,6 +13,7 @@ import { crearReclamoTool } from './tools/crear-reclamo'
 import { consultarPreciosTool } from './tools/consultar-precios'
 import { gestionarNotificacionesTool, detectarIntencionNotificaciones } from './tools/gestionar-notificaciones'
 import { recuperarCarritoTool, carritoAPresupuesto } from './tools/recuperar-carrito'
+import { generarTokenCatalogoTool } from './tools/generar-token-catalogo'
 import { SYSTEM_PROMPT, generatePersonalizedContext } from './prompts/system-prompt'
 import { createAdminClient } from '@/lib/supabase/server'
 import { ensureGoogleApplicationCredentials } from './ensure-google-credentials'
@@ -135,6 +136,7 @@ export async function processMessageWithTools(
  Posibles intenciones:
  - pedido: El cliente quiere hacer un pedido o menciona productos con cantidades
  - carrito: El cliente menciona un código de carrito (ej: ABC123, XYZ456) o dice que armó carrito en el catálogo
+ - catalogo: El cliente quiere ver el catálogo, productos con precios, o dice "ver productos", "qué tienen", "catálogo", "lista"
  - consulta_precio: El cliente pregunta por precios, lista de precios, cuánto cuesta algo, o responde "completa/todos" a una pregunta sobre precios
  - consulta_stock: El cliente pregunta por productos disponibles o stock
  - consulta_estado: El cliente pregunta por el estado de un pedido
@@ -308,6 +310,41 @@ ${listaPrecios}
             text: `No encontré productos con ese nombre. ¿Podés ser más específico?
 
 Escribí "lista de precios" para ver todos los productos disponibles.`
+          }
+        }
+      }
+
+      case 'catalogo': {
+        // Verificar si el cliente está registrado
+        if (!clienteId) {
+          return {
+            text: `🛒 ¡Claro! Tenemos un catálogo online con todos nuestros productos y precios.
+
+Para acceder, primero necesitás estar registrado como cliente. ¿Podés dejarme tu nombre o código de cliente para registrarte?`
+          }
+        }
+
+        // Generar token de catálogo
+        const catalogoResult = await generarTokenCatalogoTool({
+          telefono: phoneNumber
+        })
+
+        if (catalogoResult.success && catalogoResult.url) {
+          return {
+            text: `🛒 ¡Perfecto! Te paso el link del catálogo con todos nuestros productos y precios actualizados:
+
+${catalogoResult.url}
+
+Ahí podés:
+• Ver todos los productos con fotos
+• Armar tu carrito
+• Crear tu pedido automáticamente
+
+El link es válido por 24hs. ¡Cualquier cosa me avisas!`
+          }
+        } else {
+          return {
+            text: `Hubo un error generando el link del catálogo. ¿Podés intentar en unos minutos o prefieres que te pase la lista de precios por acá?`
           }
         }
       }
