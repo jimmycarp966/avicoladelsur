@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, useMemo, KeyboardEvent, useEffect } from
 import { UseFormRegister, UseFormSetValue, UseFormWatch, Control, Controller } from 'react-hook-form'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Trash2, Search, Package, ChevronDown } from 'lucide-react'
+import { Trash2, Search, Package } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { useDebounce } from '@/lib/hooks/useDebounce'
 
@@ -52,7 +52,7 @@ interface PresupuestoItemsTableProps {
   errors?: any
 }
 
-// Componente de búsqueda omnibox mejorado
+// Componente de búsqueda omnibox con portal
 function ProductoOmnibox({
   value,
   onSelect,
@@ -73,18 +73,53 @@ function ProductoOmnibox({
   const [selectedIndex, setSelectedIndex] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
   const debouncedSearch = useDebounce(search, 100)
+
+  // Calcular posición del dropdown
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 })
+
+  const updateDropdownPosition = useCallback(() => {
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect()
+      setDropdownPos({
+        top: rect.bottom + window.scrollY + 4,
+        left: rect.left + window.scrollX,
+        width: rect.width,
+      })
+    }
+  }, [])
+
+  useEffect(() => {
+    if (isOpen) {
+      updateDropdownPosition()
+      // Recalcular en scroll/resize
+      window.addEventListener('scroll', updateDropdownPosition, true)
+      window.addEventListener('resize', updateDropdownPosition)
+      return () => {
+        window.removeEventListener('scroll', updateDropdownPosition, true)
+        window.removeEventListener('resize', updateDropdownPosition)
+      }
+    }
+  }, [isOpen, updateDropdownPosition])
 
   // Cerrar al hacer click fuera
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      if (
+        containerRef.current && 
+        !containerRef.current.contains(event.target as Node) &&
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false)
       }
     }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isOpen])
 
   const filteredProductos = useMemo(() => {
     if (!debouncedSearch.trim()) {
@@ -179,31 +214,46 @@ function ProductoOmnibox({
   }
 
   return (
-    <div ref={containerRef} className="relative w-full">
-      <div className="relative">
-        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input
-          ref={inputRef}
-          type="text"
-          placeholder={placeholder}
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value)
-            setIsOpen(true)
-          }}
-          onFocus={() => search.trim() && setIsOpen(true)}
-          onKeyDown={handleKeyDown}
-          className="pl-8"
-          autoFocus={autoFocus}
-          autoComplete="off"
-          data-omnibox-input={rowIndex}
-        />
+    <>
+      <div ref={containerRef} className="relative w-full">
+        <div className="relative">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            ref={inputRef}
+            type="text"
+            placeholder={placeholder}
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setIsOpen(true)
+              updateDropdownPosition()
+            }}
+            onFocus={() => {
+              if (search.trim()) {
+                setIsOpen(true)
+                updateDropdownPosition()
+              }
+            }}
+            onKeyDown={handleKeyDown}
+            className="pl-8"
+            autoFocus={autoFocus}
+            autoComplete="off"
+            data-omnibox-input={rowIndex}
+          />
+        </div>
       </div>
       
+      {/* Dropdown con portal a document.body */}
       {isOpen && filteredProductos.length > 0 && (
         <div 
-          className="absolute left-0 right-0 top-full mt-1 bg-white border rounded-md shadow-xl max-h-[250px] overflow-auto z-[9999]"
-          style={{ position: 'fixed', width: containerRef.current?.offsetWidth }}
+          ref={dropdownRef}
+          className="fixed bg-white border rounded-md shadow-2xl max-h-[300px] overflow-auto"
+          style={{
+            top: dropdownPos.top,
+            left: dropdownPos.left,
+            width: dropdownPos.width,
+            zIndex: 99999,
+          }}
         >
           <div className="py-1">
             {filteredProductos.map((producto, index) => (
@@ -215,7 +265,7 @@ function ProductoOmnibox({
                   setSearch('')
                   setIsOpen(false)
                 }}
-                className={`w-full px-3 py-2 text-left text-sm hover:bg-accent flex items-center justify-between ${
+                className={`w-full px-3 py-2.5 text-left text-sm hover:bg-accent flex items-center justify-between transition-colors ${
                   index === selectedIndex ? 'bg-accent' : ''
                 }`}
               >
@@ -224,12 +274,12 @@ function ProductoOmnibox({
                     {producto.codigo} - {producto.nombre}
                   </div>
                   {producto.stock_disponible !== undefined && (
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-xs text-muted-foreground mt-0.5">
                       Stock: {producto.stock_disponible.toFixed(1)} {producto.unidad_medida}
                     </div>
                   )}
                 </div>
-                <div className="text-right text-muted-foreground ml-2">
+                <div className="text-right text-muted-foreground ml-2 shrink-0">
                   {formatCurrency(producto.precio_venta)}
                 </div>
               </button>
@@ -237,7 +287,7 @@ function ProductoOmnibox({
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }
 
@@ -320,14 +370,20 @@ export function PresupuestoItemsTable({
   }
 
   const handleRemove = useCallback((index: number) => {
-    console.log('Eliminando fila:', index)
-    onRemoveItem(index)
-  }, [onRemoveItem])
+    console.log('>>> handleRemove llamado con index:', index)
+    console.log('>>> items.length:', items.length)
+    if (items.length > 1) {
+      console.log('>>> Llamando a onRemoveItem:', index)
+      onRemoveItem(index)
+    } else {
+      console.log('>>> No se puede eliminar: solo queda 1 item')
+    }
+  }, [onRemoveItem, items.length])
 
   return (
     <div className="space-y-3">
       {/* Tabla compacta */}
-      <div className="border rounded-lg">
+      <div className="border rounded-lg overflow-visible">
         <table className="w-full text-sm">
           <thead className="bg-muted/50 border-b">
             <tr>
@@ -453,8 +509,13 @@ export function PresupuestoItemsTable({
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
-                      onClick={() => handleRemove(index)}
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        console.log('>>> Botón eliminar clickeado, index:', index)
+                        handleRemove(index)
+                      }}
                       disabled={items.length <= 1}
+                      title={items.length <= 1 ? "Debe haber al menos un producto" : "Eliminar producto"}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
