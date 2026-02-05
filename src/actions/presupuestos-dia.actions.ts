@@ -386,6 +386,34 @@ export async function obtenerPresupuestosDiaAction(fecha: string, zonaId?: strin
     return acc
   }, {}) || {}
 
+  // Ordenar presupuestos dentro de cada zona/turno: primero los que tienen items pesables pendientes
+  Object.keys(presupuestosPorZonaTurno).forEach(key => {
+    presupuestosPorZonaTurno[key].presupuestos.sort((a: any, b: any) => {
+      // Calcular items pesables pendientes para cada presupuesto
+      const pesablesPendientesA = a.items?.filter((item: any) => {
+        const esMayoristaA = esVentaMayorista(a, item)
+        return esItemPesable(item, esMayoristaA) && !item.peso_final
+      }).length || 0
+
+      const pesablesPendientesB = b.items?.filter((item: any) => {
+        const esMayoristaB = esVentaMayorista(b, item)
+        return esItemPesable(item, esMayoristaB) && !item.peso_final
+      }).length || 0
+
+      // Primero los que tienen items pesables pendientes
+      if (pesablesPendientesA > 0 && pesablesPendientesB === 0) return -1
+      if (pesablesPendientesA === 0 && pesablesPendientesB > 0) return 1
+
+      // Si ambos tienen o ambos no tienen, ordenar por cantidad de pesables pendientes (descendente)
+      if (pesablesPendientesA !== pesablesPendientesB) return pesablesPendientesB - pesablesPendientesA
+
+      // Si siguen igual, ordenar por kg totales (descendente)
+      const kgA = a.items?.reduce((sum: number, item: any) => sum + calcularKgItem(a, item), 0) || 0
+      const kgB = b.items?.reduce((sum: number, item: any) => sum + calcularKgItem(b, item), 0) || 0
+      return kgB - kgA
+    })
+  })
+
   // Calcular estadísticas
   const totalPresupuestos = presupuestos?.length || 0
   const totalItemsPesables = presupuestos?.reduce((acc, p) =>
