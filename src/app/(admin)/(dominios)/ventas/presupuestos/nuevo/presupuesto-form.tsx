@@ -24,6 +24,8 @@ import { useFormContextShortcuts } from '@/lib/hooks/useFormContextShortcuts'
 import { KeyboardHintCompact } from '@/components/ui/keyboard-hint'
 import { PresupuestoItemsTable } from './presupuesto-items-table'
 import { useEffect, useRef } from 'react'
+import { PresupuestoResumenPanel } from '@/components/presupuestos/presupuesto-resumen-panel'
+import { Copy } from 'lucide-react'
 
 const crearPresupuestoSchema = z.object({
   cliente_id: z.string().uuid('Debes seleccionar un cliente'),
@@ -762,6 +764,30 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
     }
   }, [fields.length, remove, listasPorProducto])
 
+  // Memoizar duplicateItem
+  const duplicateItem = useCallback((index: number) => {
+    const itemToDuplicate = watchedItems?.[index]
+    if (!itemToDuplicate?.producto_id) return
+
+    const newItem = {
+      producto_id: itemToDuplicate.producto_id,
+      cantidad_solicitada: itemToDuplicate.cantidad_solicitada,
+      precio_unit_est: itemToDuplicate.precio_unit_est,
+      lista_precio_id: itemToDuplicate.lista_precio_id,
+    }
+
+    append(newItem)
+
+    // Copiar lista individual si existe
+    if (listasPorProducto[index]) {
+      const newIndex = fields.length
+      setListasPorProducto(prev => ({
+        ...prev,
+        [newIndex]: listasPorProducto[index]
+      }))
+    }
+  }, [watchedItems, append, fields.length, listasPorProducto])
+
   const onSubmit = async (data: CrearPresupuestoFormData) => {
     try {
       setIsLoading(true)
@@ -873,442 +899,399 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      {/* Información del Cliente */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Información del Cliente</CardTitle>
-          <CardDescription>
-            Selecciona el cliente para el presupuesto
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label htmlFor="cliente_id" className="flex items-center gap-2">
-              Cliente *
-              <KeyboardHintCompact shortcut="C" />
-            </Label>
-            <Select
-              value={watchedCliente || ''}
-              onValueChange={(value) => {
-                // Establecer el valor primero
-                setValue('cliente_id', value, { shouldValidate: true, shouldDirty: true })
-                // Limpiar la búsqueda después de un pequeño delay para asegurar que el valor se estableció
-                setTimeout(() => {
-                  setClienteSearch('')
-                  // Avanzar al siguiente campo (zona o fecha)
-                  const zonaInput = document.getElementById('zona_id')
-                  if (zonaInput) {
-                    zonaInput.focus()
-                  } else {
-                    const fechaInput = document.getElementById('fecha_entrega_estimada')
-                    if (fechaInput) {
-                      fechaInput.focus()
+      <div className="grid gap-6 lg:grid-cols-[1fr,340px]">
+        {/* Columna izquierda: Contenido del formulario */}
+        <div className="space-y-6">
+          {/* Información del Cliente */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Información del Cliente</CardTitle>
+              <CardDescription>
+                Selecciona el cliente para el presupuesto
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="cliente_id" className="flex items-center gap-2">
+                  Cliente *
+                  <KeyboardHintCompact shortcut="C" />
+                </Label>
+                <Select
+                  value={watchedCliente || ''}
+                  onValueChange={(value) => {
+                    // Establecer el valor primero
+                    setValue('cliente_id', value, { shouldValidate: true, shouldDirty: true })
+                    // Limpiar la búsqueda después de un pequeño delay para asegurar que el valor se estableció
+                    setTimeout(() => {
+                      setClienteSearch('')
+                      // Avanzar al siguiente campo (zona o fecha)
+                      const zonaInput = document.getElementById('zona_id')
+                      if (zonaInput) {
+                        zonaInput.focus()
+                      } else {
+                        const fechaInput = document.getElementById('fecha_entrega_estimada')
+                        if (fechaInput) {
+                          fechaInput.focus()
+                        }
+                      }
+                    }, 100)
+                  }}
+                  onOpenChange={(open) => {
+                    setClienteDropdownOpen(open)
+                    if (open) {
+                      // Cuando se abre, enfocar el input de búsqueda automáticamente
+                      setTimeout(() => {
+                        const searchInput = document.querySelector('#cliente_id ~ [role="listbox"] input, [data-radix-popper-content-wrapper] input[placeholder*="Buscar"]') as HTMLInputElement
+                        if (searchInput) {
+                          searchInput.focus()
+                        }
+                      }, 50)
+                    } else {
+                      // Limpiar la búsqueda cuando se cierra el dropdown
+                      setClienteSearch('')
                     }
-                  }
-                }, 100)
-              }}
-              onOpenChange={(open) => {
-                setClienteDropdownOpen(open)
-                if (open) {
-                  // Cuando se abre, enfocar el input de búsqueda automáticamente
-                  setTimeout(() => {
-                    const searchInput = document.querySelector('#cliente_id ~ [role="listbox"] input, [data-radix-popper-content-wrapper] input[placeholder*="Buscar"]') as HTMLInputElement
-                    if (searchInput) {
-                      searchInput.focus()
-                    }
-                  }, 50)
-                } else {
-                  // Limpiar la búsqueda cuando se cierra el dropdown
-                  setClienteSearch('')
-                }
-              }}
-            >
-              <SelectTrigger id="cliente_id" className={errors.cliente_id ? 'border-red-500' : ''}>
-                <SelectValue placeholder="Buscar por código, nombre, teléfono o zona..." />
-              </SelectTrigger>
-              <SelectContent className="max-h-[300px]">
-                <div className="sticky top-0 bg-background p-2 border-b">
-                  <div className="relative">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Buscar por código, nombre..."
-                      value={clienteSearch}
-                      onChange={(e) => {
-                        setClienteSearch(e.target.value)
-                      }}
-                      className="pl-8"
-                      onClick={(e) => e.stopPropagation()}
-                      onKeyDown={(e) => {
-                        e.stopPropagation()
+                  }}
+                >
+                  <SelectTrigger id="cliente_id" className={errors.cliente_id ? 'border-red-500' : ''}>
+                    <SelectValue placeholder="Buscar por código, nombre, teléfono o zona..." />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[300px]">
+                    <div className="sticky top-0 bg-background p-2 border-b">
+                      <div className="relative">
+                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Buscar por código, nombre..."
+                          value={clienteSearch}
+                          onChange={(e) => {
+                            setClienteSearch(e.target.value)
+                          }}
+                          className="pl-8"
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => {
+                            e.stopPropagation()
+                            const filtered = getFilteredClientes(debouncedClienteSearch)
+                            const listaFinal = [...filtered]
+                            const clienteSeleccionadoEnLista = watchedCliente
+                              ? clientes.find(c => c.id === watchedCliente)
+                              : null
+                            if (clienteSeleccionadoEnLista && !listaFinal.find(c => c.id === clienteSeleccionadoEnLista.id)) {
+                              listaFinal.unshift(clienteSeleccionadoEnLista)
+                            }
+
+                            if (e.key === 'Enter' && listaFinal.length > 0) {
+                              e.preventDefault()
+                              // Seleccionar el primer resultado
+                              const primerCliente = listaFinal[0]
+                              setValue('cliente_id', primerCliente.id, { shouldValidate: true, shouldDirty: true })
+                              setClienteSearch('')
+                              setClienteDropdownOpen(false)
+                              // Avanzar al siguiente campo (zona o fecha)
+                              setTimeout(() => {
+                                const zonaInput = document.getElementById('zona_id')
+                                if (zonaInput) {
+                                  zonaInput.focus()
+                                } else {
+                                  const fechaInput = document.getElementById('fecha_entrega_estimada')
+                                  if (fechaInput) {
+                                    fechaInput.focus()
+                                  }
+                                }
+                              }, 100)
+                            } else if (e.key === 'Tab' && !e.shiftKey) {
+                              // Si hay un cliente seleccionado, cerrar dropdown y avanzar
+                              if (watchedCliente) {
+                                setClienteDropdownOpen(false)
+                              }
+                              // Permitir que TAB funcione normalmente
+                            } else if (e.key === 'Escape') {
+                              e.preventDefault()
+                              setClienteDropdownOpen(false)
+                              const trigger = document.getElementById('cliente_id')
+                              if (trigger) {
+                                trigger.focus()
+                              }
+                            }
+                          }}
+                          autoComplete="off"
+                        />
+                        {clienteSearch && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-1 top-1 h-6 w-6 p-0"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setClienteSearch('')
+                            }}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="max-h-[200px] overflow-y-auto">
+                      {(() => {
                         const filtered = getFilteredClientes(debouncedClienteSearch)
-                        const listaFinal = [...filtered]
+                        const totalClientes = clientes.length
+                        const showingAll = filtered.length >= totalClientes || filtered.length < MAX_RESULTS
+
+                        // Asegurar que el cliente seleccionado siempre esté en la lista si existe
                         const clienteSeleccionadoEnLista = watchedCliente
                           ? clientes.find(c => c.id === watchedCliente)
                           : null
+
+                        // Si hay un cliente seleccionado y no está en los resultados filtrados, agregarlo
+                        const listaFinal = [...filtered]
                         if (clienteSeleccionadoEnLista && !listaFinal.find(c => c.id === clienteSeleccionadoEnLista.id)) {
                           listaFinal.unshift(clienteSeleccionadoEnLista)
                         }
 
-                        if (e.key === 'Enter' && listaFinal.length > 0) {
-                          e.preventDefault()
-                          // Seleccionar el primer resultado
-                          const primerCliente = listaFinal[0]
-                          setValue('cliente_id', primerCliente.id, { shouldValidate: true, shouldDirty: true })
-                          setClienteSearch('')
-                          setClienteDropdownOpen(false)
-                          // Avanzar al siguiente campo (zona o fecha)
-                          setTimeout(() => {
-                            const zonaInput = document.getElementById('zona_id')
-                            if (zonaInput) {
-                              zonaInput.focus()
-                            } else {
-                              const fechaInput = document.getElementById('fecha_entrega_estimada')
-                              if (fechaInput) {
-                                fechaInput.focus()
-                              }
-                            }
-                          }, 100)
-                        } else if (e.key === 'Tab' && !e.shiftKey) {
-                          // Si hay un cliente seleccionado, cerrar dropdown y avanzar
-                          if (watchedCliente) {
-                            setClienteDropdownOpen(false)
-                          }
-                          // Permitir que TAB funcione normalmente
-                        } else if (e.key === 'Escape') {
-                          e.preventDefault()
-                          setClienteDropdownOpen(false)
-                          const trigger = document.getElementById('cliente_id')
-                          if (trigger) {
-                            trigger.focus()
-                          }
-                        }
-                      }}
-                      autoComplete="off"
-                    />
-                    {clienteSearch && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-1 top-1 h-6 w-6 p-0"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setClienteSearch('')
-                        }}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    )}
+                        return listaFinal.length > 0 ? (
+                          <>
+                            {listaFinal.map((cliente) => (
+                              <SelectItem key={cliente.id} value={cliente.id}>
+                                {cliente.codigo && `[${cliente.codigo}] `}
+                                {cliente.nombre} {cliente.telefono && `- ${cliente.telefono}`}
+                                {cliente.zona_entrega && ` (${cliente.zona_entrega})`}
+                              </SelectItem>
+                            ))}
+                            {!showingAll && (
+                              <div className="px-2 py-2 text-xs text-muted-foreground text-center border-t bg-muted/50">
+                                Mostrando {listaFinal.length} de {totalClientes} clientes
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                            No se encontraron clientes
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  </SelectContent>
+                </Select>
+                {errors.cliente_id && (
+                  <p className="text-sm text-red-500 mt-1">{errors.cliente_id.message}</p>
+                )}
+              </div>
+
+              {/* Tipo de Venta - Visible después de seleccionar cliente */}
+              {clienteSeleccionado && (
+                <div className="space-y-2">
+                  <Label>Tipo de Venta *</Label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        value="reparto"
+                        checked={watch('tipo_venta') === 'reparto'}
+                        onChange={() => setValue('tipo_venta', 'reparto')}
+                        className="h-4 w-4 text-primary"
+                      />
+                      <span className="text-sm font-medium">🚚 Reparto (entrega a domicilio)</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        value="retira_casa_central"
+                        checked={watch('tipo_venta') === 'retira_casa_central'}
+                        onChange={() => setValue('tipo_venta', 'retira_casa_central')}
+                        className="h-4 w-4 text-primary"
+                      />
+                      <span className="text-sm font-medium">🏠 Retira en Casa Central</span>
+                    </label>
                   </div>
+                  {watch('tipo_venta') === 'retira_casa_central' && (
+                    <p className="text-xs text-blue-600 mt-1">
+                      ℹ️ Este presupuesto no irá a almacén ni reparto. Se podrá facturar directamente.
+                    </p>
+                  )}
                 </div>
-                <div className="max-h-[200px] overflow-y-auto">
-                  {(() => {
-                    const filtered = getFilteredClientes(debouncedClienteSearch)
-                    const totalClientes = clientes.length
-                    const showingAll = filtered.length >= totalClientes || filtered.length < MAX_RESULTS
+              )}
 
-                    // Asegurar que el cliente seleccionado siempre esté en la lista si existe
-                    const clienteSeleccionadoEnLista = watchedCliente
-                      ? clientes.find(c => c.id === watchedCliente)
-                      : null
-
-                    // Si hay un cliente seleccionado y no está en los resultados filtrados, agregarlo
-                    const listaFinal = [...filtered]
-                    if (clienteSeleccionadoEnLista && !listaFinal.find(c => c.id === clienteSeleccionadoEnLista.id)) {
-                      listaFinal.unshift(clienteSeleccionadoEnLista)
-                    }
-
-                    return listaFinal.length > 0 ? (
-                      <>
-                        {listaFinal.map((cliente) => (
-                          <SelectItem key={cliente.id} value={cliente.id}>
-                            {cliente.codigo && `[${cliente.codigo}] `}
-                            {cliente.nombre} {cliente.telefono && `- ${cliente.telefono}`}
-                            {cliente.zona_entrega && ` (${cliente.zona_entrega})`}
+              {/* Zona y Fecha - Solo visible para reparto */}
+              {clienteSeleccionado && watch('tipo_venta') === 'reparto' && (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <Label htmlFor="zona_id" className="flex items-center gap-2">
+                      Zona de Entrega
+                      <KeyboardHintCompact shortcut="Z" />
+                    </Label>
+                    <Select
+                      key={watchedCliente} // Forzar re-render al cambiar cliente
+                      value={watch('zona_id') || ''}
+                      onValueChange={(value) => {
+                        setValue('zona_id', value, { shouldValidate: true, shouldDirty: true })
+                        // Avanzar a fecha después de seleccionar zona
+                        setTimeout(() => {
+                          const fechaInput = document.getElementById('fecha_entrega_estimada')
+                          if (fechaInput) {
+                            fechaInput.focus()
+                          }
+                        }, 100)
+                      }}
+                    >
+                      <SelectTrigger id="zona_id">
+                        <SelectValue placeholder="Selecciona una zona" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {zonas.map((zona) => (
+                          <SelectItem key={zona.id} value={zona.id}>
+                            {zona.nombre}
                           </SelectItem>
                         ))}
-                        {!showingAll && (
-                          <div className="px-2 py-2 text-xs text-muted-foreground text-center border-t bg-muted/50">
-                            Mostrando {listaFinal.length} de {totalClientes} clientes
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="px-2 py-6 text-center text-sm text-muted-foreground">
-                        No se encontraron clientes
-                      </div>
-                    )
-                  })()}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="fecha_entrega_estimada" className="flex items-center gap-2">
+                      Fecha de Entrega Estimada
+                      <KeyboardHintCompact shortcut="F" />
+                    </Label>
+                    <DateInput
+                      id="fecha_entrega_estimada"
+                      value={watch('fecha_entrega_estimada')}
+                      onChange={(value) => setValue('fecha_entrega_estimada', value)}
+                      placeholder="DD/MM/YYYY"
+                    />
+                  </div>
                 </div>
-              </SelectContent>
-            </Select>
-            {errors.cliente_id && (
-              <p className="text-sm text-red-500 mt-1">{errors.cliente_id.message}</p>
-            )}
-          </div>
-
-          {/* Tipo de Venta - Visible después de seleccionar cliente */}
-          {clienteSeleccionado && (
-            <div className="space-y-2">
-              <Label>Tipo de Venta *</Label>
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    value="reparto"
-                    checked={watch('tipo_venta') === 'reparto'}
-                    onChange={() => setValue('tipo_venta', 'reparto')}
-                    className="h-4 w-4 text-primary"
-                  />
-                  <span className="text-sm font-medium">🚚 Reparto (entrega a domicilio)</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    value="retira_casa_central"
-                    checked={watch('tipo_venta') === 'retira_casa_central'}
-                    onChange={() => setValue('tipo_venta', 'retira_casa_central')}
-                    className="h-4 w-4 text-primary"
-                  />
-                  <span className="text-sm font-medium">🏠 Retira en Casa Central</span>
-                </label>
-              </div>
-              {watch('tipo_venta') === 'retira_casa_central' && (
-                <p className="text-xs text-blue-600 mt-1">
-                  ℹ️ Este presupuesto no irá a almacén ni reparto. Se podrá facturar directamente.
-                </p>
               )}
-            </div>
-          )}
 
-          {/* Zona y Fecha - Solo visible para reparto */}
-          {clienteSeleccionado && watch('tipo_venta') === 'reparto' && (
-            <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <Label htmlFor="zona_id" className="flex items-center gap-2">
-                  Zona de Entrega
-                  <KeyboardHintCompact shortcut="Z" />
+                <Label htmlFor="lista_precio_id" className="flex items-center gap-2">
+                  Lista de Precios (Global)
+                  <KeyboardHintCompact shortcut="L" />
                 </Label>
                 <Select
-                  key={watchedCliente} // Forzar re-render al cambiar cliente
-                  value={watch('zona_id') || ''}
+                  value={watch('lista_precio_id') || ''}
                   onValueChange={(value) => {
-                    setValue('zona_id', value, { shouldValidate: true, shouldDirty: true })
-                    // Avanzar a fecha después de seleccionar zona
+                    setValue('lista_precio_id', value)
+                    // Actualizar lista_precio_id de items que usan lista global
+                    watchedItems?.forEach((_, index) => {
+                      if (!listasPorProducto[index]) {
+                        setValue(`items.${index}.lista_precio_id`, value, { shouldDirty: false })
+                      }
+                    })
+                    // Avanzar al primer producto después de seleccionar lista
                     setTimeout(() => {
-                      const fechaInput = document.getElementById('fecha_entrega_estimada')
-                      if (fechaInput) {
-                        fechaInput.focus()
+                      const firstProductSelect = document.getElementById('producto_0')
+                      if (firstProductSelect) {
+                        firstProductSelect.click()
+                        setTimeout(() => {
+                          const searchInput = document.querySelector('input[data-product-search="0"]') as HTMLInputElement
+                          if (searchInput) {
+                            searchInput.focus()
+                            searchInput.select()
+                          }
+                        }, 100)
                       }
                     }, 100)
                   }}
+                  disabled={cargandoListas || !!errorListas}
                 >
-                  <SelectTrigger id="zona_id">
-                    <SelectValue placeholder="Selecciona una zona" />
+                  <SelectTrigger id="lista_precio_id">
+                    <SelectValue placeholder={
+                      cargandoListas
+                        ? 'Cargando listas...'
+                        : errorListas
+                          ? 'Error al cargar listas'
+                          : 'Selecciona una lista de precios (por defecto para todos los productos)'
+                    } />
                   </SelectTrigger>
                   <SelectContent>
-                    {zonas.map((zona) => (
-                      <SelectItem key={zona.id} value={zona.id}>
-                        {zona.nombre}
-                      </SelectItem>
-                    ))}
+                    {todasListas.length > 0 ? (
+                      todasListas.map((lista) => (
+                        <SelectItem key={lista.id} value={lista.id}>
+                          {lista.codigo} - {lista.nombre} {lista.margen_ganancia && `(${lista.margen_ganancia}% margen)`}
+                        </SelectItem>
+                      ))
+                    ) : !cargandoListas ? (
+                      <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                        {errorListas ? `Error: ${errorListas}` : 'No hay listas disponibles'}
+                      </div>
+                    ) : null}
                   </SelectContent>
                 </Select>
+                {errorListas && (
+                  <p className="text-sm text-red-500 mt-1">
+                    Error al cargar listas. Intenta recargar la página.
+                  </p>
+                )}
+                {watch('lista_precio_id') && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Lista por defecto para todos los productos. Puedes cambiar la lista individualmente en cada producto.
+                  </p>
+                )}
               </div>
+            </CardContent>
+          </Card>
 
-              <div>
-                <Label htmlFor="fecha_entrega_estimada" className="flex items-center gap-2">
-                  Fecha de Entrega Estimada
-                  <KeyboardHintCompact shortcut="F" />
-                </Label>
-                <DateInput
-                  id="fecha_entrega_estimada"
-                  value={watch('fecha_entrega_estimada')}
-                  onChange={(value) => setValue('fecha_entrega_estimada', value)}
-                  placeholder="DD/MM/YYYY"
-                />
-              </div>
-            </div>
-          )}
+          {/* Items del Presupuesto - Nueva Tabla Compacta */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle>Productos</CardTitle>
+              <CardDescription>
+                Escribí el código o nombre y presioná Enter para agregar rápidamente
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <PresupuestoItemsTable
+                items={fields as any}
+                productos={productos}
+                listas={todasListas}
+                listaGlobalId={watchedListaPrecioGlobal}
+                control={control}
+                register={register}
+                setValue={setValue}
+                watch={watch}
+                onProductoChange={handleProductoChange}
+                onListaChange={handleListaProductoChange}
+                onAddItem={addItem}
+                onRemoveItem={removeItem}
+                onDuplicateItem={duplicateItem}
+                errors={errors}
+              />
 
-          <div>
-            <Label htmlFor="lista_precio_id" className="flex items-center gap-2">
-              Lista de Precios (Global)
-              <KeyboardHintCompact shortcut="L" />
-            </Label>
-            <Select
-              value={watch('lista_precio_id') || ''}
-              onValueChange={(value) => {
-                setValue('lista_precio_id', value)
-                // Actualizar lista_precio_id de items que usan lista global
-                watchedItems?.forEach((_, index) => {
-                  if (!listasPorProducto[index]) {
-                    setValue(`items.${index}.lista_precio_id`, value, { shouldDirty: false })
-                  }
-                })
-                // Avanzar al primer producto después de seleccionar lista
-                setTimeout(() => {
-                  const firstProductSelect = document.getElementById('producto_0')
-                  if (firstProductSelect) {
-                    firstProductSelect.click()
-                    setTimeout(() => {
-                      const searchInput = document.querySelector('input[data-product-search="0"]') as HTMLInputElement
-                      if (searchInput) {
-                        searchInput.focus()
-                        searchInput.select()
-                      }
-                    }, 100)
-                  }
-                }, 100)
-              }}
-              disabled={cargandoListas || !!errorListas}
-            >
-              <SelectTrigger id="lista_precio_id">
-                <SelectValue placeholder={
-                  cargandoListas
-                    ? 'Cargando listas...'
-                    : errorListas
-                      ? 'Error al cargar listas'
-                      : 'Selecciona una lista de precios (por defecto para todos los productos)'
-                } />
-              </SelectTrigger>
-              <SelectContent>
-                {todasListas.length > 0 ? (
-                  todasListas.map((lista) => (
-                    <SelectItem key={lista.id} value={lista.id}>
-                      {lista.codigo} - {lista.nombre} {lista.margen_ganancia && `(${lista.margen_ganancia}% margen)`}
-                    </SelectItem>
-                  ))
-                ) : !cargandoListas ? (
-                  <div className="px-2 py-6 text-center text-sm text-muted-foreground">
-                    {errorListas ? `Error: ${errorListas}` : 'No hay listas disponibles'}
-                  </div>
-                ) : null}
-              </SelectContent>
-            </Select>
-            {errorListas && (
-              <p className="text-sm text-red-500 mt-1">
-                Error al cargar listas. Intenta recargar la página.
-              </p>
-            )}
-            {watch('lista_precio_id') && (
-              <p className="text-sm text-muted-foreground mt-1">
-                Lista por defecto para todos los productos. Puedes cambiar la lista individualmente en cada producto.
-              </p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+              {errors.items && errors.items.root && (
+                <p className="text-sm text-red-500">{errors.items.root.message}</p>
+              )}
+            </CardContent>
+          </Card>
 
-      {/* Items del Presupuesto - Nueva Tabla Compacta */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle>Productos</CardTitle>
-          <CardDescription>
-            Escribí el código o nombre y presioná Enter para agregar rápidamente
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <PresupuestoItemsTable
-            items={fields as any}
-            productos={productos}
-            listas={todasListas}
-            listaGlobalId={watchedListaPrecioGlobal}
-            control={control}
-            register={register}
-            setValue={setValue}
-            watch={watch}
-            onProductoChange={handleProductoChange}
-            onListaChange={handleListaProductoChange}
-            onAddItem={addItem}
-            onRemoveItem={removeItem}
-            errors={errors}
+          {/* Observaciones */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                Observaciones
+                <KeyboardHintCompact shortcut="O" />
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Textarea
+                id="observaciones"
+                {...register('observaciones')}
+                rows={3}
+                placeholder="Agregar notas o instrucciones especiales..."
+              />
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Columna derecha: Panel sticky de resumen */}
+        <div>
+          <PresupuestoResumenPanel
+            totalEstimado={totalEstimado}
+            cantidadProductos={itemsParaTotal?.length || 0}
+            clienteNombre={clienteSeleccionado?.nombre}
+            fechaEntrega={watch('fecha_entrega_estimada')}
+            tipoVenta={watch('tipo_venta')}
+            isLoading={isLoading}
+            onCancel={() => router.back()}
           />
-
-          {errors.items && errors.items.root && (
-            <p className="text-sm text-red-500">{errors.items.root.message}</p>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Observaciones */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            Observaciones
-            <KeyboardHintCompact shortcut="O" />
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Textarea
-            id="observaciones"
-            {...register('observaciones')}
-            rows={4}
-            placeholder="Agregar notas o instrucciones especiales..."
-          />
-        </CardContent>
-      </Card>
-
-      {/* Resumen */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Resumen</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex justify-between items-center">
-            <span className="text-lg font-medium">Total Estimado:</span>
-            <span className="text-2xl font-bold text-primary">
-              {formatCurrency(totalEstimado)}
-            </span>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Resumen y Total */}
-      <Card className="bg-primary/5 border-primary/20">
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-muted-foreground">Total Estimado</p>
-              <p className="text-3xl font-bold text-primary">
-                {formatCurrency(totalEstimado)}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {itemsParaTotal?.length || 0} productos
-              </p>
-            </div>
-            <div className="text-right hidden sm:block">
-              <p className="text-xs text-muted-foreground">
-                💡 <kbd className="px-1 py-0.5 bg-muted rounded">Ctrl+Enter</kbd> para guardar rápido
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Botones de Acción */}
-      <div className="flex justify-end gap-4">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => router.back()}
-          disabled={isLoading}
-        >
-          Cancelar
-        </Button>
-        <Button type="submit" disabled={isLoading} className="bg-primary hover:bg-primary/90">
-          {isLoading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Creando...
-            </>
-          ) : (
-            <>
-              <Save className="mr-2 h-4 w-4" />
-              Crear Presupuesto
-            </>
-          )}
-        </Button>
+        </div>
       </div>
     </form>
   )

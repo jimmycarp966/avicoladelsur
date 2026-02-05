@@ -4,9 +4,10 @@ import { useState, useRef, useCallback, useMemo, KeyboardEvent, useEffect } from
 import { UseFormRegister, UseFormSetValue, UseFormWatch, Control, Controller } from 'react-hook-form'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Trash2, Search, Package } from 'lucide-react'
+import { Trash2, Search, Package, Copy, Plus } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { useDebounce } from '@/lib/hooks/useDebounce'
+import { StockIndicatorBadge } from '@/components/presupuestos/stock-indicator-badge'
 
 interface Producto {
   id: string
@@ -51,6 +52,7 @@ interface PresupuestoItemsTableProps {
   onListaChange: (index: number, listaId: string) => void
   onAddItem: () => void
   onRemoveItem: (index: number) => void
+  onDuplicateItem?: (index: number) => void
   errors?: any
 }
 
@@ -229,6 +231,7 @@ export function PresupuestoItemsTable({
   onListaChange,
   onAddItem,
   onRemoveItem,
+  onDuplicateItem,
   errors,
 }: PresupuestoItemsTableProps) {
   const [focusedRow, setFocusedRow] = useState<number | null>(null)
@@ -302,11 +305,12 @@ export function PresupuestoItemsTable({
         <table className="w-full text-sm">
           <thead className="bg-muted/50 border-b">
             <tr>
-              <th className="text-left px-3 py-2 font-medium w-[40%]">Producto</th>
-              <th className="text-center px-2 py-2 font-medium w-[12%]">Cant.</th>
-              <th className="text-left px-2 py-2 font-medium w-[15%]">Lista</th>
-              <th className="text-right px-2 py-2 font-medium w-[15%]">Precio</th>
-              <th className="text-right px-2 py-2 font-medium w-[13%]">Subtotal</th>
+              <th className="text-left px-3 py-2 font-medium w-[35%]">Producto</th>
+              <th className="text-center px-2 py-2 font-medium w-[10%]">Cant.</th>
+              <th className="text-left px-2 py-2 font-medium w-[13%]">Lista</th>
+              <th className="text-right px-2 py-2 font-medium w-[13%]">Precio</th>
+              <th className="text-right px-2 py-2 font-medium w-[12%]">Subtotal</th>
+              <th className="text-center px-2 py-2 font-medium w-[12%]">Stock</th>
               <th className="text-center px-2 py-2 font-medium w-[5%]"></th>
             </tr>
           </thead>
@@ -412,20 +416,49 @@ export function PresupuestoItemsTable({
                     {item.producto_id ? formatCurrency(subtotal) : '-'}
                   </td>
 
-                  {/* Eliminar */}
-                  <td className="px-2 py-2 text-center">
-                    {canRemove ? (
-                      <button
-                        type="button"
-                        onClick={() => handleRemove(index)}
-                        className="h-8 w-8 inline-flex items-center justify-center rounded-md text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors"
-                        title="Eliminar producto"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                  {/* Stock */}
+                  <td className="px-2 py-2">
+                    {producto && producto.stock_disponible !== undefined ? (
+                      <StockIndicatorBadge
+                        stockDisponible={producto.stock_disponible}
+                        stockReal={producto.stock_real}
+                        stockReservado={producto.stock_reservado}
+                        unidadMedida={producto.unidad_medida}
+                        size="sm"
+                      />
                     ) : (
-                      <span className="h-8 w-8 inline-block" />
+                      <span className="text-muted-foreground text-xs">-</span>
                     )}
+                  </td>
+
+                  {/* Acciones */}
+                  <td className="px-2 py-2 text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      {/* Botón de duplicar */}
+                      {onDuplicateItem && item.producto_id && (
+                        <button
+                          type="button"
+                          onClick={() => onDuplicateItem(index)}
+                          className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                          title="Duplicar producto"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      {/* Botón de eliminar */}
+                      {canRemove ? (
+                        <button
+                          type="button"
+                          onClick={() => handleRemove(index)}
+                          className="h-7 w-7 inline-flex items-center justify-center rounded-md text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors"
+                          title="Eliminar producto"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      ) : (
+                        <span className="h-7 w-7 inline-block" />
+                      )}
+                    </div>
                   </td>
                 </tr>
               )
@@ -435,15 +468,29 @@ export function PresupuestoItemsTable({
       </div>
 
       {/* Botón agregar */}
-      <Button
-        type="button"
-        variant="outline"
-        className="w-full h-10 border-dashed"
-        onClick={onAddItem}
-      >
-        <Package className="h-4 w-4 mr-2" />
-        Agregar Producto
-      </Button>
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          className="flex-1 h-9 border-dashed"
+          onClick={onAddItem}
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Agregar Producto
+        </Button>
+        {onDuplicateItem && items.length > 0 && items[items.length - 1]?.producto_id && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => onDuplicateItem(items.length - 1)}
+            className="h-9"
+            title="Duplicar último producto"
+          >
+            <Copy className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
     </div>
   )
 }
