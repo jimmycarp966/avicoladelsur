@@ -959,15 +959,15 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
         {/* Columna izquierda: Contenido del formulario */}
         <div className="space-y-6">
           {/* Información del Cliente */}
-          <Card>
+          <Card className="border-l-[3px] border-l-primary">
             <CardHeader>
-              <CardTitle>Información del Cliente</CardTitle>
+              <CardTitle className="text-primary">Información del Cliente</CardTitle>
               <CardDescription>
                 Selecciona el cliente para el presupuesto
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="cliente_id" className="flex items-center gap-2">
                   Cliente *
                   <KeyboardHintCompact shortcut="C" />
@@ -1128,7 +1128,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                   </SelectContent>
                 </Select>
                 {errors.cliente_id && (
-                  <p className="text-sm text-red-500 mt-1">{errors.cliente_id.message}</p>
+                  <p className="text-sm text-destructive">{errors.cliente_id.message}</p>
                 )}
               </div>
 
@@ -1169,7 +1169,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
               {/* Zona y Fecha - Solo visible para reparto */}
               {clienteSeleccionado && watch('tipo_venta') === 'reparto' && (
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div>
+                  <div className="space-y-2">
                     <Label htmlFor="zona_id" className="flex items-center gap-2">
                       Zona de Entrega
                       <KeyboardHintCompact shortcut="Z" />
@@ -1201,7 +1201,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                     </Select>
                   </div>
 
-                  <div>
+                  <div className="space-y-2">
                     <Label htmlFor="fecha_entrega_estimada" className="flex items-center gap-2">
                       Fecha de Entrega Estimada
                       <KeyboardHintCompact shortcut="F" />
@@ -1216,7 +1216,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                 </div>
               )}
 
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="lista_precio_id" className="flex items-center gap-2">
                   Lista de Precios (Global)
                   <KeyboardHintCompact shortcut="L" />
@@ -1272,12 +1272,12 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                   </SelectContent>
                 </Select>
                 {errorListas && (
-                  <p className="text-sm text-red-500 mt-1">
+                  <p className="text-sm text-destructive">
                     Error al cargar listas. Intenta recargar la página.
                   </p>
                 )}
                 {watch('lista_precio_id') && (
-                  <p className="text-sm text-muted-foreground mt-1">
+                  <p className="text-xs text-muted-foreground">
                     Lista por defecto para todos los productos. Puedes cambiar la lista individualmente en cada producto.
                   </p>
                 )}
@@ -1286,9 +1286,9 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
           </Card>
 
           {/* Items del Presupuesto - Nueva Tabla Compacta */}
-          <Card>
+          <Card className="border-l-[3px] border-l-accent">
             <CardHeader className="pb-3">
-              <CardTitle>Productos</CardTitle>
+              <CardTitle className="text-accent">Productos</CardTitle>
               <CardDescription>
                 Escribí el código o nombre y presioná Enter para agregar rápidamente
               </CardDescription>
@@ -1314,13 +1314,13 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
               />
 
               {errors.items && errors.items.root && (
-                <p className="text-sm text-red-500">{errors.items.root.message}</p>
+                <p className="text-sm text-destructive">{errors.items.root.message}</p>
               )}
             </CardContent>
           </Card>
 
           {/* Observaciones */}
-          <Card>
+          <Card className="border-l-[3px] border-l-muted">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 Observaciones

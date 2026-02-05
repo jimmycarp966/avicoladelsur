@@ -78,25 +78,25 @@ export function EditarPresupuestoForm({ presupuesto }: EditarPresupuestoFormProp
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div className="grid gap-6 md:grid-cols-2">
         {/* Información del Presupuesto */}
-        <Card>
+        <Card className="border-l-[3px] border-l-primary">
           <CardHeader>
-            <CardTitle>Información del Presupuesto</CardTitle>
+            <CardTitle className="text-primary">Información del Presupuesto</CardTitle>
             <CardDescription>
               Datos básicos del presupuesto {presupuesto.numero_presupuesto}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
+            <div className="space-y-2">
               <Label>Número de Presupuesto</Label>
               <Input value={presupuesto.numero_presupuesto} disabled />
             </div>
 
-            <div>
+            <div className="space-y-2">
               <Label>Cliente</Label>
               <Input value={presupuesto.cliente?.nombre || 'N/A'} disabled />
             </div>
 
-            <div>
+            <div className="space-y-2">
               <Label>Estado</Label>
               <div className="mt-2">
                 <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
@@ -105,54 +105,52 @@ export function EditarPresupuestoForm({ presupuesto }: EditarPresupuestoFormProp
               </div>
             </div>
 
-            <div>
+            <div className="space-y-2">
               <Label>Total Estimado</Label>
-              <Input 
+              <Input
                 value={`$${Number(presupuesto.total_estimado || 0).toLocaleString('es-AR', {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2
-                })}`} 
-                disabled 
+                })}`}
+                disabled
               />
             </div>
           </CardContent>
         </Card>
 
         {/* Campos Editables */}
-        <Card>
+        <Card className="border-l-[3px] border-l-success">
           <CardHeader>
-            <CardTitle>Editar Información</CardTitle>
+            <CardTitle className="text-success">Editar Información</CardTitle>
             <CardDescription>
               Modifica los campos que necesites actualizar
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="fecha_entrega_estimada">Fecha de Entrega Estimada</Label>
               <Input
                 id="fecha_entrega_estimada"
                 type="date"
                 {...register('fecha_entrega_estimada')}
-                className={errors.fecha_entrega_estimada ? 'border-red-500' : ''}
               />
               {errors.fecha_entrega_estimada && (
-                <p className="text-sm text-red-500 mt-1">
+                <p className="text-sm text-destructive">
                   {errors.fecha_entrega_estimada.message}
                 </p>
               )}
             </div>
 
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="observaciones">Observaciones</Label>
               <Textarea
                 id="observaciones"
                 {...register('observaciones')}
                 rows={6}
                 placeholder="Agregar notas o instrucciones especiales..."
-                className={errors.observaciones ? 'border-red-500' : ''}
               />
               {errors.observaciones && (
-                <p className="text-sm text-red-500 mt-1">
+                <p className="text-sm text-destructive">
                   {errors.observaciones.message}
                 </p>
               )}
@@ -162,9 +160,9 @@ export function EditarPresupuestoForm({ presupuesto }: EditarPresupuestoFormProp
       </div>
 
       {/* Items del Presupuesto (Solo lectura) */}
-      <Card>
+      <Card className="border-l-[3px] border-l-info">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="text-info flex items-center gap-2">
             <Package className="h-5 w-5" />
             Productos Incluidos
           </CardTitle>
@@ -177,12 +175,12 @@ export function EditarPresupuestoForm({ presupuesto }: EditarPresupuestoFormProp
             {presupuesto.items?.map((item: any, index: number) => (
               <div
                 key={item.id || index}
-                className="flex items-center justify-between p-4 border rounded-lg"
+                className="flex items-center justify-between p-4 border rounded-lg bg-muted/30"
               >
                 <div className="flex-1">
                   <p className="font-medium">{item.producto?.nombre || 'Producto'}</p>
                   <p className="text-sm text-muted-foreground">
-                    Cantidad: {Number(item.cantidad_solicitada).toFixed(2)} | 
+                    Cantidad: {Number(item.cantidad_solicitada).toFixed(2)} |
                     Precio unit: ${Number(item.precio_unit_est || 0).toFixed(2)}
                   </p>
                 </div>
@@ -201,16 +199,21 @@ export function EditarPresupuestoForm({ presupuesto }: EditarPresupuestoFormProp
       </Card>
 
       {/* Botones de Acción */}
-      <div className="flex justify-end gap-4">
+      <div className="flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-4 sticky bottom-4 bg-background/95 backdrop-blur-md p-4 rounded-xl border border-border shadow-lg shadow-black/10 -mx-2">
         <Button
           type="button"
           variant="outline"
           onClick={() => router.back()}
           disabled={isLoading}
+          className="hover:bg-primary/5 hover:text-primary hover:border-primary/30 w-full sm:w-auto order-2 sm:order-1"
         >
           Cancelar
         </Button>
-        <Button type="submit" disabled={isLoading}>
+        <Button
+          type="submit"
+          disabled={isLoading}
+          className="bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg transition-all w-full sm:w-auto order-1 sm:order-2"
+        >
           {isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
