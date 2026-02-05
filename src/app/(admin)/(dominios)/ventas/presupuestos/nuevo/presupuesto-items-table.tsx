@@ -52,7 +52,7 @@ interface PresupuestoItemsTableProps {
   errors?: any
 }
 
-// Componente de búsqueda omnibox con portal
+// Componente de búsqueda omnibox simplificado
 function ProductoOmnibox({
   value,
   onSelect,
@@ -73,96 +73,32 @@ function ProductoOmnibox({
   const [selectedIndex, setSelectedIndex] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-  const dropdownRef = useRef<HTMLDivElement>(null)
-  const debouncedSearch = useDebounce(search, 100)
+  const debouncedSearch = useDebounce(search, 150)
 
-  // Calcular posición del dropdown
-  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 })
+  const filteredProductos = useMemo(() => {
+    if (!debouncedSearch.trim()) return []
 
-  const updateDropdownPosition = useCallback(() => {
-    if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect()
-      setDropdownPos({
-        top: rect.bottom + window.scrollY + 4,
-        left: rect.left + window.scrollX,
-        width: rect.width,
-      })
-    }
-  }, [])
-
-  useEffect(() => {
-    if (isOpen) {
-      updateDropdownPosition()
-      // Recalcular en scroll/resize
-      window.addEventListener('scroll', updateDropdownPosition, true)
-      window.addEventListener('resize', updateDropdownPosition)
-      return () => {
-        window.removeEventListener('scroll', updateDropdownPosition, true)
-        window.removeEventListener('resize', updateDropdownPosition)
-      }
-    }
-  }, [isOpen, updateDropdownPosition])
+    const term = debouncedSearch.toLowerCase().trim()
+    return productos
+      .filter(p => 
+        p.codigo.toLowerCase().includes(term) || 
+        p.nombre.toLowerCase().includes(term)
+      )
+      .slice(0, 10)
+  }, [productos, debouncedSearch])
 
   // Cerrar al hacer click fuera
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (
-        containerRef.current && 
-        !containerRef.current.contains(event.target as Node) &&
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false)
       }
     }
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-      return () => document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [isOpen])
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
-  const filteredProductos = useMemo(() => {
-    if (!debouncedSearch.trim()) {
-      return []
-    }
-
-    const term = debouncedSearch.toLowerCase().trim()
-    const results: Producto[] = []
-    
-    for (const producto of productos) {
-      if (results.length >= 10) break
-
-      const nombreLower = producto.nombre.toLowerCase()
-      const codigoLower = producto.codigo.toLowerCase()
-
-      // Coincidencia exacta en código (prioridad alta)
-      if (codigoLower === term) {
-        results.unshift(producto)
-        continue
-      }
-
-      // Código empieza con el término
-      if (codigoLower.startsWith(term)) {
-        results.push(producto)
-        continue
-      }
-
-      // Nombre empieza con el término
-      if (nombreLower.startsWith(term)) {
-        results.push(producto)
-        continue
-      }
-
-      // Contiene el término
-      if (nombreLower.includes(term) || codigoLower.includes(term)) {
-        results.push(producto)
-      }
-    }
-
-    return results
-  }, [productos, debouncedSearch])
-
-  // Reset selected index cuando cambian los resultados
+  // Reset selected index
   useEffect(() => {
     setSelectedIndex(0)
   }, [filteredProductos.length])
@@ -183,7 +119,6 @@ function ProductoOmnibox({
       }
     } else if (e.key === 'Escape') {
       setIsOpen(false)
-      inputRef.current?.blur()
     }
   }, [filteredProductos, selectedIndex, onSelect])
 
@@ -214,80 +149,68 @@ function ProductoOmnibox({
   }
 
   return (
-    <>
-      <div ref={containerRef} className="relative w-full">
-        <div className="relative">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
-          <Input
-            ref={inputRef}
-            type="text"
-            placeholder={placeholder}
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value)
-              setIsOpen(true)
-              updateDropdownPosition()
-            }}
-            onFocus={() => {
-              if (search.trim()) {
-                setIsOpen(true)
-                updateDropdownPosition()
-              }
-            }}
-            onKeyDown={handleKeyDown}
-            className="pl-8"
-            autoFocus={autoFocus}
-            autoComplete="off"
-            data-omnibox-input={rowIndex}
-          />
-        </div>
+    <div ref={containerRef} className="relative w-full">
+      <div className="relative">
+        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+        <Input
+          ref={inputRef}
+          type="text"
+          placeholder={placeholder}
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value)
+            setIsOpen(e.target.value.length > 0)
+          }}
+          onKeyDown={handleKeyDown}
+          className="pl-8"
+          autoFocus={autoFocus}
+          autoComplete="off"
+          data-omnibox-input={rowIndex}
+        />
       </div>
       
-      {/* Dropdown con portal a document.body */}
+      {/* Dropdown simple con absolute positioning */}
       {isOpen && filteredProductos.length > 0 && (
-        <div 
-          ref={dropdownRef}
-          className="fixed bg-white border rounded-md shadow-2xl max-h-[300px] overflow-auto"
-          style={{
-            top: dropdownPos.top,
-            left: dropdownPos.left,
-            width: dropdownPos.width,
-            zIndex: 99999,
-          }}
-        >
-          <div className="py-1">
-            {filteredProductos.map((producto, index) => (
-              <button
-                key={producto.id}
-                type="button"
-                onClick={() => {
-                  onSelect(producto)
-                  setSearch('')
-                  setIsOpen(false)
-                }}
-                className={`w-full px-3 py-2.5 text-left text-sm hover:bg-accent flex items-center justify-between transition-colors ${
-                  index === selectedIndex ? 'bg-accent' : ''
-                }`}
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium">
-                    {producto.codigo} - {producto.nombre}
+        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-[250px] overflow-y-auto z-50">
+          {filteredProductos.map((producto, index) => (
+            <div
+              key={producto.id}
+              onClick={() => {
+                onSelect(producto)
+                setSearch('')
+                setIsOpen(false)
+              }}
+              className={`px-3 py-2 cursor-pointer text-sm hover:bg-gray-100 flex items-center justify-between ${
+                index === selectedIndex ? 'bg-gray-100' : ''
+              }`}
+            >
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-gray-900">
+                  {producto.codigo} - {producto.nombre}
+                </div>
+                {producto.stock_disponible !== undefined && (
+                  <div className="text-xs text-gray-500">
+                    Stock: {producto.stock_disponible.toFixed(1)} {producto.unidad_medida}
                   </div>
-                  {producto.stock_disponible !== undefined && (
-                    <div className="text-xs text-muted-foreground mt-0.5">
-                      Stock: {producto.stock_disponible.toFixed(1)} {producto.unidad_medida}
-                    </div>
-                  )}
-                </div>
-                <div className="text-right text-muted-foreground ml-2 shrink-0">
-                  {formatCurrency(producto.precio_venta)}
-                </div>
-              </button>
-            ))}
+                )}
+              </div>
+              <div className="text-right text-gray-600 ml-2 shrink-0 font-medium">
+                {formatCurrency(producto.precio_venta)}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      
+      {/* Mensaje cuando no hay resultados */}
+      {isOpen && search.length > 0 && filteredProductos.length === 0 && (
+        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3 z-50">
+          <div className="text-sm text-gray-500 text-center">
+            No se encontraron productos
           </div>
         </div>
       )}
-    </>
+    </div>
   )
 }
 
@@ -308,17 +231,13 @@ export function PresupuestoItemsTable({
 }: PresupuestoItemsTableProps) {
   const [focusedRow, setFocusedRow] = useState<number | null>(null)
 
-  const getListaDisplay = useCallback((listaId?: string) => {
-    if (!listaId) return '-'
-    const lista = listas.find(l => l.id === listaId)
-    return lista?.codigo || '-'
-  }, [listas])
+  console.log('[TABLE] items.length:', items?.length)
+  console.log('[TABLE] items:', items)
 
   const handleProductoSelect = useCallback((index: number, producto: Producto) => {
     if (producto.id) {
       setValue(`items.${index}.producto_id`, producto.id)
       onProductoChange(index, producto.id)
-      // Enfocar cantidad
       setTimeout(() => {
         const cantidadInput = document.getElementById(`cantidad-${index}`) as HTMLInputElement
         if (cantidadInput) {
@@ -337,24 +256,19 @@ export function PresupuestoItemsTable({
       e.preventDefault()
       
       if (field === 'cantidad') {
-        // Mover a precio
         const precioInput = document.getElementById(`precio-${rowIndex}`) as HTMLInputElement
         if (precioInput) {
           precioInput.focus()
           precioInput.select()
         }
       } else if (field === 'precio') {
-        // Si es la última fila, agregar nueva
         if (rowIndex === items.length - 1) {
           onAddItem()
           setTimeout(() => {
             const nextInput = document.querySelector(`[data-omnibox-input="${rowIndex + 1}"]`) as HTMLInputElement
-            if (nextInput) {
-              nextInput.focus()
-            }
+            if (nextInput) nextInput.focus()
           }, 150)
         } else {
-          // Mover a siguiente cantidad
           const nextCantidadInput = document.getElementById(`cantidad-${rowIndex + 1}`) as HTMLInputElement
           if (nextCantidadInput) {
             nextCantidadInput.focus()
@@ -370,20 +284,18 @@ export function PresupuestoItemsTable({
   }
 
   const handleRemove = useCallback((index: number) => {
-    console.log('>>> handleRemove llamado con index:', index)
-    console.log('>>> items.length:', items.length)
-    if (items.length > 1) {
-      console.log('>>> Llamando a onRemoveItem:', index)
+    console.log('[TABLE] handleRemove llamado, index:', index, 'items.length:', items?.length)
+    if (items && items.length > 1) {
       onRemoveItem(index)
-    } else {
-      console.log('>>> No se puede eliminar: solo queda 1 item')
     }
-  }, [onRemoveItem, items.length])
+  }, [onRemoveItem, items])
+
+  const canRemove = items && items.length > 1
 
   return (
     <div className="space-y-3">
-      {/* Tabla compacta */}
-      <div className="border rounded-lg overflow-visible">
+      {/* Tabla */}
+      <div className="border rounded-lg" style={{ overflow: 'visible' }}>
         <table className="w-full text-sm">
           <thead className="bg-muted/50 border-b">
             <tr>
@@ -396,7 +308,7 @@ export function PresupuestoItemsTable({
             </tr>
           </thead>
           <tbody className="divide-y">
-            {items.map((item, index) => {
+            {items?.map((item, index) => {
               const producto = productos.find(p => p.id === item.producto_id)
               const subtotal = calcularSubtotal(item.cantidad_solicitada, item.precio_unit_est)
               const hasError = errors?.items?.[index]
@@ -407,8 +319,8 @@ export function PresupuestoItemsTable({
                   className={`${hasError ? 'bg-red-50/50' : ''} ${focusedRow === index ? 'bg-accent/50' : ''}`}
                   onFocus={() => setFocusedRow(index)}
                 >
-                  {/* Producto - Omnibox */}
-                  <td className="px-2 py-2">
+                  {/* Producto */}
+                  <td className="px-2 py-2 relative">
                     <ProductoOmnibox
                       value={item.producto_id}
                       onSelect={(p) => handleProductoSelect(index, p)}
@@ -454,7 +366,6 @@ export function PresupuestoItemsTable({
                         value={item.lista_precio_id || listaGlobalId || ''}
                         onChange={(e) => onListaChange(index, e.target.value)}
                         className="w-full h-9 px-2 text-sm border rounded-md bg-background"
-                        disabled={!item.producto_id}
                       >
                         {listas.map(lista => (
                           <option key={lista.id} value={lista.id}>
@@ -495,30 +406,23 @@ export function PresupuestoItemsTable({
 
                   {/* Subtotal */}
                   <td className="px-2 py-2 text-right font-medium">
-                    {item.producto_id ? (
-                      formatCurrency(subtotal)
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
+                    {item.producto_id ? formatCurrency(subtotal) : '-'}
                   </td>
 
-                  {/* Eliminar */}
+                  {/* Eliminar - SIN disabled, solo oculto cuando hay 1 item */}
                   <td className="px-2 py-2 text-center">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
-                      onMouseDown={(e) => {
-                        e.preventDefault()
-                        console.log('>>> Botón eliminar clickeado, index:', index)
-                        handleRemove(index)
-                      }}
-                      disabled={items.length <= 1}
-                      title={items.length <= 1 ? "Debe haber al menos un producto" : "Eliminar producto"}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    {canRemove ? (
+                      <button
+                        type="button"
+                        onClick={() => handleRemove(index)}
+                        className="h-8 w-8 inline-flex items-center justify-center rounded-md text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors"
+                        title="Eliminar producto"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    ) : (
+                      <span className="h-8 w-8 inline-block" />
+                    )}
                   </td>
                 </tr>
               )
@@ -537,12 +441,6 @@ export function PresupuestoItemsTable({
         <Package className="h-4 w-4 mr-2" />
         Agregar Producto
       </Button>
-
-      {/* Tips de navegación */}
-      <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-        <span>💡 Escribí código/nombre y presioná <kbd className="px-1 py-0.5 bg-muted rounded">Enter</kbd> para seleccionar</span>
-        <span>💡 <kbd className="px-1 py-0.5 bg-muted rounded">Tab</kbd> para navegar entre campos</span>
-      </div>
     </div>
   )
 }
