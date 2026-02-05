@@ -738,7 +738,9 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
 
   // Memoizar removeItem
   const removeItem = useCallback((index: number) => {
+    console.log('[FORM] removeItem llamado con index:', index, 'fields.length:', fields.length)
     if (fields.length > 1) {
+      console.log('[FORM] Ejecutando remove...')
       remove(index)
       // Limpiar lista individual si existe
       const nuevaListasPorProducto = { ...listasPorProducto }
@@ -754,6 +756,9 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
         }
       })
       setListasPorProducto(reindexed)
+      console.log('[FORM] remove ejecutado, listas reindexadas')
+    } else {
+      console.log('[FORM] No se puede eliminar: solo queda 1 field')
     }
   }, [fields.length, remove, listasPorProducto])
 

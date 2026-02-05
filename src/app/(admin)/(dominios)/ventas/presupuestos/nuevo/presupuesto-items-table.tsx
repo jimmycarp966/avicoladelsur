@@ -286,7 +286,11 @@ export function PresupuestoItemsTable({
   const handleRemove = useCallback((index: number) => {
     console.log('[TABLE] handleRemove llamado, index:', index, 'items.length:', items?.length)
     if (items && items.length > 1) {
+      console.log('[TABLE] Llamando a onRemoveItem con index:', index)
       onRemoveItem(index)
+      console.log('[TABLE] onRemoveItem llamado')
+    } else {
+      console.log('[TABLE] No se puede eliminar: solo queda 1 item')
     }
   }, [onRemoveItem, items])
 
