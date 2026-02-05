@@ -22,7 +22,7 @@ import { useDebounce } from '@/lib/hooks/useDebounce'
 import { useFocusField } from '@/lib/hooks/useFocusField'
 import { useFormContextShortcuts } from '@/lib/hooks/useFormContextShortcuts'
 import { KeyboardHintCompact } from '@/components/ui/keyboard-hint'
-import { ProductoItemRow } from './producto-item-row'
+import { PresupuestoItemsTable } from './presupuesto-items-table'
 import { useEffect, useRef } from 'react'
 
 const crearPresupuestoSchema = z.object({
@@ -68,8 +68,6 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
   const router = useRouter()
   const { showToast } = useNotificationStore()
   const [isLoading, setIsLoading] = useState(false)
-  const [productoSearch, setProductoSearch] = useState<{ [key: number]: string }>({})
-  const [productoDropdownOpen, setProductoDropdownOpen] = useState<{ [key: number]: boolean }>({})
   const [clienteSearch, setClienteSearch] = useState('')
   const [clienteDropdownOpen, setClienteDropdownOpen] = useState(false)
   const [todasListas, setTodasListas] = useState<Array<{ id: string; codigo: string; nombre: string; tipo: string; margen_ganancia: number | null }>>([])
@@ -1197,64 +1195,34 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
         </CardContent>
       </Card>
 
-      {/* Items del Presupuesto */}
+      {/* Items del Presupuesto - Nueva Tabla Compacta */}
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-3">
           <CardTitle>Productos</CardTitle>
           <CardDescription>
-            Agrega los productos al presupuesto
+            Escribí el código o nombre y presioná Enter para agregar rápidamente
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {fields.map((field, index) => {
-            const itemListaId = listasPorProducto[index] || watchedListaPrecioGlobal
-            const usaListaGlobal = !listasPorProducto[index] && !!watchedListaPrecioGlobal
-
-            return (
-              <ProductoItemRow
-                key={field.id}
-                index={index}
-                fieldId={field.id}
-                productos={productos}
-                productoSearch={productoSearch[index] || ''}
-                onProductoSearchChange={(value) => {
-                  setProductoSearch(prev => ({ ...prev, [index]: value }))
-                }}
-                onProductoChange={handleProductoChange}
-                onRemove={removeItem}
-                errors={errors.items?.[index]}
-                canRemove={fields.length > 1}
-                watch={watch}
-                setValue={setValue}
-                register={register}
-                control={control}
-                watchedItem={watchedItems?.[index]}
-                todasListas={todasListas}
-                listaId={itemListaId}
-                usaListaGlobal={usaListaGlobal}
-                listaGlobalId={watchedListaPrecioGlobal}
-                onListaChange={handleListaProductoChange}
-                totalItems={fields.length}
-                onAddItem={addItem}
-              />
-            )
-          })}
+          <PresupuestoItemsTable
+            items={watchedItems || []}
+            productos={productos}
+            listas={todasListas}
+            listaGlobalId={watchedListaPrecioGlobal}
+            control={control}
+            register={register}
+            setValue={setValue}
+            watch={watch}
+            onProductoChange={handleProductoChange}
+            onListaChange={handleListaProductoChange}
+            onAddItem={addItem}
+            onRemoveItem={removeItem}
+            errors={errors}
+          />
 
           {errors.items && errors.items.root && (
             <p className="text-sm text-red-500">{errors.items.root.message}</p>
           )}
-
-          <Button
-            ref={agregarProductoButtonRef}
-            type="button"
-            variant="outline"
-            onClick={addItem}
-            className="w-full"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Agregar Producto
-            <KeyboardHintCompact shortcut="A" className="ml-auto" />
-          </Button>
         </CardContent>
       </Card>
 
@@ -1287,6 +1255,28 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
             <span className="text-2xl font-bold text-primary">
               {formatCurrency(totalEstimado)}
             </span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Resumen y Total */}
+      <Card className="bg-primary/5 border-primary/20">
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">Total Estimado</p>
+              <p className="text-3xl font-bold text-primary">
+                {formatCurrency(totalEstimado)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {itemsParaTotal?.length || 0} productos
+              </p>
+            </div>
+            <div className="text-right hidden sm:block">
+              <p className="text-xs text-muted-foreground">
+                💡 <kbd className="px-1 py-0.5 bg-muted rounded">Ctrl+Enter</kbd> para guardar rápido
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
