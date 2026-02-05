@@ -162,7 +162,7 @@ export async function obtenerPresupuestosDiaAction(fecha: string, zonaId?: strin
     ),
   ).sort((a, b) => b.totalKg - a.totalKg)
 
-  // Lista de preparación
+  // Lista de preparación - agrupada por categoría
   const listaPreparacion = Object.entries(
     (presupuestosDelDia || []).reduce(
       (
@@ -175,6 +175,7 @@ export async function obtenerPresupuestosDiaAction(fecha: string, zonaId?: strin
               string,
               {
                 nombre: string
+                categoria: string | null
                 pesable: boolean
                 totalCantidad: number
                 presupuestosIds: Set<string>
@@ -218,6 +219,7 @@ export async function obtenerPresupuestosDiaAction(fecha: string, zonaId?: strin
           if (!acc[key].productos[productoKey]) {
             acc[key].productos[productoKey] = {
               nombre: item.producto?.nombre || 'Producto sin nombre',
+              categoria: item.producto?.categoria || null,
               pesable: esPesable,
               totalCantidad: 0,
               presupuestosIds: new Set<string>(),
@@ -238,27 +240,61 @@ export async function obtenerPresupuestosDiaAction(fecha: string, zonaId?: strin
       },
       {},
     ),
-  ).map(([key, grupo]) => ({
-    key,
-    zona: grupo.zona,
-    turno: grupo.turno,
-    totalKgPesables: grupo.totalKgPesables,
-    productos: Object.values(grupo.productos)
-      .map((producto) => ({
-        nombre: producto.nombre,
-        pesable: producto.pesable,
-        totalCantidad: producto.totalCantidad,
-        presupuestos: producto.presupuestosIds.size,
-        presupuestosIds: producto.presupuestosIds,
-        presupuestosData: producto.presupuestosData,
+  ).map(([key, grupo]) => {
+    // Agrupar productos por categoría
+    const productosPorCategoria = Object.values(grupo.productos).reduce(
+      (acc: Record<string, Array<{
+        nombre: string
+        pesable: boolean
+        totalCantidad: number
+        presupuestos: number
+        presupuestosIds: Set<string>
+        presupuestosData: Array<{ id: string; numero: string; cliente?: string }>
+      }>>, producto) => {
+        const categoria = producto.categoria || 'Sin categoría'
+        if (!acc[categoria]) {
+          acc[categoria] = []
+        }
+        acc[categoria].push({
+          nombre: producto.nombre,
+          pesable: producto.pesable,
+          totalCantidad: producto.totalCantidad,
+          presupuestos: producto.presupuestosIds.size,
+          presupuestosIds: producto.presupuestosIds,
+          presupuestosData: producto.presupuestosData,
+        })
+        return acc
+      },
+      {},
+    )
+
+    // Ordenar categorías alfabéticamente
+    const categoriasOrdenadas = Object.entries(productosPorCategoria)
+      .map(([nombreCategoria, productos]) => ({
+        nombre: nombreCategoria,
+        productos: productos.sort((a, b) => {
+          // Pesables primero, luego cajas (no pesables)
+          if (a.pesable !== b.pesable) return a.pesable ? -1 : 1
+          // Dentro de cada grupo, ordenar por cantidad descendente
+          return b.totalCantidad - a.totalCantidad
+        }),
       }))
       .sort((a, b) => {
-        // Pesables primero, luego cajas (no pesables)
-        if (a.pesable !== b.pesable) return a.pesable ? -1 : 1
-        // Dentro de cada grupo, ordenar por cantidad descendente
-        return b.totalCantidad - a.totalCantidad
-      }),
-  }))
+        // "Sin categoría" al final
+        if (a.nombre === 'Sin categoría' && b.nombre !== 'Sin categoría') return 1
+        if (a.nombre !== 'Sin categoría' && b.nombre === 'Sin categoría') return -1
+        // Orden alfabético para el resto
+        return a.nombre.localeCompare(b.nombre)
+      })
+
+    return {
+      key,
+      zona: grupo.zona,
+      turno: grupo.turno,
+      totalKgPesables: grupo.totalKgPesables,
+      categorias: categoriasOrdenadas,
+    }
+  })
 
   // Obtener sugerencias de vehículos
   const { data: sugerenciasVehiculos } = await supabase.rpc('fn_asignar_vehiculos_por_peso', {

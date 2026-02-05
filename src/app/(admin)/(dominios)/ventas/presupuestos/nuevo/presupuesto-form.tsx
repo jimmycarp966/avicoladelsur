@@ -334,6 +334,24 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
     }
   }, [])
 
+  // Efecto para enfocar y abrir automáticamente el selector de cliente al montar
+  useEffect(() => {
+    const focusClienteSelect = () => {
+      const clienteTrigger = document.getElementById('cliente_id') as HTMLButtonElement
+      if (clienteTrigger) {
+        clienteTrigger.focus()
+        // Abrir el dropdown automáticamente
+        setTimeout(() => {
+          setClienteDropdownOpen(true)
+        }, 100)
+      }
+    }
+
+    // Esperar a que el componente esté montado
+    const timeoutId = setTimeout(focusClienteSelect, 150)
+    return () => clearTimeout(timeoutId)
+  }, [])
+
   // Efecto para cargar y aplicar automáticamente zona y lista de precios del cliente
   useEffect(() => {
     if (!watchedCliente) return
@@ -1008,7 +1026,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                     }
                   }}
                 >
-                  <SelectTrigger id="cliente_id" className={errors.cliente_id ? 'border-red-500' : ''}>
+                  <SelectTrigger id="cliente_id" autoFocus className={errors.cliente_id ? 'border-red-500' : ''}>
                     <SelectValue placeholder="Buscar por código, nombre, teléfono o zona..." />
                   </SelectTrigger>
                   <SelectContent className="max-h-[300px]">

@@ -19,8 +19,7 @@ import { obtenerTransferenciasDiaAction } from '@/actions/sucursales-transferenc
 import { PresupuestosDiaRealtime } from '@/components/almacen/PresupuestosDiaRealtime'
 import { obtenerPresupuestosDiaAction, esItemPesable, calcularKgItem } from '@/actions/presupuestos-dia.actions'
 import { esVentaMayorista } from '@/lib/utils'
-import { PrintPreparacionParcial } from '@/components/almacen/PrintPreparacionParcial'
-import { ProductoPreparacionCard } from '@/components/almacen/ProductoPreparacionCard'
+import { ListaPreparacionCollapsible } from '@/components/almacen/ListaPreparacionCollapsible'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 60 // Revalida cada 60 segundos
@@ -333,60 +332,7 @@ async function PresupuestosDiaContent({
       )}
 
       {/* Lista de preparación consolidada */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                Lista de preparación del día
-              </CardTitle>
-              <CardDescription>
-                Consolidado de productos por zona y turno considerando los filtros seleccionados
-              </CardDescription>
-            </div>
-            <PrintPreparacionParcial listaPreparacion={listaPreparacion} fecha={fecha} />
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {listaPreparacion.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">
-              No hay presupuestos que coincidan con los filtros actuales.
-            </div>
-          )}
-
-          {listaPreparacion.map((grupo) => (
-            <div key={grupo.key} className="rounded-lg border border-dashed border-primary/20 p-4">
-              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">{grupo.turno === 'Sin turno' ? 'Turno sin asignar' : `Turno ${grupo.turno}`}</p>
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <MapPin className="h-4 w-4" />
-                    {grupo.zona}
-                  </h3>
-                </div>
-                <Badge variant="outline" className="text-sm">
-                  {grupo.totalKgPesables.toFixed(1)} kg pesables
-                </Badge>
-              </div>
-
-              <div className="mt-4 space-y-3">
-                {grupo.productos.map((producto) => (
-                  <ProductoPreparacionCard
-                    key={`${grupo.key}-${producto.nombre}`}
-                    nombre={producto.nombre}
-                    pesable={producto.pesable}
-                    totalCantidad={producto.totalCantidad}
-                    presupuestos={producto.presupuestos}
-                    presupuestosIds={producto.presupuestosIds}
-                    presupuestosData={producto.presupuestosData}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+      <ListaPreparacionCollapsible listaPreparacion={listaPreparacion} fecha={fecha} />
 
       {/* Agrupación por zona y turno */}
       {Object.keys(presupuestosPorZonaTurno).length > 0 && (

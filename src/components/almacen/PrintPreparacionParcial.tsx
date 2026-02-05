@@ -7,17 +7,21 @@ import { toast } from 'sonner'
 
 interface ProductoPreparacion {
   nombre: string
-  codigo?: string
-  totalCantidad: number
   pesable: boolean
+  totalCantidad: number
   presupuestos: number
+}
+
+interface CategoriaPreparacion {
+  nombre: string
+  productos: ProductoPreparacion[]
 }
 
 interface GrupoPreparacion {
   key: string
   zona: string
   turno: string
-  productos: ProductoPreparacion[]
+  categorias: CategoriaPreparacion[]
   totalKgPesables: number
 }
 
@@ -30,7 +34,8 @@ export function PrintPreparacionParcial({ listaPreparacion, fecha }: PrintPrepar
   const [isLoading, setIsLoading] = useState(false)
 
   // Contar total de productos
-  const totalProductos = listaPreparacion.reduce((acc, grupo) => acc + grupo.productos.length, 0)
+  const totalProductos = listaPreparacion.reduce((acc, grupo) =>
+    acc + grupo.categorias.reduce((sum, cat) => sum + cat.productos.length, 0), 0)
 
   const handlePrint = async () => {
     if (totalProductos === 0) {
@@ -56,6 +61,7 @@ export function PrintPreparacionParcial({ listaPreparacion, fecha }: PrintPrepar
     .zona-section { page-break-after: always; margin-bottom: 20px; }
     .zona-section:last-child { page-break-after: auto; }
     .zona-header { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; padding: 10px 15px; border-radius: 6px 6px 0 0; font-weight: bold; font-size: 14px; }
+    .categoria-header { background-color: #f3f4f6; color: #374151; padding: 8px 12px; font-weight: bold; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #e5e7eb; margin-top: 10px; }
     table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
     th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
     th { background-color: #f5f5f5; font-weight: 600; font-size: 11px; }
@@ -73,22 +79,28 @@ export function PrintPreparacionParcial({ listaPreparacion, fecha }: PrintPrepar
 </head>
 <body>`)
 
-      // Una sección por cada zona
+      // Una sección por cada zona/turno
       listaPreparacion.forEach((grupo, index) => {
         const isLast = index === listaPreparacion.length - 1
-        const productosPesables = grupo.productos.filter(p => p.pesable)
-        const productosNoPesables = grupo.productos.filter(p => !p.pesable)
+        const totalProductosGrupo = grupo.categorias.reduce((sum, cat) => sum + cat.productos.length, 0)
 
         htmlParts.push(`
   <div class="zona-section${isLast ? ' last' : ''}">
     <h1>📦 Lista de Preparación - ${fecha}</h1>
     <h2>${grupo.zona} ${grupo.turno !== 'Sin turno' ? `• Turno ${grupo.turno}` : ''}</h2>
-    
+
     <div class="zona-header">
-      ${grupo.zona} ${grupo.turno !== 'Sin turno' ? `- Turno ${grupo.turno}` : ''} 
-      (${grupo.productos.length} productos, ${grupo.totalKgPesables.toFixed(1)} kg pesables)
-    </div>
-    
+      ${grupo.zona} ${grupo.turno !== 'Sin turno' ? `- Turno ${grupo.turno}` : ''}
+      (${totalProductosGrupo} productos, ${grupo.totalKgPesables.toFixed(1)} kg pesables)
+    </div>`)
+
+        // Una sección por cada categoría
+        grupo.categorias.forEach(categoria => {
+          const productosPesables = categoria.productos.filter(p => p.pesable)
+          const productosNoPesables = categoria.productos.filter(p => !p.pesable)
+
+          htmlParts.push(`
+    <div class="categoria-header">${categoria.nombre}</div>
     <table>
       <thead>
         <tr>
@@ -100,9 +112,9 @@ export function PrintPreparacionParcial({ listaPreparacion, fecha }: PrintPrepar
       </thead>
       <tbody>`)
 
-        // Primero productos pesables (resaltados)
-        productosPesables.forEach(producto => {
-          htmlParts.push(`
+          // Primero productos pesables (resaltados)
+          productosPesables.forEach(producto => {
+            htmlParts.push(`
         <tr class="pesable-row">
           <td>
             ${producto.nombre}
@@ -112,11 +124,11 @@ export function PrintPreparacionParcial({ listaPreparacion, fecha }: PrintPrepar
           <td>${producto.presupuestos}</td>
           <td class="cantidad">${producto.totalCantidad.toFixed(1)} kg</td>
         </tr>`)
-        })
+          })
 
-        // Luego productos no pesables
-        productosNoPesables.forEach(producto => {
-          htmlParts.push(`
+          // Luego productos no pesables
+          productosNoPesables.forEach(producto => {
+            htmlParts.push(`
         <tr>
           <td>
             ${producto.nombre}
@@ -126,14 +138,22 @@ export function PrintPreparacionParcial({ listaPreparacion, fecha }: PrintPrepar
           <td>${producto.presupuestos}</td>
           <td class="cantidad">${producto.totalCantidad.toFixed(0)} u</td>
         </tr>`)
+          })
+
+          htmlParts.push(`
+      </tbody>
+    </table>`)
         })
 
+        // Total de productos pesables y no pesables del grupo
+        const totalPesablesGrupo = grupo.categorias.reduce((sum, cat) =>
+          sum + cat.productos.filter(p => p.pesable).length, 0)
+        const totalNoPesablesGrupo = grupo.categorias.reduce((sum, cat) =>
+          sum + cat.productos.filter(p => !p.pesable).length, 0)
+
         htmlParts.push(`
-      </tbody>
-    </table>
-    
     <div class="footer">
-      Resumen: ${productosPesables.length} pesables (${grupo.totalKgPesables.toFixed(1)} kg) + ${productosNoPesables.length} unidades/cajas
+      Resumen: ${totalPesablesGrupo} pesables (${grupo.totalKgPesables.toFixed(1)} kg) + ${totalNoPesablesGrupo} unidades/cajas
       • Impreso: ${new Date().toLocaleString('es-AR')}
     </div>
   </div>`)
