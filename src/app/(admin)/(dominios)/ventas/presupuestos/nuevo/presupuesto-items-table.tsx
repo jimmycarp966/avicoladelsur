@@ -53,6 +53,8 @@ interface PresupuestoItemsTableProps {
   onAddItem: () => void
   onRemoveItem: (index: number) => void
   onDuplicateItem?: (index: number) => void
+  canRemoveItem: (index: number) => boolean
+  itemsCount?: number  // Cantidad real de items (de fields.length)
   errors?: any
 }
 
@@ -79,16 +81,78 @@ function ProductoOmnibox({
   const inputRef = useRef<HTMLInputElement>(null)
   const debouncedSearch = useDebounce(search, 150)
 
+  // Resetear search cuando cambia el value (se selecciona un producto)
+  useEffect(() => {
+    if (value) {
+      setSearch('')
+      setIsOpen(false)
+    }
+  }, [value])
+
   const filteredProductos = useMemo(() => {
     if (!debouncedSearch.trim()) return []
 
     const term = debouncedSearch.toLowerCase().trim()
-    return productos
-      .filter(p => 
-        p.codigo.toLowerCase().includes(term) || 
-        p.nombre.toLowerCase().includes(term)
-      )
-      .slice(0, 10)
+
+    // Separar en grupos de prioridad para mejor ordenamiento
+    const nombreExacto: typeof productos = []
+    const nombrePalabraCompleta: typeof productos = []
+    const nombreEmpiezaCon: typeof productos = []
+    const codigoEmpiezaCon: typeof productos = []
+    const codigoExacto: typeof productos = []
+    const contiene: typeof productos = []
+
+    for (const p of productos) {
+      const nombreLower = p.nombre.toLowerCase()
+      const codigoLower = p.codigo.toLowerCase()
+
+      // Prioridad 1: Código exacto
+      if (codigoLower === term) {
+        codigoExacto.push(p)
+        continue
+      }
+
+      // Prioridad 2: Nombre exacto
+      if (nombreLower === term) {
+        nombreExacto.push(p)
+        continue
+      }
+
+      // Prioridad 3: Nombre empieza con término y es palabra completa
+      if (nombreLower.startsWith(term)) {
+        const charDespues = nombreLower[term.length]
+        if (charDespues === ' ' || charDespues === undefined) {
+          nombrePalabraCompleta.push(p)
+        } else {
+          nombreEmpiezaCon.push(p)
+        }
+        continue
+      }
+
+      // Prioridad 4: Código empieza con el término
+      if (codigoLower.startsWith(term)) {
+        codigoEmpiezaCon.push(p)
+        continue
+      }
+
+      // Prioridad 5: Contiene el término
+      if (nombreLower.includes(term) || codigoLower.includes(term)) {
+        contiene.push(p)
+      }
+    }
+
+    // Ordenar por longitud de nombre (más corto primero)
+    nombrePalabraCompleta.sort((a, b) => a.nombre.length - b.nombre.length)
+    nombreEmpiezaCon.sort((a, b) => a.nombre.length - b.nombre.length)
+
+    return [
+      ...codigoExacto,
+      ...nombreExacto,
+      ...nombrePalabraCompleta,
+      ...nombreEmpiezaCon,
+      ...codigoEmpiezaCon,
+      ...contiene
+    ].slice(0, 10)
   }, [productos, debouncedSearch])
 
   // Cerrar al hacer click fuera
@@ -127,6 +191,9 @@ function ProductoOmnibox({
   }, [filteredProductos, selectedIndex, onSelect])
 
   const productoSeleccionado = productos.find(p => p.id === value)
+
+  // Debug: log para ver qué está pasando
+  console.log('[OMNIBOX] value:', value, 'productoSeleccionado:', productoSeleccionado?.codigo, productoSeleccionado?.nombre)
 
   if (productoSeleccionado) {
     return (
@@ -232,15 +299,21 @@ export function PresupuestoItemsTable({
   onAddItem,
   onRemoveItem,
   onDuplicateItem,
+  canRemoveItem,
+  itemsCount,
   errors,
 }: PresupuestoItemsTableProps) {
   const [focusedRow, setFocusedRow] = useState<number | null>(null)
 
-  console.log('[TABLE] items.length:', items?.length, 'items:', items?.map((i, idx) => ({ idx, producto_id: i.producto_id })))
+  // Usar itemsCount (de fields.length) como la fuente de verdad para la cantidad de items
+  const displayItems = itemsCount !== undefined ? items.slice(0, itemsCount) : items
+
+  console.log('[TABLE] items.length:', items?.length, 'itemsCount:', itemsCount, 'displayItems.length:', displayItems?.length)
 
   const handleProductoSelect = useCallback((index: number, producto: Producto) => {
+    console.log('[TABLE] handleProductoSelect:', { index, productoId: producto.id, productoCodigo: producto.codigo })
     if (producto.id) {
-      setValue(`items.${index}.producto_id`, producto.id)
+      setValue(`items.${index}.producto_id`, producto.id, { shouldValidate: true, shouldDirty: true })
       onProductoChange(index, producto.id)
       setTimeout(() => {
         const cantidadInput = document.getElementById(`cantidad-${index}`) as HTMLInputElement
@@ -250,15 +323,15 @@ export function PresupuestoItemsTable({
         }
       }, 50)
     } else {
-      setValue(`items.${index}.producto_id`, '')
-      setValue(`items.${index}.precio_unit_est`, 0)
+      setValue(`items.${index}.producto_id`, '', { shouldValidate: true, shouldDirty: true })
+      setValue(`items.${index}.precio_unit_est`, 0, { shouldValidate: true, shouldDirty: true })
     }
   }, [setValue, onProductoChange])
 
   const handleKeyNavigation = useCallback((e: KeyboardEvent<HTMLInputElement>, rowIndex: number, field: 'cantidad' | 'precio') => {
     if (e.key === 'Enter' || e.key === 'Tab') {
       e.preventDefault()
-      
+
       if (field === 'cantidad') {
         const precioInput = document.getElementById(`precio-${rowIndex}`) as HTMLInputElement
         if (precioInput) {
@@ -266,7 +339,8 @@ export function PresupuestoItemsTable({
           precioInput.select()
         }
       } else if (field === 'precio') {
-        if (rowIndex === items.length - 1) {
+        const maxIndex = displayItems.length - 1
+        if (rowIndex === maxIndex) {
           onAddItem()
           setTimeout(() => {
             const nextInput = document.querySelector(`[data-omnibox-input="${rowIndex + 1}"]`) as HTMLInputElement
@@ -281,7 +355,7 @@ export function PresupuestoItemsTable({
         }
       }
     }
-  }, [items.length, onAddItem])
+  }, [displayItems.length, onAddItem])
 
   const calcularSubtotal = (cantidad: number, precio: number) => {
     return (cantidad || 0) * (precio || 0)
@@ -289,14 +363,12 @@ export function PresupuestoItemsTable({
 
   const handleRemove = useCallback((index: number) => {
     console.log('[TABLE] handleRemove llamado, index:', index, 'items.length:', items?.length)
-    if (items && items.length > 1) {
+    if (canRemoveItem(index)) {
       onRemoveItem(index)
     } else {
       console.log('[TABLE] No se puede eliminar: solo queda 1 item')
     }
-  }, [onRemoveItem, items])
-
-  const canRemove = items && items.length > 1
+  }, [onRemoveItem, canRemoveItem])
 
   return (
     <div className="space-y-3">
@@ -315,7 +387,7 @@ export function PresupuestoItemsTable({
             </tr>
           </thead>
           <tbody className="divide-y">
-            {items?.map((item, index) => {
+            {displayItems?.map((item, index) => {
               const producto = productos.find(p => p.id === item.producto_id)
               const subtotal = calcularSubtotal(item.cantidad_solicitada, item.precio_unit_est)
               const hasError = errors?.items?.[index]
@@ -446,7 +518,7 @@ export function PresupuestoItemsTable({
                         </button>
                       )}
                       {/* Botón de eliminar */}
-                      {canRemove ? (
+                      {canRemoveItem(index) ? (
                         <button
                           type="button"
                           onClick={() => handleRemove(index)}
@@ -478,12 +550,12 @@ export function PresupuestoItemsTable({
           <Plus className="h-4 w-4 mr-2" />
           Agregar Producto
         </Button>
-        {onDuplicateItem && items.length > 0 && items[items.length - 1]?.producto_id && (
+        {onDuplicateItem && displayItems.length > 0 && displayItems[displayItems.length - 1]?.producto_id && (
           <Button
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => onDuplicateItem(items.length - 1)}
+            onClick={() => onDuplicateItem(displayItems.length - 1)}
             className="h-9"
             title="Duplicar último producto"
           >

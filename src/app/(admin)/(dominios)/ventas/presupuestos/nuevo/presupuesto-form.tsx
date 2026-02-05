@@ -556,54 +556,90 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
       return clientes.slice(0, MAX_RESULTS)
     }
 
-    // Optimizar filtrado: buscar coincidencias exactas primero, luego parciales
-    const results: typeof clientes = []
-    const termLower = term.toLowerCase()
-
     // Asegurar que el cliente seleccionado siempre esté en la lista si existe
-    const clienteSeleccionadoEnLista = watchedCliente
+    const clienteSeleccionado = watchedCliente
       ? clientes.find(c => c.id === watchedCliente)
       : null
 
+    // Separar en grupos de prioridad
+    const codigoExacto: typeof clientes = []
+    const nombreExacto: typeof clientes = []
+    const nombrePalabraCompleta: typeof clientes = []
+    const nombreEmpiezaCon: typeof clientes = []
+    const codigoEmpiezaCon: typeof clientes = []
+    const contiene: typeof clientes = []
+
     for (const cliente of clientes) {
-      if (results.length >= MAX_RESULTS) break
+      const nombreLower = cliente.nombre.toLowerCase()
+      const codigoLower = cliente.codigo?.toLowerCase() || ''
+      const telefono = cliente.telefono || ''
 
-      // Si es el cliente seleccionado, agregarlo primero si no está ya incluido
-      if (cliente.id === watchedCliente && !results.find(c => c.id === cliente.id)) {
-        results.unshift(cliente)
+      // Si es el cliente seleccionado, incluirlo siempre (se agregará al inicio después)
+      if (cliente.id === watchedCliente) {
+        continue // Se maneja separadamente al final
+      }
+
+      // Prioridad 1: Código exacto
+      if (codigoLower === term) {
+        codigoExacto.push(cliente)
         continue
       }
 
-      // Coincidencia exacta en código (prioridad alta)
-      if (cliente.codigo?.toLowerCase() === termLower) {
-        results.unshift(cliente) // Al inicio
+      // Prioridad 2: Nombre exacto
+      if (nombreLower === term) {
+        nombreExacto.push(cliente)
         continue
       }
 
-      // Coincidencia que empieza con el término (prioridad media)
-      if (
-        cliente.nombre.toLowerCase().startsWith(termLower) ||
-        cliente.codigo?.toLowerCase().startsWith(termLower) ||
-        cliente.telefono?.startsWith(term)
-      ) {
-        results.push(cliente)
+      // Prioridad 3: Nombre empieza con término y es palabra completa
+      if (nombreLower.startsWith(term)) {
+        const charDespues = nombreLower[term.length]
+        if (charDespues === ' ' || charDespues === undefined) {
+          nombrePalabraCompleta.push(cliente)
+        } else {
+          nombreEmpiezaCon.push(cliente)
+        }
         continue
       }
 
-      // Coincidencia parcial (prioridad baja)
-      if (
-        cliente.nombre.toLowerCase().includes(termLower) ||
-        cliente.codigo?.toLowerCase().includes(termLower) ||
-        cliente.telefono?.includes(term) ||
-        cliente.zona_entrega?.toLowerCase().includes(termLower)
-      ) {
-        results.push(cliente)
+      // Prioridad 4: Teléfono empieza con el término
+      if (telefono.startsWith(term)) {
+        codigoEmpiezaCon.push(cliente)
+        continue
+      }
+
+      // Prioridad 5: Código empieza con el término
+      if (codigoLower.startsWith(term)) {
+        codigoEmpiezaCon.push(cliente)
+        continue
+      }
+
+      // Prioridad 6: Contiene el término
+      if (nombreLower.includes(term) || codigoLower.includes(term) || telefono.includes(term)) {
+        contiene.push(cliente)
       }
     }
 
+    // Ordenar por longitud de nombre (más corto primero)
+    nombrePalabraCompleta.sort((a, b) => a.nombre.length - b.nombre.length)
+    nombreEmpiezaCon.sort((a, b) => a.nombre.length - b.nombre.length)
+
+    // Combinar todos los grupos
+    let results = [
+      ...codigoExacto,
+      ...nombreExacto,
+      ...nombrePalabraCompleta,
+      ...nombreEmpiezaCon,
+      ...codigoEmpiezaCon,
+      ...contiene
+    ]
+
+    // Limitar a MAX_RESULTS
+    results = results.slice(0, MAX_RESULTS)
+
     // Si hay un cliente seleccionado y no está en los resultados, agregarlo al inicio
-    if (clienteSeleccionadoEnLista && !results.find(c => c.id === clienteSeleccionadoEnLista.id)) {
-      results.unshift(clienteSeleccionadoEnLista)
+    if (clienteSeleccionado && !results.find(c => c.id === clienteSeleccionado.id)) {
+      results.unshift(clienteSeleccionado)
     }
 
     return results
@@ -763,6 +799,26 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
       console.log('[FORM] No se puede eliminar: solo queda 1 field')
     }
   }, [fields.length, remove, listasPorProducto])
+
+  // Función para verificar si se puede eliminar un item
+  const canRemoveItem = useCallback((index: number) => {
+    return fields.length > 1
+  }, [fields.length])
+
+  // Combinar fields (con IDs) y watchedItems (con valores) para la tabla
+  // IMPORTANTE: Usar fields.length como dependencia para forzar recálculo cuando se agrega/elimina
+  const itemsWithIds = useMemo(() => {
+    // Si watchedItems tiene más elementos que fields, ocurrió una eliminación
+    // y necesitamos sincronizar
+    const itemsToUse = (watchedItems?.length || 0) > fields.length
+      ? watchedItems?.slice(0, fields.length)
+      : watchedItems
+
+    return itemsToUse?.map((item: any, index: number) => ({
+      ...item,
+      id: fields[index]?.id || item.producto_id || index
+    })) || []
+  }, [watchedItems, fields, fields.length])
 
   // Memoizar duplicateItem
   const duplicateItem = useCallback((index: number) => {
@@ -1239,7 +1295,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
             </CardHeader>
             <CardContent className="space-y-4">
               <PresupuestoItemsTable
-                items={fields as any}
+                items={itemsWithIds as any}
                 productos={productos}
                 listas={todasListas}
                 listaGlobalId={watchedListaPrecioGlobal}
@@ -1252,6 +1308,8 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                 onAddItem={addItem}
                 onRemoveItem={removeItem}
                 onDuplicateItem={duplicateItem}
+                canRemoveItem={canRemoveItem}
+                itemsCount={fields.length}
                 errors={errors}
               />
 

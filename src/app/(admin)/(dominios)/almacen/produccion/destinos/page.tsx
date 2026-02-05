@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -74,11 +74,71 @@ export default function DestinosProduccionPage() {
     const [productoAAsociar, setProductoAAsociar] = useState('')
     const [busquedaProducto, setBusquedaProducto] = useState('') // Filtro de búsqueda
 
-    // Productos filtrados por búsqueda
-    const productosFiltrados = productos.filter(p =>
-        p.nombre.toLowerCase().includes(busquedaProducto.toLowerCase()) ||
-        p.codigo.toLowerCase().includes(busquedaProducto.toLowerCase())
-    )
+    // Productos filtrados por búsqueda con prioridad de coincidencias
+    const productosFiltrados = useMemo(() => {
+        const term = busquedaProducto.toLowerCase().trim()
+        if (!term) return productos
+
+        // Separar en grupos de prioridad
+        const codigoExacto: typeof productos = []
+        const nombreExacto: typeof productos = []
+        const nombrePalabraCompleta: typeof productos = []
+        const nombreEmpiezaCon: typeof productos = []
+        const codigoEmpiezaCon: typeof productos = []
+        const contiene: typeof productos = []
+
+        for (const p of productos) {
+            const nombreLower = p.nombre.toLowerCase()
+            const codigoLower = p.codigo.toLowerCase()
+
+            // Prioridad 1: Código exacto
+            if (codigoLower === term) {
+                codigoExacto.push(p)
+                continue
+            }
+
+            // Prioridad 2: Nombre exacto
+            if (nombreLower === term) {
+                nombreExacto.push(p)
+                continue
+            }
+
+            // Prioridad 3: Nombre empieza con término y es palabra completa
+            if (nombreLower.startsWith(term)) {
+                const charDespues = nombreLower[term.length]
+                if (charDespues === ' ' || charDespues === undefined) {
+                    nombrePalabraCompleta.push(p)
+                } else {
+                    nombreEmpiezaCon.push(p)
+                }
+                continue
+            }
+
+            // Prioridad 4: Código empieza con el término
+            if (codigoLower.startsWith(term)) {
+                codigoEmpiezaCon.push(p)
+                continue
+            }
+
+            // Prioridad 5: Contiene el término
+            if (nombreLower.includes(term) || codigoLower.includes(term)) {
+                contiene.push(p)
+            }
+        }
+
+        // Ordenar por longitud de nombre (más corto primero)
+        nombrePalabraCompleta.sort((a, b) => a.nombre.length - b.nombre.length)
+        nombreEmpiezaCon.sort((a, b) => a.nombre.length - b.nombre.length)
+
+        return [
+            ...codigoExacto,
+            ...nombreExacto,
+            ...nombrePalabraCompleta,
+            ...nombreEmpiezaCon,
+            ...codigoEmpiezaCon,
+            ...contiene
+        ]
+    }, [productos, busquedaProducto])
 
     useEffect(() => {
         cargarDatos()

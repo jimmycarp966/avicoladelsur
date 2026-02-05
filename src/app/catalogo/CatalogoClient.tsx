@@ -153,17 +153,81 @@ export default function CatalogoClient({ productos, categorias, telefono, auth }
 
     // Filtrar y ordenar productos
     const productosFiltrados = useMemo(() => {
-        let filtrados = productos.filter(p => {
-            const matchBusqueda = p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-                p.codigo.toLowerCase().includes(busqueda.toLowerCase())
+        // Primero filtrar por categoría y favoritos
+        let filtradosPorCategoria = productos.filter(p => {
             const matchCategoria = categoriaSeleccionada === 'todas' ||
                 p.categoria?.id === categoriaSeleccionada
             const matchFavoritos = !soloFavoritos || favoritos.has(p.id)
-            return matchBusqueda && matchCategoria && matchFavoritos
+            return matchCategoria && matchFavoritos
         })
 
-        // Ordenar
-        filtrados = [...filtrados].sort((a, b) => {
+        // Si hay búsqueda, aplicar ordenamiento por prioridad
+        if (busqueda.trim()) {
+            const term = busqueda.toLowerCase().trim()
+
+            // Separar en grupos de prioridad
+            const codigoExacto: typeof productos = []
+            const nombreExacto: typeof productos = []
+            const nombrePalabraCompleta: typeof productos = []
+            const nombreEmpiezaCon: typeof productos = []
+            const codigoEmpiezaCon: typeof productos = []
+            const contiene: typeof productos = []
+
+            for (const p of filtradosPorCategoria) {
+                const nombreLower = p.nombre.toLowerCase()
+                const codigoLower = p.codigo.toLowerCase()
+
+                // Prioridad 1: Código exacto
+                if (codigoLower === term) {
+                    codigoExacto.push(p)
+                    continue
+                }
+
+                // Prioridad 2: Nombre exacto
+                if (nombreLower === term) {
+                    nombreExacto.push(p)
+                    continue
+                }
+
+                // Prioridad 3: Nombre empieza con término y es palabra completa
+                if (nombreLower.startsWith(term)) {
+                    const charDespues = nombreLower[term.length]
+                    if (charDespues === ' ' || charDespues === undefined) {
+                        nombrePalabraCompleta.push(p)
+                    } else {
+                        nombreEmpiezaCon.push(p)
+                    }
+                    continue
+                }
+
+                // Prioridad 4: Código empieza con el término
+                if (codigoLower.startsWith(term)) {
+                    codigoEmpiezaCon.push(p)
+                    continue
+                }
+
+                // Prioridad 5: Contiene el término
+                if (nombreLower.includes(term) || codigoLower.includes(term)) {
+                    contiene.push(p)
+                }
+            }
+
+            // Ordenar por longitud de nombre (más corto primero)
+            nombrePalabraCompleta.sort((a, b) => a.nombre.length - b.nombre.length)
+            nombreEmpiezaCon.sort((a, b) => a.nombre.length - b.nombre.length)
+
+            filtradosPorCategoria = [
+                ...codigoExacto,
+                ...nombreExacto,
+                ...nombrePalabraCompleta,
+                ...nombreEmpiezaCon,
+                ...codigoEmpiezaCon,
+                ...contiene
+            ]
+        }
+
+        // Ordenar según el criterio seleccionado
+        return [...filtradosPorCategoria].sort((a, b) => {
             switch (orden) {
                 case 'precio_asc':
                     return a.precio_minorista - b.precio_minorista
@@ -173,8 +237,6 @@ export default function CatalogoClient({ productos, categorias, telefono, auth }
                     return a.nombre.localeCompare(b.nombre)
             }
         })
-
-        return filtrados
     }, [productos, busqueda, categoriaSeleccionada, orden, favoritos, soloFavoritos])
 
     // Total del carrito
