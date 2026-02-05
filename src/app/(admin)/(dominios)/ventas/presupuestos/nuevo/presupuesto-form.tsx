@@ -1210,7 +1210,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
         </CardHeader>
         <CardContent className="space-y-4">
           <PresupuestoItemsTable
-            items={watchedItems || []}
+            items={fields as any}
             productos={productos}
             listas={todasListas}
             listaGlobalId={watchedListaPrecioGlobal}

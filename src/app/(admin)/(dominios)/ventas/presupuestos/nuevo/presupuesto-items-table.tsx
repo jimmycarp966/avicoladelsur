@@ -29,7 +29,9 @@ interface ListaPrecio {
   margen_ganancia: number | null
 }
 
-interface Item {
+// Item con id de useFieldArray
+interface FieldItem {
+  id: string  // react-hook-form field id
   producto_id: string
   cantidad_solicitada: number
   precio_unit_est: number
@@ -37,7 +39,7 @@ interface Item {
 }
 
 interface PresupuestoItemsTableProps {
-  items: Item[]
+  items: FieldItem[]
   productos: Producto[]
   listas: ListaPrecio[]
   listaGlobalId?: string
@@ -231,8 +233,7 @@ export function PresupuestoItemsTable({
 }: PresupuestoItemsTableProps) {
   const [focusedRow, setFocusedRow] = useState<number | null>(null)
 
-  console.log('[TABLE] items.length:', items?.length)
-  console.log('[TABLE] items:', items)
+  console.log('[TABLE] items.length:', items?.length, 'items:', items?.map((i, idx) => ({ idx, producto_id: i.producto_id })))
 
   const handleProductoSelect = useCallback((index: number, producto: Producto) => {
     if (producto.id) {
@@ -286,9 +287,7 @@ export function PresupuestoItemsTable({
   const handleRemove = useCallback((index: number) => {
     console.log('[TABLE] handleRemove llamado, index:', index, 'items.length:', items?.length)
     if (items && items.length > 1) {
-      console.log('[TABLE] Llamando a onRemoveItem con index:', index)
       onRemoveItem(index)
-      console.log('[TABLE] onRemoveItem llamado')
     } else {
       console.log('[TABLE] No se puede eliminar: solo queda 1 item')
     }
@@ -319,7 +318,7 @@ export function PresupuestoItemsTable({
 
               return (
                 <tr 
-                  key={`row-${index}`}
+                  key={item.id}  // Usar el id del field array para key estable
                   className={`${hasError ? 'bg-red-50/50' : ''} ${focusedRow === index ? 'bg-accent/50' : ''}`}
                   onFocus={() => setFocusedRow(index)}
                 >
@@ -413,7 +412,7 @@ export function PresupuestoItemsTable({
                     {item.producto_id ? formatCurrency(subtotal) : '-'}
                   </td>
 
-                  {/* Eliminar - SIN disabled, solo oculto cuando hay 1 item */}
+                  {/* Eliminar */}
                   <td className="px-2 py-2 text-center">
                     {canRemove ? (
                       <button
