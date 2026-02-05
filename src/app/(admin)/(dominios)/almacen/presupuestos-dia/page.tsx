@@ -462,7 +462,19 @@ async function PresupuestosDiaContent({
                                   </AccordionTrigger>
                                   <AccordionContent className="px-4 pb-4 pt-0">
                                     <div className="space-y-3 w-full overflow-visible">
-                                      {presupuesto.items.map((item: any) => {
+                                      {[...presupuesto.items].sort((a: any, b: any) => {
+                                        // Ordenar: pesables primero, luego por cantidad descendente
+                                        const esMayoristaA = a.producto?.venta_mayor_habilitada === true &&
+                                          (a.lista_precio?.tipo === 'mayorista' || presupuesto.lista_precio?.tipo === 'mayorista')
+                                        const esMayoristaB = b.producto?.venta_mayor_habilitada === true &&
+                                          (b.lista_precio?.tipo === 'mayorista' || presupuesto.lista_precio?.tipo === 'mayorista')
+                                        const esPesableA = esItemPesable(a, esMayoristaA)
+                                        const esPesableB = esItemPesable(b, esMayoristaB)
+                                        if (esPesableA !== esPesableB) return esPesableA ? -1 : 1
+                                        const cantidadA = esPesableA ? calcularKgItem(presupuesto, a) : a.cantidad_solicitada || 0
+                                        const cantidadB = esPesableB ? calcularKgItem(presupuesto, b) : b.cantidad_solicitada || 0
+                                        return cantidadB - cantidadA
+                                      }).map((item: any) => {
 
                                         // Calcular valores una sola vez fuera del JSX (EXACTAMENTE igual que en ver detalles)
                                         const esMayorista =
@@ -721,7 +733,17 @@ async function PresupuestosDiaContent({
                                 </AccordionTrigger>
                                 <AccordionContent>
                                   <div className="space-y-3 px-4 pb-4">
-                                    {presupuesto.items.map((item: any) => {
+                                    {[...presupuesto.items].sort((a: any, b: any) => {
+                                      // Ordenar: pesables primero, luego por cantidad descendente
+                                      const esMayoristaA = esVentaMayorista(presupuesto, a)
+                                      const esMayoristaB = esVentaMayorista(presupuesto, b)
+                                      const esPesableA = esItemPesable(a, esMayoristaA)
+                                      const esPesableB = esItemPesable(b, esMayoristaB)
+                                      if (esPesableA !== esPesableB) return esPesableA ? -1 : 1
+                                      const cantidadA = esPesableA ? calcularKgItem(presupuesto, a) : a.cantidad_solicitada || 0
+                                      const cantidadB = esPesableB ? calcularKgItem(presupuesto, b) : b.cantidad_solicitada || 0
+                                      return cantidadB - cantidadA
+                                    }).map((item: any) => {
                                       // Calcular valores una sola vez fuera del JSX
                                       const esMayorista = esVentaMayorista(presupuesto, item)
                                       const esPesable = esItemPesable(item, esMayorista)
