@@ -1,6 +1,6 @@
 # Flujo Completo: Presupuestos → Pedidos → Rutas Diarias
 
-**Última actualización**: Noviembre 2025  
+**Última actualización**: Febrero 2026
 **Estado**: ✅ Implementado y Verificado
 
 ## 📋 Resumen Ejecutivo
@@ -32,10 +32,12 @@ Respuesta: "Presupuesto PRES-YYYYMMDD-XXXX creado"
 Vendedor → /ventas/presupuestos/nuevo
 ↓
 Formulario con:
-- Selector de clientes buscable (nombre, teléfono, zona)
-- Selector de productos buscable (código, nombre)
+- **Selector de clientes** con autoFocus automático (dropdown se abre al cargar)
+- Búsqueda por: nombre, teléfono, zona, código
+- **Selector de productos** buscable (código, nombre)
 - Fecha de entrega: automática (hoy), editable
 - Zona: opcional (se detecta del cliente si existe)
+- Tipo de venta: Reparto o Retira en Casa Central
 ↓
 Crear Presupuesto
 ↓
@@ -72,12 +74,25 @@ Filtros disponibles:
 Vista muestra:
 - Total de presupuestos del día
 - Total de kg estimados
-- Lista de presupuestos con:
-  - Número de presupuesto
-  - Cliente
-  - Zona y turno
-  - Items con badge "BALANZA" si aplica
-  - Botón "Pasar a Pedido" individual
+- Resumen consolidado del día (sin filtros)
+- **Lista de preparación del día** (colapsable):
+  - Consolidado de productos por zona, turno y categoría/rubro
+  - Productos agrupados por categoría (Lácteos, Panificados, Carnes, etc.)
+  - Dentro de cada categoría: **productos pesables (BALANZA) primero**
+  - Ordenados por cantidad descendente dentro de cada grupo
+  - Opción de imprimir lista organizada
+- Lista de presupuestos agrupados por zona/turno:
+  - **Ordenamiento**: Presupuestos con items pesables pendientes primero
+  - Luego los que solo tienen items no pesables
+  - Dentro de cada grupo: por cantidad de pesables pendientes (descendente)
+  - Si siguen iguales: por kg totales (descendente)
+  - Información de cada presupuesto:
+    - Número de presupuesto
+    - Cliente
+    - Zona y turno
+    - Items con badge "BALANZA" si aplica
+    - Botón "Pasar a Pedido" individual
+  - Al expandir "Ver productos": items ordenados con pesables primero
 ↓
 Botón "Pasar a Pedidos del Día" (masivo):
 - Convierte todos los presupuestos visibles
@@ -328,10 +343,28 @@ generarRutaDiariaManual(pedidosIds, fecha, zona_id, turno)
 - Aparecen automáticamente en "Presupuestos del Día"
 - No requiere acción manual de "enviar a almacén"
 
+### Ordenamiento Inteligente en Presupuestos del Día
+- **Lista de preparación**: Productos agrupados por categoría/rubro
+  - Productos pesables (BALANZA) primero dentro de cada categoría
+  - Ordenados por cantidad descendente
+  - Categorías ordenadas alfabéticamente ("Sin categoría" al final)
+- **Presupuestos dentro de cada zona/turno**:
+  - Presupuestos con items pesables pendientes primero
+  - Luego los que solo tienen items no pesables
+  - Dentro de cada grupo: por cantidad de pesables pendientes (descendente)
+  - Si siguen iguales: por kg totales (descendente)
+- **Items dentro de cada presupuesto**: Pesables primero, por cantidad
+
 ### Selectores Buscables
 - Implementados con campo de búsqueda dentro del dropdown
 - Filtrado en tiempo real
 - Búsqueda por múltiples campos (código, nombre, teléfono, zona)
+- **Selector de cliente con autoFocus automático** al crear nuevo presupuesto
+
+### Lista de Preparación Colapsable
+- La sección de "Lista de preparación del día" es colapsable/desplegable
+- Permite ocultar/mostrar para mejor organización de la pantalla
+- Mantiene botón de impresión accesible
 
 ### Next.js 16 Compatibility
 - Todos los `params` se manejan como Promise con `await`
@@ -365,3 +398,18 @@ generarRutaDiariaManual(pedidosIds, fecha, zona_id, turno)
 7. **Generar ruta automática**: Desde módulo de pedidos
 8. **Generar ruta manual**: Seleccionar pedidos específicos
 
+## 📜 Historial de Cambios
+
+### Febrero 2026
+- **Lista de preparación colapsable**: Sección ahora puede colapsarse/desplegarse
+- **Agrupación por categoría**: Productos en lista de preparación agrupados por rubro/categoría
+- **Ordenamiento pesables primero**:
+  - En lista de preparación: pesables primero dentro de cada categoría
+  - En presupuestos: los que tienen items pesables pendientes aparecen primero
+  - En items de cada presupuesto: pesables primero al expandir
+- **autoFocus en cliente**: Al crear nuevo presupuesto, el selector de cliente tiene foco automático
+
+### Noviembre 2025
+- Asignación automática de turno según horarios de corte
+- Presupuestos creados directamente en estado 'en_almacen'
+- Mejoras en interfaz de pesaje
