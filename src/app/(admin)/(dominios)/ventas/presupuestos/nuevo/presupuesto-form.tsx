@@ -409,6 +409,8 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
       const itemsActuales = getValues('items')
       if (!itemsActuales || itemsActuales.length === 0) return
 
+      console.log('[PRESUPUESTO FORM] actualizarPrecios llamado - items:', itemsActuales.length, 'precios modificados:', Array.from(preciosModificadosManualmenteRef.current))
+
       // Verificar si realmente cambió la lista global
       const listaGlobalCambio = ultimaListaGlobalRef.current !== watchedListaPrecioGlobal
 
@@ -438,6 +440,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
         // Esta verificación debe ir ANTES de la verificación de productosProcesadosRef
         // para que tenga prioridad sobre el cache
         if (!listaCambio && preciosModificadosManualmenteRef.current.has(i)) {
+          console.log('[PRESUPUESTO FORM] Saltando actualización de precio para índice', i, '- fue modificado manualmente')
           // Marcar como procesado para no volver a intentar en futuras iteraciones
           productosProcesadosRef.current.add(clave)
           ultimasListasRef.current[i] = listaId
@@ -681,7 +684,9 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
 
   // Función para marcar que el precio fue modificado manualmente
   const handlePrecioModificadoManualmente = useCallback((index: number) => {
+    console.log('[PRESUPUESTO FORM] Precio modificado manualmente para índice:', index)
     preciosModificadosManualmenteRef.current.add(index)
+    console.log('[PRESUPUESTO FORM] Precios modificados:', Array.from(preciosModificadosManualmenteRef.current))
   }, [])
 
   // Función para cambiar lista de un producto específico

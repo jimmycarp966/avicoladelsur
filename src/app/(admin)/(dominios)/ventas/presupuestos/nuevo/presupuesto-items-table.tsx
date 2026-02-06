@@ -341,6 +341,10 @@ export function PresupuestoItemsTable({
           precioInput.select()
         }
       } else if (field === 'precio') {
+        // IMPORTANTE: Marcar el precio como modificado manualmente ANTES de agregar el nuevo item
+        // Esto es necesario porque onAddItem() dispara efectos que pueden sobrescribir el precio
+        onPrecioModificadoManualmente?.(rowIndex)
+
         const maxIndex = displayItems.length - 1
         if (rowIndex === maxIndex) {
           onAddItem()
@@ -357,7 +361,7 @@ export function PresupuestoItemsTable({
         }
       }
     }
-  }, [displayItems.length, onAddItem])
+  }, [displayItems.length, onAddItem, onPrecioModificadoManualmente])
 
   const calcularSubtotal = (cantidad: number, precio: number) => {
     return (cantidad || 0) * (precio || 0)
