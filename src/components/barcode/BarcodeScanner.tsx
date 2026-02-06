@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { X, Scan, Flashlight, FlashlightOff } from 'lucide-react'
+import { useSoundAlert } from '@/components/ui/sound-alert'
 
 interface BarcodeScannerProps {
     onScan: (code: string) => void
@@ -34,6 +35,9 @@ export function BarcodeScanner({
     const scanIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
     const canvasRef = useRef<HTMLCanvasElement | null>(null)
     const readerRef = useRef<MultiFormatReader | null>(null)
+
+    // Hook de sonido para el beep de escáner
+    const { playScannerBeep } = useSoundAlert(true)
 
     // Estado
     const [isScanning, setIsScanning] = useState(false)
@@ -138,7 +142,7 @@ export function BarcodeScanner({
             // Verificar antorcha
             const track = stream.getVideoTracks()[0]
             const caps = track.getCapabilities?.()
-            // @ts-ignore
+            // @ts-expect-error - torch es una capacidad no estándar
             if (caps?.torch) {
                 setTorchSupported(true)
                 addDebugLog('💡 Antorcha disponible')
@@ -171,7 +175,7 @@ export function BarcodeScanner({
                     const imageData = ctx.getImageData(0, 0, width, height)
 
                     // 3. Crear LuminanceSource desde los pixels
-                    // @ts-ignore - RGBLuminanceSource espera Uint8ClampedArray pero acepta number[] en algun version
+                    // @ts-expect-error - RGBLuminanceSource constructor typing issue
                     const len = imageData.data.length
                     const luminances = new Uint8ClampedArray(len / 4)
 
@@ -207,6 +211,7 @@ export function BarcodeScanner({
                         logToServer('info', 'Código escaneado', { code })
 
                         vibrate()
+                        playScannerBeep()  // Beep típico de escáner
 
                         // Detener
                         stopAll()
@@ -217,12 +222,13 @@ export function BarcodeScanner({
                 }
             }, 100)
 
-        } catch (err: any) {
-            addDebugLog(`❌ Error: ${err.message}`, true)
-            setError('No se pudo acceder a la cámara: ' + err.message)
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Error desconocido'
+            addDebugLog(`❌ Error: ${message}`, true)
+            setError('No se pudo acceder a la cámara: ' + message)
             setCameraStarted(false)
         }
-    }, [addDebugLog, logToServer, onScan, vibrate])
+    }, [addDebugLog, logToServer, onScan, vibrate, playScannerBeep, stopAll])
 
     const stopAll = useCallback(() => {
         if (scanIntervalRef.current) clearInterval(scanIntervalRef.current)
@@ -243,12 +249,13 @@ export function BarcodeScanner({
         try {
             const track = streamRef.current.getVideoTracks()[0]
             const newState = !torchEnabled
-            // @ts-ignore
+            // @ts-expect-error - torch constraint no está en los tipos estándar
             await track.applyConstraints({ advanced: [{ torch: newState }] })
             setTorchEnabled(newState)
             addDebugLog(`💡 Antorcha: ${newState ? 'ON' : 'OFF'}`)
-        } catch (err: any) {
-            addDebugLog(`Antorcha error: ${err.message}`, true)
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Error desconocido'
+            addDebugLog(`Antorcha error: ${message}`, true)
         }
     }, [torchEnabled, addDebugLog])
 

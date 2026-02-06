@@ -7,7 +7,7 @@ import { useEffect, useRef, useCallback, useState } from 'react'
  *
  * @example
  * ```tsx
- * const { playBeep, playDoubleBeep, playSuccess, playAlert, activateAudio } = useSoundAlert(true)
+ * const { playBeep, playDoubleBeep, playSuccess, playAlert, playScannerBeep, activateAudio } = useSoundAlert(true)
  *
  * <button onClick={() => playDoubleBeep()}>Notificar</button>
  * ```
@@ -103,6 +103,26 @@ export function useSoundAlert(enabled: boolean = true) {
   }, [enabled])
 
   /**
+   * Reproduce el BEEP típico de escáner de código de barras
+   * Un beep agudo y corto (2500Hz, 100ms)
+   */
+  const playScannerBeep = useCallback(() => {
+    console.log('[useSoundAlert] playScannerBeep llamado, enabled:', enabled)
+    if (!enabled) {
+      console.warn('[useSoundAlert] Sonido deshabilitado')
+      return
+    }
+    if (!audioContextRef.current) {
+      console.warn('[useSoundAlert] AudioContext no inicializado')
+      return
+    }
+    console.log('[useSoundAlert] Estado del AudioContext:', audioContextRef.current.state)
+
+    // Beep agudo y corto típico de escáner
+    playBeep(2500, 80, 0.25)
+  }, [enabled, playBeep])
+
+  /**
    * Reproduce un pitido doble (beep-beep) para notificaciones más prominentes
    */
   const playDoubleBeep = useCallback((freq1: number = 800, freq2: number = 1000, duration: number = 150) => {
@@ -130,7 +150,39 @@ export function useSoundAlert(enabled: boolean = true) {
   }, [enabled, playBeep])
 
   /**
-   * Reproduce un sonido de notificación nuevo (doble beep agudo)
+   * Función auxiliar para reproducir un tono con envolvente
+   * (declarada antes de playNotification para evitar error de referencia)
+   */
+  function playTone(
+    ctx: AudioContext,
+    frequency: number,
+    startTime: number,
+    attackTime: number,
+    duration: number,
+    volume: number = 0.3
+  ) {
+    const oscillator = ctx.createOscillator()
+    const gainNode = ctx.createGain()
+
+    oscillator.connect(gainNode)
+    gainNode.connect(ctx.destination)
+
+    oscillator.frequency.value = frequency
+    oscillator.type = 'sine'  // Onda senoidal para un sonido de campana suave
+
+    // Envolvente AD (Attack-Decay) para simular una campana
+    gainNode.gain.setValueAtTime(0, startTime)
+    gainNode.gain.linearRampToValueAtTime(volume, startTime + attackTime)
+    // Decay exponencial para simular el resonate de una campana
+    gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration)
+
+    oscillator.start(startTime)
+    oscillator.stop(startTime + duration)
+  }
+
+  /**
+   * Reproduce un sonido de notificación nuevo (ta-da-DING!)
+   * Melodía llamativa tipo campana de atención para nuevos pedidos
    */
   const playNotification = useCallback(() => {
     console.log('[useSoundAlert] playNotification llamado, enabled:', enabled)
@@ -143,8 +195,32 @@ export function useSoundAlert(enabled: boolean = true) {
       return
     }
     console.log('[useSoundAlert] Estado del AudioContext:', audioContextRef.current.state)
-    playDoubleBeep(880, 1100, 150)
-  }, [enabled, playDoubleBeep])
+
+    const ctx = audioContextRef.current
+
+    // Reanudar contexto si está suspendido
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(err => console.error('[useSoundAlert] Error reanudando:', err))
+    }
+
+    try {
+      const now = ctx.currentTime
+
+      // Crear una melodía más llamativa: "ta-da-DING!" tipo campana de atención
+      // Primera nota: grave (ta)
+      playTone(ctx, 523.25, now, 0.1, 0.15)  // C5
+      // Segunda nota: media (da)
+      playTone(ctx, 659.25, now + 0.15, 0.1, 0.15)  // E5
+      // Tercera nota: aguda y larga (DING!)
+      playTone(ctx, 1046.50, now + 0.3, 0.25, 0.4)  // C6 - campana brillante
+      // Armónico para dar cuerpo al "ding"
+      playTone(ctx, 1318.51, now + 0.3, 0.1, 0.35)  // E6 armónico
+
+      console.log('[useSoundAlert] Notificación reproducida (ta-da-DING!)')
+    } catch (error) {
+      console.error('[useSoundAlert] Error reproduciendo notificación:', error)
+    }
+  }, [enabled])
 
   return {
     playBeep,
@@ -152,6 +228,7 @@ export function useSoundAlert(enabled: boolean = true) {
     playSuccess,
     playAlert,
     playNotification,
+    playScannerBeep,
     activateAudio,
     audioState,
   }
