@@ -28,30 +28,39 @@ export function EnPreparacionRealtime({ zonaId, turno }: EnPreparacionRealtimePr
   const audioActivatedRef = useRef(false)
 
   // Activar el AudioContext en la primera interacción del usuario
+  // Se hace en MULTIPLES eventos para asegurar que se active lo antes posible
   useEffect(() => {
-    const handleUserInteraction = () => {
-      if (!audioActivatedRef.current && audioState === 'suspended') {
-        activateAudio().then((success) => {
-          if (success) {
-            audioActivatedRef.current = true
-            console.log('[EnPreparacionRealtime] AudioContext activado por interacción del usuario')
-          }
-        })
+    const tryActivateAudio = async () => {
+      if (audioActivatedRef.current) return
+
+      const success = await activateAudio()
+      if (success) {
+        audioActivatedRef.current = true
+        console.log('[EnPreparacionRealtime] ✅ AudioContext activado')
+        // Remover todos los listeners una vez activado
+        cleanup()
       }
     }
 
-    // Escuchar eventos de interacción del usuario
-    const events = ['click', 'keydown', 'touchstart']
-    events.forEach(event => {
-      document.addEventListener(event, handleUserInteraction, { once: true })
-    })
-
-    return () => {
+    // Función de cleanup para remover listeners
+    const cleanup = () => {
+      const events = ['click', 'keydown', 'touchstart', 'mousedown', 'pointerdown']
       events.forEach(event => {
-        document.removeEventListener(event, handleUserInteraction)
+        document.removeEventListener(event, tryActivateAudio)
       })
     }
-  }, [audioState, activateAudio])
+
+    // Agregar listeners a MÚLTIPLES eventos (sin once, para reintentar)
+    const events = ['click', 'keydown', 'touchstart', 'mousedown', 'pointerdown']
+    events.forEach(event => {
+      document.addEventListener(event, tryActivateAudio, { passive: true })
+    })
+
+    // Intentar activar inmediatamente (por si ya hubo interacción antes)
+    tryActivateAudio()
+
+    return cleanup
+  }, [activateAudio])
 
   // Log al montar el componente
   useEffect(() => {
