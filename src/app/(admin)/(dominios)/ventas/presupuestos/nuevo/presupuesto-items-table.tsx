@@ -50,6 +50,7 @@ interface PresupuestoItemsTableProps {
   watch: UseFormWatch<any>
   onProductoChange: (index: number, productoId: string) => void
   onListaChange: (index: number, listaId: string) => void
+  onPrecioModificadoManualmente?: (index: number) => void
   onAddItem: () => void
   onRemoveItem: (index: number) => void
   onDuplicateItem?: (index: number) => void
@@ -296,6 +297,7 @@ export function PresupuestoItemsTable({
   watch,
   onProductoChange,
   onListaChange,
+  onPrecioModificadoManualmente,
   onAddItem,
   onRemoveItem,
   onDuplicateItem,
@@ -475,6 +477,11 @@ export function PresupuestoItemsTable({
                           onChange={(e) => {
                             const value = parseFloat(e.target.value) || 0
                             field.onChange(value)
+                            // Marcar que el precio fue modificado manualmente
+                            onPrecioModificadoManualmente?.(index)
+                          }}
+                          onBlur={(e) => {
+                            field.onBlur()
                           }}
                           onKeyDown={(e) => handleKeyNavigation(e as any, index, 'precio')}
                           disabled={!item.producto_id}

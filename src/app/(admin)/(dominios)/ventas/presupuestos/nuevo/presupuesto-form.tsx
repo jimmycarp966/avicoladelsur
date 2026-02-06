@@ -80,6 +80,10 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
   // Estado para listas por producto (index -> lista_id)
   const [listasPorProducto, setListasPorProducto] = useState<Record<number, string>>({})
 
+  // Estado para rastrear qué precios fueron modificados manualmente por el usuario
+  // Para no sobrescribirlos al agregar nuevos productos
+  const preciosModificadosManualmenteRef = useRef<Set<number>>(new Set())
+
   const {
     register,
     control,
@@ -409,8 +413,10 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
       const listaGlobalCambio = ultimaListaGlobalRef.current !== watchedListaPrecioGlobal
 
       // Si cambió la lista global, limpiar el cache de productos procesados
+      // Y también limpiar los precios modificados manualmente (para actualizar todos)
       if (listaGlobalCambio) {
         productosProcesadosRef.current.clear()
+        preciosModificadosManualmenteRef.current.clear()
       }
 
       for (let i = 0; i < itemsActuales.length; i++) {
@@ -427,6 +433,16 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
         // Verificar si la lista para este producto cambió
         const listaAnterior = ultimasListasRef.current[i]
         const listaCambio = listaAnterior !== listaId || listaGlobalCambio
+
+        // IMPORTANTE: PRIMERO verificar si el precio fue modificado manualmente
+        // Esta verificación debe ir ANTES de la verificación de productosProcesadosRef
+        // para que tenga prioridad sobre el cache
+        if (!listaCambio && preciosModificadosManualmenteRef.current.has(i)) {
+          // Marcar como procesado para no volver a intentar en futuras iteraciones
+          productosProcesadosRef.current.add(clave)
+          ultimasListasRef.current[i] = listaId
+          continue
+        }
 
         // Si la lista no cambió y ya procesamos este producto con esta lista, saltar
         if (!listaCambio && productosProcesadosRef.current.has(clave)) {
@@ -477,7 +493,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
 
     actualizarPrecios()
     // Solo ejecutar cuando cambien las listas o cuando se agreguen productos nuevos
-    // NO cuando cambien los items para evitar loops infinitos
+    // NO cuando cambian los items para evitar loops infinitos
   }, [watchedListaPrecioGlobal, listasPorProducto, setValue, getValues, triggerActualizacion, todasListas, productos])
 
   // Memoizar handleProductoChange
@@ -663,6 +679,11 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
     return results
   }, [clientes, watchedCliente])
 
+  // Función para marcar que el precio fue modificado manualmente
+  const handlePrecioModificadoManualmente = useCallback((index: number) => {
+    preciosModificadosManualmenteRef.current.add(index)
+  }, [])
+
   // Función para cambiar lista de un producto específico
   const handleListaProductoChange = useCallback(async (index: number, listaId: string) => {
     const nuevaListasPorProducto = { ...listasPorProducto }
@@ -679,6 +700,9 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
       }
     }
     setListasPorProducto(nuevaListasPorProducto)
+
+    // Limpiar el marcador de precio modificado manualmente para permitir la actualización
+    preciosModificadosManualmenteRef.current.delete(index)
 
     // Actualizar precio del producto con la nueva lista
     const item = watchedItems?.[index]
@@ -1323,6 +1347,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                 watch={watch}
                 onProductoChange={handleProductoChange}
                 onListaChange={handleListaProductoChange}
+                onPrecioModificadoManualmente={handlePrecioModificadoManualmente}
                 onAddItem={addItem}
                 onRemoveItem={removeItem}
                 onDuplicateItem={duplicateItem}
