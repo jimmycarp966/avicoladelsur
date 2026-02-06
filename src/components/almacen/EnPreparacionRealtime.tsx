@@ -26,26 +26,40 @@ export function EnPreparacionRealtime({ zonaId, turno }: EnPreparacionRealtimePr
   const router = useRouter()
   const { playNotification } = useSoundAlert(true)
 
-  // Suscribirse a INSERT de nuevos presupuestos en estado en_almacen
+  // Log al montar el componente
+  useEffect(() => {
+    devLog('[EnPreparacionRealtime] Componente montado - Suscribiendo a presupuestos...')
+  }, [])
+
+  // Suscribirse a INSERT de nuevos presupuestos
+  // NOTA: No usamos filtro aquí porque Supabase Realtime puede no filtrar correctamente
+  // en el momento del INSERT. Filtramos en el código.
   useRealtime({
     table: 'presupuestos',
     event: 'INSERT',
-    filter: `estado=eq.en_almacen`,
     onInsert: (payload) => {
       const presupuesto = payload.new as any
 
-      devLog('[EnPreparacionRealtime] Nuevo presupuesto detectado:', presupuesto)
+      console.log('[EnPreparacionRealtime] 🔔 INSERT recibido:', presupuesto)
+
+      // Filtrar por estado en_almacen
+      if (presupuesto.estado !== 'en_almacen') {
+        console.log('[EnPreparacionRealtime] ❌ Filtrado por estado:', presupuesto.estado)
+        return
+      }
 
       // Verificar si el presupuesto coincide con los filtros opcionales
       if (zonaId && presupuesto.zona_id !== zonaId) {
-        devLog('[EnPreparacionRealtime] Presupuesto filtrado por zona:', presupuesto.zona_id, 'esperado:', zonaId)
+        console.log('[EnPreparacionRealtime] ❌ Filtrado por zona:', presupuesto.zona_id, 'esperado:', zonaId)
         return
       }
 
       if (turno && presupuesto.turno !== turno) {
-        devLog('[EnPreparacionRealtime] Presupuesto filtrado por turno:', presupuesto.turno, 'esperado:', turno)
+        console.log('[EnPreparacionRealtime] ❌ Filtrado por turno:', presupuesto.turno, 'esperado:', turno)
         return
       }
+
+      console.log('[EnPreparacionRealtime] ✅ Presupuesto válido - Notificando:', presupuesto.numero_presupuesto)
 
       // Reproducir sonido de notificación
       playNotification()
@@ -61,7 +75,6 @@ export function EnPreparacionRealtime({ zonaId, turno }: EnPreparacionRealtimePr
       })
 
       // Refrescar la página después de un breve delay
-      // para que el usuario vea la notificación primero
       setTimeout(() => {
         router.refresh()
       }, 500)
@@ -72,9 +85,9 @@ export function EnPreparacionRealtime({ zonaId, turno }: EnPreparacionRealtimePr
   useRealtime({
     table: 'presupuestos',
     event: 'UPDATE',
-    filter: `estado=eq.en_almacen&preparacion_completada=eq.true`,
     onUpdate: (payload) => {
       const presupuesto = payload.new as any
+      console.log('[EnPreparacionRealtime] 🔄 UPDATE recibido:', presupuesto)
 
       // Verificar si coincide con los filtros
       if (zonaId && presupuesto.zona_id !== zonaId) return
@@ -82,7 +95,7 @@ export function EnPreparacionRealtime({ zonaId, turno }: EnPreparacionRealtimePr
 
       // Si se marcó como completado, refrescar para mostrar el cambio
       if (presupuesto.preparacion_completada) {
-        devLog('[EnPreparacionRealtime] Presupuesto marcado como listo:', presupuesto.numero_presupuesto)
+        console.log('[EnPreparacionRealtime] ✅ Presupuesto marcado como listo:', presupuesto.numero_presupuesto)
         router.refresh()
       }
     },
