@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useRealtime } from '@/lib/hooks/useRealtime'
 import { toast } from 'sonner'
@@ -24,12 +24,40 @@ interface EnPreparacionRealtimeProps {
  */
 export function EnPreparacionRealtime({ zonaId, turno }: EnPreparacionRealtimeProps) {
   const router = useRouter()
-  const { playNotification } = useSoundAlert(true)
+  const { playNotification, activateAudio, audioState } = useSoundAlert(true)
+  const audioActivatedRef = useRef(false)
+
+  // Activar el AudioContext en la primera interacción del usuario
+  useEffect(() => {
+    const handleUserInteraction = () => {
+      if (!audioActivatedRef.current && audioState === 'suspended') {
+        activateAudio().then((success) => {
+          if (success) {
+            audioActivatedRef.current = true
+            console.log('[EnPreparacionRealtime] AudioContext activado por interacción del usuario')
+          }
+        })
+      }
+    }
+
+    // Escuchar eventos de interacción del usuario
+    const events = ['click', 'keydown', 'touchstart']
+    events.forEach(event => {
+      document.addEventListener(event, handleUserInteraction, { once: true })
+    })
+
+    return () => {
+      events.forEach(event => {
+        document.removeEventListener(event, handleUserInteraction)
+      })
+    }
+  }, [audioState, activateAudio])
 
   // Log al montar el componente
   useEffect(() => {
     devLog('[EnPreparacionRealtime] Componente montado - Suscribiendo a presupuestos...')
-  }, [])
+    devLog('[EnPreparacionRealtime] Estado del audio:', audioState)
+  }, [audioState])
 
   // Suscribirse a INSERT de nuevos presupuestos
   // NOTA: No usamos filtro aquí porque Supabase Realtime puede no filtrar correctamente

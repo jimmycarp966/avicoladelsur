@@ -1,19 +1,37 @@
 'use client'
 
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 
 /**
  * Hook para reproducir alertas sonoras usando Web Audio API
  *
  * @example
  * ```tsx
- * const { playBeep, playDoubleBeep, playSuccess, playAlert } = useSoundAlert(true)
+ * const { playBeep, playDoubleBeep, playSuccess, playAlert, activateAudio } = useSoundAlert(true)
  *
  * <button onClick={() => playDoubleBeep()}>Notificar</button>
  * ```
  */
 export function useSoundAlert(enabled: boolean = true) {
   const audioContextRef = useRef<AudioContext | null>(null)
+  const [audioState, setAudioState] = useState<'uninitialized' | 'suspended' | 'running' | 'closed'>('uninitialized')
+
+  // Función para activar el audioContext (debe llamarse desde un evento de usuario)
+  const activateAudio = useCallback(async () => {
+    if (!audioContextRef.current) return false
+
+    try {
+      if (audioContextRef.current.state === 'suspended') {
+        await audioContextRef.current.resume()
+        console.log('[useSoundAlert] AudioContext reanudado')
+      }
+      setAudioState(audioContextRef.current.state as any)
+      return true
+    } catch (error) {
+      console.error('[useSoundAlert] Error activando AudioContext:', error)
+      return false
+    }
+  }, [])
 
   // Inicializar AudioContext al montar el componente
   useEffect(() => {
@@ -23,6 +41,8 @@ export function useSoundAlert(enabled: boolean = true) {
     const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
     if (AudioContextClass) {
       audioContextRef.current = new AudioContextClass()
+      setAudioState(audioContextRef.current.state)
+      console.log('[useSoundAlert] AudioContext inicializado, estado:', audioContextRef.current.state)
     }
 
     return () => {
@@ -41,13 +61,17 @@ export function useSoundAlert(enabled: boolean = true) {
    * @param volume - Volumen entre 0 y 1 (por defecto 0.3)
    */
   const playBeep = useCallback((frequency: number = 800, duration: number = 200, volume: number = 0.3) => {
-    if (!enabled || !audioContextRef.current) return
+    if (!enabled || !audioContextRef.current) {
+      console.warn('[useSoundAlert] playBeep: enabled=', enabled, 'audioContext=', !!audioContextRef.current)
+      return
+    }
 
     const ctx = audioContextRef.current
 
     // Reanudar contexto si está suspendido (política de autoplay)
     if (ctx.state === 'suspended') {
-      ctx.resume()
+      console.log('[useSoundAlert] Intentando reanudar AudioContext suspendido...')
+      ctx.resume().catch(err => console.error('[useSoundAlert] Error reanudando:', err))
     }
 
     try {
@@ -71,6 +95,8 @@ export function useSoundAlert(enabled: boolean = true) {
       // Reproducir
       oscillator.start(now)
       oscillator.stop(now + duration / 1000)
+
+      console.log('[useSoundAlert] Beep reproducido: freq=', frequency, 'dur=', duration)
     } catch (error) {
       console.error('[useSoundAlert] Error reproduciendo beep:', error)
     }
@@ -107,7 +133,16 @@ export function useSoundAlert(enabled: boolean = true) {
    * Reproduce un sonido de notificación nuevo (doble beep agudo)
    */
   const playNotification = useCallback(() => {
-    if (!enabled) return
+    console.log('[useSoundAlert] playNotification llamado, enabled:', enabled)
+    if (!enabled) {
+      console.warn('[useSoundAlert] Sonido deshabilitado')
+      return
+    }
+    if (!audioContextRef.current) {
+      console.warn('[useSoundAlert] AudioContext no inicializado')
+      return
+    }
+    console.log('[useSoundAlert] Estado del AudioContext:', audioContextRef.current.state)
     playDoubleBeep(880, 1100, 150)
   }, [enabled, playDoubleBeep])
 
@@ -117,5 +152,7 @@ export function useSoundAlert(enabled: boolean = true) {
     playSuccess,
     playAlert,
     playNotification,
+    activateAudio,
+    audioState,
   }
 }

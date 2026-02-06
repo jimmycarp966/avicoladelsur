@@ -1,6 +1,7 @@
 import { Suspense } from 'react'
 import { obtenerPresupuestosEnPreparacionAction } from '@/actions/en-preparacion.actions'
 import { EnPreparacionRealtime } from '@/components/almacen/EnPreparacionRealtime'
+import { SoundTestButton } from '@/components/almacen/SoundTestButton'
 import { EnPreparacionSkeleton } from './en-preparacion-skeleton'
 import { EnPreparacionContent } from './EnPreparacionContent'
 
@@ -18,6 +19,11 @@ async function EnPreparacionPageContent() {
     <>
       {/* Componente Realtime - invisible pero funcional para notificaciones */}
       <EnPreparacionRealtime />
+
+      {/* Botón para probar y activar el sonido */}
+      <div className="flex justify-end mb-4">
+        <SoundTestButton />
+      </div>
 
       {/* Contenido principal con acciones de marcar/desmarcar */}
       <EnPreparacionContent presupuestos={presupuestos} />
