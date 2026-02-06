@@ -107,6 +107,12 @@ export function EnPreparacionRealtime({ zonaId, turno }: EnPreparacionRealtimePr
         router.refresh()
       }, 500)
     },
+    onError: (error) => {
+      console.error('[EnPreparacionRealtime] ❌ Error en Realtime:', error)
+      toast.error('Error de conexión en tiempo real', {
+        description: error.message
+      })
+    },
   })
 
   // Suscribirse a UPDATE de presupuestos (cuando se marca como listo)
@@ -126,6 +132,9 @@ export function EnPreparacionRealtime({ zonaId, turno }: EnPreparacionRealtimePr
         console.log('[EnPreparacionRealtime] ✅ Presupuesto marcado como listo:', presupuesto.numero_presupuesto)
         router.refresh()
       }
+    },
+    onError: (error) => {
+      console.error('[EnPreparacionRealtime] ❌ Error en Realtime UPDATE:', error)
     },
   })
 

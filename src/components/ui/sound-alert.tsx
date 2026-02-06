@@ -159,7 +159,8 @@ export function useSoundAlert(enabled: boolean = true) {
     startTime: number,
     attackTime: number,
     duration: number,
-    volume: number = 0.3
+    volume: number = 0.3,
+    waveType: OscillatorType = 'sine'
   ) {
     const oscillator = ctx.createOscillator()
     const gainNode = ctx.createGain()
@@ -168,12 +169,11 @@ export function useSoundAlert(enabled: boolean = true) {
     gainNode.connect(ctx.destination)
 
     oscillator.frequency.value = frequency
-    oscillator.type = 'sine'  // Onda senoidal para un sonido de campana suave
+    oscillator.type = waveType
 
-    // Envolvente AD (Attack-Decay) para simular una campana
+    // Envolvente AD (Attack-Decay)
     gainNode.gain.setValueAtTime(0, startTime)
     gainNode.gain.linearRampToValueAtTime(volume, startTime + attackTime)
-    // Decay exponencial para simular el resonate de una campana
     gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration)
 
     oscillator.start(startTime)
@@ -181,8 +181,8 @@ export function useSoundAlert(enabled: boolean = true) {
   }
 
   /**
-   * Reproduce un sonido de notificación nuevo (ta-da-DING!)
-   * Melodía llamativa tipo campana de atención para nuevos pedidos
+   * Reproduce un sonido de notificación tipo ALARMA
+   * Sonido insistente y llamativo para nuevos pedidos críticos
    */
   const playNotification = useCallback(() => {
     console.log('[useSoundAlert] playNotification llamado, enabled:', enabled)
@@ -206,17 +206,20 @@ export function useSoundAlert(enabled: boolean = true) {
     try {
       const now = ctx.currentTime
 
-      // Crear una melodía más llamativa: "ta-da-DING!" tipo campana de atención
-      // Primera nota: grave (ta)
-      playTone(ctx, 523.25, now, 0.1, 0.15)  // C5
-      // Segunda nota: media (da)
-      playTone(ctx, 659.25, now + 0.15, 0.1, 0.15)  // E5
-      // Tercera nota: aguda y larga (DING!)
-      playTone(ctx, 1046.50, now + 0.3, 0.25, 0.4)  // C6 - campana brillante
-      // Armónico para dar cuerpo al "ding"
-      playTone(ctx, 1318.51, now + 0.3, 0.1, 0.35)  // E6 armónico
+      // Sonido tipo alarma: tres pulsos agudos ascendentes con onda square
+      // PULSO 1
+      playTone(ctx, 880, now, 0.01, 0.12, 0.3, 'square')      // A5
+      // PULSO 2 (más agudo)
+      playTone(ctx, 1046, now + 0.15, 0.01, 0.12, 0.35, 'square')  // C6
+      // PULSO 3 (aún más agudo)
+      playTone(ctx, 1318, now + 0.30, 0.01, 0.15, 0.4, 'square')   // E6
 
-      console.log('[useSoundAlert] Notificación reproducida (ta-da-DING!)')
+      // Segunda ronda más insistente
+      playTone(ctx, 880, now + 0.5, 0.01, 0.12, 0.3, 'square')
+      playTone(ctx, 1046, now + 0.65, 0.01, 0.12, 0.35, 'square')
+      playTone(ctx, 1318, now + 0.80, 0.01, 0.20, 0.4, 'square')
+
+      console.log('[useSoundAlert] Alarma reproducida')
     } catch (error) {
       console.error('[useSoundAlert] Error reproduciendo notificación:', error)
     }
