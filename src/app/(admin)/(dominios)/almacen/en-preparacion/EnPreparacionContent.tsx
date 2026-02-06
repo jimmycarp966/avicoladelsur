@@ -1,0 +1,238 @@
+'use client'
+
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { Bell, Package, User, MapPin, CheckCircle2, X, Loader2 } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { toast } from 'sonner'
+import {
+  marcarPreparacionListoAction,
+  desmarcarPreparacionListoAction,
+} from '@/actions/en-preparacion.actions'
+import type { PresupuestoEnPreparacion } from '@/types/domain.types'
+
+interface EnPreparacionContentProps {
+  presupuestos: PresupuestoEnPreparacion[]
+}
+
+export function EnPreparacionContent({ presupuestos }: EnPreparacionContentProps) {
+  const router = useRouter()
+  const [loading, setLoading] = useState<string | null>(null)
+
+  // Filtrar: mostrar pendientes primero, luego completados
+  const pendientes = presupuestos.filter((p) => !p.preparacion_completada)
+  const completados = presupuestos.filter((p) => p.preparacion_completada)
+
+  const handleMarcarListo = async (presupuestoId: string) => {
+    setLoading(presupuestoId)
+    try {
+      const result = await marcarPreparacionListoAction(presupuestoId)
+      if (result.success) {
+        toast.success(result.message || 'Marcado como listo')
+        router.refresh()
+      } else {
+        toast.error(result.error || 'Error al marcar como listo')
+      }
+    } catch (error) {
+      toast.error('Error al marcar como listo')
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  const handleDesmarcar = async (presupuestoId: string) => {
+    setLoading(presupuestoId)
+    try {
+      const result = await desmarcarPreparacionListoAction(presupuestoId)
+      if (result.success) {
+        toast.success(result.message || 'Desmarcado')
+        router.refresh()
+      } else {
+        toast.error(result.error || 'Error al desmarcar')
+      }
+    } catch (error) {
+      toast.error('Error al desmarcar')
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Bell className="h-6 w-6 text-orange-500" />
+            En Preparación
+          </h1>
+          <p className="text-muted-foreground">
+            Presupuestos listos para preparar en cámara frigorífica
+          </p>
+        </div>
+        <div className="flex items-center gap-4">
+          {pendientes.length > 0 && (
+            <Badge variant="destructive" className="text-sm px-3 py-1">
+              {pendientes.length} pendiente{pendientes.length !== 1 ? 's' : ''}
+            </Badge>
+          )}
+          {completados.length > 0 && (
+            <Badge variant="outline" className="text-sm px-3 py-1">
+              {completados.length} listo{completados.length !== 1 ? 's' : ''} para pesaje
+            </Badge>
+          )}
+        </div>
+      </div>
+
+      {/* Lista de presupuestos pendientes */}
+      {pendientes.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold text-orange-600 dark:text-orange-400 flex items-center gap-2">
+            <Package className="h-5 w-5" />
+            Pendientes de Preparación
+          </h2>
+          <div className="grid gap-4">
+            {pendientes.map((p) => (
+              <PresupuestoCard
+                key={p.id}
+                presupuesto={p}
+                loading={loading === p.id}
+                onMarcarListo={() => handleMarcarListo(p.id)}
+                onDesmarcar={() => handleDesmarcar(p.id)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Lista de presupuestos completados */}
+      {completados.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold text-green-600 dark:text-green-400 flex items-center gap-2">
+            <CheckCircle2 className="h-5 w-5" />
+            Listos para Pesaje
+          </h2>
+          <div className="grid gap-4">
+            {completados.map((p) => (
+              <PresupuestoCard
+                key={p.id}
+                presupuesto={p}
+                loading={loading === p.id}
+                onMarcarListo={() => handleMarcarListo(p.id)}
+                onDesmarcar={() => handleDesmarcar(p.id)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Estado vacío */}
+      {pendientes.length === 0 && completados.length === 0 && (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            <Bell className="mx-auto h-12 w-12 mb-4 opacity-50" />
+            <p className="text-lg">No hay presupuestos en preparación</p>
+            <p className="text-sm mt-2">
+              Los nuevos presupuestos en estado <span className="font-mono bg-muted px-1 rounded">en_almacen</span> aparecerán aquí automáticamente
+            </p>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}
+
+interface PresupuestoCardProps {
+  presupuesto: PresupuestoEnPreparacion
+  loading: boolean
+  onMarcarListo: () => void
+  onDesmarcar: () => void
+}
+
+function PresupuestoCard({ presupuesto, loading, onMarcarListo, onDesmarcar }: PresupuestoCardProps) {
+  const isCompletado = presupuesto.preparacion_completada
+
+  return (
+    <Card
+      className={`border-l-4 transition-all ${
+        isCompletado
+          ? 'border-l-green-500 bg-green-50/50 dark:bg-green-950/20'
+          : 'border-l-orange-500'
+      }`}
+    >
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg flex items-center gap-2">
+            #{presupuesto.numero_presupuesto}
+            {isCompletado && (
+              <Badge variant="success" className="text-xs">
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                Listo para pesaje
+              </Badge>
+            )}
+          </CardTitle>
+          <Button
+            variant={isCompletado ? 'outline' : 'default'}
+            size="sm"
+            onClick={isCompletado ? onDesmarcar : onMarcarListo}
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Guardando...
+              </>
+            ) : isCompletado ? (
+              <>
+                <X className="h-4 w-4 mr-2" />
+                Desmarcar
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Listo
+              </>
+            )}
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          <div className="flex items-center gap-4 text-sm flex-wrap">
+            <span className="flex items-center gap-1 font-medium">
+              <User className="h-4 w-4" />
+              {presupuesto.cliente?.nombre || 'Cliente sin nombre'}
+            </span>
+            <span className="flex items-center gap-1">
+              <MapPin className="h-4 w-4" />
+              {presupuesto.zona?.nombre || 'Sin zona'}
+            </span>
+            <Badge variant={presupuesto.turno === 'mañana' ? 'default' : 'secondary'}>
+              {presupuesto.turno || 'Sin turno'}
+            </Badge>
+            {isCompletado && presupuesto.preparado_por_obj && (
+              <Badge variant="outline" className="text-xs">
+                Por {presupuesto.preparado_por_obj.nombre}
+              </Badge>
+            )}
+          </div>
+          <div className="border-t pt-3">
+            <p className="text-xs text-muted-foreground mb-2">
+              Productos ({presupuesto.items?.length || 0}):
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {presupuesto.items?.map((item: any) => (
+                <Badge key={item.id} variant="outline" className="text-xs">
+                  {item.producto?.nombre || 'Producto'} x{item.cantidad_solicitada}
+                  {item.pesable && ' ⚖️'}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}

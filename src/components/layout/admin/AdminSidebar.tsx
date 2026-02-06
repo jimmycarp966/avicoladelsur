@@ -28,10 +28,26 @@ import {
   MessageSquare,
 } from 'lucide-react'
 import type { Usuario } from '@/types/domain.types'
+import type { LucideIcon } from 'lucide-react'
 
 interface AdminSidebarProps {
   onClose?: () => void
   user: Usuario | null
+}
+
+interface NavigationChild {
+  name: string
+  href: string
+  icon?: LucideIcon
+}
+
+interface NavigationItem {
+  name: string
+  href: string
+  icon: LucideIcon
+  roles: string[]
+  badge?: string
+  children?: NavigationChild[]
 }
 
 // Función para obtener badges dinámicos - versión cliente
@@ -73,10 +89,11 @@ const navigation = [
     icon: Package,
     roles: ['admin', 'almacenista'],
     children: [
+      { name: 'En Preparación', href: '/almacen/en-preparacion', icon: Bell },
       { name: 'Productos', href: '/almacen/productos' },
       { name: 'Lotes', href: '/almacen/lotes' },
       { name: 'Producción', href: '/almacen/produccion' },
-      { name: 'Control de Stock', href: '/almacen/control-stock' }, // Re-añadido con comentario para forzar mtime
+      { name: 'Control de Stock', href: '/almacen/control-stock' },
       { name: 'Presupuestos del Día', href: '/almacen/presupuestos-dia' },
       { name: 'Pedidos', href: '/almacen/pedidos' },
       { name: 'Transferencias', href: '/sucursales/transferencias' },
@@ -196,7 +213,7 @@ function hasAccess(user: Usuario | null, requiredRoles: string[]): boolean {
 }
 
 interface NavigationItemProps {
-  item: typeof navigation[0]
+  item: NavigationItem
   pathname: string
   user: Usuario | null
   onClose?: () => void
@@ -260,23 +277,26 @@ function NavigationItem({ item, pathname, user, onClose, badges }: NavigationIte
         <div className="mt-2 ml-4 space-y-1 border-l-2 border-white/20 pl-4 animate-in fade-in slide-in-from-top-2 duration-200">
           {item.children.map((child) => {
             const childIsActive = pathname === child.href
+            const ChildIcon = child.icon
             return (
               <Link
                 key={child.href}
                 href={child.href}
                 onClick={onClose}
                 className={cn(
-                  'group relative flex items-center rounded-lg py-2 px-3 text-sm font-medium transition-all duration-200',
+                  'group relative flex items-center rounded-lg py-2 px-3 text-sm font-medium transition-all duration-200 gap-2',
                   childIsActive
                     ? 'bg-white/15 text-white font-semibold'
                     : 'text-white/70 hover:bg-white/10 hover:text-white'
                 )}
               >
+                {/* Icono del hijo si existe */}
+                {ChildIcon && <ChildIcon className="h-4 w-4" />}
                 {/* Punto amarillo/crema para submenu activo */}
                 {childIsActive && (
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-[#FCDE8D] rounded-full -ml-6"></div>
                 )}
-                {child.name}
+                <span>{child.name}</span>
               </Link>
             )
           })}

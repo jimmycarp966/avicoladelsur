@@ -273,6 +273,40 @@ export interface PresupuestoItem extends BaseEntity {
   subtotal_final?: number
 }
 
+// Presupuesto en preparación (para vista de cámara frigorífica)
+export interface PresupuestoEnPreparacion extends BaseEntity {
+  numero_presupuesto: string
+  cliente_id: string
+  zona_id?: string
+  estado: 'pendiente' | 'cotizacion' | 'en_almacen' | 'facturado' | 'anulado'
+  fecha_entrega_estimada?: string
+  turno?: 'mañana' | 'tarde'
+  preparacion_completada: boolean
+  preparacion_completada_at?: string
+  preparado_por?: string
+  // Relaciones
+  cliente?: {
+    nombre: string
+    telefono?: string
+  }
+  zona?: {
+    nombre: string
+  }
+  items?: Array<{
+    id: string
+    producto?: {
+      nombre: string
+      categoria?: string
+    }
+    cantidad_solicitada: number
+    pesable: boolean
+  }>
+  preparado_por_obj?: {
+    nombre: string
+    apellido?: string
+  }
+}
+
 // Zona
 export interface Zona extends BaseEntity {
   nombre: string
