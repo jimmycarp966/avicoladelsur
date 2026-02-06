@@ -95,6 +95,13 @@ export function BarcodeScanner({
         canvasRef.current = document.createElement('canvas')
     }, [])
 
+    // Función para detener todo (declarada ANTES de startCamera para evitar TDZ)
+    const stopAll = useCallback(() => {
+        if (scanIntervalRef.current) clearInterval(scanIntervalRef.current)
+        streamRef.current?.getTracks().forEach(t => t.stop())
+        readerRef.current?.reset()
+    }, [])
+
     // Función para iniciar cámara (User Gesture Triggered)
     const startCamera = useCallback(async () => {
         if (!videoRef.current) return
@@ -229,12 +236,6 @@ export function BarcodeScanner({
             setCameraStarted(false)
         }
     }, [addDebugLog, logToServer, onScan, vibrate, playScannerBeep, stopAll])
-
-    const stopAll = useCallback(() => {
-        if (scanIntervalRef.current) clearInterval(scanIntervalRef.current)
-        streamRef.current?.getTracks().forEach(t => t.stop())
-        readerRef.current?.reset()
-    }, [])
 
     // Cleanup
     useEffect(() => {
