@@ -160,7 +160,7 @@ export function useSoundAlert(enabled: boolean = true) {
     attackTime: number,
     duration: number,
     volume: number = 0.3,
-    waveType: OscillatorType = 'sine'
+    waveType: 'sine' | 'square' | 'sawtooth' | 'triangle' = 'sine'
   ) {
     const oscillator = ctx.createOscillator()
     const gainNode = ctx.createGain()
