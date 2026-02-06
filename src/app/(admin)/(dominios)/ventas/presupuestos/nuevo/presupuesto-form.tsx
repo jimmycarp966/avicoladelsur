@@ -439,9 +439,10 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
         console.log('[PRESUPUESTO FORM] Procesando índice', i, '- listaCambio:', listaCambio, 'precioModificado:', preciosModificadosManualmenteRef.current.has(i), 'listaAnterior:', listaAnterior, 'listaId:', listaId)
 
         // IMPORTANTE: PRIMERO verificar si el precio fue modificado manualmente
-        // Esta verificación debe ir ANTES de la verificación de productosProcesadosRef
-        // para que tenga prioridad sobre el cache
-        if (!listaCambio && preciosModificadosManualmenteRef.current.has(i)) {
+        // Esta verificación tiene prioridad sobre listaCambio
+        // Solo debemos saltar la actualización si NO cambió explícitamente la lista global
+        // (listaGlobalCambio se maneja aparte - limpia todos los precios modificados)
+        if (preciosModificadosManualmenteRef.current.has(i) && !listaGlobalCambio) {
           console.log('[PRESUPUESTO FORM] Saltando actualización de precio para índice', i, '- fue modificado manualmente')
           // Marcar como procesado para no volver a intentar en futuras iteraciones
           productosProcesadosRef.current.add(clave)
