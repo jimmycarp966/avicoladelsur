@@ -24,7 +24,8 @@ interface EnPreparacionRealtimeProps {
  */
 export function EnPreparacionRealtime({ zonaId, turno }: EnPreparacionRealtimeProps) {
   const router = useRouter()
-  const { playNotification, activateAudio, audioState } = useSoundAlert(true)
+  // TEMPORALMENTE DESHABILITADO: el sonido está causando error de JavaScript
+  const { playNotification, activateAudio, audioState } = useSoundAlert(false)
   const audioActivatedRef = useRef(false)
 
   // Activar el AudioContext en la primera interacción del usuario
