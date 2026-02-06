@@ -1,8 +1,11 @@
 # 🏗️ Arquitectura del Sistema - Avícola del Sur ERP
 
-**Última Actualización:** 24 de Enero 2026 (09:30)  
+**Última Actualización:** 6 de Febrero 2026 (09:30)  
 **Estado:** ✅ PRODUCCIÓN  
-**Docs relacionadas:** [README](./README.md) · [Architecture Deep-Dive](./ARCHITECTURE.md) · [Supabase Setup](./SUPABASE_SETUP.md)
+**Versión:** v2.3  
+**Docs relacionadas:** [README](./README.md) · [Architecture Deep-Dive](./ARCHITECTURE.MD) · [Supabase Setup](./SUPABASE_SETUP.md)
+
+---
 
 ## 📚 Índice Rápido
 
@@ -11,9 +14,9 @@
 | [TL;DR](#-tldr-resumen-ejecutivo) | Resumen ejecutivo del sistema |
 | [Stack](#-stack-tecnológico) | Tecnologías utilizadas |
 | [Módulos](#-módulos-principales-mapa-técnico) | §1-§6 Reparto, Tesorería, Almacén, Ventas, RRHH, Sucursales |
-| [Servicios IA](#-servicios-de-ia--google-cloud) | Gemini, Maps, Predictions |
+| [Servicios IA](#-servicios-de-ia--google-cloud) | Gemini, Maps, Routing |
 | [Patrones](#️-patrones-de-arquitectura-de-software) | Arquitectura Server-Authoritative |
-| [Server Actions](#-server-actions-referencia-completa) | 32 actions organizados por módulo |
+| [Server Actions](#-server-actions-referencia-completa) | 39 actions organizados por módulo |
 | [Estructura](#-estructura-de-directorios-auditada) | Organización de carpetas |
 | [Navegación](#-mapa-de-navegación-del-sistema-menú-oficial) | Menú del sidebar |
 | [Flujos](#-flujos-críticos) | Happy paths principales |
@@ -21,400 +24,388 @@
 | [API](#-api--webhooks-headless) | Endpoints públicos |
 | [Esquema DB](#-esquema-de-datos-crítico-entidades-core) | Tablas y enums |
 | [Componentes UI](#-catálogo-de-componentes-ui-building-blocks) | Building blocks reutilizables |
-| [Cambios](#-cambios-recientes-últimos-5) | Historial reciente |
+| [Cambios Recientes](#-cambios-recientes) | Historial de actualizaciones |
 
 ---
 
 ## 📋 TL;DR (Resumen Ejecutivo)
 
-Sistema ERP modular completo para Avícola del Sur que unifica **Almacén (WMS)**, **Ventas (CRM)**, **Reparto (TMS)**, **Tesorería** y **RRHH** en una única fuente de verdad sobre **Supabase**. Para una vista operativa general ver [README](./README.md); para la especificación técnica completa ver [ARCHITECTURE.md](./ARCHITECTURE.md).
+Sistema ERP modular completo para Avícola del Sur que unifica **Almacén (WMS)**, **Ventas (CRM)**, **Reparto (TMS)**, **Tesorería** y **RRHH** en una única fuente de verdad sobre **Supabase**.
 
-### Diferenciales Clave (Enero 2026)
-1.  **IA Omnipresente**: Google Gemini integrado en validación de stock (pesaje), conciliación bancaria inteligente, chatbot de ventas y optimización de rutas.
-2.  **Reparto Autónomo**: Navegación interactiva con selección de rutas (Google Directions), decisión inteligente del próximo cliente y GPS tracking en tiempo real.
-3.  **Conciliación Bancaria AI**: Motor que ingesta extractos PDF/Excel y matchea transacciones automáticamente con movimientos de caja.
-4.  **Producción Científica**: Módulo de desposte con análisis de rendimientos esperados vs reales, control estricto de mermas y **Producción Incremental (Memory Bank)** con impresión de resúmenes.
-5.  **Memory Bank Inteligente**: El bot de WhatsApp aprende de cada conversación, extrayendo hechos y preferencias automáticamente para personalizar la atención.
-6.  **Catálogo Público y Carrito**: Sincronización automática entre catálogo web y WhatsApp mediante códigos únicos de carrito.
+### Diferenciales Clave (Febrero 2026)
+
+1. **IA Omnipresente**: Google Gemini integrado en validación de stock (pesaje), conciliación bancaria inteligente, chatbot de ventas y optimización de rutas.
+2. **Reparto Autónomo**: Navegación interactiva con selección de rutas alternativas (OpenRouteService + Google), decisión inteligente del próximo cliente y GPS tracking en tiempo real.
+3. **Conciliación Bancaria AI**: Motor que ingesta extractos PDF/Excel y matchea transacciones automáticamente con movimientos de caja usando Gemini 3.0 Pro.
+4. **Producción Científica**: Módulo de desposte con análisis de rendimientos esperados vs reales, control estricto de mermas y **Producción Incremental** con impresión de resúmenes.
+5. **Memory Bank Inteligente**: El bot de WhatsApp aprende de cada conversación, extrayendo hechos y preferencias automáticamente para personalizar la atención.
+6. **Sistema de Remitos**: Generación automática de documentos PDF para entregas, traslados y producción con numeración secuencial.
+7. **Pesaje Acumulativo**: Escaner de balanza con soporte para múltiples bolsas, acumulación de pesos y barra de progreso visual.
 
 ---
 
 ## 🛠️ Stack Tecnológico *(resumen – detalles en README#arquitectura-del-sistema)*
 
-- **Framework**: Next.js 16 (App Router, Server Actions)
-- **Frontend**: React 19 + TypeScript + Tailwind CSS v4 + shadcn/ui
-- **Base de Datos**: Supabase (Postgres 15+) + RLS + Realtime
-- **IA Core**: Google Gemini 2.5 Flash (alta velocidad) y 3.0 Pro (razonamiento complejo)
-- **Mapas**: Google Maps JS API (TMS/Navegación) + Leaflet (Reportes Heatmap)
+- **Framework**: Next.js 16 (App Router, Server Actions, React 19)
+- **Frontend**: React 19 + TypeScript 5.9 + Tailwind CSS v4 + shadcn/ui
+- **Base de Datos**: Supabase (Postgres 15+) + RLS + Realtime (184+ migraciones)
+- **IA Core**: Google Vertex AI (Gemini 2.5 Flash / 3.0 Pro)
+- **Mapas**: Google Maps JS API (visualización) + OpenRouteService (routing OSM)
 - **Infraestructura**: Vercel (Frontend/Edge) + Supabase (Backend/Storage)
-- **Protocolo IA**: Model Context Protocol (MCP) para integración de herramientas externas
+- **Barcode**: @zxing/library para escaneo de códigos EAN-13
 
 ---
 
 ## 📦 Módulos Principales (Mapa Técnico)
 
-> Para un desglose extendido de cada dominio revisa [ARCHITECTURE.md#🏢-dominios-de-negocio](./ARCHITECTURE.md#🏢-dominios-de-negocio).
+> Para un desglose extendido de cada dominio revisa [ARCHITECTURE.MD#🏢-dominios-de-negocio](./ARCHITECTURE.MD).
 
 ### 1. 🚛 Reparto (TMS) & Navegación
 *Scope: Logística last-mile, app de conductor y monitoreo.*
-- **Backend Logic**: `reparto.actions.ts` (CRUD), `ruta-optimizer.ts` (Algoritmo TSP híbrido), `google-directions.ts`.
-- **Data Models**: `rutas_reparto` (Cabecera), `detalles_ruta` (Entregas), `ubicaciones_repartidores` (Tracking), `preferencias_rutas_repartidor`.
-- **UI Key Components**: `NavigationInteractivo.tsx` (App Conductor), `MonitorMap.tsx` (Admin Dashboard), `RutaAlternativasSelector.tsx`.
-- **Features 2.0**:
-  - **ORS Optimization API**: Optimización de orden de visitas (TSP solver VROOM) con datos de OpenStreetMap.
-  - Selección de rutas alternativas (Google Alternatives).
-  - Priorización inteligente de clientes (`next-client-selector.ts`).
-  - Marcadores de clientes sincronizados con orden optimizado.
+
+- **Backend Logic**: `reparto.actions.ts`, `plan-rutas.actions.ts`, `ruta-optimizer.ts`, `ors-directions.ts`
+- **Data Models**: `rutas_reparto`, `detalles_ruta`, `ubicaciones_repartidores`, `preferencias_rutas_repartidor`
+- **UI Key Components**: 
+  - `NavigationInteractivo.tsx` - App Conductor con voz
+  - `MonitorMap.tsx` - Admin Dashboard tiempo real
+  - `RutaAlternativasSelector.tsx` - Selección de rutas
+  - `GpsTracker.tsx` - Tracking background
+- **Features**:
+  - Optimización TSP con ORS VROOM
+  - Fallback híbrido: ORS → Google → Local (NN + 2-opt)
+  - PWA offline-first
+  - Alertas automáticas de desvío
 
 ### 2. 💰 Tesorería & Conciliación IA
 *Scope: Flujo de dinero, cajas, bancos, proveedores y cuentas corrientes.*
-- **Backend Logic**: `tesoreria.actions.ts`, `conciliacion.actions.ts`, `gastos.actions.ts`, `proveedores.actions.ts`.
-- **AI Core**: `gemini-matcher.ts` (Gemini 3.0 Pro para matching difuso de transacciones).
-- **Data Models**: `tesoreria_cajas`, `movimientos_caja`, `conciliacion_bancaria_items`, `cuentas_corrientes`, `gastos`, `gastos_categorias`, `proveedores`, `proveedores_facturas`, `proveedores_pagos`.
-- **Features 2.0**:
-  - Conciliación PDF->BD automática con parser robusto (locales regionales).
-  - Validación de rendiciones de ruta (Cruce Cobros vs Remesa).
-  - **Acreditación Atómica**: Uso de RPC SQL para sincronizar CC y Caja sin condiciones de carrera.
-  - **Gestión de Proveedores**: Facturas, pagos y deuda.
-  - **Dashboard KPIs**: Tesoro Total, Deuda Proveedores, Clientes Morosos.
-  - **Retiros en Tránsito**: Tracking de remesas desde sucursales.
+
+- **Backend Logic**: `tesoreria.actions.ts`, `conciliacion*.actions.ts`, `proveedores.actions.ts`
+- **AI Core**: `gemini-matcher.ts` (Gemini 3.0 Pro para matching difuso)
+- **Data Models**: `tesoreria_cajas`, `movimientos_caja`, `conciliacion_bancaria_items`, `cuentas_corrientes`, `proveedores`
+- **Features**:
+  - Parser robusto multiformato (PDF/Excel)
+  - Matching inteligente con IA
+  - Acreditación atómica vía RPC
+  - Gestión de proveedores completa
 
 ### 3. 🏭 Almacén & Producción
 *Scope: Inventario, manufactura (desposte) y recepción.*
-- **Backend Logic**: `produccion.actions.ts` (Desposte), `almacen.actions.ts` (Stock), `rendimientos.actions.ts`.
-- **Data Models**: `lotes` (FIFO Kernel), `movimientos_stock`, `produccion_ordenes`, `produccion_config` (Rendimientos teóricos).
-- **Features 2.0**:
-  - Control de Merma Líquida vs Sólida.
-  - Validación de Peso IA (Detección de outliers en balanza).
-  - **Control de Stock por Turnos**: Conteo físico de inventario (Mañana/Noche) con conciliación automática.
-  - **Sistema de Remitos Internos**: Generación de remitos de producción tras el desposte.
-  - **Producción Incremental**: Registro parcial de kilos terminados con barra de progreso visual (Memory Bank) e impresión de resumen final detallado.
-  - **Control de Stock por Turnos**: Auditoría física de inventario (Mañana/Noche) con timer de 1 hora y detección de producción activa.
+
+- **Backend Logic**: `produccion.actions.ts`, `almacen.actions.ts`, `rendimientos.actions.ts`, `pesajes.actions.ts`
+- **Data Models**: `lotes`, `movimientos_stock`, `produccion_ordenes`, `produccion_config`
+- **Features**:
+  - Control de Merma Líquida vs Sólida
+  - Validación de Peso con IA (detección de outliers)
+  - Pesaje acumulativo de múltiples bolsas
+  - Producción Incremental con Memory Bank
+  - Control de Stock por Turnos (auditoría física)
+  - Sistema de Remitos de producción
 
 ### 4. 🛒 Ventas & Clientes
 *Scope: CRM, facturación y toma de pedidos.*
-- **Backend Logic**: `ventas.actions.ts`, `src/app/api/bot/route.ts` (Bot principal), `src/app/api/webhooks/whatsapp-meta/route.ts` (Webhook Meta), `listas-precios.actions.ts`.
-- **AI Core**: `agent.ts` (Orquestador), `memory-extractor.ts` (Extracción de hechos).
-- **Data Models**: `pedidos` (Agregador de entregas), `presupuestos`, `clientes`, `listas_precios`, `bot_sessions` (Contexto persistente).
-- **Features 2.0**:
-  - Chatbot NLU para toma de pedidos natural.
-  - Listas de precios dinámicas con vigencia y auditoría de cambios.
-  - **Memory Bank Inteligente**: Aprendizaje automático de preferencias por cliente.
-  - **Catálogo Web Público**: `/catalogo` para navegación sin login con carrito persistente.
-  - **Carritos Compartidos**: Sincronización de pedidos web -> WhatsApp mediante `carritos_pendientes`.
-  - **Remitos de Entrega**: Generación de documentos PDF con firma digital.
+
+- **Backend Logic**: `ventas.actions.ts`, `presupuestos*.actions.ts`, `listas-precios.actions.ts`
+- **AI Core**: `agent.ts` (Orquestador), `memory-extractor.ts`
+- **Data Models**: `pedidos`, `presupuestos`, `clientes`, `listas_precios`, `bot_sessions`
+- **Features**:
+  - Chatbot NLU para toma de pedidos natural
+  - Listas de precios dinámicas con vigencia
+  - Memory Bank Inteligente
+  - Catálogo Web Público con carrito persistente
+  - Remitos de entrega con firma digital
 
 ### 5. 👥 RRHH (Human Resources)
 *Scope: Gestión de personal, asistencia, pagos y comunicación interna.*
-- **Backend Logic**: `rrhh.actions.ts`, `reportes-empleados.actions.ts`, `mensajes.actions.ts`.
-- **Data Models**: `rrhh_empleados`, `rrhh_asistencias` (Geo-fenced), `rrhh_liquidaciones`, `rrhh_adelantos`, `mensajes_internos`.
-- **Features 2.0**:
-  - Cálculo de nómina automático basado en presentismo.
-  - Adelantos con límite automático según sueldo básico.
-  - **Mensajería Interna**: Sistema de comunicación entre empleados con bandeja de entrada, enviados, y marcado de leídos.
-  - **Objetivación de Evaluaciones**: Transformación de criterios subjetivos en métricas operativas basadas en datos del ERP (ver `RRHH_PROPUESTA_EVALUACIONES.md`).
+
+- **Backend Logic**: `rrhh.actions.ts`, `reportes-empleados.actions.ts`, `mensajes.actions.ts`
+- **Data Models**: `rrhh_empleados`, `rrhh_asistencias`, `rrhh_liquidaciones`, `rrhh_adelantos`, `mensajes_internos`
+- **Features**:
+  - Cálculo de nómina automático
+  - Adelantos con límite del 30% del sueldo básico
+  - Mensajería interna entre empleados
+  - Objetivación de evaluaciones vía Huella Digital Operativa
 
 ### 6. 🏪 Sucursales & POS
 *Scope: Gestión de puntos de venta distribuidos.*
-- **Backend Logic**: `sucursales.actions.ts`, `pos-sucursal.actions.ts`, `ventas-sucursal.actions.ts`, `sucursales-transferencias.actions.ts`.
-- **Data Models**: `sucursales`, `sucursales_stock`, `sucursales_ventas`, `transferencias_sucursales`.
-- **Features 2.0**:
-  - POS táctil para venta directa.
-  - Transferencias de stock inter-sucursales.
-  - Dashboard local para encargados.
-  - Conteos de inventario con validación.
-  - **Remitos de Traslado**: Comprobantes internos para el transporte de mercadería entre sucursales.
+
+- **Backend Logic**: `sucursales.actions.ts`, `pos-sucursal.actions.ts`, `sucursales-transferencias.actions.ts`
+- **Data Models**: `sucursales`, `sucursales_stock`, `transferencias_sucursales`
+- **Features**:
+  - POS táctil para venta directa
+  - Transferencias de stock inter-sucursales con remitos
+  - Auditoría de precios mayorista/minorista
+  - Conteos de inventario con validación
 
 ---
 
-## 🤖 Servicios de IA & Google Cloud *(ver también README#🧠-inteligencia-artificial-aplicada-gemini)*
+## 🤖 Servicios de IA & Google Cloud
 
 | Servicio | Implementación | Propósito |
 |----------|----------------|-----------|
-| **Gemini 2.5 Flash** | `src/lib/gemini.ts` | Validaciones rápidas (balanza), Chatbot ventas, Clasificación de Gastos. |
-| **Gemini 2.5 Flash** | `vertex/memory-extractor.ts` | Extracción automática de hechos y preferencias del cliente. |
-| **Gemini 3.0 Pro** | `conciliacion/gemini-matcher.ts` | Razonamiento complejo: Conciliación bancaria y Auditoría de Cobros. |
-| **Maps JS API** | `components/shared/LocationPicker` | Selector de ubicaciones y visualización de rutas |
-| **Directions API** | `lib/rutas/google-directions.ts` | Cálculo de rutas óptimas y alternativas |
-| **Places API** | `lib/google-cloud/places.ts` | Autocompletado de direcciones |
-| **Predictions API** | `api/ia/prediccion-stock` | Endpoint cron para predecir quiebres de stock. |
-| **Risk API** | `api/ia/clientes-riesgo` | Análisis de historial de pagos para scoring de crédito. |
-
-
----
+| **Gemini 2.5 Flash** | `src/lib/services/gemini.ts` | Validaciones rápidas, chatbot ventas |
+| **Gemini 2.5 Flash** | `vertex/memory-extractor.ts` | Extracción automática de hechos y preferencias |
+| **Gemini 3.0 Pro** | `conciliacion/gemini-matcher.ts` | Razonamiento complejo: Conciliación bancaria |
+| **Maps JS API** | `components/reparto/MonitorMap.tsx` | Visualización GPS y rutas |
+| **Directions API** | `lib/services/google-directions.ts` | Rutas alternativas (fallback) |
+| **Places API** | `lib/services/places.ts` | Autocompletado de direcciones |
+| **OpenRouteService** | `lib/services/ors-directions.ts` | Optimización TSP, routing OSM |
 
 ---
 
 ## 🏗️ Patrones de Arquitectura de Software
 
-El sistema sigue una arquitectura **Server-Authoritative** estricta para garantizar consistencia y seguridad:
+El sistema sigue una arquitectura **Server-Authoritative** estricta:
 
 | Capa | Ubicación | Responsabilidad | Ejemplo |
 |------|-----------|-----------------|---------|
-| **1. Presentación** | `src/app` & `components` | Rendering UI, estado efímero. No contiene reglas de negocio. | `RutaAlternativasSelector.tsx` |
-| **2. Orquestación** | `src/actions` | **Backend-for-Frontend**. Valida inputs (Zod), verifica permisos, llama a servicios y formatea respuestas para la UI. | `reparto.actions.ts` |
-| **3. Dominio/Servicios** | `src/lib/services` | Lógica pura de negocio, algoritmos complejos e integraciones (Google/Twilio). Desacoplado de la UI. | `ruta-optimizer.ts`, `gemini.ts` |
-| **4. Datos Atómicos** | `supabase/functions` | **RPCs de Postgres**. Garantizan atomicidad transaccional y consistencia de datos a nivel BD. | `fn_asignar_pedido_a_ruta` |
+| **1. Presentación** | `src/app` & `components` | Rendering UI, estado efímero. No contiene reglas de negocio. | `PesajeItemCard.tsx` |
+| **2. Orquestación** | `src/actions` | **Backend-for-Frontend**. Valida inputs (Zod), verifica permisos, llama a servicios. | `reparto.actions.ts` |
+| **3. Dominio/Servicios** | `src/lib/services` | Lógica pura de negocio, algoritmos complejos e integraciones. | `ruta-optimizer.ts`, `gemini.ts` |
+| **4. Datos Atómicos** | `supabase/migrations` | **RPCs de Postgres**. Garantizan atomicidad transaccional. | `fn_acreditar_saldo_cliente_v2` |
 
 ---
 
 ## 🔧 Server Actions (Referencia Completa)
 
-*Todos los actions están en `src/actions/`. Usar como backend-for-frontend.*
+*39 actions en `src/actions/`. Usar como backend-for-frontend.*
 
 ### Por Módulo
 
-| Módulo | Action | Propósito |
-|--------|--------|-----------|
+| Módulo | Actions | Propósito |
+|--------|---------|-----------|
 | **Auth** | `auth.actions.ts` | Login, logout, gestión de sesión |
 | **Dashboard** | `dashboard.actions.ts` | KPIs, métricas, alertas |
-| **Almacén** | `almacen.actions.ts` | Stock, lotes, movimientos FIFO |
-| | `produccion.actions.ts` | Órdenes de desposte, entradas/salidas |
-| | `destinos-produccion.actions.ts` | Configuración de destinos |
-| | `rendimientos.actions.ts` | Rendimientos esperados vs reales |
-| | `pesajes.actions.ts` | Validación de pesos, aprendizaje |
-| | `presupuestos-dia.actions.ts` | Cola de preparación diaria |
-| **Ventas** | `ventas.actions.ts` | Clientes, facturas, pedidos |
-| | `presupuestos.actions.ts` | Cotizaciones, conversión a pedido |
-| | `listas-precios.actions.ts` | Listas dinámicas, auditoría |
-| | `entregas.actions.ts` | Gestión de entregas individuales |
-| **Reparto** | `reparto.actions.ts` | Rutas, asignaciones, tracking |
-| | `plan-rutas.actions.ts` | Planificación semanal |
-| **Tesorería** | `tesoreria.actions.ts` | Cajas, movimientos, cierres |
-| | `conciliacion.actions.ts` | Ingesta bancaria, matching IA |
-| | `gastos.actions.ts` | Registro de gastos |
-| | `proveedores.actions.ts` | Facturas, pagos, deuda |
-| **Sucursales** | `sucursales.actions.ts` | CRUD sucursales |
-| | `pos-sucursal.actions.ts` | Punto de venta táctil |
-| | `ventas-sucursal.actions.ts` | Ventas locales |
-| | `sucursales-transferencias.actions.ts` | Transferencias inter-sucursales |
+| **Almacén** | `almacen.actions.ts`, `produccion.actions.ts`, `pesajes.actions.ts`, `presupuestos-dia.actions.ts` | Stock, lotes, desposte, pesaje, preparación diaria |
+| **Ventas** | `ventas.actions.ts`, `presupuestos.actions.ts`, `listas-precios.actions.ts` | Clientes, facturas, presupuestos, listas de precios |
+| **Reparto** | `reparto.actions.ts`, `plan-rutas.actions.ts` | Rutas, asignaciones, tracking, planificación semanal |
+| **Tesorería** | `tesoreria.actions.ts`, `conciliacion*.actions.ts`, `gastos.actions.ts`, `proveedores.actions.ts` | Cajas, conciliación IA, gastos, proveedores |
+| **RRHH** | `rrhh.actions.ts`, `mensajes.actions.ts` | Empleados, asistencia, liquidaciones, mensajería |
+| **Sucursales** | `sucursales*.actions.ts`, `pos-sucursal.actions.ts` | CRUD sucursales, POS, transferencias |
 | **Remitos** | `remitos.actions.ts` | Generación de PDFs para entregas, traslados y producción |
-| **RRHH** | `rrhh.actions.ts` | Empleados, asistencia, liquidaciones |
-| | `mensajes.actions.ts` | Mensajería interna entre empleados |
-| **Reportes** | `reportes.actions.ts` | Reportes generales |
-| | `reportes-almacen.actions.ts` | Reportes de stock |
-| | `reportes-clientes.actions.ts` | Análisis de clientes |
-| | `reportes-empleados.actions.ts` | Métricas RRHH |
-| | `reportes-pedidos.actions.ts` | Análisis de ventas |
-| | `reportes-reparto.actions.ts` | Eficiencia de entregas |
-| | `reportes-stock.actions.ts` | Inventario y rotación |
-| | `reportes-tesoreria.actions.ts` | Flujo de caja |
+| **Reportes** | `reportes*.actions.ts` (8 archivos) | Reportes especializados por módulo |
 
 ---
 
+## 📂 Estructura de Directorios Auditada
+
 ```
 src/
-├── actions/                  # Server Actions (Mutaciones seguraas)
+├── actions/                  # 39 Server Actions (lógica de negocio)
 ├── app/
 │   ├── (admin)/              # Backoffice (Layout principal + sidebar)
-│   │   ├── (dominios)/       # Módulos de negocio (almacen, ventas, etc)
-│   ├── (repartidor)/         # App Móvil (Layout simplificado)
-│   ├── sucursal/             # POS / Panel de sucursal (layout propio)
-│   ├── api/                  # Endpoints (Webhooks, Cron jobs, Proxy)
-├── components/
-│   ├── ui/                   # Design System (shadcn)
-│   ├── [modulo]/             # Componentes específicos de dominio
+│   │   ├── (dominios)/       # Módulos de negocio
+│   │   │   ├── almacen/      # WMS - Stock, lotes, producción, pesaje
+│   │   │   ├── ventas/       # CRM - Presupuestos, clientes, listas de precios
+│   │   │   ├── reparto/      # TMS - Rutas, planificación, monitor GPS
+│   │   │   ├── tesoreria/    # Finanzas - Cajas, conciliación, proveedores
+│   │   │   ├── rrhh/         # RRHH - Empleados, asistencia, liquidaciones
+│   │   │   ├── sucursales/   # Multi-sucursal, transferencias
+│   │   │   └── reportes/     # 9 tipos de reportes
+│   │   └── dashboard/        # Dashboard principal
+│   │
+│   ├── (repartidor)/         # PWA para repartidores (mobile-first)
+│   │   ├── entregas/
+│   │   ├── ruta/[ruta_id]/
+│   │   └── home/
+│   │
+│   ├── sucursal/             # POS de sucursales
+│   ├── api/                  # Route handlers (webhooks, APIs)
+│   ├── catalogo/             # Catálogo público web
+│   └── login/                # Autenticación
+│
+├── components/               # 166+ componentes React
+│   ├── ui/                   # 50+ componentes shadcn/ui
+│   ├── almacen/              # 13 componentes (PesajeForm, PesajeItemCard)
+│   ├── reparto/              # 12 componentes (MonitorMap, NavigationInteractivo)
+│   ├── rrhh/                 # Componentes de RRHH
+│   ├── sucursales/           # Componentes de sucursales
+│   ├── tables/               # Tablas con TanStack
+│   ├── forms/                # Formularios reutilizables
+│   └── layout/               # Layouts (sidebar, headers)
+│
 ├── lib/
+│   ├── services/             # Integraciones externas (Google, WhatsApp, ORS)
+│   ├── rutas/                # Algoritmos de optimización de rutas
 │   ├── conciliacion/         # Motor de conciliación bancaria
-│   ├── rutas/                # Lógica de navegación y optimización
-│   ├── services/             # Integraciones externas (WhatsApp, Google)
-│   ├── supabase/             # Clientes BD
-├── supabase/
-│   ├── migrations/           # 150+ archivos de historial SQL
+│   ├── vertex/               # Agente de IA (Gemini)
+│   ├── schemas/              # Esquemas Zod para validación
+│   ├── supabase/             # Clientes Supabase (server/browser)
+│   └── utils/                # Utilidades generales
+│
+├── hooks/                    # Custom React hooks
+├── store/                    # Estado global Zustand
+└── types/                    # Tipos TypeScript
+
+supabase/
+├── migrations/               # 184+ migraciones SQL
+└── seed.sql                  # Datos iniciales
 ```
 
 ---
 
 ## 🧭 Mapa de Navegación del Sistema (Menú Oficial)
 
-> Para el árbol completo del App Router revisa [README#📁-estructura-del-proyecto](./README.md#📁-estructura-del-proyecto).
-
-Jerarquía completa de opciones disponibles en el Sidebar Administrativo (`AdminSidebar.tsx`):
+Jerarquía completa de opciones disponibles en el Sidebar Administrativo:
 
 *   **📊 Dashboard**: Vista general de KPIs (`/dashboard`)
 *   **📦 Almacén**:
     *   `Productos`, `Lotes` (Stock), `Producción` (Desposte)
-    *   `Presupuestos del Día` (Cola de preparación), `Pedidos` (Histórico)
-    *   `Transferencias`, `Recepción`, `Documentos IA`
+    *   `Presupuestos del Día` (Cola de preparación), `En Preparación` (Pedidos activos)
+    *   `Pedidos` (Histórico), `Control de Stock` (Auditoría)
+    *   `Transferencias`, `Recepción`
 *   **🛒 Ventas**:
     *   `Presupuestos` (Cotizaciones), `Clientes`, `Listas de Precios`
     *   `Facturas` (Comprobantes), `Reclamos`
 *   **🚛 Reparto**:
-    *   `Rutas` (Planificación diaria), `Monitor GPS` (Tiempo real), `Vehículos`
+    *   `Rutas` (Planificación diaria), `Monitor GPS` (Tiempo real)
+    *   `Planificación Semanal` (Calendario), `Vehiculos`
 *   **💰 Tesorería**:
-    *   `Cajas` (Saldos), `Movimientos` (Diarios), `Cierres de Caja` (Arqueos)
-    *   `Validar rutas` (Rendición choferes), `Conciliación` (Bancaria), `Cuentas Corrientes`
-    *   `Tesoro` (Reserva), `Gastos`, `Por Sucursal`
+    *   `Cajas`, `Movimientos`, `Cierres de Caja`
+    *   `Validar rutas` (Rendición choferes), `Conciliación` (Bancaria)
+    *   `Cuentas Corrientes`, `Tesoro`, `Gastos`, `Proveedores`
 *   **🤖 Inteligencia Artificial**:
-    *   `Predicciones` (Stock/Ventas), `Reportes IA`, `Documentos IA`
+    *   `Predicciones`, `Reportes IA`
 *   **🏢 Sucursales**:
-    *   `Gestión`, `Dashboard` (Vista local), `Ventas (POS)`
-    *   `Inventario` (Conteos), `Alertas de Stock`, `Reportes`
+    *   `Gestión`, `Dashboard`, `Ventas (POS)`, `Inventario`
+    *   `Transferencias`, `Alertas de Stock`
 *   **👥 RRHH**:
-    *   `Empleados`, `Mensajes` (Comunicación interna), `Asistencia`, `Liquidaciones`, `Adelantos`
-    *   `Licencias`, `Evaluaciones`, `Novedades`, `Reportes`
+    *   `Empleados`, `Mensajes`, `Asistencia`, `Liquidaciones`
+    *   `Adelantos`, `Licencias`, `Evaluaciones`, `Reportes`
 *   **📈 Reportes**:
     *   Ventas, Pedidos, Stock, Almacén, Reparto, Tesorería, Clientes, Empleados, Sucursales
 
 ---
 
-
 ## 🔄 Flujos Críticos
 
 ### 1. Venta a Entrega (The Happy Path)
-1. **Pedido**: Bot/Vendedor crea pedido → `entregas` creada.
-2. **Asignación**: Sistema asigna ruta automática (`next-client-selector`).
-3. **Reparto**: Repartidor recibe ruta, elige camino (`RutaAlternativasSelector`).
-4. **Entrega**: Check-in GPS + Cobro → Impacto en Caja/CC → Stock descontado.
 
-### 2. Conciliación Bancaria
-1. **Ingesta**: Admin sube PDF del banco.
-2. **Parseo**: Sistema extrae líneas con parser robusto a formatos regionales (puntos/comas).
-3. **Matching IA**: Gemini compara con `movimientos_caja` y `cobros`.
-4. **Acreditación**: Admin confirma matches → Acreditación atómica vía RPC SQL (`fn_acreditar_saldo_cliente_v2`).
+```
+Bot/Vendedor → Presupuesto → Almacén (Pesaje) → Conversión a Pedido
+    ↓
+Asignación Automática a Ruta → PWA Repartidor → Entrega + Cobro
+    ↓
+Tesorería (Validación) → Acreditación en Caja/CC
+```
+
+### 2. Conciliación Bancaria con IA
+
+```
+PDF Bancario → Parser → Gemini Matching → Sugerencias → Confirmación
+    ↓
+RPC Acreditación Atómica → Actualización Caja + CC
+```
+
+### 3. Pesaje con Escaner de Balanza
+
+```
+Presupuesto del Día → Pesaje → Escanear Etiqueta EAN-13
+    ↓
+Parsear Peso → Acumular Múltiples Bolsas → Validación IA → Guardar
+```
 
 ---
 
 ## 🔐 Seguridad y Infraestructura Invisible (Middleware)
 
 El archivo `middleware.ts` actúa como firewall de aplicación:
+
 1.  **RBAC Estricto**:
     *   `/admin/*`: Solo `admin`.
     *   `/tesoreria/*`: `admin`, `tesorero`, `encargado_sucursal`.
     *   `/rrhh/*`: Solo `admin`.
-2.  **Redirección Forzada**: Los usuarios `encargado_sucursal` son redirigidos automáticamente a `/sucursal/dashboard` si intentan acceder al dashboard general.
+2.  **Redirección Forzada**: Los usuarios `encargado_sucursal` son redirigidos automáticamente a `/sucursal/dashboard`.
 3.  **Sesión**: Verificación de token Supabase y refresh automático antes de expiración (<10 min).
 
-## ⚡ API & Webhooks (Headless)
+---
 
-Endpoints que operan sin interfaz gráfica:
+## ⚡ API & Webhooks (Headless)
 
 | Endpoint | Método | Función | Seguridad |
 |----------|--------|---------|-----------|
 | `/api/webhooks/whatsapp-meta` | GET/POST | Webhook WhatsApp Business (Meta) | **Pública** (verificación + recepción) |
-| `/api/bot` | POST | Bot principal (procesa comandos + IA + genera presupuestos/reclamos) | **Pública** (entra por webhook) |
-| `/api/ia/prediccion-stock` | GET/CRON | Ejecuta modelos de predicción de inventario | Admin Only |
-| `/api/ia/auditar-cobros` | POST | Cruza pagos recibidos vs pedidos cerrados | Admin Only |
-| `/api/webhooks/mercadopago` | POST | Notificación de pagos exitosos | **Pública** (Valida Firma MP) |
+| `/api/bot` | POST | Bot principal (procesa comandos + IA) | **Pública** |
+| `/api/reparto/ubicacion` | POST | Tracking GPS | Autenticado |
+| `/api/rutas/generar` | POST | Optimización de rutas | Admin |
+| `/api/almacen/analizar-peso` | POST | Validación de peso con IA | Autenticado |
+| `/api/tesoreria/procesar-extracto` | POST | Parser bancario | Admin/Tesorero |
+| `/api/almacen/simular-peso` | POST | Simulación de peso para testing | Admin |
 
 ---
 
 ## 💾 Esquema de Datos Crítico (Entidades Core)
 
-*Referencia rápida para evitar consulas al documento completo.*
-
 ### Tablas Principales (Postgres)
-- **Ventas**: `pedidos`, `detalles_pedido`, `clientes`, `presupuestos`, `cotizaciones`
-- **Reparto**: `rutas_reparto`, `detalles_ruta` (entregas), `vehiculos`, `checklist_vehicular`
-- **Almacén**: `productos`, `lotes` (stock), `movimientos_stock`, `produccion_ordenes`
-- **Tesorería**: `tesoreria_cajas`, `tesoreria_movimientos`, `cuentas_corrientes`
-- **RRHH**: `rrhh_empleados`, `rrhh_asistencias`, `rrhh_liquidaciones`
-- **Documentos**: `remitos` (Cabecera y snapshot de items), `documentos_procesados` (OCR AI)
+
+- **Ventas**: `presupuestos`, `pedidos`, `entregas`, `clientes`, `listas_precios`
+- **Reparto**: `rutas_reparto`, `detalles_ruta`, `vehiculos`, `ubicaciones_repartidores`
+- **Almacén**: `productos`, `lotes`, `movimientos_stock`, `produccion_ordenes`
+- **Tesorería**: `tesoreria_cajas`, `tesoreria_movimientos`, `cuentas_corrientes`, `proveedores`
+- **RRHH**: `rrhh_empleados`, `rrhh_asistencias`, `rrhh_liquidaciones`, `mensajes_internos`
+- **Documentos**: `remitos`, `remitos_items`, `remitos_firmas`
 
 ### Enums y Estados (Valores Exactos)
+
 - **Roles**: `'admin'`, `'vendedor'`, `'repartidor'`, `'almacenista'`, `'tesorero'`, `'encargado_sucursal'`
-- **Estado Pedido**: `'pendiente'`, `'confirmado'`, `'preparando'`, `'en_camino'`, `'entregado'`, `'cancelado'`
-- **Estado Ruta**: `'planificada'`, `'en_curso'`, `'completada'`, `'cancelada'`
-- **Estado Entrega**: `'pendiente'`, `'en_camino'`, `'entregado'`, `'fallido'`, `'ausente'`
-- **Estado Pago**: `'pendiente'`, `'pagado'`, `'parcial'`, `'cuenta_corriente'`
-- **Tipos Movimiento Stock**: `'ingreso'`, `'salida'`, `'ajuste'`, `'merma'`, `'produccion'`
+- **Estado Presupuesto**: `'pendiente'`, `'en_almacen'`, `'preparado'`, `'en_reparto'`, `'entregado'`, `'cancelado'`
+- **Estado Pedido**: `'abierto'`, `'cerrado'`
+- **Estado Entrega**: `'pendiente'`, `'en_camino'`, `'entregado'`, `'fallido'`
+- **Estado Pago**: `'pendiente'`, `'parcial'`, `'pagado'`, `'fiado'`
 
 ---
 
 ## 🧩 Catálogo de Componentes UI (Building Blocks)
 
-*Usar estos componentes pre-fabricados para evitar duplicación.*
-
 | Componente | Path | Descripción |
 |------------|------|-------------|
-| **`<DataTable />`** | `components/ui/data-table.tsx` | Tabla server-side/client-side con filtros, ordenamiento y paginación listos. Wrappea TanStack Table. |
-| **`<GoogleMapSelector />`** | `components/ui/google-map-selector.tsx` | Input de formulario para seleccionar coordenadas. Incluye buscador y marcador arrastrable. |
-| **`<MonitorMap />`** | `components/reparto/MonitorMap.tsx` | Mapa en vivo de flotas. Muestra múltiples rutas coloreadas y ubicación real de choferes. |
+| **`<DataTable />`** | `components/ui/data-table.tsx` | Tabla server-side/client-side con filtros, ordenamiento y paginación. Wrappea TanStack Table. |
+| **`<MonitorMap />`** | `components/reparto/MonitorMap.tsx` | Mapa en vivo de flotas. Muestra múltiples rutas coloreadas y ubicación real. |
 | **`<NavigationInteractivo />`** | `components/reparto/NavigationInteractivo.tsx` | Modo navegación turn-by-turn con voz y detección de llegada. |
-| **`<GpsTracker />`** | `components/reparto/GpsTracker.tsx` | Componente invisible que reporta geo-posición en segundo plano. |
-| **`<SignaturePad />`** | `components/shared/SignaturePad` | (Verificar path) Captura de firma digital para entregas. |
-| **`<PrintPreparacionParcial />`** | `components/almacen/PrintPreparacionParcial.tsx` | Impresión parcial de lista de preparación (productos pendientes de pesaje). |
-| **`<PedidosPreparadosView />`** | `components/almacen/PedidosPreparadosView.tsx` | Vista agrupada de pedidos terminados por zona/cliente. |
-| **`<HeatmapMap />`** | `components/reportes/charts/HeatmapMap.tsx` | Mapa de calor interactivo basado en Leaflet para visualización de densidad de datos (ventas/empleados). |
+| **`<PesajeItemCard />`** | `components/almacen/PesajeItemCard.tsx` | Card de pesaje con escaneo acumulativo de múltiples bolsas y validación IA. |
+| **`<GpsTracker />`** | `components/reparto/GpsTracker.tsx` | Componente invisible que reporta geo-posición cada 5s. |
+| **`<SignaturePad />`** | `components/shared/SignaturePad` | Captura de firma digital para entregas y remitos. |
 
 ---
 
-## 📝 Cambios Recientes (Últimos 5)
+## 📝 Cambios Recientes
 
-> Histórico completo disponible en [ARCHITECTURE.md#📝-cambios-recientes](./ARCHITECTURE.md#📝-cambios-recientes).
+### 2026-02-06 · Fix BarcodeScanner TDZ
+- **Fix**: Error "Cannot access before initialization" al escanear en pesaje
+- **Cambio**: Reordenar declaración de funciones para evitar TDZ
 
 ### 2026-02-02 · Pesaje Acumulativo de Múltiples Bolsas
-- **Nueva Funcionalidad**: Sistema de escaneo acumulativo en `PesajeItemCard.tsx` para productos que requieren múltiples bolsas.
-- **UI Mejorada**: Lista detallada de bolsas escaneadas con peso individual y total acumulado.
-- **Barra de Progreso**: Indicador visual de avance hacia el objetivo (ej: 15/20 kg = 75%).
-- **Gestión Flexible**: Botones para eliminar bolsas individuales o reiniciar todos los escaneos.
-- **Feedback Inmediato**: Toast con información de cada escaneo (ej: "Bolsa 2: 10.250 kg → Total: 20.050 kg").
+- Sistema de escaneo acumulativo con lista de bolsas individuales
+- Barra de progreso visual hacia el objetivo
+- Gestión flexible (eliminar individual/reiniciar todo)
 
-### 2026-01-23 · Selección Elite de Skills del Agente
-- **Optimización de IA**: Curación de 36 skills de alta prioridad (23 trending de skills.sh + 13 custom de dominio) reemplazando 69 skills genéricas.
-- **Eficiencia**: Reducción de ruido y mayor precisión en las respuestas del agente Antigravity.
-- **Estructura**: Migración de skills a `.agent/skills/` para mejor visibilidad y control de versiones.
+### 2026-01-23 · Selección Elite de Skills
+- Curación de 36 skills de alta prioridad
+- Migración a estructura `.claude/skills/`
 
-### 2026-01-22 · Sistema Integral de Remitos (Internos y Externos)
-- **Nueva Estructura**: Tabla `remitos` con numeración secuencial (`seq_remito_numero`) para documentar movimientos de mercadería.
-- **RemitoService**: Motor de generación de PDFs basado en `pdfkit` con soporte para logos, firmas digitales y snapshots de datos.
-- **Integración Multimódulo**:
-  - **Ventas/Reparto**: Remitos de entrega firmados por el cliente.
-  - **Almacén/Producción**: Remitos internos de ingreso de mercadería despostada.
-  - **Sucursales**: Remitos de traslado para transferencias de stock.
-- **Acceso**: Botones "Ver Remito" integrados en listados de transferencias, entregas y órdenes de producción.
-
-### 2026-01-22 · Propuesta de Objetivación de Evaluaciones RRHH
-- **Documento Maestro**: `RRHH_PROPUESTA_EVALUACIONES.md`.
-- **Enfoque**: Transformación de criterios subjetivos (Actitud, Puntualidad, etc.) en métricas de "Huella Digital Operativa" (asistencia biométrica, mermas, tiempos de respuesta, KPIs de producción).
-- **Integración**: Diseño de panel de "Soporte de Decisión" para evaluadores.
+### 2026-01-22 · Sistema Integral de Remitos
+- Tabla `remitos` con numeración secuencial
+- Motor de PDFs con pdfkit
+- Cobertura: entregas, traslados, producción
 
 ### 2026-01-17 · Sistema de Mensajería Interna
-- **Nueva Tabla**: `mensajes_internos` con RLS para comunicación segura entre empleados.
-- **Módulo RRHH > Mensajes**: Bandeja de entrada, enviados, composición de mensajes, marcado de leídos.
-- **Server Actions**: `mensajes.actions.ts` con operaciones CRUD completas.
-- **Acceso**: Disponible en sidebar bajo RRHH > Mensajes.
+- Tabla `mensajes_internos` con RLS
+- Bandeja de entrada, enviados, marcado de leídos
 
-### 2026-01-17 · Rediseño UI/UX Dashboard
-- **Nuevos Componentes**: `StatCard`, `PageHeader`, `EmptyState` para consistencia visual.
-- **Mejoras Globales**: Cards con `rounded-2xl`, tablas con zebra striping, badges más grandes.
-- **Dashboard**: Integrado con nuevos componentes de métricas KPI.
+---
 
-### 2026-01-16 · Ajustes en Experiencia de Repartidor (UX)
-- **Redirección tras Cobro**: El sistema ahora redirige automáticamente al mapa de navegación interactiva tras un cobro exitoso, optimizando el flujo de trabajo en calle.
-- **Selector de Facturas Vencidas**: Integración de deuda anterior en el flujo de pago, permitiendo seleccionar y cobrar múltiples facturas pendientes del cliente de forma atómica.
-- **Refactorización de Devoluciones**: Reordenamiento del formulario (Motivo primero) y campos condicionales para reducir la carga cognitiva del repartidor.
-- **Imputación de Pagos**: Soporte en API para aplicar pagos a facturas específicas desde el módulo de reparto.
+## 📊 Métricas del Sistema
 
-### 2026-01-15 · Mejoras de Contexto e Inteligencia del Bot
-- **Memory Bank Inteligente**: Extracción automática de hechos y preferencias con Gemini 2.5 Flash.
-- **Contexto Conversacional**: Historial de mensajes en el prompt de intención para manejar respuestas cortas (ej: "Completa").
-- **Persistencia de Intentos**: El bot recuerda qué quería pedir el cliente antes de registrarse y lo retoma automáticamente.
-- **Herramienta de Precios**: Integración de `consultar_precios` para informar precios reales por cliente o lista mayorista.
-- **Flujo de Registro**: Refinado con resumen de pedido y confirmación previa al alta del cliente.
+| Métrica | Valor |
+|---------|-------|
+| Componentes React | 166+ |
+| Server Actions | 39 |
+| Migraciones SQL | 184+ |
+| Tablas BD | 80+ |
+| Skills de IA | 36 |
+| Tests E2E | 15+ suites |
+| Cobertura de módulos | 100% (6/6) |
 
-### 2026-01-14 · Optimización Bot WhatsApp & Registro de Clientes
-- Registro de clientes con **códigos numéricos consecutivos** y asignación de `zona_id`.
-- Geocodificación automática de **coordenadas** PostGIS al registrar direcciones desde el bot.
-- Toma de pedidos con **lectura dinámica de productos** desde Supabase (adiós a listas mockeadas).
-- Sistema inteligente de búsqueda de productos (`findProductoByCode`) con fallback a nombres parciales.
-- Lógica de "insistencia" cuando el bot detecta intención de pedido sin productos especificados.
+---
 
-### 2026-01-14 · Consistencia Monitor GPS ↔ Vista Repartidor
-- Simplificación de vista repartidor: obtiene datos directamente de `rutas_planificadas`.
-- Generación de orden optimizado en tiempo real (ORS/Google).
-- Logs de debug en client-side y retorno a base (`returnToDepot: true`).
-
-### 2026-01-13 · Migración Routing a OpenRouteService (ORS)
-- Reemplazo de Google Maps Directions API por ORS para routing.
-- Wrapper `ors-directions.ts` con fallback ORS → Google → Local optimizer.
-- Cambio de vehicle: 'car' → 'driving-car'.
-
-### 2026-01-13 · Flujo Cierre de Caja + Retiros Automáticos de Sucursales
-- Sistema de cierre de caja con arqueo detallado de billetes argentinos.
-- Retiros automáticos cuando saldo_final > 50,000 ARS.
-- Tablas: `rutas_retiros` y `arqueo_billetes`.
-
-### 2026-01-14 · ORS Optimization API para Rutas de Reparto
-- Integración con ORS Optimization API (VROOM/TSP solver).
-- Optimización automática del orden de visitas.
+*Documento mantenido por el equipo de desarrollo.*  
+*Última actualización: 6 de Febrero de 2026*

@@ -1,8 +1,9 @@
 # 🚀 Avícola del Sur ERP - Sistema Integral de Gestión
 
-**Versión:** Enero 2026 (v2.3)  
+**Versión:** Febrero 2026 (v2.3.1)  
 **Estado:** ✅ PRODUCCIÓN  
-**Docs relacionadas:** [Architecture Summary](./ARCHITECTURE_SUMMARY.md) · [Architecture Deep-Dive](./ARCHITECTURE.md) · [Supabase Setup](./SUPABASE_SETUP.md)
+**Docs relacionadas:** [Architecture Summary](./ARCHITECTURE_SUMMARY.md) · [Architecture Deep-Dive](./ARCHITECTURE.md) · [Supabase Setup](./SUPABASE_SETUP.md)  
+**Última actualización:** 6 de Febrero 2026
 
 **Plataforma unificada** de gestión avícola que integra WMS (Almacén), TMS (Reparto), CRM (Ventas), Carrito Web Público y ERP (Finanzas/RRHH). Potenciada por **Google Gemini AI** para decisiones inteligentes en tiempo real dentro de una arquitectura **server-authoritative** sobre Supabase.
 
@@ -23,18 +24,19 @@
 ## ✨ Pilares del Sistema (Auditoría Enero 2026)
 
 ### 🧠 Inteligencia Artificial Aplicada (Gemini)
-- **Validación de Peso**: Gemini 2.5 Flash detecta errores de tipeo en balanzas en tiempo real.
-- **Conciliación Bancaria**: Gemini 3.0 Pro analiza extractos bancarios y sugiere matchings contables complejos.
+- **Validación de Peso**: Gemini 2.5 Flash detecta errores de tipeo en balanzas en tiempo real con análisis de anomalías.
+- **Conciliación Bancaria**: Gemini 3.0 Pro analiza extractos bancarios (PDF/Excel) y sugiere matchings contables complejos con >90% precisión.
 - **Chatbot de Ventas**: Intérprete de lenguaje natural para toma de pedidos vía WhatsApp e integración con Carritos Web.
 - **Memory Bank Inteligente**: Extracción automática de hechos y preferencias con Gemini 2.5 Flash para atención personalizada.
 - **Catálogo Web Público**: Sincronización automática de carritos web con el bot de WhatsApp vía códigos únicos (`carritos_pendientes`).
-- **Optimización Logística**: Algoritmos híbridos (Google Optimization + Heurística local) para reparto eficiente.
+- **Optimización Logística**: Algoritmos híbridos (OpenRouteService + Google Directions + Heurística local) para reparto eficiente.
 
 ### 🚛 Logística Avanzada (TMS)
 - **Navegación Interactiva**: App de repartidor con selección de rutas alternativas en tiempo real (OpenRouteService con datos OSM actualizados).
 - **Decisión Inteligente**: Priorización automática de próximo cliente basada en horario de cierre y distancia.
-- **PWA Offline-First**: Tracking GPS continuo, firma digital y cobros sin conexión.
+- **PWA Offline-First**: Tracking GPS continuo (cada 5s), firma digital y cobros sin conexión.
 - **Voz Sintética**: Instrucciones de navegación "Turn-by-turn" integradas en la app.
+- **Alertas Automáticas**: Detección de desvíos (>200m) y clientes saltados (<100m) en tiempo real.
 
 ### 🏭 Producción Científica (WMS)
 - **Desposte Controlado**: Comparativa tiempo real de Rendimiento Teórico vs Real.
@@ -118,7 +120,7 @@
 - **Framework**: Next.js 16 (App Router, Server Actions)
 - **Frontend**: React 19 + TypeScript + Tailwind CSS + shadcn/ui
 - **Backend**: Server Actions + Supabase (Postgres + Auth + Storage + Realtime)
-- **Base de Datos**: Supabase (PostgreSQL) con **118+ migraciones** y funciones RPC optimizadas.
+- **Base de Datos**: Supabase (PostgreSQL) con **184+ migraciones** y funciones RPC optimizadas.
 - **Backend**: Next.js Server Actions (seguridad y performance).
 - **Frontend**: React 19, Tailwind CSS, Shadcn UI.
 - **Mapas**: Google Maps JavaScript API (TMS) + Leaflet (Reportes Heatmap)
@@ -137,6 +139,7 @@
 - **App Repartidor**: PWA móvil (`src/app/(repartidor)`), tracking GPS y entregas.
 - **App Sucursal**: POS y panel local (`src/app/sucursal`).
 - **Bot Vendedor**: Endpoint principal (`POST /api/bot`) + webhook Meta (`/api/webhooks/whatsapp-meta`, opcional).
+- **Catálogo Público**: Sin autenticación (`src/app/catalogo`), sincronizado con WhatsApp.
 
 ### Dominios de Negocio (Organización Funcional)
 1. **Almacén (WMS)**: Control de stock, lotes, picking, transferencias entre sucursales
