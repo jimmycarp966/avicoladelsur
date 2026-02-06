@@ -23,8 +23,7 @@ export async function obtenerPresupuestosEnPreparacionAction() {
           producto:productos(nombre, categoria),
           cantidad_solicitada,
           pesable
-        ),
-        preparado_por_obj:usuarios!presupuestos_preparado_por_fkey(nombre, apellido)
+        )
       `)
       .eq('estado', 'en_almacen')
       .order('created_at', { ascending: false })
