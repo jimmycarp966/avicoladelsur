@@ -92,6 +92,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
     getValues,
     setValue,
     trigger,
+    reset,
     formState: { errors },
   } = useForm<CrearPresupuestoFormData>({
     resolver: zodResolver(crearPresupuestoSchema),
@@ -925,33 +926,35 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
       console.log('[CLIENT] Data keys:', result.data ? Object.keys(result.data) : 'no data')
 
       if (result.success) {
-        showToast('success', result.message || 'Presupuesto creado exitosamente')
         const presupuestoId = result.data?.presupuesto_id
+        const presupuestoCodigo = result.data?.codigo || presupuestoId
 
-        console.log('[CLIENT] Presupuesto ID extraído:', presupuestoId)
-        console.log('[CLIENT] Tipo de presupuestoId:', typeof presupuestoId)
+        // Mostrar toast de éxito
+        showToast('success', `Presupuesto ${presupuestoCodigo} creado! Listo para crear otro.`)
 
-        if (presupuestoId) {
-          const url = `/ventas/presupuestos/${presupuestoId}`
-          console.log('[CLIENT] ✅ Presupuesto ID válido:', presupuestoId)
-          console.log('[CLIENT] 🔗 Redirigiendo a URL:', url)
+        // Reiniciar formulario para nuevo presupuesto
+        reset({
+          cliente_id: '',
+          zona_id: '',
+          fecha_entrega_estimada: new Date().toISOString().split('T')[0],
+          observaciones: '',
+          tipo_venta: 'reparto',
+          lista_precio_id: undefined,
+          items: [{ producto_id: '', cantidad_solicitada: 1, precio_unit_est: 0, lista_precio_id: undefined }],
+        })
+        setClienteSearch('')
+        setListasPorProducto({})
+        preciosModificadosManualmenteRef.current.clear()
+        setTotalUpdateKey(prev => prev + 1)
 
-          // Redirigir a la lista primero, luego el usuario puede hacer click en el presupuesto
-          // Esto evita problemas de timing donde el presupuesto aún no está disponible
-          showToast('success', `Presupuesto creado! Puedes verlo en la lista.`)
-          router.push('/ventas/presupuestos')
-          router.refresh()
-
-          // Alternativa: intentar acceder directamente después de un delay
-          // setTimeout(() => {
-          //   window.location.href = url
-          // }, 2000)
-        } else {
-          console.warn('[CLIENT] ⚠️ No se encontró presupuesto_id en result.data')
-          console.warn('[CLIENT] Result.data completo:', JSON.stringify(result.data, null, 2))
-          alert('Presupuesto creado pero no se pudo obtener el ID. Redirigiendo a lista.')
-          router.push('/ventas/presupuestos')
-        }
+        // Enfocar cliente nuevamente para empezar otro presupuesto
+        setTimeout(() => {
+          const clienteTrigger = document.getElementById('cliente_id') as HTMLButtonElement
+          if (clienteTrigger) {
+            clienteTrigger.focus()
+            setClienteDropdownOpen(true)
+          }
+        }, 150)
       } else {
         console.error('[CLIENT] Error al crear presupuesto:', result)
         showToast('error', result.error || 'Error al crear presupuesto')
@@ -995,6 +998,15 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
         addItem()
         return
       }
+
+      // F12: Finalizar venta (funciona desde cualquier lugar)
+      if (e.key === 'F12') {
+        e.preventDefault()
+        if (!isLoading) {
+          handleSubmit(onSubmit)()
+        }
+        return
+      }
     }
 
     window.addEventListener('keydown', handleGlobalKeyDown)
@@ -1005,7 +1017,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      <div className="grid gap-6 lg:grid-cols-[1fr,340px]">
+      <div className="grid gap-4 xl:grid-cols-[1fr,340px]">
         {/* Columna izquierda: Contenido del formulario */}
         <div className="space-y-6">
           {/* Información del Cliente */}
@@ -1182,42 +1194,8 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                 )}
               </div>
 
-              {/* Tipo de Venta - Visible después de seleccionar cliente */}
+              {/* Zona y Fecha - Visible después de seleccionar cliente */}
               {clienteSeleccionado && (
-                <div className="space-y-2">
-                  <Label>Tipo de Venta *</Label>
-                  <div className="flex gap-4">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        value="reparto"
-                        checked={watch('tipo_venta') === 'reparto'}
-                        onChange={() => setValue('tipo_venta', 'reparto')}
-                        className="h-4 w-4 text-primary"
-                      />
-                      <span className="text-sm font-medium">🚚 Reparto (entrega a domicilio)</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        value="retira_casa_central"
-                        checked={watch('tipo_venta') === 'retira_casa_central'}
-                        onChange={() => setValue('tipo_venta', 'retira_casa_central')}
-                        className="h-4 w-4 text-primary"
-                      />
-                      <span className="text-sm font-medium">🏠 Retira en Casa Central</span>
-                    </label>
-                  </div>
-                  {watch('tipo_venta') === 'retira_casa_central' && (
-                    <p className="text-xs text-blue-600 mt-1">
-                      ℹ️ Este presupuesto no irá a almacén ni reparto. Se podrá facturar directamente.
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Zona y Fecha - Solo visible para reparto */}
-              {clienteSeleccionado && watch('tipo_venta') === 'reparto' && (
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="zona_id" className="flex items-center gap-2">
