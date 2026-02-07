@@ -19,6 +19,7 @@ interface BarcodeScannerProps {
     onClose: () => void
     title?: string
     description?: string
+    autoStart?: boolean  // Si true, inicia cámara automáticamente sin botón
 }
 
 // Tiempo mínimo entre escaneos del mismo código (debounce)
@@ -28,7 +29,8 @@ export function BarcodeScanner({
     onScan,
     onClose,
     title = 'Escanear Código',
-    description = 'Apunta la cámara al código de barras'
+    description = 'Apunta la cámara al código de barras',
+    autoStart = false
 }: BarcodeScannerProps) {
     const videoRef = useRef<HTMLVideoElement>(null)
     const streamRef = useRef<MediaStream | null>(null)
@@ -182,7 +184,6 @@ export function BarcodeScanner({
                     const imageData = ctx.getImageData(0, 0, width, height)
 
                     // 3. Crear LuminanceSource desde los pixels
-                    // @ts-expect-error - RGBLuminanceSource constructor typing issue
                     const len = imageData.data.length
                     const luminances = new Uint8ClampedArray(len / 4)
 
@@ -236,6 +237,13 @@ export function BarcodeScanner({
             setCameraStarted(false)
         }
     }, [addDebugLog, logToServer, onScan, vibrate, playScannerBeep, stopAll])
+
+    // Auto-start cámara si autoStart es true
+    useEffect(() => {
+        if (autoStart && !cameraStarted) {
+            startCamera()
+        }
+    }, [autoStart, cameraStarted, startCamera])
 
     // Cleanup
     useEffect(() => {
@@ -435,6 +443,7 @@ export function ScanButton({
                     onClose={() => setIsOpen(false)}
                     title={title}
                     description={description}
+                    autoStart={true}  // Iniciar cámara automáticamente
                 />
             )}
         </>

@@ -53,9 +53,10 @@ interface PesajeFormProps {
   presupuesto: Presupuesto
   itemsPesables: ItemPesable[]
   presupuestoId: string
+  siguientePresupuestoPesableId?: string | null  // ID del siguiente presupuesto con items pesables pendientes
 }
 
-export function PesajeForm({ presupuesto, itemsPesables, presupuestoId }: PesajeFormProps) {
+export function PesajeForm({ presupuesto, itemsPesables, presupuestoId, siguientePresupuestoPesableId }: PesajeFormProps) {
   const router = useRouter()
   const [updatingItems, setUpdatingItems] = useState<Set<string>>(new Set())
   const [isFinalizing, setIsFinalizing] = useState(false)
@@ -143,8 +144,13 @@ export function PesajeForm({ presupuesto, itemsPesables, presupuestoId }: Pesaje
       const result = await response.json()
 
       if (result.success) {
-        alert(result.message || 'Pesaje finalizado correctamente. El presupuesto seguirá disponible en Presupuestos del Día.')
-        router.push('/almacen/presupuestos-dia')
+        alert(result.message || 'Pesaje finalizado correctamente.')
+        // Navegación automática: si hay otro presupuesto pesable, ir a él
+        if (siguientePresupuestoPesableId) {
+          router.push(`/almacen/presupuesto/${siguientePresupuestoPesableId}/pesaje`)
+        } else {
+          router.push('/almacen/presupuestos-dia')
+        }
       } else {
         alert(result.message || 'Error al finalizar el pesaje')
         setIsFinalizing(false)
@@ -213,6 +219,39 @@ export function PesajeForm({ presupuesto, itemsPesables, presupuestoId }: Pesaje
       }
     } catch (error) {
       console.error('Error simulando peso:', error)
+    }
+  }
+
+  // Handler para marcar item sin stock (peso = 0)
+  const handleMarcarSinStock = async (itemId: string) => {
+    setUpdatingItems((prev) => new Set(prev).add(itemId))
+    try {
+      const response = await fetch('/api/almacen/presupuesto/pesaje', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          presupuesto_item_id: itemId,
+          peso_final: 0,
+          sin_stock: true  // Flag para indicar que es por falta de stock
+        })
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        router.refresh()
+      } else {
+        alert(result.message || 'Error al marcar sin stock')
+      }
+    } catch (error) {
+      console.error('Error marcando sin stock:', error)
+      alert('Error de conexión')
+    } finally {
+      setUpdatingItems((prev) => {
+        const next = new Set(prev)
+        next.delete(itemId)
+        return next
+      })
     }
   }
 
@@ -295,7 +334,7 @@ export function PesajeForm({ presupuesto, itemsPesables, presupuestoId }: Pesaje
                 item.producto?.venta_mayor_habilitada === true &&
                 (item.lista_precio?.tipo === 'mayorista' || presupuesto.lista_precio?.tipo === 'mayorista')
               }
-              kgPorUnidadMayor={item.producto?.kg_por_unidad_mayor}
+              kgPorUnidadMayor={item.producto?.kg_por_unidad_mayor ?? undefined}
               unidadMayorNombre={item.producto?.unidad_mayor_nombre}
               estaPesado={estaPesado}
               estaActualizando={estaActualizando}
@@ -304,6 +343,9 @@ export function PesajeForm({ presupuesto, itemsPesables, presupuestoId }: Pesaje
               }}
               onAplicarPeso={async (peso: number) => {
                 await handleActualizarPeso(item.id, peso)
+              }}
+              onMarcarSinStock={async () => {
+                await handleMarcarSinStock(item.id)
               }}
             />
           )

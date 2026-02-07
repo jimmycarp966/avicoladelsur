@@ -447,3 +447,53 @@ export async function obtenerPresupuestosDiaAction(fecha: string, zonaId?: strin
     },
   }
 }
+
+/**
+ * Obtiene el ID del siguiente presupuesto que tiene items pesables sin pesar,
+ * excluyendo el presupuesto actual. Útil para navegación automática tras finalizar pesaje.
+ */
+export async function obtenerSiguientePresupuestoPesableAction(
+  presupuestoActualId: string
+): Promise<string | null> {
+  const supabase = await createClient()
+  const hoy = getTodayArgentina()
+
+  // Buscar presupuestos del día en estado 'en_almacen' con items pesables pendientes
+  const { data: presupuestos, error } = await supabase
+    .from('presupuestos')
+    .select(`
+      id,
+      numero_presupuesto,
+      lista_precio:listas_precios(tipo),
+      items:presupuesto_items(
+        id,
+        pesable,
+        peso_final,
+        producto:productos(categoria, venta_mayor_habilitada)
+      )
+    `)
+    .eq('estado', 'en_almacen')
+    .eq('fecha_entrega_estimada', hoy)
+    .or('tipo_venta.eq.reparto,tipo_venta.is.null')
+    .neq('id', presupuestoActualId) // Excluir el actual
+    .order('numero_presupuesto', { ascending: true })
+
+  if (error) {
+    console.error('Error buscando siguiente presupuesto pesable:', error)
+    return null
+  }
+
+  // Filtrar presupuestos que tengan al menos 1 item pesable sin peso_final
+  for (const presupuesto of presupuestos || []) {
+    const itemsPesablesSinPesar = presupuesto.items?.filter((item: any) => {
+      const esPesable = esItemPesable(item, esVentaMayorista(presupuesto, item))
+      return esPesable && !item.peso_final
+    }) || []
+
+    if (itemsPesablesSinPesar.length > 0) {
+      return presupuesto.id
+    }
+  }
+
+  return null // No hay más presupuestos pesables pendientes
+}

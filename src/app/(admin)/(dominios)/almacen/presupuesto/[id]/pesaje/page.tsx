@@ -4,6 +4,7 @@ import { Scale } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { obtenerPresupuestoAction } from '@/actions/presupuestos.actions'
+import { obtenerSiguientePresupuestoPesableAction } from '@/actions/presupuestos-dia.actions'
 import { PesajeSkeleton } from './pesaje-skeleton'
 import { PesajeForm } from '@/components/almacen/PesajeForm'
 import { esVentaMayorista } from '@/lib/utils'
@@ -49,11 +50,15 @@ async function PesajeContent({ presupuestoId }: { presupuestoId: string }) {
     )
   }
 
+  // Obtener el siguiente presupuesto pesable para navegación automática
+  const siguientePresupuestoPesableId = await obtenerSiguientePresupuestoPesableAction(presupuestoId)
+
   return (
     <PesajeForm
       presupuesto={presupuesto}
       itemsPesables={itemsPesables}
       presupuestoId={presupuestoId}
+      siguientePresupuestoPesableId={siguientePresupuestoPesableId}
     />
   )
 }

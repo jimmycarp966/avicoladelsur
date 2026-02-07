@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Scale, CheckCircle, AlertTriangle, TrendingUp, X, Package, RotateCcw } from 'lucide-react'
+import { Scale, CheckCircle, AlertTriangle, TrendingUp, X, Package, RotateCcw, PackageX } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -62,6 +62,7 @@ interface PesajeItemCardProps {
   estaActualizando: boolean
   onSimularPeso: () => Promise<void>
   onAplicarPeso: (peso: number) => Promise<void>
+  onMarcarSinStock?: () => Promise<void>  // Nueva prop para saltear por falta de stock
 }
 
 export function PesajeItemCard({
@@ -73,6 +74,7 @@ export function PesajeItemCard({
   estaActualizando,
   onSimularPeso,
   onAplicarPeso,
+  onMarcarSinStock,
 }: PesajeItemCardProps) {
   // Estado para escaneos acumulativos (múltiples bolsas)
   const [scanEntries, setScanEntries] = useState<ScanEntry[]>([])
@@ -88,6 +90,7 @@ export function PesajeItemCard({
     usandoIA: boolean
   } | null>(null)
   const [estadisticasProducto, setEstadisticasProducto] = useState<ProductoEstadisticas | null>(null)
+  const [showSinStockDialog, setShowSinStockDialog] = useState(false)  // Nuevo estado
 
   // Calcular peso total acumulado de todas las bolsas escaneadas
   const pesoTotalAcumulado = scanEntries.reduce((sum, entry) => sum + entry.peso, 0)
@@ -135,12 +138,26 @@ export function PesajeItemCard({
     confianza: number
     usandoIA: boolean
   }> => {
-    // Timeout de 15 segundos para dar más margen en dev/producción lenta
+    // OPTIMIZACIÓN: Validación rápida local si la diferencia es menor al 15%
+    // Esto evita llamar a la IA para casos obvios y acelera mucho el flujo
+    const diferenciaPct = Math.abs((pesoIngresado - pesoSolicitadoKg) / pesoSolicitadoKg) * 100
+    if (diferenciaPct <= 15) {
+      console.log(`[PESAJE] Diferencia ${diferenciaPct.toFixed(1)}% ≤15%, aprobado sin IA`)
+      return {
+        esAnomalo: false,
+        razon: '',
+        sugerencia: null,
+        confianza: 95,
+        usandoIA: false
+      }
+    }
+
+    // Timeout reducido a 5 segundos para no bloquear el flujo
     const controller = new AbortController()
     const timeoutId = setTimeout(() => {
-      console.warn('[PESAJE] Timeout de 15s alcanzado para Gemini. Abortando...')
+      console.warn('[PESAJE] Timeout de 5s alcanzado para Gemini. Abortando...')
       controller.abort()
-    }, 15000)
+    }, 5000)
 
     try {
       console.log(`[PESAJE] Iniciando análisis para ${item.producto?.nombre}: ${pesoIngresado}kg (solicitado: ${pesoSolicitadoKg}kg)`)
@@ -431,6 +448,14 @@ export function PesajeItemCard({
     toast.info('Todos los escaneos fueron eliminados')
   }, [])
 
+  // Handler para marcar sin stock
+  const handleConfirmarSinStock = async () => {
+    setShowSinStockDialog(false)
+    if (onMarcarSinStock) {
+      await onMarcarSinStock()
+    }
+  }
+
 
   return (
     <>
@@ -625,6 +650,21 @@ export function PesajeItemCard({
                   Simular
                 </Button>
 
+                {/* Botón Sin stock para saltear ítems */}
+                {onMarcarSinStock && !estaPesado && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowSinStockDialog(true)}
+                    disabled={estaActualizando || isAnalyzing}
+                    className="flex-1 md:flex-none text-orange-600 border-orange-300 hover:bg-orange-50"
+                  >
+                    <PackageX className="mr-2 h-4 w-4" />
+                    Sin stock
+                  </Button>
+                )}
+
                 <Button
                   type="button"
                   disabled={estaPesado || estaActualizando || isAnalyzing || !pesoInput || parseFloat(pesoInput) <= 0}
@@ -730,6 +770,40 @@ export function PesajeItemCard({
               className="bg-orange-600 hover:bg-orange-700"
             >
               Sí, Aplicar Peso
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Diálogo de confirmación Sin stock */}
+      <AlertDialog open={showSinStockDialog} onOpenChange={setShowSinStockDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-orange-600">
+              <PackageX className="h-5 w-5" />
+              Marcar Sin Stock
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Vas a marcar <strong>{item.producto?.nombre || 'este producto'}</strong> como sin stock disponible.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Esto registrará peso 0 kg y el cliente no recibirá este producto (la factura se ajustará).
+                </p>
+                <p className="text-sm font-medium text-orange-600">
+                  ¿Estás seguro?
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmarSinStock}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              Sí, Sin Stock
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
