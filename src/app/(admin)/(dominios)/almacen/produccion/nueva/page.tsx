@@ -81,6 +81,16 @@ interface LoteDisponible {
     fecha_vencimiento?: string
 }
 
+// Tipo para productos por destino (coincide con obtenerProductosPorDestinoAction)
+interface ProductoDestino {
+    id: string
+    codigo: string
+    nombre: string
+    categoria?: string
+    es_desperdicio: boolean
+    es_desperdicio_solido: boolean
+}
+
 export default function NuevaOrdenProduccionPage() {
     const router = useRouter()
     const [step, setStep] = useState(1)
@@ -97,7 +107,7 @@ export default function NuevaOrdenProduccionPage() {
     const [productos, setProductos] = useState<Producto[]>([])
     const [destinos, setDestinos] = useState<DestinoProduccion[]>([])
     const [lotesDisponibles, setLotesDisponibles] = useState<LoteDisponible[]>([])
-    const [productosPorDestino, setProductosPorDestino] = useState<Record<string, Producto[]>>({})
+    const [productosPorDestino, setProductosPorDestino] = useState<Record<string, ProductoDestino[]>>({})
     const [prediccionesPorDestino, setPrediccionesPorDestino] = useState<Record<string, PrediccionRendimiento[]>>({})
     const [currentDestinationIndex, setCurrentDestinationIndex] = useState(0)
 
@@ -140,10 +150,12 @@ export default function NuevaOrdenProduccionPage() {
     // Productos disponibles para el destino actual
     const productosDisponiblesActual = productosPorDestino[currentDestinoId] || []
 
-    // Productos filtrados para salidas (solo productos con venta por mayor - cajones)
+    // Productos filtrados para salidas (SOLO "CAJON POLLO" - no otros cajones como ALAS)
     const productosFiltradosSalida = productos
-        .filter(p => p.venta_mayor_habilitada === true)  // Solo productos de venta por mayor (cajones, etc.)
+        .filter(p => p.venta_mayor_habilitada === true)  // Solo productos de venta por mayor (cajones)
+        .filter(p => p.nombre.toUpperCase().includes('CAJON POLLO'))  // Solo CAJON POLLO
         .filter(p =>
+            busquedaSalida === '' ||
             p.nombre.toLowerCase().includes(busquedaSalida.toLowerCase()) ||
             p.codigo.toLowerCase().includes(busquedaSalida.toLowerCase())
         )
@@ -215,7 +227,7 @@ export default function NuevaOrdenProduccionPage() {
                 return
             }
 
-            const nuevoMap: Record<string, Producto[]> = {}
+            const nuevoMap: Record<string, ProductoDestino[]> = {}
 
             for (const destinoId of destinosUnicos) {
                 const { data } = await obtenerProductosPorDestinoAction(destinoId)

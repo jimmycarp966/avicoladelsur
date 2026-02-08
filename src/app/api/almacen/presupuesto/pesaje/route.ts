@@ -4,7 +4,7 @@ import { z } from 'zod'
 
 const actualizarPesoSchema = z.object({
   presupuesto_item_id: z.string().uuid(),
-  peso_final: z.number().positive(),
+  peso_final: z.number().nonnegative(),  // Permite 0 para marcar "sin stock"
 })
 
 export async function POST(request: NextRequest) {
