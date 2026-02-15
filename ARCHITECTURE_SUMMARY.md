@@ -52,7 +52,8 @@ Sistema ERP modular completo para Avícola del Sur que unifica **Almacén (WMS)*
 - **Base de Datos**: Supabase (Postgres 15+) + RLS + Realtime (184+ migraciones)
 - **IA Core**: Google Vertex AI (Gemini 2.5 Flash / 3.0 Pro)
 - **Mapas**: Google Maps JS API (visualización) + OpenRouteService (routing OSM)
-- **Infraestructura**: Vercel (Frontend/Edge) + Supabase (Backend/Storage)
+- **Infraestructura**: Vercel (Frontend/Edge/CLI) + Supabase (Backend/Storage)
+
 - **Barcode**: @zxing/library para escaneo de códigos EAN-13
 
 ---
