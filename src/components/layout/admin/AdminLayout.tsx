@@ -37,7 +37,7 @@ export function AdminLayout({ children, user }: AdminLayoutProps) {
           />
 
           {/* Sidebar móvil */}
-          <div className="fixed left-0 top-0 bottom-0 w-72 bg-white shadow-lg">
+          <div className="fixed left-0 top-0 bottom-0 w-72 bg-[#2F7058] shadow-lg">
             <AdminSidebar onClose={() => setSidebarOpen(false)} user={user} />
           </div>
         </div>

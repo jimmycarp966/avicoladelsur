@@ -1,6 +1,6 @@
 # 🏗️ Arquitectura del Sistema - Avícola del Sur ERP
 
-**Última Actualización:** 6 de Febrero 2026 (09:30)  
+**Última Actualización:** 15 de Febrero 2026 (18:00)  
 **Estado:** ✅ PRODUCCIÓN  
 **Versión:** v2.3  
 **Docs relacionadas:** [README](./README.md) · [Architecture Deep-Dive](./ARCHITECTURE.MD) · [Supabase Setup](./SUPABASE_SETUP.md)
@@ -387,6 +387,10 @@ El archivo `middleware.ts` actúa como firewall de aplicación:
 
 ## 📝 Cambios Recientes
 
+### 2026-02-15 · Fix UI Sidebar Móvil
+- **Fix**: Espacio en blanco al final del sidebar en dispositivos móviles
+- **Cambio**: Asegurar `h-full` en `AdminSidebar` y fondo correcto en el contenedor de `AdminLayout`
+
 ### 2026-02-06 · Fix BarcodeScanner TDZ
 - **Fix**: Error "Cannot access before initialization" al escanear en pesaje
 - **Cambio**: Reordenar declaración de funciones para evitar TDZ
@@ -426,4 +430,4 @@ El archivo `middleware.ts` actúa como firewall de aplicación:
 ---
 
 *Documento mantenido por el equipo de desarrollo.*  
-*Última actualización: 6 de Febrero de 2026*
+*Última actualización: 15 de Febrero de 2026*

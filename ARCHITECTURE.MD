@@ -483,6 +483,10 @@ interface ApiResponse<T> {
 
 ## 📝 Cambios Recientes (Febrero 2026)
 
+### 2026-02-15 · Fix UI Sidebar Móvil
+- **Fix**: Espacio en blanco al final del sidebar en dispositivos móviles
+- **Cambio**: Asegurar `h-full` en `AdminSidebar` y fondo correcto en el contenedor de `AdminLayout`
+
 ### 2026-02-06 · Fix BarcodeScanner - Temporal Dead Zone
 - **Problema**: Error "Cannot access 'D' before initialization" al escanear en pesaje
 - **Causa**: Función `stopAll` se usaba antes de declararse dentro de `startCamera`
@@ -533,6 +537,6 @@ interface ApiResponse<T> {
 
 ---
 
-*Documento actualizado: 6 de Febrero de 2026*
+*Documento actualizado: 15 de Febrero de 2026*
 *Versión del sistema: v2.3*
 *Estado: Producción ✅*

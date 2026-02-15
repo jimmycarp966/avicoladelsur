@@ -332,7 +332,7 @@ export function AdminSidebar({ onClose, user }: AdminSidebarProps) {
   }, [])
 
   return (
-    <div className="relative flex grow flex-col overflow-y-auto bg-gradient-sidebar">
+    <div className="relative flex h-full grow flex-col overflow-y-auto bg-gradient-sidebar">
       {/* Logo y título - Destacado */}
       <div className="flex h-20 shrink-0 items-center justify-between px-6 border-b border-white/10">
         <div className="flex items-center gap-3">

@@ -1,9 +1,9 @@
 # 🚀 Avícola del Sur ERP - Sistema Integral de Gestión
 
-**Versión:** Febrero 2026 (v2.3.1)  
+**Versión:** Febrero 2026 (v2.3.2)  
 **Estado:** ✅ PRODUCCIÓN  
 **Docs relacionadas:** [Architecture Summary](./ARCHITECTURE_SUMMARY.md) · [Architecture Deep-Dive](./ARCHITECTURE.md) · [Supabase Setup](./SUPABASE_SETUP.md)  
-**Última actualización:** 6 de Febrero 2026
+**Última actualización:** 15 de Febrero 2026
 
 **Plataforma unificada** de gestión avícola que integra WMS (Almacén), TMS (Reparto), CRM (Ventas), Carrito Web Público y ERP (Finanzas/RRHH). Potenciada por **Google Gemini AI** para decisiones inteligentes en tiempo real dentro de una arquitectura **server-authoritative** sobre Supabase.
 
