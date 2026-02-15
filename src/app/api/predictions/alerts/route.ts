@@ -1,39 +1,85 @@
-/**
+﻿/**
  * GET /api/predictions/alerts
- * 
- * Endpoint para obtener alertas de stock generadas por IA
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { obtenerAlertasStockActivas } from '@/lib/services/predictions/stock-alert'
+import { createAIMetadata } from '@/lib/ai/metadata'
+import { logAIUsage } from '@/lib/ai/logger'
+import type { AIMetadata } from '@/types/ai.types'
 
-export async function GET(request: NextRequest) {
+interface AlertsResponse {
+  success: boolean
+  data?: any[]
+  error?: string
+  ai: AIMetadata
+}
+
+export async function GET(_request: NextRequest) {
+  const startedAt = Date.now()
+
   try {
     const supabase = await createClient()
 
-    // Verificar autenticación
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
     if (authError || !user) {
-      return NextResponse.json(
-        { success: false, error: 'No autenticado' },
-        { status: 401 }
-      )
+      const ai = createAIMetadata({
+        strategy: 'none',
+        used: false,
+        provider: 'none',
+        model: null,
+        fallbackUsed: false,
+        reason: 'No autenticado.',
+        startedAt,
+      })
+
+      return NextResponse.json<AlertsResponse>({ success: false, error: 'No autenticado', ai }, { status: 401 })
     }
 
-    // Obtener alertas activas
     const alertas = await obtenerAlertasStockActivas(supabase)
 
-    return NextResponse.json({
-      success: true,
-      data: alertas
+    const ai = createAIMetadata({
+      strategy: 'none',
+      used: false,
+      provider: 'none',
+      model: null,
+      fallbackUsed: false,
+      reason: 'Endpoint de lectura. No ejecuta inferencia IA en tiempo real.',
+      startedAt,
     })
+
+    logAIUsage({ endpoint: '/api/predictions/alerts', feature: 'predictions_alerts', success: true, ai })
+
+    return NextResponse.json<AlertsResponse>({ success: true, data: alertas, ai })
   } catch (error: any) {
     console.error('Error al obtener alertas de stock:', error)
-    return NextResponse.json(
-      { success: false, error: error.message || 'Error al obtener alertas' },
+
+    const ai = createAIMetadata({
+      strategy: 'none',
+      used: false,
+      provider: 'none',
+      model: null,
+      fallbackUsed: false,
+      reason: 'Error no controlado al obtener alertas.',
+      startedAt,
+    })
+
+    logAIUsage({
+      endpoint: '/api/predictions/alerts',
+      feature: 'predictions_alerts',
+      success: false,
+      ai,
+      error: error.message || 'unknown',
+    })
+
+    return NextResponse.json<AlertsResponse>(
+      { success: false, error: error.message || 'Error al obtener alertas', ai },
       { status: 500 }
     )
   }
 }
-

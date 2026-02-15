@@ -1,7 +1,6 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
-/node_modules
+# Dependencies
+node_modules/
+**/node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -10,58 +9,66 @@
 !.yarn/releases
 !.yarn/versions
 
-# testing
-/coverage
-
-# next.js
+# Build outputs
 /.next/
 /out/
+/build/
+**/dist/
+video/out/
 
-# production
-/build
+# Testing artifacts
+/coverage/
+/playwright-report/
+/test-results/
 
-# misc
-.DS_Store
-*.pem
+# Local caches and runtime temp
+/.npm-cache/
+/.venv/
+/.vercel/
 /.agent/*
 !/.agent/skills/
 .windsurf/skills/
 .windsurf/plans/
 .claude/
 .cursor/
+.vscode/
 .gemini/
 .opencode/
 .agents/
+.mcp.json
+mcp_config.json
+.sisyphus/boulder.json
 supabase/.temp/
 scripts/reset_data.sql
 
-
-/.venv
-
-# debug
+# Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+*.log
+.next-dev.out.log
+.next-dev.err.log
+.next-dev.pid
 
-# env files (can opt-in for committing if needed)
+# Environment files
 .env*
+!.env.example
+!env.example
 
-# Google Cloud credentials
+# Credentials and sensitive local artifacts
 google-cloud-service-account.json
-*.json
-!package.json
-!tsconfig.json
-!public/manifest.json
-
-# Base64 credential artifacts
+*.pem
 *.base64
+credenciales.md
+/pres/
+/pdf_content.txt
+/read_pdf.py
+/202601 Liquidación Enero AVS.xlsx
+/WhatsApp Image *.jpeg
 
-# vercel
-.vercel
-
-# typescript
+# Misc
+.DS_Store
 *.tsbuildinfo
 next-env.d.ts
-
-.vercel
+nul

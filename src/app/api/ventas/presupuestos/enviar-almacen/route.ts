@@ -19,8 +19,13 @@ export async function POST(request: NextRequest) {
         message: result.message
       })
     } else {
+      const errorMessage = result.error || result.message || 'No se pudo enviar el presupuesto a almacén'
       return NextResponse.json(
-        { success: false, message: result.message },
+        {
+          success: false,
+          error: errorMessage,
+          message: result.message || result.error || errorMessage
+        },
         { status: 400 }
       )
     }

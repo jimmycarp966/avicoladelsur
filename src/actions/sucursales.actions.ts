@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import type { ApiResponse } from '@/types/api.types'
+import { sincronizarSolicitudesAutomaticasStockBajo } from '@/lib/services/sucursales-stock-sync'
 
 // Tipos para sucursales
 export interface CrearSucursalParams {
@@ -270,14 +271,17 @@ export async function registrarVentaSucursalAction(
       }
     }
 
-    // Evaluar stock bajo después de la venta
-    const { error: alertaError } = await supabase
-      .rpc('fn_evaluar_stock_bajo_sucursal', {
-        p_sucursal_id: userData.sucursal_id
-      })
-
-    if (alertaError) {
-      console.warn('Error al evaluar stock bajo:', alertaError)
+    // Evaluar stock bajo despues de la venta y sincronizar solicitudes automaticas
+    try {
+      for (const item of params.items) {
+        await sincronizarSolicitudesAutomaticasStockBajo(
+          supabase as any,
+          userData.sucursal_id,
+          item.productoId
+        )
+      }
+    } catch (stockError) {
+      console.warn('Error al sincronizar stock bajo:', stockError)
       // No fallar la venta por esto
     }
 

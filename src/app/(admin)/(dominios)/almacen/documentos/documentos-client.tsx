@@ -7,8 +7,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Separator } from '@/components/ui/separator'
 import { AlertCircle, FileSearch, Sparkles } from 'lucide-react'
+import { AIStrategyBadge } from '@/components/ai/AIStrategyBadge'
+import type { AIMetadata } from '@/types/ai.types'
 
 type Documento = {
   id: string
@@ -32,6 +33,7 @@ export default function DocumentosClient({ documentos }: { documentos: Documento
   const [loading, setLoading] = useState(false)
   const [estado, setEstado] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [ai, setAi] = useState<AIMetadata | null>(null)
 
   const handleUpload = async () => {
     if (!file) {
@@ -57,6 +59,7 @@ export default function DocumentosClient({ documentos }: { documentos: Documento
 
       if (!resp.ok || !data.success) {
         setError(data.error || 'No se pudo procesar el documento')
+        setAi(data.ai || null)
         return
       }
 
@@ -71,6 +74,7 @@ export default function DocumentosClient({ documentos }: { documentos: Documento
 
       setItems((prev) => [nuevo, ...prev])
       setEstado('Documento enviado a Document AI')
+      setAi(data.ai || null)
       setFile(null)
     } catch (err: any) {
       setError(err?.message || 'Error inesperado')
@@ -108,10 +112,13 @@ export default function DocumentosClient({ documentos }: { documentos: Documento
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="border-primary/20">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileSearch className="h-5 w-5 text-primary" />
-              Nuevo documento
-            </CardTitle>
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="flex items-center gap-2">
+                <FileSearch className="h-5 w-5 text-primary" />
+                Nuevo documento
+              </CardTitle>
+              <AIStrategyBadge ai={ai} />
+            </div>
             <CardDescription>Procesa facturas, remitos o recibos con Document AI</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

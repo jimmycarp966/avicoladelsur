@@ -1,0 +1,28 @@
+{
+  "name": "avicola-marketing-video",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "remotion studio",
+    "build": "remotion render MarketingVideo out/video.mp4 --codec=h264 --crf=18 --overwrite",
+    "build:preview": "remotion render MarketingVideo out/preview.mp4 --codec=h264 --crf=28 --overwrite",
+    "upgrade": "remotion upgrade",
+    "dev": "remotion studio"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.284",
+    "@remotion/transitions": "^4.0.284",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "remotion": "^4.0.284"
+  },
+  "devDependencies": {
+    "@remotion/eslint-config": "^4.0.284",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/web": "^0.0.217",
+    "eslint": "^9",
+    "prettier": "^3",
+    "typescript": "^5.9.3"
+  }
+}

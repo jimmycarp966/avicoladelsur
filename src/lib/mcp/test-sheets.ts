@@ -14,7 +14,11 @@ async function testSheetsConnection() {
         // Intentamos pasar la API KEY que el usuario nos acaba de dar o la de Maps
         const env = {
             ...process.env,
-            GOOGLE_API_KEY: process.env.GOOGLE_AI_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
+            GOOGLE_API_KEY:
+                process.env.GOOGLE_GEMINI_API_KEY ||
+                process.env.GEMINI_API_KEY ||
+                process.env.GOOGLE_AI_API_KEY ||
+                process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,
         };
 
         console.log('🔌 Conectando al servidor sheets-server.ts (LOCAL)...');

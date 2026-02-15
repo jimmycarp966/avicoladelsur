@@ -9,6 +9,8 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { AlertCircle, Brain, Radar, Siren } from 'lucide-react'
+import { AIStrategyBadge } from '@/components/ai/AIStrategyBadge'
+import type { AIMetadata } from '@/types/ai.types'
 
 type Producto = {
   id: string
@@ -62,6 +64,9 @@ export default function PrediccionesClient({ productos }: { productos: Producto[
   const [estado, setEstado] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState<string | null>(null)
+  const [aiPrediccion, setAiPrediccion] = useState<AIMetadata | null>(null)
+  const [aiBatch, setAiBatch] = useState<AIMetadata | null>(null)
+  const [aiAlertas, setAiAlertas] = useState<AIMetadata | null>(null)
 
   const productosOrdenados = useMemo(
     () => [...productos].sort((a, b) => a.nombre.localeCompare(b.nombre)),
@@ -87,10 +92,12 @@ export default function PrediccionesClient({ productos }: { productos: Producto[
 
       if (!resp.ok || !data.success) {
         setError(data.error || 'No se pudo obtener la predicción')
+        setAiPrediccion(data.ai || null)
         return
       }
 
       setPrediccionIndividual(data.data as Prediccion)
+      setAiPrediccion(data.ai || null)
       setEstado('Predicción generada')
     } catch (err: any) {
       setError(err?.message || 'Error desconocido')
@@ -115,6 +122,7 @@ export default function PrediccionesClient({ productos }: { productos: Producto[
 
       if (!resp.ok || !data.success) {
         setError(data.error || 'No se pudieron generar predicciones')
+        setAiBatch(data.ai || null)
         return
       }
 
@@ -123,6 +131,7 @@ export default function PrediccionesClient({ productos }: { productos: Producto[
         prediccionesGeneradas: data.data?.prediccionesGeneradas || 0,
         totalProductos: data.data?.totalProductos || 0,
       })
+      setAiBatch(data.ai || null)
       setEstado('Predicciones generadas')
     } catch (err: any) {
       setError(err?.message || 'Error desconocido')
@@ -142,10 +151,12 @@ export default function PrediccionesClient({ productos }: { productos: Producto[
 
       if (!resp.ok || !data.success) {
         setError(data.error || 'No se pudieron obtener las alertas')
+        setAiAlertas(data.ai || null)
         return
       }
 
       setAlertas((data.data || []) as Alerta[])
+      setAiAlertas(data.ai || null)
       setEstado('Alertas actualizadas')
     } catch (err: any) {
       setError(err?.message || 'Error desconocido')
@@ -184,10 +195,13 @@ export default function PrediccionesClient({ productos }: { productos: Producto[
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="border-primary/20">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Brain className="h-5 w-5 text-primary" />
-              Predicción puntual
-            </CardTitle>
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="flex items-center gap-2">
+                <Brain className="h-5 w-5 text-primary" />
+                Predicción puntual
+              </CardTitle>
+              <AIStrategyBadge ai={aiPrediccion} />
+            </div>
             <CardDescription>Consulta rápida por producto</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -264,10 +278,13 @@ export default function PrediccionesClient({ productos }: { productos: Producto[
 
         <Card className="border-primary/20">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Radar className="h-5 w-5 text-primary" />
-              Batch de predicciones
-            </CardTitle>
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="flex items-center gap-2">
+                <Radar className="h-5 w-5 text-primary" />
+                Batch de predicciones
+              </CardTitle>
+              <AIStrategyBadge ai={aiBatch} />
+            </div>
             <CardDescription>Genera para todos los productos activos</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -320,10 +337,13 @@ export default function PrediccionesClient({ productos }: { productos: Producto[
 
         <Card className="border-primary/20">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Siren className="h-5 w-5 text-primary" />
-              Alertas IA
-            </CardTitle>
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="flex items-center gap-2">
+                <Siren className="h-5 w-5 text-primary" />
+                Alertas IA
+              </CardTitle>
+              <AIStrategyBadge ai={aiAlertas} />
+            </div>
             <CardDescription>Riesgo de rotura de stock y demanda alta</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

@@ -1,4 +1,20 @@
 # Changelog - Avícola del Sur ERP
+## 2026-02-13 - Codex
+**Docs: Aclaracion de integracion Hikvision RRHH (marcaciones por API)**
+
+Se actualizo la documentacion operativa de marcaciones para dejar explicito:
+
+- La fuente de marcaciones es la API de Hikvision (Hik-Connect), no una tabla local garantizada en Supabase.
+- El estado "No mapeado" depende de la correspondencia entre `employeeNo`/`personCode` y RRHH.
+- Recomendacion de usar un identificador dedicado `hik_person_code` para el mapeo estable (sin sobrecargar `dni`).
+- Reglas de validacion de calidad de datos para eventos incompletos.
+
+**Archivos modificados:**
+- `hikvision.md`
+- `docs/CHANGELOG.md`
+- `docs/last_update.md`
+
+---
 
 ## 2026-01-14 — Antigravity
 **Feat: Optimización Bot WhatsApp & Registro de Clientes**
@@ -384,3 +400,4 @@ Se refinó el proceso de "Nueva Orden de Producción" implementando un flujo sec
 **Archivos modificados:**
 - `src/app/(admin)/(dominios)/almacen/produccion/nueva/page.tsx`
 - `ARCHITECTURE_SUMMARY.md`
+

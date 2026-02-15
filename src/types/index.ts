@@ -2,3 +2,4 @@
 export * from './database.types'
 export * from './api.types'
 export * from './domain.types'
+export * from './ai.types'

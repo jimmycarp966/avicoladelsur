@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { devError, devLog } from '@/lib/utils/logger'
@@ -19,6 +19,168 @@ const crearTransferenciaSchema = z.object({
         cantidad: z.number().positive(),
     })),
 })
+
+function esErrorColumnaCostoUnitarioLotes(error: unknown): boolean {
+    const texto =
+        typeof error === 'string'
+            ? error
+            : JSON.stringify(error || {})
+
+    const normalizado = texto.toLowerCase()
+    return normalizado.includes('costo_unitario') && normalizado.includes('lotes')
+}
+
+async function confirmarRecepcionTransferenciaFallbackCompat(
+    transferenciaId: string,
+    userId: string,
+    itemsRecibidos?: { item_id: string; cantidad_recibida: number }[]
+): Promise<{ success: boolean; error?: string }> {
+    const admin = createAdminClient()
+
+    const { data: transferencia, error: transferenciaError } = await admin
+        .from('transferencias_stock')
+        .select('id, numero_transferencia, estado, sucursal_destino_id')
+        .eq('id', transferenciaId)
+        .maybeSingle()
+
+    if (transferenciaError) {
+        throw transferenciaError
+    }
+
+    if (!transferencia) {
+        return { success: false, error: 'Transferencia no encontrada' }
+    }
+
+    if (!['entregado', 'en_ruta', 'en_transito', 'preparado'].includes(transferencia.estado)) {
+        return { success: false, error: 'Transferencia no esta en estado para recibir' }
+    }
+
+    if (itemsRecibidos && itemsRecibidos.length > 0) {
+        for (const itemRecibido of itemsRecibidos) {
+            const { error: updateRecibidoError } = await admin
+                .from('transferencia_items')
+                .update({ cantidad_recibida: itemRecibido.cantidad_recibida })
+                .eq('id', itemRecibido.item_id)
+                .eq('transferencia_id', transferenciaId)
+
+            if (updateRecibidoError) {
+                throw updateRecibidoError
+            }
+        }
+    }
+
+    const { data: itemsTransferencia, error: itemsError } = await admin
+        .from('transferencia_items')
+        .select('id, producto_id, lote_origen_id, cantidad_solicitada, cantidad_enviada, cantidad_recibida')
+        .eq('transferencia_id', transferenciaId)
+
+    if (itemsError) {
+        throw itemsError
+    }
+
+    for (const item of itemsTransferencia || []) {
+        const cantidadRecibida = Number(
+            item.cantidad_recibida ?? item.cantidad_enviada ?? item.cantidad_solicitada ?? 0
+        )
+
+        if (cantidadRecibida <= 0) {
+            continue
+        }
+
+        if (item.cantidad_recibida == null) {
+            const { error: updateItemError } = await admin
+                .from('transferencia_items')
+                .update({ cantidad_recibida: cantidadRecibida })
+                .eq('id', item.id)
+
+            if (updateItemError) {
+                throw updateItemError
+            }
+        }
+
+        let numeroLoteOrigen: string | null = null
+        let fechaVencimientoOrigen: string | null = null
+        let proveedorOrigen: string | null = null
+
+        if (item.lote_origen_id) {
+            const { data: loteOrigen, error: loteOrigenError } = await admin
+                .from('lotes')
+                .select('numero_lote, fecha_vencimiento, proveedor')
+                .eq('id', item.lote_origen_id)
+                .maybeSingle()
+
+            if (loteOrigenError) {
+                throw loteOrigenError
+            }
+
+            numeroLoteOrigen = loteOrigen?.numero_lote ?? null
+            fechaVencimientoOrigen = loteOrigen?.fecha_vencimiento ?? null
+            proveedorOrigen = loteOrigen?.proveedor ?? null
+        }
+
+        const baseNumeroLote = numeroLoteOrigen || transferencia.numero_transferencia || transferencia.id
+        const numeroLoteDestino = `TRANS-${baseNumeroLote}-${item.id.slice(0, 8)}`.slice(0, 50)
+
+        const { data: loteDestino, error: loteDestinoError } = await admin
+            .from('lotes')
+            .insert({
+                producto_id: item.producto_id,
+                sucursal_id: transferencia.sucursal_destino_id,
+                cantidad_ingresada: cantidadRecibida,
+                cantidad_disponible: cantidadRecibida,
+                fecha_ingreso: new Date().toISOString().slice(0, 10),
+                fecha_vencimiento: fechaVencimientoOrigen,
+                proveedor: proveedorOrigen || 'Transferencia',
+                estado: 'disponible',
+                numero_lote: numeroLoteDestino,
+            })
+            .select('id')
+            .single()
+
+        if (loteDestinoError || !loteDestino) {
+            throw loteDestinoError || new Error('No se pudo crear lote destino')
+        }
+
+        const { error: movimientoError } = await admin
+            .from('movimientos_stock')
+            .insert({
+                lote_id: loteDestino.id,
+                tipo_movimiento: 'ingreso',
+                cantidad: cantidadRecibida,
+                motivo: `Transferencia recibida: ${transferencia.numero_transferencia}`,
+                usuario_id: userId,
+            })
+
+        if (movimientoError) {
+            throw movimientoError
+        }
+
+        const { error: linkLoteError } = await admin
+            .from('transferencia_items')
+            .update({ lote_destino_id: loteDestino.id })
+            .eq('id', item.id)
+
+        if (linkLoteError) {
+            throw linkLoteError
+        }
+    }
+
+    const { error: updateTransferenciaError } = await admin
+        .from('transferencias_stock')
+        .update({
+            estado: 'recibido',
+            fecha_recepcion: new Date().toISOString(),
+            recibido_por: userId,
+            updated_at: new Date().toISOString(),
+        })
+        .eq('id', transferenciaId)
+
+    if (updateTransferenciaError) {
+        throw updateTransferenciaError
+    }
+
+    return { success: true }
+}
 
 // Crear transferencia
 export async function crearTransferenciaAction(formData: FormData) {
@@ -721,9 +883,36 @@ export async function confirmarRecepcionTransferenciaAction(
             p_items_recibidos: itemsRecibidos || null,
         })
 
-        if (error) throw error
-        if (!result.success) {
-            return { success: false, error: result.error }
+        if (error) {
+            if (esErrorColumnaCostoUnitarioLotes(error)) {
+                devLog('[Transferencias] Fallback compat para recepcion por columna lotes.costo_unitario inexistente')
+                const fallback = await confirmarRecepcionTransferenciaFallbackCompat(
+                    transferenciaId,
+                    user.id,
+                    itemsRecibidos
+                )
+
+                if (!fallback.success) {
+                    return { success: false, error: fallback.error || 'Error al confirmar recepcion (fallback)' }
+                }
+            } else {
+                throw error
+            }
+        } else if (!result?.success) {
+            if (esErrorColumnaCostoUnitarioLotes(result?.error)) {
+                devLog('[Transferencias] Fallback compat activado por error SQL en resultado RPC')
+                const fallback = await confirmarRecepcionTransferenciaFallbackCompat(
+                    transferenciaId,
+                    user.id,
+                    itemsRecibidos
+                )
+
+                if (!fallback.success) {
+                    return { success: false, error: fallback.error || 'Error al confirmar recepcion (fallback)' }
+                }
+            } else {
+                return { success: false, error: result.error }
+            }
         }
 
         revalidatePath('/sucursales/transferencias')

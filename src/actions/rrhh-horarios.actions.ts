@@ -1,0 +1,368 @@
+'use server'
+
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server'
+import { devError } from '@/lib/utils/logger'
+import type { ApiResponse } from '@/types/api.types'
+import type { HorariosHoyData, HorarioEventoNormalizado } from '@/types/domain.types'
+import {
+  fetchHikConnectEvents,
+  safeLogHikError,
+  validateHikConnectConfig,
+} from '@/lib/services/hikconnect.client'
+import {
+  getArgentinaDateRange,
+  normalizeHikAttendanceEvents,
+  timestampToLocalHour,
+} from '@/lib/services/rrhh-horarios.service'
+
+interface EmpleadoLookup {
+  id: string
+  dni: string | null
+  cuil: string | null
+  legajo: string | null
+  nombre: string | null
+  apellido: string | null
+  usuario?: {
+    nombre?: string | null
+    apellido?: string | null
+  } | null
+}
+
+function normalizeIdentity(value: string): string {
+  return value.replace(/[^0-9A-Za-z]+/g, '').toUpperCase()
+}
+
+function digitsOnly(value: string): string {
+  return value.replace(/\D+/g, '')
+}
+
+function normalizePersonName(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^0-9A-Za-z ]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase()
+}
+
+function readString(record: Record<string, unknown>, key: string): string {
+  const value = record[key]
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function extractRawEventTimestamp(raw: Record<string, unknown>): string | undefined {
+  const candidates = [
+    'occurTime',
+    'eventTime',
+    'time',
+    'timestamp',
+    'punchTime',
+    'recordTime',
+    'deviceTime',
+    'authTime',
+    'verifyTime',
+    'eventDateTime',
+    'captureTime',
+    'localTime',
+    'createdAt',
+  ]
+
+  for (const key of candidates) {
+    const value = raw[key]
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+  return undefined
+}
+
+function isTimestampOnBusinessDate(timestamp: string, date: string): boolean {
+  const parsed = new Date(timestamp)
+  if (Number.isNaN(parsed.getTime())) return false
+  const eventDate = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(parsed)
+  return eventDate === date
+}
+
+function extractHikPersonName(raw: Record<string, unknown>): string | undefined {
+  const direct =
+    readString(raw, 'personName') ||
+    readString(raw, 'name') ||
+    readString(raw, 'employeeName') ||
+    readString(raw, 'userName')
+
+  if (direct) return direct
+
+  const personInfo = raw.personInfo
+  if (!personInfo || typeof personInfo !== 'object') return undefined
+  const person = personInfo as Record<string, unknown>
+
+  const personName = readString(person, 'personName') || readString(person, 'name')
+  if (personName) return personName
+
+  const baseInfo = person.baseInfo
+  if (!baseInfo || typeof baseInfo !== 'object') return undefined
+  const base = baseInfo as Record<string, unknown>
+
+  const full = readString(base, 'personName') || readString(base, 'name')
+  if (full) return full
+
+  const first = readString(base, 'firstName')
+  const last = readString(base, 'lastName')
+  const composed = `${first} ${last}`.trim()
+  return composed || undefined
+}
+
+function parseManualHikMap(): Map<string, string> {
+  const raw = (process.env.HIK_CONNECT_PERSON_MAP || '').trim()
+  const map = new Map<string, string>()
+  if (!raw) return map
+
+  const entries = raw.split(',').map((item) => item.trim()).filter(Boolean)
+  for (const entry of entries) {
+    const separator = entry.includes('=') ? '=' : entry.includes(':') ? ':' : ''
+    if (!separator) continue
+    const [left, right] = entry.split(separator).map((part) => part.trim())
+    if (!left || !right) continue
+    map.set(normalizeIdentity(left), right)
+  }
+
+  return map
+}
+
+async function checkAdmin(supabase: SupabaseClient): Promise<boolean> {
+  const { data: authResult, error: authError } = await supabase.auth.getUser()
+  if (authError || !authResult.user) return false
+
+  const { data: userData, error: userError } = await supabase
+    .from('usuarios')
+    .select('rol, activo')
+    .eq('id', authResult.user.id)
+    .single()
+
+  if (userError || !userData) return false
+  return userData.activo && userData.rol === 'admin'
+}
+
+function buildDailyRows(
+  events: HorarioEventoNormalizado[],
+  employeeMap: Map<string, EmpleadoLookup>,
+  employeeByName: Map<string, EmpleadoLookup>,
+): HorariosHoyData['registros'] {
+  const grouped = new Map<
+    string,
+    {
+      employeeNo: string
+      timestamps: string[]
+      hikName?: string
+    }
+  >()
+
+  for (const event of events) {
+    const key = event.employee_no
+    const current = grouped.get(key) || { employeeNo: key, timestamps: [] as string[], hikName: undefined as string | undefined }
+    current.timestamps.push(event.timestamp)
+    if (!current.hikName && event.raw && typeof event.raw === 'object') {
+      current.hikName = extractHikPersonName(event.raw)
+    }
+
+    grouped.set(key, current)
+  }
+
+  const rows: HorariosHoyData['registros'] = []
+  for (const row of grouped.values()) {
+    const employeeNoKey = normalizeIdentity(row.employeeNo)
+    const employeeNoDigits = digitsOnly(row.employeeNo)
+    const hikNameKey = row.hikName ? normalizePersonName(row.hikName) : ''
+    const empleado = employeeMap.get(employeeNoKey)
+      || (employeeNoDigits ? employeeMap.get(employeeNoDigits) : undefined)
+      || (hikNameKey ? employeeByName.get(hikNameKey) : undefined)
+
+    const nombre = `${empleado?.usuario?.nombre || empleado?.nombre || ''} ${empleado?.usuario?.apellido || empleado?.apellido || ''}`.trim() || row.hikName || ''
+    const sortedTimes = row.timestamps
+      .map((ts) => new Date(ts))
+      .filter((d) => !Number.isNaN(d.getTime()))
+      .sort((a, b) => a.getTime() - b.getTime())
+
+    const first = sortedTimes[0]
+    const last = sortedTimes[sortedTimes.length - 1]
+    const hasDistinctOut = first && last && first.getTime() !== last.getTime()
+
+    rows.push({
+      employee_no: row.employeeNo,
+      empleado_id: empleado?.id,
+      dni: empleado?.dni || empleado?.cuil || empleado?.legajo || row.employeeNo,
+      empleado_nombre: nombre || undefined,
+      hora_entrada: first ? timestampToLocalHour(first.toISOString()) : undefined,
+      hora_salida: hasDistinctOut ? timestampToLocalHour(last.toISOString()) : undefined,
+      mapeado: !!empleado,
+      origen: 'hik_connect',
+    })
+  }
+
+  return rows.sort((a, b) => {
+    if (a.mapeado !== b.mapeado) return a.mapeado ? -1 : 1
+    const aName = a.empleado_nombre || ''
+    const bName = b.empleado_nombre || ''
+    return aName.localeCompare(bName, 'es')
+  })
+}
+
+export async function obtenerHorariosHoyDesdeHikAction(fecha?: string): Promise<ApiResponse<HorariosHoyData>> {
+  try {
+    const missingConfig = validateHikConnectConfig()
+    if (missingConfig.length > 0) {
+      return {
+        success: false,
+        error: `Faltan variables de entorno: ${missingConfig.join(', ')}`,
+      }
+    }
+
+    const supabase = await createClient()
+    const isAdmin = await checkAdmin(supabase)
+    if (!isAdmin) {
+      return {
+        success: false,
+        error: 'No autorizado. Solo administradores pueden consultar horarios Hik-Connect.',
+      }
+    }
+
+    let baseDate = new Date()
+    if (fecha) {
+      const safe = /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? `${fecha}T12:00:00-03:00` : ''
+      if (!safe) {
+        return {
+          success: false,
+          error: 'Fecha invalida. Use formato YYYY-MM-DD.',
+        }
+      }
+      baseDate = new Date(safe)
+      if (Number.isNaN(baseDate.getTime())) {
+        return {
+          success: false,
+          error: 'Fecha invalida. No se pudo interpretar.',
+        }
+      }
+    }
+
+    const range = getArgentinaDateRange(baseDate)
+    const hikResponse = await fetchHikConnectEvents({
+      startTime: range.start,
+      endTime: range.end,
+      date: range.date,
+      pageNo: 1,
+      pageSize: 200,
+    })
+
+    const rawEventsForDate = hikResponse.events.filter((event) => {
+      if (!event || typeof event !== 'object') return false
+      const raw = event as Record<string, unknown>
+      const timestamp = extractRawEventTimestamp(raw)
+      if (!timestamp) return false
+      return isTimestampOnBusinessDate(timestamp, range.date)
+    })
+
+    const { normalized: normalizedToday, warnings } = normalizeHikAttendanceEvents(rawEventsForDate)
+
+    const uniqueIdentityKeys = [...new Set(normalizedToday.map((item) => normalizeIdentity(item.employee_no)).filter(Boolean))]
+
+    const employeeMap = new Map<string, EmpleadoLookup>()
+    const employeeById = new Map<string, EmpleadoLookup>()
+    const employeeByName = new Map<string, EmpleadoLookup>()
+    if (uniqueIdentityKeys.length > 0) {
+      const { data: empleados, error } = await supabase
+        .from('rrhh_empleados')
+        .select('id, dni, cuil, legajo, nombre, apellido, usuario:usuarios(nombre, apellido)')
+        .eq('activo', true)
+
+      if (error) {
+        devError('Error consultando empleados para mapeo de horarios:', error)
+      } else {
+        ;(empleados || []).forEach((empleado) => {
+          const typed = empleado as EmpleadoLookup
+          employeeById.set(typed.id, typed)
+
+          const fullName = `${typed.nombre || ''} ${typed.apellido || ''}`.trim()
+          if (fullName) {
+            const fullNameKey = normalizePersonName(fullName)
+            employeeByName.set(fullNameKey, typed)
+
+            const reverseName = `${typed.apellido || ''} ${typed.nombre || ''}`.trim()
+            if (reverseName) {
+              employeeByName.set(normalizePersonName(reverseName), typed)
+            }
+          }
+
+          const keys = [
+            typed.dni ? normalizeIdentity(typed.dni) : '',
+            typed.cuil ? normalizeIdentity(typed.cuil) : '',
+            typed.legajo ? normalizeIdentity(typed.legajo) : '',
+            typed.id ? normalizeIdentity(typed.id) : '',
+          ].filter(Boolean)
+
+          for (const key of keys) {
+            employeeMap.set(key, typed)
+            const keyDigits = digitsOnly(key)
+            if (keyDigits) {
+              employeeMap.set(keyDigits, typed)
+            }
+          }
+        })
+      }
+    }
+
+    const manualMap = parseManualHikMap()
+    let appliedManualMapCount = 0
+    for (const [hikCode, employeeRef] of manualMap.entries()) {
+      const refKey = normalizeIdentity(employeeRef)
+      const refDigits = digitsOnly(employeeRef)
+      const resolved =
+        employeeById.get(employeeRef) ||
+        employeeMap.get(refKey) ||
+        (refDigits ? employeeMap.get(refDigits) : undefined)
+
+      if (resolved) {
+        employeeMap.set(hikCode, resolved)
+        const hikDigits = digitsOnly(hikCode)
+        if (hikDigits) {
+          employeeMap.set(hikDigits, resolved)
+        }
+        appliedManualMapCount++
+      }
+    }
+
+    const registros = buildDailyRows(normalizedToday, employeeMap, employeeByName)
+    const mappedCount = registros.filter((row) => row.mapeado).length
+
+    if (manualMap.size > 0 && appliedManualMapCount < manualMap.size) {
+      warnings.push(`Se aplicaron ${appliedManualMapCount}/${manualMap.size} mapeos manuales de HIK_CONNECT_PERSON_MAP.`)
+    }
+
+    if (registros.length > 0 && mappedCount === 0) {
+      warnings.push(
+        'No se pudo mapear ninguna marcacion a RRHH. Revise DNI/CUIL/legajo o configure HIK_CONNECT_PERSON_MAP.',
+      )
+    }
+
+    return {
+      success: true,
+      data: {
+        fecha: range.date,
+        total_eventos: rawEventsForDate.length,
+        registros,
+        warnings: [...hikResponse.warnings, ...warnings],
+      },
+      message: 'Horarios del dia obtenidos desde Hik-Connect',
+    }
+  } catch (error) {
+    safeLogHikError(error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error interno obteniendo horarios desde Hik-Connect',
+    }
+  }
+}

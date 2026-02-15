@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import type { ApiResponse } from '@/types/api.types'
+import { sincronizarSolicitudesAutomaticasStockBajo } from '@/lib/services/sucursales-stock-sync'
 
 // ===========================================
 // TIPOS
@@ -169,6 +170,20 @@ export async function registrarVentaSucursalConControlAction(
 
     if (!data.success) {
       return { success: false, error: data.error || 'Error desconocido al registrar venta' }
+    }
+
+    // Re-evaluar stock bajo de los productos vendidos para crear/actualizar solicitudes automaticas
+    try {
+      for (const item of params.items) {
+        await sincronizarSolicitudesAutomaticasStockBajo(
+          supabase as any,
+          params.sucursalId,
+          item.productoId
+        )
+      }
+    } catch (stockError) {
+      console.warn('Error al sincronizar stock bajo en venta sucursal:', stockError)
+      // No bloqueamos la venta por errores de sincronizacion automatica
     }
 
     revalidatePath('/sucursal/ventas')

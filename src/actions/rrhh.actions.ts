@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { devError } from '@/lib/utils/logger'
 import type { ApiResponse } from '@/types/api.types'
 import type { Empleado } from '@/types/domain.types'
@@ -416,6 +416,42 @@ export async function eliminarEmpleadoAction(empleadoId: string): Promise<ApiRes
   }
 }
 
+export async function obtenerEmpleadosActivosAction(): Promise<ApiResponse<Empleado[]>> {
+  try {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+      .from('rrhh_empleados')
+      .select(`
+        *,
+        usuario:usuarios(id, nombre, apellido, email),
+        sucursal:sucursales(id, nombre),
+        categoria:rrhh_categorias(id, nombre, sueldo_basico)
+      `)
+      .eq('activo', true)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      devError('Error al obtener empleados activos:', error)
+      return {
+        success: false,
+        error: 'Error al obtener empleados: ' + error.message,
+      }
+    }
+
+    return {
+      success: true,
+      data: (data || []) as Empleado[],
+    }
+  } catch (error) {
+    devError('Error en obtenerEmpleadosActivosAction:', error)
+    return {
+      success: false,
+      error: 'Error interno del servidor',
+    }
+  }
+}
+
 export async function obtenerEmpleadoPorIdAction(empleadoId: string): Promise<ApiResponse<Empleado>> {
   try {
     const supabase = await createClient()
@@ -712,6 +748,7 @@ export async function crearAdelantoAction(
 ): Promise<ApiResponse<{ adelantoId: string }>> {
   try {
     const supabase = await createClient()
+    const adminSupabase = createAdminClient()
 
     // Obtener el usuario actual
     const { data: { user }, error: userError } = await supabase.auth.getUser()
@@ -724,7 +761,7 @@ export async function crearAdelantoAction(
 
     // Validar límite de adelantos (30% del sueldo básico)
     if (adelantoData.tipo === 'dinero' && adelantoData.monto) {
-      const { data: isValid, error: validationError } = await supabase
+      const { data: isValid, error: validationError } = await adminSupabase
         .rpc('fn_validar_limite_adelanto', {
           p_empleado_id: adelantoData.empleado_id,
           p_monto: adelantoData.monto,
@@ -746,7 +783,7 @@ export async function crearAdelantoAction(
       }
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await adminSupabase
       .from('rrhh_adelantos')
       .insert({
         ...adelantoData,
@@ -785,7 +822,7 @@ export async function aprobarAdelantoAction(
   aprobadoPor: string
 ): Promise<ApiResponse<void>> {
   try {
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     const { data, error } = await supabase
       .from('rrhh_adelantos')
@@ -796,13 +833,13 @@ export async function aprobarAdelantoAction(
       })
       .eq('id', adelantoId)
       .select('id')
-      .single()
+      .maybeSingle()
 
-    if (error) {
+    if (error || !data?.id) {
       devError('Error al aprobar adelanto:', error)
       return {
         success: false,
-        error: 'Error al aprobar adelanto: ' + error.message,
+        error: 'Error al aprobar adelanto: ' + (error?.message || 'Adelanto no encontrado'),
       }
     }
 
@@ -823,7 +860,7 @@ export async function aprobarAdelantoAction(
 
 export async function rechazarAdelantoAction(adelantoId: string): Promise<ApiResponse<void>> {
   try {
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     const { error } = await supabase
       .from('rrhh_adelantos')
@@ -907,6 +944,7 @@ export async function calcularLiquidacionMensualAction(
 export async function aprobarLiquidacionAction(liquidacionId: string): Promise<ApiResponse<void>> {
   try {
     const supabase = await createClient()
+    const adminSupabase = createAdminClient()
 
     // Obtener el usuario actual
     const { data: { user }, error: userError } = await supabase.auth.getUser()
@@ -917,7 +955,7 @@ export async function aprobarLiquidacionAction(liquidacionId: string): Promise<A
       }
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await adminSupabase
       .from('rrhh_liquidaciones')
       .update({
         estado: 'aprobada',
@@ -926,13 +964,13 @@ export async function aprobarLiquidacionAction(liquidacionId: string): Promise<A
       })
       .eq('id', liquidacionId)
       .select('id')
-      .single()
+      .maybeSingle()
 
-    if (error) {
+    if (error || !data?.id) {
       devError('Error al aprobar liquidación:', error)
       return {
         success: false,
-        error: 'Error al aprobar liquidación: ' + error.message,
+        error: 'Error al aprobar liquidación: ' + (error?.message || 'Liquidación no encontrada'),
       }
     }
 
@@ -953,7 +991,7 @@ export async function aprobarLiquidacionAction(liquidacionId: string): Promise<A
 
 export async function marcarLiquidacionPagadaAction(liquidacionId: string): Promise<ApiResponse<void>> {
   try {
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     const { data, error } = await supabase
       .from('rrhh_liquidaciones')
@@ -964,13 +1002,13 @@ export async function marcarLiquidacionPagadaAction(liquidacionId: string): Prom
       })
       .eq('id', liquidacionId)
       .select('id')
-      .single()
+      .maybeSingle()
 
-    if (error) {
+    if (error || !data?.id) {
       devError('Error al marcar liquidación como pagada:', error)
       return {
         success: false,
-        error: 'Error al marcar liquidación como pagada: ' + error.message,
+        error: 'Error al marcar liquidación como pagada: ' + (error?.message || 'Liquidación no encontrada'),
       }
     }
 

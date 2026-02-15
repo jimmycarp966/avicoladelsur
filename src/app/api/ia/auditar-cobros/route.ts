@@ -1,60 +1,55 @@
-/**
+﻿/**
  * POST /api/ia/auditar-cobros
- * 
- * Endpoint que analiza cobros recientes de sucursales en busca de anomalías.
- * No muestra nada a cajeros, solo genera notificaciones para administradores.
- * 
- * Puede ser llamado por:
- * - Un cron job (Vercel Cron / GitHub Actions)
- * - Un webhook de Supabase cuando se inserta un cobro
- * - Manualmente desde el dashboard de admin
+ * Auditoria de cobros basada en reglas (sin IA generativa).
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
-
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '')
+import { createAIMetadata } from '@/lib/ai/metadata'
+import { logAIUsage } from '@/lib/ai/logger'
+import type { AIMetadata } from '@/types/ai.types'
 
 interface AnomaliaDetectada {
-    cobroId: string
-    tipo: 'descuento_excesivo' | 'monto_inusual' | 'frecuencia_alta' | 'patron_sospechoso' | 'horario_inusual'
-    severidad: 'alto' | 'medio' | 'bajo'
-    descripcion: string
-    monto: number
-    usuario: string
-    sucursal: string
-    sugerencia?: string
+  cobroId: string
+  tipo: 'descuento_excesivo' | 'monto_inusual' | 'frecuencia_alta' | 'patron_sospechoso' | 'horario_inusual'
+  severidad: 'alto' | 'medio' | 'bajo'
+  descripcion: string
+  monto: number
+  usuario: string
+  sucursal: string
+  sugerencia?: string
 }
 
 interface AuditarCobrosResponse {
-    success: boolean
-    cobrosAnalizados: number
-    anomaliasDetectadas: AnomaliaDetectada[]
-    notificacionesCreadas: number
-    error?: string
+  success: boolean
+  cobrosAnalizados: number
+  anomaliasDetectadas: AnomaliaDetectada[]
+  notificacionesCreadas: number
+  error?: string
+  ai: AIMetadata
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse<AuditarCobrosResponse>> {
+  const startedAt = Date.now()
+
+  try {
+    const supabase = await createClient()
+
+    let horasAtras = 24
     try {
-        const supabase = await createClient()
+      const body = await request.json()
+      if (body.horasAtras) horasAtras = body.horasAtras
+    } catch {
+      // Body vacio es valido.
+    }
 
-        // Obtener parámetros opcionales
-        let horasAtras = 24 // Por defecto últimas 24 horas
-        try {
-            const body = await request.json()
-            if (body.horasAtras) horasAtras = body.horasAtras
-        } catch {
-            // Body vacío es OK
-        }
+    const fechaDesde = new Date()
+    fechaDesde.setHours(fechaDesde.getHours() - horasAtras)
 
-        const fechaDesde = new Date()
-        fechaDesde.setHours(fechaDesde.getHours() - horasAtras)
-
-        // Obtener cobros recientes de todas las sucursales
-        const { data: cobros, error: cobrosError } = await supabase
-            .from('movimientos_caja')
-            .select(`
+    const { data: cobros, error: cobrosError } = await supabase
+      .from('movimientos_caja')
+      .select(
+        `
         id,
         monto,
         tipo,
@@ -69,184 +64,199 @@ export async function POST(request: NextRequest): Promise<NextResponse<AuditarCo
           sucursal_id,
           sucursales:sucursal_id (nombre)
         )
-      `)
-            .eq('tipo', 'ingreso')
-            .gte('created_at', fechaDesde.toISOString())
-            .order('created_at', { ascending: false })
-            .limit(500)
+      `
+      )
+      .eq('tipo', 'ingreso')
+      .gte('created_at', fechaDesde.toISOString())
+      .order('created_at', { ascending: false })
+      .limit(500)
 
-        if (cobrosError) throw cobrosError
+    if (cobrosError) throw cobrosError
 
-        const anomalias: AnomaliaDetectada[] = []
+    const anomalias: AnomaliaDetectada[] = []
 
-        // Obtener promedios históricos por usuario para comparación
-        const { data: promediosUsuario, error: promediosError } = await supabase
-            .rpc('fn_promedios_cobros_por_usuario')
+    const { data: promediosUsuario, error: promediosError } = await supabase.rpc('fn_promedios_cobros_por_usuario')
 
-        // Si no existe la función RPC, calcular manualmente
-        const promediosPorUsuario: Record<string, { promedio: number; max: number; count: number }> = {}
+    const promediosPorUsuario: Record<string, { promedio: number; max: number; count: number }> = {}
 
-        if (!promediosError && promediosUsuario) {
-            for (const p of promediosUsuario) {
-                promediosPorUsuario[p.usuario_id] = {
-                    promedio: p.promedio_monto,
-                    max: p.max_monto,
-                    count: p.cantidad_cobros
-                }
-            }
+    if (!promediosError && promediosUsuario) {
+      for (const p of promediosUsuario) {
+        promediosPorUsuario[p.usuario_id] = {
+          promedio: p.promedio_monto,
+          max: p.max_monto,
+          count: p.cantidad_cobros,
         }
+      }
+    }
 
-        // Analizar cada cobro
-        for (const cobro of cobros || []) {
-            const usuarioNombre = `${(cobro.usuarios as any)?.nombre || ''} ${(cobro.usuarios as any)?.apellido || ''}`.trim() || 'Desconocido'
-            const sucursalNombre = (cobro.cajas as any)?.sucursales?.nombre || 'Central'
-            const monto = Number(cobro.monto || 0)
+    for (const cobro of cobros || []) {
+      const usuarioNombre = `${(cobro.usuarios as any)?.nombre || ''} ${(cobro.usuarios as any)?.apellido || ''}`.trim() || 'Desconocido'
+      const sucursalNombre = (cobro.cajas as any)?.sucursales?.nombre || 'Central'
+      const monto = Number(cobro.monto || 0)
 
-            // Regla 1: Monto significativamente mayor al promedio del usuario
-            const stats = promediosPorUsuario[cobro.usuario_id]
-            if (stats && monto > stats.promedio * 3 && monto > 50000) {
-                anomalias.push({
-                    cobroId: cobro.id,
-                    tipo: 'monto_inusual',
-                    severidad: monto > stats.max * 1.5 ? 'alto' : 'medio',
-                    descripcion: `Cobro de $${monto.toLocaleString()} es ${(monto / stats.promedio).toFixed(1)}x mayor al promedio del usuario ($${stats.promedio.toLocaleString()})`,
-                    monto,
-                    usuario: usuarioNombre,
-                    sucursal: sucursalNombre,
-                })
-            }
+      const stats = promediosPorUsuario[cobro.usuario_id]
+      if (stats && monto > stats.promedio * 3 && monto > 50000) {
+        anomalias.push({
+          cobroId: cobro.id,
+          tipo: 'monto_inusual',
+          severidad: monto > stats.max * 1.5 ? 'alto' : 'medio',
+          descripcion: `Cobro de $${monto.toLocaleString()} es ${(monto / stats.promedio).toFixed(1)}x mayor al promedio del usuario ($${stats.promedio.toLocaleString()})`,
+          monto,
+          usuario: usuarioNombre,
+          sucursal: sucursalNombre,
+        })
+      }
 
-            // Regla 2: Cobros en horario inusual (antes 6am o después 10pm)
-            const hora = new Date(cobro.created_at).getHours()
-            if (hora < 6 || hora >= 22) {
-                anomalias.push({
-                    cobroId: cobro.id,
-                    tipo: 'horario_inusual',
-                    severidad: 'medio',
-                    descripcion: `Cobro realizado a las ${hora}:${new Date(cobro.created_at).getMinutes().toString().padStart(2, '0')} (fuera de horario habitual)`,
-                    monto,
-                    usuario: usuarioNombre,
-                    sucursal: sucursalNombre,
-                })
-            }
+      const hora = new Date(cobro.created_at).getHours()
+      if (hora < 6 || hora >= 22) {
+        anomalias.push({
+          cobroId: cobro.id,
+          tipo: 'horario_inusual',
+          severidad: 'medio',
+          descripcion: `Cobro realizado a las ${hora}:${new Date(cobro.created_at).getMinutes().toString().padStart(2, '0')} (fuera de horario habitual)`,
+          monto,
+          usuario: usuarioNombre,
+          sucursal: sucursalNombre,
+        })
+      }
 
-            // Regla 3: Montos redondos sospechosos (múltiplos exactos de 10000)
-            if (monto >= 10000 && monto % 10000 === 0 && monto <= 100000) {
-                // Solo marcar si es muy frecuente (buscar patrones)
-                const cobrosRedondosUsuario = (cobros || []).filter(
-                    (c: any) => c.usuario_id === cobro.usuario_id &&
-                        Number(c.monto) % 10000 === 0 &&
-                        Number(c.monto) >= 10000
-                )
-
-                if (cobrosRedondosUsuario.length >= 3) {
-                    anomalias.push({
-                        cobroId: cobro.id,
-                        tipo: 'patron_sospechoso',
-                        severidad: 'bajo',
-                        descripcion: `Usuario tiene ${cobrosRedondosUsuario.length} cobros de montos redondos ($${monto.toLocaleString()})`,
-                        monto,
-                        usuario: usuarioNombre,
-                        sucursal: sucursalNombre,
-                    })
-                }
-            }
-        }
-
-        // Regla 4: Frecuencia alta - muchos cobros en poco tiempo por mismo usuario
-        const cobrosPorUsuario: Record<string, any[]> = {}
-        for (const cobro of cobros || []) {
-            if (!cobrosPorUsuario[cobro.usuario_id]) {
-                cobrosPorUsuario[cobro.usuario_id] = []
-            }
-            cobrosPorUsuario[cobro.usuario_id].push(cobro)
-        }
-
-        for (const [usuarioId, cobrosList] of Object.entries(cobrosPorUsuario)) {
-            // Más de 20 cobros en una hora
-            const unaHoraAtras = new Date(Date.now() - 60 * 60 * 1000)
-            const cobrosUltimaHora = cobrosList.filter(
-                (c: any) => new Date(c.created_at) > unaHoraAtras
-            )
-
-            if (cobrosUltimaHora.length > 20) {
-                const usuarioNombre = `${(cobrosUltimaHora[0].usuarios as any)?.nombre || ''} ${(cobrosUltimaHora[0].usuarios as any)?.apellido || ''}`.trim()
-                const sucursalNombre = (cobrosUltimaHora[0].cajas as any)?.sucursales?.nombre || 'Central'
-
-                anomalias.push({
-                    cobroId: cobrosUltimaHora[0].id,
-                    tipo: 'frecuencia_alta',
-                    severidad: 'medio',
-                    descripcion: `${cobrosUltimaHora.length} cobros en la última hora (inusualmente alto)`,
-                    monto: cobrosUltimaHora.reduce((sum: number, c: any) => sum + Number(c.monto), 0),
-                    usuario: usuarioNombre,
-                    sucursal: sucursalNombre,
-                })
-            }
-        }
-
-        // Eliminar duplicados (mismo cobro puede tener múltiples anomalías)
-        const anomaliasUnicas = anomalias.filter(
-            (a, index, self) => index === self.findIndex((t) => t.cobroId === a.cobroId && t.tipo === a.tipo)
+      if (monto >= 10000 && monto % 10000 === 0 && monto <= 100000) {
+        const cobrosRedondosUsuario = (cobros || []).filter(
+          (c: any) => c.usuario_id === cobro.usuario_id && Number(c.monto) % 10000 === 0 && Number(c.monto) >= 10000
         )
 
-        // Crear notificaciones para administradores
-        let notificacionesCreadas = 0
-
-        for (const anomalia of anomaliasUnicas) {
-            // Solo notificar anomalías de severidad media o alta
-            if (anomalia.severidad === 'bajo') continue
-
-            const { error: notifError } = await supabase
-                .from('notificaciones')
-                .insert({
-                    titulo: `⚠️ Anomalía detectada: ${anomalia.tipo.replace('_', ' ')}`,
-                    mensaje: `${anomalia.descripcion}. Usuario: ${anomalia.usuario}. Sucursal: ${anomalia.sucursal}. Monto: $${anomalia.monto.toLocaleString()}`,
-                    tipo: anomalia.severidad === 'alto' ? 'error' : 'warning',
-                    categoria: 'tesoreria',
-                    metadata: {
-                        cobroId: anomalia.cobroId,
-                        tipoAnomalia: anomalia.tipo,
-                        severidad: anomalia.severidad,
-                        usuario: anomalia.usuario,
-                        sucursal: anomalia.sucursal,
-                        monto: anomalia.monto,
-                    },
-                    // usuario_id null = notificación global para admins
-                    usuario_id: null,
-                })
-
-            if (!notifError) notificacionesCreadas++
+        if (cobrosRedondosUsuario.length >= 3) {
+          anomalias.push({
+            cobroId: cobro.id,
+            tipo: 'patron_sospechoso',
+            severidad: 'bajo',
+            descripcion: `Usuario tiene ${cobrosRedondosUsuario.length} cobros de montos redondos ($${monto.toLocaleString()})`,
+            monto,
+            usuario: usuarioNombre,
+            sucursal: sucursalNombre,
+          })
         }
-
-        return NextResponse.json({
-            success: true,
-            cobrosAnalizados: (cobros || []).length,
-            anomaliasDetectadas: anomaliasUnicas,
-            notificacionesCreadas,
-        })
-    } catch (error) {
-        console.error('[IA] Error en auditar-cobros:', error)
-        return NextResponse.json({
-            success: false,
-            cobrosAnalizados: 0,
-            anomaliasDetectadas: [],
-            notificacionesCreadas: 0,
-            error: 'Error al auditar cobros',
-        })
+      }
     }
+
+    const cobrosPorUsuario: Record<string, any[]> = {}
+    for (const cobro of cobros || []) {
+      if (!cobrosPorUsuario[cobro.usuario_id]) {
+        cobrosPorUsuario[cobro.usuario_id] = []
+      }
+      cobrosPorUsuario[cobro.usuario_id].push(cobro)
+    }
+
+    for (const cobrosList of Object.values(cobrosPorUsuario)) {
+      const unaHoraAtras = new Date(Date.now() - 60 * 60 * 1000)
+      const cobrosUltimaHora = cobrosList.filter((c: any) => new Date(c.created_at) > unaHoraAtras)
+
+      if (cobrosUltimaHora.length > 20) {
+        const usuarioNombre = `${(cobrosUltimaHora[0].usuarios as any)?.nombre || ''} ${(cobrosUltimaHora[0].usuarios as any)?.apellido || ''}`.trim()
+        const sucursalNombre = (cobrosUltimaHora[0].cajas as any)?.sucursales?.nombre || 'Central'
+
+        anomalias.push({
+          cobroId: cobrosUltimaHora[0].id,
+          tipo: 'frecuencia_alta',
+          severidad: 'medio',
+          descripcion: `${cobrosUltimaHora.length} cobros en la ultima hora (inusualmente alto)`,
+          monto: cobrosUltimaHora.reduce((sum: number, c: any) => sum + Number(c.monto), 0),
+          usuario: usuarioNombre,
+          sucursal: sucursalNombre,
+        })
+      }
+    }
+
+    const anomaliasUnicas = anomalias.filter(
+      (a, index, self) => index === self.findIndex((t) => t.cobroId === a.cobroId && t.tipo === a.tipo)
+    )
+
+    let notificacionesCreadas = 0
+
+    for (const anomalia of anomaliasUnicas) {
+      if (anomalia.severidad === 'bajo') continue
+
+      const { error: notifError } = await supabase.from('notificaciones').insert({
+        titulo: `Anomalia detectada: ${anomalia.tipo.replace('_', ' ')}`,
+        mensaje: `${anomalia.descripcion}. Usuario: ${anomalia.usuario}. Sucursal: ${anomalia.sucursal}. Monto: $${anomalia.monto.toLocaleString()}`,
+        tipo: anomalia.severidad === 'alto' ? 'error' : 'warning',
+        categoria: 'tesoreria',
+        metadata: {
+          cobroId: anomalia.cobroId,
+          tipoAnomalia: anomalia.tipo,
+          severidad: anomalia.severidad,
+          usuario: anomalia.usuario,
+          sucursal: anomalia.sucursal,
+          monto: anomalia.monto,
+        },
+        usuario_id: null,
+      })
+
+      if (!notifError) notificacionesCreadas++
+    }
+
+    const ai = createAIMetadata({
+      strategy: 'none',
+      used: false,
+      provider: 'none',
+      model: null,
+      fallbackUsed: false,
+      reason: 'Motor de auditoria por reglas. No usa IA generativa.',
+      startedAt,
+      deprecated: true,
+      deprecatedMessage: 'Endpoint legado bajo /api/ia. Conservado por compatibilidad.',
+    })
+
+    logAIUsage({ endpoint: '/api/ia/auditar-cobros', feature: 'auditar_cobros', success: true, ai })
+
+    return NextResponse.json({
+      success: true,
+      cobrosAnalizados: (cobros || []).length,
+      anomaliasDetectadas: anomaliasUnicas,
+      notificacionesCreadas,
+      ai,
+    })
+  } catch (error) {
+    console.error('[IA] Error en auditar-cobros:', error)
+
+    const ai = createAIMetadata({
+      strategy: 'none',
+      used: false,
+      provider: 'none',
+      model: null,
+      fallbackUsed: false,
+      reason: 'Error no controlado en auditoria de cobros.',
+      startedAt,
+      deprecated: true,
+      deprecatedMessage: 'Endpoint legado bajo /api/ia. Conservado por compatibilidad.',
+    })
+
+    logAIUsage({
+      endpoint: '/api/ia/auditar-cobros',
+      feature: 'auditar_cobros',
+      success: false,
+      ai,
+      error: error instanceof Error ? error.message : 'unknown',
+    })
+
+    return NextResponse.json({
+      success: false,
+      cobrosAnalizados: 0,
+      anomaliasDetectadas: [],
+      notificacionesCreadas: 0,
+      error: 'Error al auditar cobros',
+      ai,
+    })
+  }
 }
 
-// GET para permitir llamadas desde cron jobs
 export async function GET(request: NextRequest) {
-    // Verificar token de cron si está configurado
-    const authHeader = request.headers.get('authorization')
-    const cronSecret = process.env.CRON_SECRET
+  const authHeader = request.headers.get('authorization')
+  const cronSecret = process.env.CRON_SECRET
 
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
 
-    // Redirigir a POST con parámetros por defecto
-    return POST(request)
+  return POST(request)
 }

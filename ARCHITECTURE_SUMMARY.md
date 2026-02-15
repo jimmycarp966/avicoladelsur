@@ -15,6 +15,7 @@
 | [Stack](#-stack-tecnológico) | Tecnologías utilizadas |
 | [Módulos](#-módulos-principales-mapa-técnico) | §1-§6 Reparto, Tesorería, Almacén, Ventas, RRHH, Sucursales |
 | [Servicios IA](#-servicios-de-ia--google-cloud) | Gemini, Maps, Routing |
+| [WebMCP](#-webmcp-capa-agentica-experimental) | Tools frontend por rol y dominio |
 | [Patrones](#️-patrones-de-arquitectura-de-software) | Arquitectura Server-Authoritative |
 | [Server Actions](#-server-actions-referencia-completa) | 39 actions organizados por módulo |
 | [Estructura](#-estructura-de-directorios-auditada) | Organización de carpetas |
@@ -149,6 +150,22 @@ Sistema ERP modular completo para Avícola del Sur que unifica **Almacén (WMS)*
 | **Directions API** | `lib/services/google-directions.ts` | Rutas alternativas (fallback) |
 | **Places API** | `lib/services/places.ts` | Autocompletado de direcciones |
 | **OpenRouteService** | `lib/services/ors-directions.ts` | Optimización TSP, routing OSM |
+
+---
+
+## 🧩 WebMCP (Capa Agéntica Experimental)
+
+- **Objetivo**: exponer capacidades del ERP como tools para agentes IA en interfaz web.
+- **Activación**: `NEXT_PUBLIC_WEBMCP_ENABLED=true`.
+- **Registro global**: `src/components/providers/WebMCPProvider.tsx`.
+- **Catálogo de tools**: `src/lib/webmcp/tool-catalog.ts`.
+- **Ejecución segura**: `POST /api/webmcp/execute` (allowlist + control de rol + confirmación granular `none|soft|hard`).
+- **Descubrimiento por usuario**: `GET /api/webmcp/tools`.
+- **Trazabilidad**: `GET /api/webmcp/auditoria` + tabla `webmcp_audit_logs` (migración `20260214_webmcp_auditoria.sql`).
+- **Cobertura inicial**:
+  - Navegación de módulos (`dashboard`, `almacen`, `ventas`, `reparto`, `tesoreria`, `rrhh`, `sucursales`, `reportes`, `home`, `entregas`, `sucursal/dashboard`).
+  - Datos/acciones sobre APIs existentes de productos, reparto, tesorería, sucursales e IA operacional.
+  - Mutaciones críticas de ventas/almacén/reparto con confirmación reforzada cuando corresponde.
 
 ---
 

@@ -151,6 +151,7 @@ const navigation = [
     roles: ['admin'],
     children: [
       { name: 'Predicciones', href: '/dashboard/predicciones' },
+      { name: 'Capacidades IA', href: '/dashboard/ia-capacidades' },
       { name: 'Reportes IA', href: '/reportes/ia' },
       { name: 'Documentos IA', href: '/almacen/documentos' },
     ],
@@ -179,6 +180,7 @@ const navigation = [
       { name: 'Empleados', href: '/rrhh/empleados' },
       { name: 'Mensajes', href: '/rrhh/mensajes' },
       { name: 'Asistencia', href: '/rrhh/asistencia' },
+      { name: 'Horarios', href: '/rrhh/horarios' },
       { name: 'Liquidaciones', href: '/rrhh/liquidaciones' },
       { name: 'Adelantos', href: '/rrhh/adelantos' },
       { name: 'Licencias', href: '/rrhh/licencias' },

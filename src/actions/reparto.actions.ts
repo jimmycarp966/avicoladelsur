@@ -1881,15 +1881,19 @@ export async function asignarTransferenciaARutaDesdeAlmacen(
     }
 
     // Buscar ruta existente que coincida con fecha, turno y zona
-    const { data: rutaExistente, error: rutaError } = await supabase
+    let rutaExistenteQuery = supabase
       .from('rutas_reparto')
       .select('id')
       .eq('fecha_ruta', transferencia.fecha_entrega)
       .eq('turno', transferencia.turno)
-      .eq('zona_id', transferencia.zona_id)
       .in('estado', ['planificada', 'en_curso'])
       .limit(1)
-      .single()
+
+    rutaExistenteQuery = transferencia.zona_id
+      ? rutaExistenteQuery.eq('zona_id', transferencia.zona_id)
+      : rutaExistenteQuery.is('zona_id', null)
+
+    const { data: rutaExistente, error: rutaError } = await rutaExistenteQuery.single()
 
     let rutaId: string
 
@@ -1897,19 +1901,74 @@ export async function asignarTransferenciaARutaDesdeAlmacen(
       rutaId = rutaExistente.id
     } else {
       // Buscar plan semanal para obtener vehículo y repartidor
-      const { data: planSemanal, error: planError } = await supabase
+      let planSemanalQuery = supabase
         .from('plan_rutas_semanal')
         .select('vehiculo_id, repartidor_id')
-        .eq('zona_id', transferencia.zona_id)
         .eq('turno', transferencia.turno)
         .eq('activo', true)
         .limit(1)
-        .single()
 
-      if (planError || !planSemanal) {
+      if (transferencia.zona_id) {
+        planSemanalQuery = planSemanalQuery.eq('zona_id', transferencia.zona_id)
+      }
+
+      const { data: planSemanal, error: planError } = await planSemanalQuery.maybeSingle()
+      if (planError && planError.code !== 'PGRST116') {
+        throw new Error(`Error al buscar plan de ruta semanal: ${planError.message}`)
+      }
+      let vehiculoRutaId = planSemanal?.vehiculo_id || null
+      let repartidorRutaId = planSemanal?.repartidor_id || null
+      if (!vehiculoRutaId) {
+        const { data: vehiculoFallback, error: vehiculoFallbackError } = await supabase
+          .from('vehiculos')
+          .select('id')
+          .eq('activo', true)
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle()
+        if (vehiculoFallbackError && vehiculoFallbackError.code !== 'PGRST116') {
+          throw new Error(`Error al buscar vehiculo fallback: ${vehiculoFallbackError.message}`)
+        }
+        vehiculoRutaId = vehiculoFallback?.id || null
+      }
+      if (!vehiculoRutaId) {
         return {
           success: false,
-          error: 'No hay plan de ruta disponible para esta zona y turno. Configure un plan semanal primero.',
+          error: 'No hay vehiculos activos disponibles para crear la ruta de la transferencia.',
+        }
+      }
+      if (!repartidorRutaId) {
+        const { data: repartidorVehiculo, error: repartidorVehiculoError } = await supabase
+          .from('usuarios')
+          .select('id')
+          .eq('vehiculo_asignado', vehiculoRutaId)
+          .eq('rol', 'repartidor')
+          .eq('activo', true)
+          .limit(1)
+          .maybeSingle()
+        if (repartidorVehiculoError && repartidorVehiculoError.code !== 'PGRST116') {
+          throw new Error(`Error al buscar repartidor por vehiculo: ${repartidorVehiculoError.message}`)
+        }
+        repartidorRutaId = repartidorVehiculo?.id || null
+      }
+      if (!repartidorRutaId) {
+        const { data: repartidorFallback, error: repartidorFallbackError } = await supabase
+          .from('usuarios')
+          .select('id')
+          .eq('rol', 'repartidor')
+          .eq('activo', true)
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle()
+        if (repartidorFallbackError && repartidorFallbackError.code !== 'PGRST116') {
+          throw new Error(`Error al buscar repartidor fallback: ${repartidorFallbackError.message}`)
+        }
+        repartidorRutaId = repartidorFallback?.id || null
+      }
+      if (!repartidorRutaId) {
+        return {
+          success: false,
+          error: 'No hay repartidores activos disponibles para crear la ruta de la transferencia.',
         }
       }
 
@@ -1925,13 +1984,15 @@ export async function asignarTransferenciaARutaDesdeAlmacen(
         .from('rutas_reparto')
         .insert({
           numero_ruta: numeroRutaData as string,
-          vehiculo_id: planSemanal.vehiculo_id,
-          repartidor_id: planSemanal.repartidor_id,
+          vehiculo_id: vehiculoRutaId,
+          repartidor_id: repartidorRutaId,
           fecha_ruta: transferencia.fecha_entrega,
           turno: transferencia.turno,
           zona_id: transferencia.zona_id,
           estado: 'planificada',
-          observaciones: 'Ruta creada automáticamente para transferencia',
+          observaciones: planSemanal
+            ? 'Ruta creada automaticamente para transferencia'
+            : 'Ruta creada automaticamente para transferencia (fallback sin plan semanal)',
         })
         .select()
         .single()

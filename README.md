@@ -31,6 +31,23 @@
 - **Catálogo Web Público**: Sincronización automática de carritos web con el bot de WhatsApp vía códigos únicos (`carritos_pendientes`).
 - **Optimización Logística**: Algoritmos híbridos (OpenRouteService + Google Directions + Heurística local) para reparto eficiente.
 
+### 🧩 WebMCP (Experimental)
+- Estado: integración experimental para exponer herramientas del ERP a agentes IA desde frontend.
+- Activación por flag: `NEXT_PUBLIC_WEBMCP_ENABLED=true`.
+- Cobertura: navegación agéntica en admin/repartidor/sucursal y tools de datos por rol.
+- Cobertura Fase 2: mutaciones de ventas/almacén/reparto (facturación, pesaje, entregas, devoluciones, optimización de rutas) con permisos por rol.
+- Seguridad: control de rol server-side y confirmación granular por riesgo (`none`, `soft`, `hard`).
+- Endpoints internos:
+  - `GET /api/webmcp/tools` lista tools habilitadas según usuario.
+  - `POST /api/webmcp/execute` ejecuta tools de API con allowlist y validación de permisos.
+  - `GET /api/webmcp/auditoria` consulta trazabilidad de ejecuciones WebMCP.
+- Puntos de código:
+  - `src/components/providers/WebMCPProvider.tsx`
+  - `src/lib/webmcp/tool-catalog.ts`
+  - `src/app/api/webmcp/execute/route.ts`
+  - `src/app/api/webmcp/auditoria/route.ts`
+  - `supabase/migrations/20260214_webmcp_auditoria.sql`
+
 ### 🚛 Logística Avanzada (TMS)
 - **Navegación Interactiva**: App de repartidor con selección de rutas alternativas en tiempo real (OpenRouteService con datos OSM actualizados).
 - **Decisión Inteligente**: Priorización automática de próximo cliente basada en horario de cierre y distancia.
@@ -88,7 +105,7 @@
    ```bash
    cp env.example .env.local
    ```
-   Completar con claves Supabase (`NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`), Google (`GOOGLE_AI_API_KEY`, `GOOGLE_MAPS_API_KEY`, `GOOGLE_PLACES_API_KEY`), IA (`GEMINI_MODEL_FLASH`, `GEMINI_MODEL_PRO` si se sobreescribe) y WhatsApp (`WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_BUSINESS_TOKEN` o `TWILIO_*`). Añadir `NGROK_AUTH_TOKEN` para exponer webhooks locales.
+   Completar con claves Supabase (`NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`), Google (`GOOGLE_GEMINI_API_KEY`, `GOOGLE_MAPS_API_KEY`, `GOOGLE_PLACES_API_KEY`), IA (`GEMINI_MODEL_FLASH`, `GEMINI_MODEL_PRO` si se sobreescribe) y WhatsApp (`WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_BUSINESS_TOKEN` o `TWILIO_*`). `GOOGLE_AI_API_KEY` se mantiene solo por compatibilidad legacy. Añadir `NGROK_AUTH_TOKEN` para exponer webhooks locales.
 5. **Sincronizar assets IA (opcional)**
    ```bash
    npm run ia:sync
@@ -1629,6 +1646,7 @@ BOTPRESS_WEBHOOK_URL=https://your-botpress-webhook
 | [🏗️ ARCHITECTURE_SUMMARY.md](./ARCHITECTURE_SUMMARY.md) | Resumen ejecutivo de la arquitectura del sistema |
 | [📐 ARCHITECTURE.MD](./ARCHITECTURE.MD) | Arquitectura técnica detallada con diagramas |
 | [🧪 TESTING.md](./TESTING.md) | Guía completa de pruebas del sistema |
+| [🤖 docs/IA_CAPABILITIES.md](./docs/IA_CAPABILITIES.md) | Inventario operativo de capacidades IA, estrategias y rutas canónicas |
 | [🗃️ SUPABASE_SETUP.md](./SUPABASE_SETUP.md) | Configuración de la base de datos Supabase |
 | [👔 RRHH_README.md](./RRHH_README.md) | Documentación del módulo de Recursos Humanos |
 | [🔑 credenciales.md](./credenciales.md) | Credenciales de acceso para testing |

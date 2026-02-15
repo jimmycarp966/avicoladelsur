@@ -10,6 +10,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { AIStrategyBadge } from '@/components/ai/AIStrategyBadge'
+import type { AIMetadata } from '@/types/ai.types'
 import { useNotificationStore } from '@/store/notificationStore'
 import { Loader2, Save, Upload, X, Sparkles, Building2 } from 'lucide-react'
 import { uploadFileToStorage } from '@/lib/supabase/storage'
@@ -29,6 +31,7 @@ interface SugerenciaIA {
   categoria: string
   confianza: number
   razon: string
+  ai?: AIMetadata | null
 }
 
 export function GastoForm({ categorias, cajas }: GastoFormProps) {
@@ -94,7 +97,7 @@ export function GastoForm({ categorias, cajas }: GastoFormProps) {
     }
     setCargandoSugerencia(true)
     try {
-      const response = await fetch('/api/ia/clasificar-gasto', {
+      const response = await fetch('/api/tesoreria/clasificar-gasto', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ descripcion }),
@@ -105,6 +108,7 @@ export function GastoForm({ categorias, cajas }: GastoFormProps) {
           categoria: data.categoria,
           confianza: data.confianza || 50,
           razon: data.razon || '',
+          ai: data.ai || null,
         })
       } else {
         setSugerenciaIA(null)
@@ -350,6 +354,9 @@ export function GastoForm({ categorias, cajas }: GastoFormProps) {
                       {sugerenciaIA.confianza}% confianza
                     </Badge>
                   </p>
+                  <div className="mt-1">
+                    <AIStrategyBadge ai={sugerenciaIA.ai} />
+                  </div>
                   {sugerenciaIA.razon && (
                     <p className="text-xs text-muted-foreground truncate">{sugerenciaIA.razon}</p>
                   )}

@@ -1,14 +1,13 @@
 'use client'
 
-import { Suspense, useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { EmpleadosTable } from '@/components/tables/EmpleadosTable'
 import { Button } from '@/components/ui/button'
 import { Plus, Users, UserCheck, TrendingUp, Building2 } from 'lucide-react'
 import Link from 'next/link'
-import { eliminarEmpleadoAction } from '@/actions/rrhh.actions'
+import { eliminarEmpleadoAction, obtenerEmpleadosActivosAction } from '@/actions/rrhh.actions'
 import { useNotificationStore } from '@/store/notificationStore'
-import { createClient } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatCard } from '@/components/ui/stat-card'
 import { Card, CardContent } from '@/components/ui/card'
@@ -33,35 +32,39 @@ export default function EmpleadosPage() {
   const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
+    let mounted = true
+
     const loadEmpleados = async () => {
       try {
-        const supabase = createClient()
-        const { data, error } = await supabase
-          .from('rrhh_empleados')
-          .select(`
-            *,
-            usuario:usuarios(id, nombre, apellido, email),
-            sucursal:sucursales(id, nombre),
-            categoria:rrhh_categorias(id, nombre, sueldo_basico)
-          `)
-          .eq('activo', true)
-          .order('created_at', { ascending: false })
+        const result = await Promise.race([
+          obtenerEmpleadosActivosAction(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Timeout al cargar empleados')), 12000)
+          ),
+        ])
 
-        if (error) {
-          console.error('Error fetching empleados:', error)
+        if (!mounted) return
+
+        if (!result.success) {
+          console.error('Error fetching empleados:', result.error)
           showToast('error', 'Error al cargar empleados', 'Error')
         } else {
-          setEmpleados(data as Empleado[])
+          setEmpleados(result.data || [])
         }
       } catch (error) {
+        if (!mounted) return
         console.error('Error loading empleados:', error)
         showToast('error', 'Error al cargar empleados', 'Error')
       } finally {
-        setLoading(false)
+        if (mounted) setLoading(false)
       }
     }
 
     loadEmpleados()
+
+    return () => {
+      mounted = false
+    }
   }, [showToast])
 
   const handleView = (empleado: Empleado) => {
@@ -90,7 +93,7 @@ export default function EmpleadosPage() {
       } else {
         showToast('error', result.error || 'Error al eliminar empleado', 'Error')
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error deleting empleado:', error)
       showToast('error', 'Error al eliminar empleado', 'Error')
     } finally {

@@ -9,6 +9,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { AlertCircle, BookOpenText, Sparkles } from 'lucide-react'
+import { AIStrategyBadge } from '@/components/ai/AIStrategyBadge'
+import type { AIMetadata } from '@/types/ai.types'
 
 function getFecha(offset: number) {
   const date = new Date()
@@ -27,6 +29,8 @@ export default function ReportesIA() {
   const [errorReporte, setErrorReporte] = useState<string | null>(null)
   const [errorChat, setErrorChat] = useState<string | null>(null)
   const [loading, setLoading] = useState<'reporte' | 'chat' | null>(null)
+  const [aiReporte, setAiReporte] = useState<AIMetadata | null>(null)
+  const [aiChat, setAiChat] = useState<AIMetadata | null>(null)
 
   const hayReporte = useMemo(() => Boolean(reporte?.contenido), [reporte])
 
@@ -45,6 +49,7 @@ export default function ReportesIA() {
       const data = await resp.json()
       if (!resp.ok || !data.success) {
         setErrorReporte(data.error || 'No se pudo generar el reporte')
+        setAiReporte(data.ai || null)
         return
       }
 
@@ -53,6 +58,7 @@ export default function ReportesIA() {
         contenido: data.data?.contenido,
         fecha: data.data?.fechaGeneracion,
       })
+      setAiReporte(data.ai || null)
       setEstado('Reporte generado con Gemini')
     } catch (err: any) {
       setErrorReporte(err?.message || 'Error inesperado')
@@ -81,10 +87,12 @@ export default function ReportesIA() {
       const data = await resp.json()
       if (!resp.ok || !data.success) {
         setErrorChat(data.error || 'No se pudo obtener respuesta')
+        setAiChat(data.ai || null)
         return
       }
 
       setRespuesta(data.data?.respuesta || '')
+      setAiChat(data.ai || null)
       setEstado('Respuesta generada con Gemini')
     } catch (err: any) {
       setErrorChat(err?.message || 'Error inesperado')
@@ -117,10 +125,13 @@ export default function ReportesIA() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="border-primary/20">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BookOpenText className="h-5 w-5 text-primary" />
-              Generar reporte IA
-            </CardTitle>
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="flex items-center gap-2">
+                <BookOpenText className="h-5 w-5 text-primary" />
+                Generar reporte IA
+              </CardTitle>
+              <AIStrategyBadge ai={aiReporte} />
+            </div>
             <CardDescription>Resumen ejecutivo con ventas y productos más vendidos</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -180,10 +191,13 @@ export default function ReportesIA() {
 
         <Card className="border-primary/20">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
-              Chat de análisis
-            </CardTitle>
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                Chat de análisis
+              </CardTitle>
+              <AIStrategyBadge ai={aiChat} />
+            </div>
             <CardDescription>Preguntas en lenguaje natural sobre tus datos recientes</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

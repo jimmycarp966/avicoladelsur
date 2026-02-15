@@ -16,7 +16,11 @@
     "verificar-bot": "node verificar-datos-bot.js",
     "test:sucursales": "npx tsx scripts/test-sucursales-robot.ts",
     "test:bot:webhook": "npx tsx scripts/test-bot-webhook.ts",
-    "test:bot:e2e": "playwright test tests/bot-webhook.spec.ts"
+    "test:bot:e2e": "playwright test tests/bot-webhook.spec.ts",
+    "test:webmcp:presupuesto-flow": "node scripts/test-webmcp-presupuesto-flow.cjs",
+    "test:webmcp:sucursales-transferencias": "node scripts/test-webmcp-sucursales-transferencias.cjs",
+    "test:webmcp:reparto-pedidos": "node scripts/test-webmcp-reparto-pedidos.cjs",
+    "test:webmcp:rrhh-flow": "node scripts/test-webmcp-rrhh-flow.cjs"
   },
   "dependencies": {
     "@google-cloud/storage-mcp": "^0.3.2",
@@ -24,6 +28,7 @@
     "@google/genai": "^1.35.0",
     "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "^5.2.2",
+    "@mcp-b/global": "^1.5.0",
     "@mediapipe/tasks-vision": "^0.10.22-rc.20250304",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",

@@ -2,6 +2,7 @@
 
 import { ReactNode } from 'react'
 import { AuthProvider } from './AuthProvider'
+import { WebMCPProvider } from './WebMCPProvider'
 import { Toaster } from '@/components/ui/sonner'
 
 interface ProvidersProps {
@@ -11,6 +12,7 @@ interface ProvidersProps {
 export function Providers({ children }: ProvidersProps) {
   return (
     <AuthProvider>
+      <WebMCPProvider />
       {children}
       <Toaster
         position="top-right"

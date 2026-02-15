@@ -1,17 +1,13 @@
-# Evidencia de Actualización
-**Fecha y Hora:** 14 de enero de 2026 - 22:45
+# Evidencia de Actualizacion
+**Fecha y Hora:** 13 de febrero de 2026 - 06:38
 
 ## Archivos Modificados
-- `.context/MEMORY.md`
-- `src/actions/ventas.actions.ts`
-- `src/app/api/bot/route.ts`
-- `src/lib/vertex/agent.ts`
-- `src/lib/vertex/prompts/system-prompt.ts`
-- `ARCHITECTURE_SUMMARY.md`
+- `hikvision.md`
 - `docs/CHANGELOG.md`
+- `docs/last_update.md`
 
 ## Resumen del Cambio
-Se optimizó el Bot WhatsApp para mejorar el flujo de registro de clientes (códigos numéricos consecutivos, geocodificación de coordenadas y asignación de zona_id) y la precisión en la toma de pedidos mediante lectura dinámica de productos desde Supabase y un sistema inteligente de búsqueda (código/nombre), impacto: mejora en la consistencia de datos de clientes y tickets de venta.
+Se actualizo la documentacion de RRHH Horarios para aclarar que las marcaciones se consultan por API de Hikvision (Hik-Connect), que el estado "No mapeado" depende del mapeo `employeeNo`/`personCode` contra RRHH, y que se recomienda un campo dedicado `hik_person_code` para un vinculo estable sin usar `dni` como identificador externo.
 
-## Diagrama de Arquitectura
-Ruta: `docs/diagrams/architecture.mmd` (Actualizado para reflejar flujo Bot -> DB dinámico)
+## Nota Operativa
+No se aplicaron cambios de codigo ni migraciones en esta tarea; solo documentacion.

@@ -689,6 +689,36 @@ export interface ReporteAdelantos {
   estado: string
 }
 
+// Horarios (PoC Hik-Connect)
+export interface HorarioMarcacionRawHik {
+  [key: string]: unknown
+}
+
+export interface HorarioEventoNormalizado {
+  employee_no: string
+  timestamp: string
+  type: 'check_in' | 'check_out'
+  raw: HorarioMarcacionRawHik
+}
+
+export interface HorarioDiarioEmpleado {
+  employee_no: string
+  empleado_id?: string
+  dni?: string
+  empleado_nombre?: string
+  hora_entrada?: string
+  hora_salida?: string
+  mapeado: boolean
+  origen: 'hik_connect'
+}
+
+export interface HorariosHoyData {
+  fecha: string
+  total_eventos: number
+  registros: HorarioDiarioEmpleado[]
+  warnings: string[]
+}
+
 // Lista de Precios
 export interface ListaPrecio extends BaseEntity {
   codigo: string
@@ -834,4 +864,3 @@ export interface Pesaje extends BaseEntity {
   producto?: Producto
   operario?: Usuario
 }
-
