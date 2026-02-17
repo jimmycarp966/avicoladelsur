@@ -1,13 +1,20 @@
 # Evidencia de Actualizacion
-**Fecha y Hora:** 13 de febrero de 2026 - 06:38
+**Fecha y Hora:** 17 de febrero de 2026 - 12:20
 
 ## Archivos Modificados
-- `hikvision.md`
 - `docs/CHANGELOG.md`
 - `docs/last_update.md`
 
 ## Resumen del Cambio
-Se actualizo la documentacion de RRHH Horarios para aclarar que las marcaciones se consultan por API de Hikvision (Hik-Connect), que el estado "No mapeado" depende del mapeo `employeeNo`/`personCode` contra RRHH, y que se recomienda un campo dedicado `hik_person_code` para un vinculo estable sin usar `dni` como identificador externo.
+Se actualizo la documentacion para registrar la entrega operativa del 17/02/2026, incluyendo:
+
+- Validacion IA de certificados en licencias RRHH y flujo pendiente para auditoria manual.
+- Regla de plazo de presentacion de certificado dentro de 24 hs (gestionado por RRHH).
+- Sincronizacion entre recepcion de almacen y movimientos de proveedores.
+- Refactor UX/UI de pagina `almacen/recepcion`.
+- Filtros y activacion de notificaciones por area.
+- Renombre funcional de facturacion a comprobantes y nueva numeracion `COMP-000000001` para nuevas emisiones.
+- Ajustes en sucursales, transferencias, orden en `en preparacion` y cierre de sesion.
 
 ## Nota Operativa
-No se aplicaron cambios de codigo ni migraciones en esta tarea; solo documentacion.
+Esta actualizacion documenta cambios ya implementados en codigo y migraciones dentro del commit `6055937e`.
