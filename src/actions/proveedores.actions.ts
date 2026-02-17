@@ -416,6 +416,40 @@ export async function listarPagosProveedorAction(proveedorId: string) {
     }
 }
 
+// Listar movimientos de almacen vinculados al proveedor
+export async function listarMovimientosProveedorAction(proveedorId: string) {
+    try {
+        const supabase = await createClient()
+
+        const { data, error } = await supabase
+            .from('recepcion_almacen')
+            .select(`
+                id,
+                created_at,
+                tipo,
+                cantidad,
+                unidad_medida,
+                motivo,
+                numero_comprobante_ref,
+                tipo_comprobante_ref,
+                fecha_comprobante,
+                monto_compra,
+                producto:productos(id, codigo, nombre),
+                factura:proveedores_facturas(id, numero_factura, estado, monto_total, monto_pagado)
+            `)
+            .eq('proveedor_id', proveedorId)
+            .order('created_at', { ascending: false })
+            .limit(200)
+
+        if (error) throw error
+
+        return { success: true, data: data || [] }
+    } catch (error: any) {
+        devError('Error en listarMovimientosProveedorAction:', error)
+        return { success: false, error: error.message || 'Error al listar movimientos' }
+    }
+}
+
 // Obtener estado de cuenta de un proveedor
 export async function obtenerEstadoCuentaProveedorAction(proveedorId: string) {
     try {

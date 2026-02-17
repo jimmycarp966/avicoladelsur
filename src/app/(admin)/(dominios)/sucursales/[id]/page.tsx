@@ -154,6 +154,7 @@ export default async function SucursalDashboardPage({ params }: PageProps) {
                                 <table className="w-full text-sm text-left">
                                     <thead className="bg-muted/50 text-muted-foreground">
                                         <tr>
+                                            <th className="p-4 font-medium">Codigo</th>
                                             <th className="p-4 font-medium">Producto</th>
                                             <th className="p-4 font-medium text-right">Cantidad</th>
                                             <th className="p-4 font-medium text-center">Estado</th>
@@ -163,6 +164,7 @@ export default async function SucursalDashboardPage({ params }: PageProps) {
                                     <tbody>
                                         {inventario.map((item) => (
                                             <tr key={item.productoId} className="border-t hover:bg-muted/50">
+                                                <td className="p-4 font-mono text-xs text-muted-foreground">{item.codigo || '-'}</td>
                                                 <td className="p-4 font-medium">{item.nombre}</td>
                                                 <td className="p-4 text-right">{item.cantidadActual}</td>
                                                 <td className="p-4 text-center">
@@ -183,7 +185,7 @@ export default async function SucursalDashboardPage({ params }: PageProps) {
                                         ))}
                                         {inventario.length === 0 && (
                                             <tr>
-                                                <td colSpan={4} className="p-8 text-center text-muted-foreground">
+                                                <td colSpan={5} className="p-8 text-center text-muted-foreground">
                                                     No hay inventario registrado en esta sucursal
                                                 </td>
                                             </tr>

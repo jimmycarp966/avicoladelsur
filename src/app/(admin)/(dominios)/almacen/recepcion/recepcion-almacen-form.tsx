@@ -16,11 +16,29 @@ interface RecepcionAlmacenFormProps {
   productos: Array<{ id: string; nombre: string; codigo: string; unidad_medida: string; categoria?: string }>
   lotes: Array<{ id: string; numero_lote: string; producto_id: string; cantidad_disponible: number; proveedor?: string }>
   categorias: string[]
-  proveedores: string[]
+  proveedoresFiltro: string[]
+  proveedoresTesoreria: Array<{ id: string; nombre: string }>
+  facturasProveedorPendientes: Array<{
+    id: string
+    proveedor_id: string
+    numero_factura: string
+    estado: string
+    monto_total: number
+    monto_pagado: number
+    fecha_emision: string
+  }>
 }
 
-export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores }: RecepcionAlmacenFormProps) {
+export function RecepcionAlmacenForm({
+  productos,
+  lotes,
+  categorias,
+  proveedoresFiltro,
+  proveedoresTesoreria,
+  facturasProveedorPendientes,
+}: RecepcionAlmacenFormProps) {
   const router = useRouter()
+  const today = new Date().toISOString().slice(0, 10)
   const [loading, setLoading] = useState(false)
   const [tipo, setTipo] = useState<'ingreso' | 'egreso'>('ingreso')
   const [productoId, setProductoId] = useState('')
@@ -29,6 +47,12 @@ export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores
   const [unidadMedida, setUnidadMedida] = useState('kg')
   const [motivo, setMotivo] = useState('')
   const [destinoProduccion, setDestinoProduccion] = useState(false)
+  const [proveedorId, setProveedorId] = useState('')
+  const [facturaProveedorId, setFacturaProveedorId] = useState('')
+  const [numeroComprobanteRef, setNumeroComprobanteRef] = useState('')
+  const [tipoComprobanteRef, setTipoComprobanteRef] = useState('factura')
+  const [fechaComprobante, setFechaComprobante] = useState(today)
+  const [montoCompra, setMontoCompra] = useState('')
   
   // Filtros de búsqueda
   const [busquedaProducto, setBusquedaProducto] = useState('')
@@ -70,6 +94,16 @@ export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores
     return lotes.filter(l => l.producto_id === productoId)
   }, [lotes, productoId])
 
+  const facturasProveedorFiltradas = useMemo(() => {
+    if (!proveedorId) return []
+    return facturasProveedorPendientes.filter((factura) => factura.proveedor_id === proveedorId)
+  }, [facturasProveedorPendientes, proveedorId])
+
+  const facturaSeleccionada = useMemo(
+    () => facturasProveedorFiltradas.find((factura) => factura.id === facturaProveedorId),
+    [facturasProveedorFiltradas, facturaProveedorId]
+  )
+
   // Obtener unidad de medida del producto seleccionado y asignarla automáticamente
   const productoSeleccionado = productos.find(p => p.id === productoId)
   const unidadMedidaProducto = productoSeleccionado?.unidad_medida || 'kg'
@@ -102,6 +136,25 @@ export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores
         return
       }
 
+      const esCompra = tipo === 'ingreso' && motivo === 'compra'
+      if (esCompra && !proveedorId) {
+        toast.error('Selecciona el proveedor para sincronizar deuda y comprobantes')
+        setLoading(false)
+        return
+      }
+
+      if (esCompra && !facturaProveedorId && !numeroComprobanteRef.trim()) {
+        toast.error('Ingresa un numero de comprobante o vincula una factura de proveedor')
+        setLoading(false)
+        return
+      }
+
+      if (esCompra && !facturaProveedorId && (!montoCompra || parseFloat(montoCompra) <= 0)) {
+        toast.error('Para compras nuevas debes indicar un monto de compra mayor a 0')
+        setLoading(false)
+        return
+      }
+
       const response = await fetch('/api/almacen/recepcion', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -113,6 +166,14 @@ export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores
           unidad_medida: unidadMedida || unidadMedidaProducto,
           motivo,
           destino_produccion: tipo === 'egreso' ? destinoProduccion : false,
+          proveedor_id: tipo === 'ingreso' && proveedorId ? proveedorId : undefined,
+          factura_proveedor_id: tipo === 'ingreso' && facturaProveedorId ? facturaProveedorId : undefined,
+          numero_comprobante_ref: tipo === 'ingreso'
+            ? (numeroComprobanteRef.trim() || facturaSeleccionada?.numero_factura || undefined)
+            : undefined,
+          tipo_comprobante_ref: tipo === 'ingreso' ? tipoComprobanteRef : undefined,
+          fecha_comprobante: tipo === 'ingreso' ? fechaComprobante : undefined,
+          monto_compra: tipo === 'ingreso' && montoCompra ? parseFloat(montoCompra) : undefined,
         }),
       })
 
@@ -127,8 +188,14 @@ export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores
         setMotivo('')
         setDestinoProduccion(false)
         setBusquedaProducto('')
-        setFiltroCategoria('')
-        setFiltroProveedor('')
+        setFiltroCategoria('all')
+        setFiltroProveedor('all')
+        setProveedorId('')
+        setFacturaProveedorId('')
+        setNumeroComprobanteRef('')
+        setTipoComprobanteRef('factura')
+        setFechaComprobante(today)
+        setMontoCompra('')
         setUnidadMedida('kg') // Se reseteará automáticamente con el useEffect
         router.refresh()
       } else {
@@ -153,7 +220,21 @@ export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Tabs value={tipo} onValueChange={(value) => setTipo(value as 'ingreso' | 'egreso')}>
+        <Tabs
+          value={tipo}
+          onValueChange={(value) => {
+            const nextTipo = value as 'ingreso' | 'egreso'
+            setTipo(nextTipo)
+            if (nextTipo === 'egreso') {
+              setProveedorId('')
+              setFacturaProveedorId('')
+              setNumeroComprobanteRef('')
+              setTipoComprobanteRef('factura')
+              setFechaComprobante(today)
+              setMontoCompra('')
+            }
+          }}
+        >
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="ingreso" className="flex items-center gap-2">
               <ArrowDownCircle className="h-4 w-4" />
@@ -222,7 +303,7 @@ export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Todos los proveedores</SelectItem>
-                        {proveedores.map(prov => (
+                        {proveedoresFiltro.map(prov => (
                           <SelectItem key={prov} value={prov}>
                             {prov}
                           </SelectItem>
@@ -239,8 +320,8 @@ export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores
                       size="sm"
                       onClick={() => {
                         setBusquedaProducto('')
-                        setFiltroCategoria('')
-                        setFiltroProveedor('')
+                        setFiltroCategoria('all')
+                        setFiltroProveedor('all')
                       }}
                       className="text-xs"
                     >
@@ -386,6 +467,129 @@ export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores
                 </Select>
               </div>
 
+              <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
+                <div>
+                  <p className="text-sm font-semibold">Sincronizacion con Proveedores</p>
+                  <p className="text-xs text-muted-foreground">
+                    Para ingresos por compra podes vincular deuda, comprobante y factura del proveedor.
+                  </p>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="proveedor-ingreso">
+                      Proveedor {motivo === 'compra' ? '*' : '(opcional)'}
+                    </Label>
+                    <Select
+                      value={proveedorId || 'none'}
+                      onValueChange={(value) => {
+                        const next = value === 'none' ? '' : value
+                        setProveedorId(next)
+                        setFacturaProveedorId('')
+                        setNumeroComprobanteRef('')
+                        setMontoCompra('')
+                      }}
+                    >
+                      <SelectTrigger id="proveedor-ingreso">
+                        <SelectValue placeholder="Selecciona proveedor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sin proveedor</SelectItem>
+                        {proveedoresTesoreria.map((proveedor) => (
+                          <SelectItem key={proveedor.id} value={proveedor.id}>
+                            {proveedor.nombre}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="factura-proveedor-ingreso">Factura existente (opcional)</Label>
+                    <Select
+                      value={facturaProveedorId || 'none'}
+                      onValueChange={(value) => setFacturaProveedorId(value === 'none' ? '' : value)}
+                      disabled={!proveedorId}
+                    >
+                      <SelectTrigger id="factura-proveedor-ingreso">
+                        <SelectValue placeholder="Vincular factura pendiente/parcial" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Nueva factura / sin vincular</SelectItem>
+                        {facturasProveedorFiltradas.map((factura) => (
+                          <SelectItem key={factura.id} value={factura.id}>
+                            {factura.numero_factura} - {factura.estado}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="tipo-comprobante-ref">Tipo comprobante</Label>
+                    <Select value={tipoComprobanteRef} onValueChange={setTipoComprobanteRef}>
+                      <SelectTrigger id="tipo-comprobante-ref">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="factura">Factura</SelectItem>
+                        <SelectItem value="remito">Remito</SelectItem>
+                        <SelectItem value="recibo">Recibo</SelectItem>
+                        <SelectItem value="nota_credito">Nota de credito</SelectItem>
+                        <SelectItem value="otro">Otro</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="fecha-comprobante-ref">Fecha comprobante</Label>
+                    <Input
+                      id="fecha-comprobante-ref"
+                      type="date"
+                      value={fechaComprobante}
+                      onChange={(event) => setFechaComprobante(event.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="numero-comprobante-ref">
+                      Numero comprobante {motivo === 'compra' ? '*' : '(opcional)'}
+                    </Label>
+                    <Input
+                      id="numero-comprobante-ref"
+                      placeholder="Ej: 0001-00001234"
+                      value={numeroComprobanteRef}
+                      onChange={(event) => setNumeroComprobanteRef(event.target.value)}
+                      disabled={!!facturaProveedorId}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="monto-compra-ref">Monto compra (deuda)</Label>
+                    <Input
+                      id="monto-compra-ref"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={montoCompra}
+                      onChange={(event) => setMontoCompra(event.target.value)}
+                      disabled={!!facturaProveedorId}
+                    />
+                  </div>
+                </div>
+
+                {facturaSeleccionada && (
+                  <div className="rounded-md border bg-background p-3 text-xs text-muted-foreground">
+                    Factura vinculada: {facturaSeleccionada.numero_factura} - estado {facturaSeleccionada.estado}.
+                    Saldo pendiente aproximado:{' '}
+                    {(facturaSeleccionada.monto_total - facturaSeleccionada.monto_pagado).toFixed(2)}
+                  </div>
+                )}
+              </div>
+
               <Button type="submit" disabled={loading} className="w-full">
                 {loading ? 'Registrando...' : 'Registrar Ingreso'}
               </Button>
@@ -449,7 +653,7 @@ export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Todos los proveedores</SelectItem>
-                        {proveedores.map(prov => (
+                        {proveedoresFiltro.map(prov => (
                           <SelectItem key={prov} value={prov}>
                             {prov}
                           </SelectItem>
@@ -466,8 +670,8 @@ export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores
                       size="sm"
                       onClick={() => {
                         setBusquedaProducto('')
-                        setFiltroCategoria('')
-                        setFiltroProveedor('')
+                        setFiltroCategoria('all')
+                        setFiltroProveedor('all')
                       }}
                       className="text-xs"
                     >
@@ -601,4 +805,3 @@ export function RecepcionAlmacenForm({ productos, lotes, categorias, proveedores
     </Card>
   )
 }
-

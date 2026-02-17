@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowDownCircle, ArrowUpCircle, Calendar, Filter, Package } from 'lucide-react'
+import { ArrowDownCircle, ArrowUpCircle, Package } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
@@ -126,6 +126,8 @@ export function RecepcionAlmacenLista({
                   <TableHead>Lote</TableHead>
                   <TableHead>Cantidad</TableHead>
                   <TableHead>Motivo</TableHead>
+                  <TableHead>Proveedor</TableHead>
+                  <TableHead>Comprobante</TableHead>
                   <TableHead>Usuario</TableHead>
                 </TableRow>
               </TableHeader>
@@ -173,6 +175,19 @@ export function RecepcionAlmacenLista({
                       )}
                     </TableCell>
                     <TableCell>
+                      {recepcion.proveedor?.nombre || '-'}
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium text-xs">
+                        {recepcion.factura_proveedor?.numero_factura || recepcion.numero_comprobante_ref || '-'}
+                      </div>
+                      {recepcion.monto_compra ? (
+                        <span className="text-xs text-muted-foreground">${Number(recepcion.monto_compra).toFixed(2)}</span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
                       {recepcion.usuario?.nombre || 'N/A'} {recepcion.usuario?.apellido || ''}
                     </TableCell>
                   </TableRow>
@@ -185,4 +200,3 @@ export function RecepcionAlmacenLista({
     </Card>
   )
 }
-

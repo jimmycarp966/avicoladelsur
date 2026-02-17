@@ -39,6 +39,7 @@ export default async function LicenciasPage() {
   const totalLicencias = licencias.length
   const aprobadas = licencias.filter(l => l.aprobado).length
   const pendientes = licencias.filter(l => !l.aprobado).length
+  const pendientesRevision = licencias.filter(l => l.estado_revision === 'pendiente').length
 
   // Licencias por tipo
   const porTipo = {
@@ -109,6 +110,7 @@ export default async function LicenciasPage() {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Pendientes</p>
               <p className="text-2xl font-bold text-gray-900">{pendientes}</p>
+              <p className="text-xs text-muted-foreground">{pendientesRevision} en revision RRHH</p>
             </div>
           </div>
         </div>
@@ -162,8 +164,8 @@ export default async function LicenciasPage() {
           <div>
             <h3 className="font-semibold text-blue-900">Sistema de Licencias</h3>
             <p className="text-blue-700 text-sm mt-1">
-              Las licencias requieren aprobación antes de ser efectivas. Los empleados en licencia activa
-              no generan asistencia y afectan los cálculos de presentismo y productividad.
+              Sin certificado no se valida. Cada licencia queda en revision manual de RRHH con auditoria IA
+              y control de plazo de presentacion dentro de 24 horas (con excepciones autorizadas).
             </p>
           </div>
         </div>

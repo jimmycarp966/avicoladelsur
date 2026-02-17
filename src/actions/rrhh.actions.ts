@@ -2,6 +2,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { getGeminiModel } from '@/lib/ai/runtime'
+import { GEMINI_MODEL_FLASH } from '@/lib/constants/gemini-models'
 import { devError } from '@/lib/utils/logger'
 import type { ApiResponse } from '@/types/api.types'
 import type { Empleado } from '@/types/domain.types'
@@ -1029,27 +1031,250 @@ export async function marcarLiquidacionPagadaAction(liquidacionId: string): Prom
 
 // ========== LICENCIAS ==========
 
-export async function crearLicenciaAction(
-  licenciaData: {
-    empleado_id: string
-    tipo: 'vacaciones' | 'enfermedad' | 'maternidad' | 'estudio' | 'otro'
-    fecha_inicio: string
-    fecha_fin: string
-    observaciones?: string
+type AuditoriaCertificadoIA = {
+  valido: boolean
+  confianza: number
+  observaciones: string
+  nombreDetectado?: string
+  diagnosticoDetectado?: string
+}
+
+function normalizarTexto(value?: string | null) {
+  return (value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function coincideNombre(esperado: string, detectado: string) {
+  const esperadoNorm = normalizarTexto(esperado)
+  const detectadoNorm = normalizarTexto(detectado)
+
+  if (!esperadoNorm || !detectadoNorm) return false
+  if (esperadoNorm.includes(detectadoNorm) || detectadoNorm.includes(esperadoNorm)) return true
+
+  const tokens = esperadoNorm.split(' ').filter((token) => token.length > 2)
+  return tokens.length > 0 && tokens.every((token) => detectadoNorm.includes(token))
+}
+
+function coincideDiagnostico(reportado?: string, detectado?: string) {
+  const reportadoNorm = normalizarTexto(reportado)
+  const detectadoNorm = normalizarTexto(detectado)
+
+  if (!reportadoNorm) return true
+  if (!detectadoNorm) return false
+  return reportadoNorm.includes(detectadoNorm) || detectadoNorm.includes(reportadoNorm)
+}
+
+async function auditarCertificadoConIA(
+  file: File,
+  contexto: { nombreEmpleado: string; diagnosticoReportado?: string }
+): Promise<AuditoriaCertificadoIA> {
+  const fallback: AuditoriaCertificadoIA = {
+    valido: false,
+    confianza: 0,
+    observaciones: 'No se pudo validar automaticamente. Requiere revision manual.',
   }
-): Promise<ApiResponse<{ licenciaId: string }>> {
+
+  if (!file.type.startsWith('image/')) {
+    return {
+      ...fallback,
+      observaciones: 'Solo se admiten imagenes para auditoria IA del certificado.',
+    }
+  }
+
+  const model = getGeminiModel(GEMINI_MODEL_FLASH, {
+    generationConfig: {
+      responseMimeType: 'application/json',
+      temperature: 0.1,
+    },
+  })
+
+  if (!model) {
+    return {
+      ...fallback,
+      observaciones: 'IA no configurada. Queda pendiente de revision manual RRHH.',
+    }
+  }
+
+  try {
+    const buffer = await file.arrayBuffer()
+    const base64Data = Buffer.from(buffer).toString('base64')
+
+    const prompt = `
+Analiza esta imagen de certificado medico laboral y responde SOLO JSON valido:
+{
+  "es_certificado_medico": true/false,
+  "nombre_paciente": "texto o null",
+  "diagnostico": "texto o null",
+  "fecha_emision": "YYYY-MM-DD o null",
+  "confianza": 0-100,
+  "observaciones": "hallazgos cortos"
+}
+`
+
+    const result = await model.generateContent([
+      prompt,
+      { inlineData: { data: base64Data, mimeType: file.type } },
+    ])
+
+    const response = await result.response
+    const text = response.text()
+    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) return fallback
+
+    const parsed = JSON.parse(jsonMatch[0]) as {
+      es_certificado_medico?: boolean
+      nombre_paciente?: string | null
+      diagnostico?: string | null
+      confianza?: number
+      observaciones?: string
+    }
+
+    const nombreDetectado = parsed.nombre_paciente || ''
+    const diagnosticoDetectado = parsed.diagnostico || ''
+    const nombreOk = coincideNombre(contexto.nombreEmpleado, nombreDetectado)
+    const diagnosticoOk = coincideDiagnostico(contexto.diagnosticoReportado, diagnosticoDetectado)
+    const esCertificado = !!parsed.es_certificado_medico
+
+    return {
+      valido: esCertificado && nombreOk && diagnosticoOk,
+      confianza: Number(parsed.confianza || 0),
+      observaciones: parsed.observaciones || 'Analisis IA completado.',
+      nombreDetectado,
+      diagnosticoDetectado,
+    }
+  } catch (error) {
+    devError('Error en auditarCertificadoConIA:', error)
+    return fallback
+  }
+}
+
+export async function crearLicenciaAction(formData: FormData): Promise<ApiResponse<{ licenciaId: string }>> {
   try {
     const supabase = await createClient()
 
-    // Calcular días totales
-    const fechaInicio = new Date(licenciaData.fecha_inicio)
-    const fechaFin = new Date(licenciaData.fecha_fin)
+    const empleado_id = String(formData.get('empleado_id') || '')
+    const tipo = String(formData.get('tipo') || '') as
+      | 'vacaciones'
+      | 'enfermedad'
+      | 'maternidad'
+      | 'estudio'
+      | 'otro'
+    const fecha_inicio = String(formData.get('fecha_inicio') || '')
+    const fecha_fin = String(formData.get('fecha_fin') || '')
+    const fecha_sintomas = String(formData.get('fecha_sintomas') || '')
+    const diagnostico_reportado = String(formData.get('diagnostico_reportado') || '').trim() || undefined
+    const excepcion_plazo = String(formData.get('excepcion_plazo') || 'false') === 'true'
+    const motivo_excepcion = String(formData.get('motivo_excepcion') || '').trim() || undefined
+    const observaciones = String(formData.get('observaciones') || '').trim() || undefined
+    const certificado = formData.get('certificado') as File | null
+
+    if (!empleado_id || !tipo || !fecha_inicio || !fecha_fin || !fecha_sintomas) {
+      return { success: false, error: 'Faltan campos obligatorios de la licencia' }
+    }
+
+    if (!certificado || certificado.size <= 0) {
+      return { success: false, error: 'Debe adjuntar el certificado en imagen para validar la licencia' }
+    }
+
+    if (!certificado.type.startsWith('image/')) {
+      return { success: false, error: 'El certificado debe ser una imagen valida (JPG, PNG o WEBP)' }
+    }
+
+    const fechaInicio = new Date(fecha_inicio)
+    const fechaFin = new Date(fecha_fin)
+    const fechaSintomas = new Date(fecha_sintomas)
+    const ahora = new Date()
+
+    if (Number.isNaN(fechaInicio.getTime()) || Number.isNaN(fechaFin.getTime()) || Number.isNaN(fechaSintomas.getTime())) {
+      return { success: false, error: 'Las fechas informadas no son validas' }
+    }
+
+    if (fechaFin < fechaInicio) {
+      return { success: false, error: 'La fecha de fin no puede ser anterior a la fecha de inicio' }
+    }
+
+    const fechaLimitePresentacion = new Date(fechaSintomas.getTime() + 24 * 60 * 60 * 1000)
+    const presentadoEnTermino = ahora <= fechaLimitePresentacion
+
+    if (!presentadoEnTermino && !excepcion_plazo) {
+      return {
+        success: false,
+        error: 'El certificado debe presentarse dentro de las 24 horas desde el inicio. Marque excepcion si corresponde.',
+      }
+    }
+
+    if (excepcion_plazo && !motivo_excepcion) {
+      return { success: false, error: 'Debe informar el motivo de excepcion de plazo' }
+    }
+
+    const { data: empleado, error: empleadoError } = await supabase
+      .from('rrhh_empleados')
+      .select('id, nombre, apellido, usuario:usuarios(nombre, apellido)')
+      .eq('id', empleado_id)
+      .single()
+
+    if (empleadoError || !empleado) {
+      return { success: false, error: 'Empleado no encontrado' }
+    }
+
+    const nombreEmpleado =
+      `${(empleado as any).usuario?.nombre || (empleado as any).nombre || ''} ${(empleado as any).usuario?.apellido || (empleado as any).apellido || ''}`.trim() ||
+      'Empleado'
+
+    const safeFileName = certificado.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+    const storagePath = `rrhh/licencias/${empleado_id}/${Date.now()}-${safeFileName}`
+    const certBuffer = Buffer.from(await certificado.arrayBuffer())
+
+    const { error: uploadError } = await supabase.storage.from('documentos').upload(storagePath, certBuffer, {
+      contentType: certificado.type || 'image/jpeg',
+      upsert: false,
+    })
+
+    if (uploadError) {
+      devError('Error subiendo certificado de licencia:', uploadError)
+      return { success: false, error: 'No se pudo subir el certificado. Intenta nuevamente.' }
+    }
+
+    const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(storagePath)
+
+    const auditoriaIA = await auditarCertificadoConIA(certificado, {
+      nombreEmpleado,
+      diagnosticoReportado: diagnostico_reportado,
+    })
+
     const diasTotal = Math.ceil((fechaFin.getTime() - fechaInicio.getTime()) / (1000 * 60 * 60 * 24)) + 1
 
     const { data, error } = await supabase
       .from('rrhh_licencias')
       .insert({
-        ...licenciaData,
+        empleado_id,
+        tipo,
+        fecha_inicio,
+        fecha_fin,
+        fecha_sintomas: fechaSintomas.toISOString(),
+        diagnostico_reportado,
+        excepcion_plazo,
+        motivo_excepcion,
+        fecha_presentacion_certificado: ahora.toISOString(),
+        fecha_limite_presentacion: fechaLimitePresentacion.toISOString(),
+        presentado_en_termino: presentadoEnTermino,
+        certificado_url: urlData.publicUrl,
+        certificado_storage_path: storagePath,
+        certificado_nombre_archivo: certificado.name,
+        certificado_mime_type: certificado.type || 'image/jpeg',
+        certificado_tamano_bytes: certificado.size,
+        estado_revision: 'pendiente',
+        revision_manual_required: true,
+        ia_certificado_valido: auditoriaIA.valido,
+        ia_confianza: auditoriaIA.confianza,
+        ia_observaciones: auditoriaIA.observaciones,
+        ia_nombre_detectado: auditoriaIA.nombreDetectado || null,
+        ia_diagnostico_detectado: auditoriaIA.diagnosticoDetectado || null,
+        observaciones,
         dias_total: diasTotal,
         aprobado: false,
       })
@@ -1069,7 +1294,7 @@ export async function crearLicenciaAction(
     return {
       success: true,
       data: { licenciaId: data.id },
-      message: 'Licencia creada exitosamente, pendiente de aprobación',
+      message: 'Licencia creada con certificado. Queda pendiente de revision manual por RRHH.',
     }
   } catch (error) {
     devError('Error en crearLicencia:', error)
@@ -1099,6 +1324,10 @@ export async function aprobarLicenciaAction(licenciaId: string): Promise<ApiResp
         aprobado: true,
         aprobado_por: user.id,
         fecha_aprobacion: new Date().toISOString(),
+        estado_revision: 'aprobado',
+        revision_manual_required: false,
+        revisado_por: user.id,
+        fecha_revision: new Date().toISOString(),
       })
       .eq('id', licenciaId)
       .select('id')

@@ -13,20 +13,22 @@ import {
     FileText,
     CreditCard,
     AlertTriangle,
-    TrendingDown,
+    PackageSearch,
     Wallet
 } from 'lucide-react'
 import {
     obtenerProveedorAction,
     listarFacturasProveedorAction,
     listarPagosProveedorAction,
-    obtenerEstadoCuentaProveedorAction
+    obtenerEstadoCuentaProveedorAction,
+    listarMovimientosProveedorAction
 } from '@/actions/proveedores.actions'
 import { formatCurrency } from '@/lib/utils'
 import { FacturasTable } from './facturas-table'
 import { PagosTable } from './pagos-table'
 import { RegistrarFacturaDialog } from './registrar-factura-dialog'
 import { RegistrarPagoDialog } from './registrar-pago-dialog'
+import { MovimientosTable } from './movimientos-table'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,11 +46,12 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 export default async function ProveedorDetallePage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params
 
-    const [proveedorResult, facturasResult, pagosResult, estadoCuentaResult] = await Promise.all([
+    const [proveedorResult, facturasResult, pagosResult, estadoCuentaResult, movimientosResult] = await Promise.all([
         obtenerProveedorAction(id),
         listarFacturasProveedorAction(id),
         listarPagosProveedorAction(id),
-        obtenerEstadoCuentaProveedorAction(id)
+        obtenerEstadoCuentaProveedorAction(id),
+        listarMovimientosProveedorAction(id)
     ])
 
     if (!proveedorResult.success) {
@@ -59,6 +62,7 @@ export default async function ProveedorDetallePage({ params }: { params: Promise
     const facturas = facturasResult.success ? facturasResult.data : []
     const pagos = pagosResult.success ? pagosResult.data : []
     const estadoCuenta = estadoCuentaResult.success ? estadoCuentaResult.data : null
+    const movimientos = movimientosResult.success ? movimientosResult.data : []
 
     return (
         <div className="space-y-6">
@@ -182,9 +186,9 @@ export default async function ProveedorDetallePage({ params }: { params: Promise
                 </Card>
             </div>
 
-            {/* Tabs de Facturas y Pagos */}
+            {/* Tabs de Facturas, Pagos y Movimientos */}
             <Tabs defaultValue="facturas" className="w-full">
-                <TabsList className="grid w-full max-w-md grid-cols-2">
+                <TabsList className="grid w-full max-w-2xl grid-cols-3">
                     <TabsTrigger value="facturas" className="gap-2">
                         <FileText className="h-4 w-4" />
                         Facturas ({facturas.length})
@@ -192,6 +196,10 @@ export default async function ProveedorDetallePage({ params }: { params: Promise
                     <TabsTrigger value="pagos" className="gap-2">
                         <CreditCard className="h-4 w-4" />
                         Pagos ({pagos.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="movimientos" className="gap-2">
+                        <PackageSearch className="h-4 w-4" />
+                        Movimientos ({movimientos.length})
                     </TabsTrigger>
                 </TabsList>
 
@@ -219,6 +227,20 @@ export default async function ProveedorDetallePage({ params }: { params: Promise
                         </CardHeader>
                         <CardContent>
                             <PagosTable pagos={pagos} />
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="movimientos" className="mt-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Movimientos de Almacen</CardTitle>
+                            <CardDescription>
+                                Ingresos y egresos sincronizados con comprobantes del proveedor
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <MovimientosTable movimientos={movimientos} />
                         </CardContent>
                     </Card>
                 </TabsContent>

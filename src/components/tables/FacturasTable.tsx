@@ -37,23 +37,24 @@ interface Factura {
 interface FacturasTableProps {
   onView?: (factura: Factura) => void
   onPrint?: (factura: Factura) => void
-  clienteId?: string // Para filtrar por cliente
+  clienteId?: string
 }
 
 export function FacturasTable({ onView, onPrint, clienteId }: FacturasTableProps = {}) {
   const [facturas, setFacturas] = useState<Factura[]>([])
   const [loading, setLoading] = useState(true)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   useEffect(() => {
     const loadFacturas = async () => {
       try {
+        setLoading(true)
+        setErrorMessage(null)
         const supabase = createClient()
 
-        // Query básico primero - sin campos opcionales que pueden no existir
         let query = supabase
           .from('facturas')
-          .select(
-            `
+          .select(`
             id,
             numero_factura,
             cliente_id,
@@ -64,8 +65,7 @@ export function FacturasTable({ onView, onPrint, clienteId }: FacturasTableProps
             total,
             estado,
             cliente:clientes(nombre)
-          `
-          )
+          `)
           .order('fecha_emision', { ascending: false })
           .limit(200)
 
@@ -76,32 +76,32 @@ export function FacturasTable({ onView, onPrint, clienteId }: FacturasTableProps
         const { data, error } = await query
 
         if (error) {
-          console.error('Error cargando facturas:', error.message, error.code, error.details)
-          setLoading(false)
+          console.error('Error cargando comprobantes:', error.message, error.code, error.details)
+          setErrorMessage('No se pudieron cargar los comprobantes. Intenta nuevamente.')
           return
         }
 
-        if (data) {
-          const mapped: Factura[] = data.map((f: any) => ({
-            id: f.id,
-            numero_factura: f.numero_factura,
-            cliente_id: f.cliente_id,
-            pedido_id: f.pedido_id,
-            fecha_emision: f.fecha_emision,
-            fecha_vencimiento: f.fecha_vencimiento || null,
-            subtotal: f.subtotal,
-            descuento: f.descuento,
-            total: f.total,
-            monto_pagado: f.monto_pagado || 0,
-            saldo_pendiente: f.saldo_pendiente ?? f.total,
-            estado: f.estado,
-            estado_pago: f.estado_pago || 'pendiente',
-            cliente_nombre: f.cliente?.nombre || 'Cliente',
-          }))
-          setFacturas(mapped)
-        }
+        const mapped: Factura[] = (data || []).map((f: any) => ({
+          id: f.id,
+          numero_factura: f.numero_factura,
+          cliente_id: f.cliente_id,
+          pedido_id: f.pedido_id,
+          fecha_emision: f.fecha_emision,
+          fecha_vencimiento: f.fecha_vencimiento || null,
+          subtotal: f.subtotal,
+          descuento: f.descuento,
+          total: f.total,
+          monto_pagado: f.monto_pagado || 0,
+          saldo_pendiente: f.saldo_pendiente ?? f.total,
+          estado: f.estado,
+          estado_pago: f.estado_pago || 'pendiente',
+          cliente_nombre: f.cliente?.nombre || 'Cliente',
+        }))
+
+        setFacturas(mapped)
       } catch (err) {
-        console.error('Error inesperado cargando facturas:', err)
+        console.error('Error inesperado cargando comprobantes:', err)
+        setErrorMessage('Error inesperado al cargar comprobantes.')
       } finally {
         setLoading(false)
       }
@@ -113,13 +113,13 @@ export function FacturasTable({ onView, onPrint, clienteId }: FacturasTableProps
   const getEstadoPagoBadge = (estado: string) => {
     switch (estado) {
       case 'pagada':
-        return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">✓ Pagada</Badge>
+        return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Pagada</Badge>
       case 'parcial':
-        return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">◐ Parcial</Badge>
+        return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Parcial</Badge>
       case 'pendiente':
-        return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">○ Pendiente</Badge>
+        return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Pendiente</Badge>
       case 'anulada':
-        return <Badge variant="destructive">✕ Anulada</Badge>
+        return <Badge variant="destructive">Anulada</Badge>
       default:
         return <Badge variant="secondary">{estado}</Badge>
     }
@@ -128,19 +128,15 @@ export function FacturasTable({ onView, onPrint, clienteId }: FacturasTableProps
   const columns: ColumnDef<Factura>[] = [
     {
       accessorKey: 'numero_factura',
-      header: ({ column }) => (
-        <SortableHeader column={column}>Factura</SortableHeader>
-      ),
+      header: ({ column }) => <SortableHeader column={column}>Comprobante</SortableHeader>,
       cell: ({ row }) => {
         const numero = row.getValue('numero_factura') as string
-        return <span className="font-semibold text-primary">#{numero}</span>
+        return <span className="font-semibold text-primary">{numero}</span>
       },
     },
     {
       accessorKey: 'fecha_emision',
-      header: ({ column }) => (
-        <SortableHeader column={column}>Fecha</SortableHeader>
-      ),
+      header: ({ column }) => <SortableHeader column={column}>Fecha</SortableHeader>,
       cell: ({ row }) => {
         const fecha = row.getValue('fecha_emision') as string
         return <span>{formatDate(fecha)}</span>
@@ -151,12 +147,9 @@ export function FacturasTable({ onView, onPrint, clienteId }: FacturasTableProps
       header: 'Cliente',
       cell: ({ row }) => {
         const nombre = (row.getValue('cliente_nombre') as string) || 'Cliente'
-        const clienteId = row.original.cliente_id
+        const clienteIdValue = row.original.cliente_id
         return (
-          <Link
-            href={`/ventas/clientes/${clienteId}`}
-            className="hover:underline text-primary"
-          >
+          <Link href={`/ventas/clientes/${clienteIdValue}`} className="hover:underline text-primary">
             {nombre}
           </Link>
         )
@@ -164,23 +157,15 @@ export function FacturasTable({ onView, onPrint, clienteId }: FacturasTableProps
     },
     {
       accessorKey: 'total',
-      header: ({ column }) => (
-        <SortableHeader column={column}>Total</SortableHeader>
-      ),
+      header: ({ column }) => <SortableHeader column={column}>Total</SortableHeader>,
       cell: ({ row }) => {
         const total = row.getValue('total') as number
-        return (
-          <span className="font-semibold text-foreground">
-            {formatCurrency(total)}
-          </span>
-        )
+        return <span className="font-semibold text-foreground">{formatCurrency(total)}</span>
       },
     },
     {
       accessorKey: 'saldo_pendiente',
-      header: ({ column }) => (
-        <SortableHeader column={column}>Saldo</SortableHeader>
-      ),
+      header: ({ column }) => <SortableHeader column={column}>Saldo</SortableHeader>,
       cell: ({ row }) => {
         const saldo = row.original.saldo_pendiente
         const estadoPago = row.original.estado_pago
@@ -197,13 +182,7 @@ export function FacturasTable({ onView, onPrint, clienteId }: FacturasTableProps
     {
       accessorKey: 'estado_pago',
       header: 'Estado Pago',
-      cell: ({ row }) => {
-        const estado = row.original.estado_pago
-        return getEstadoPagoBadge(estado)
-      },
-      filterFn: (row, id, value) => {
-        return value.includes(row.getValue(id))
-      },
+      cell: ({ row }) => getEstadoPagoBadge(row.original.estado_pago),
     },
     {
       id: 'actions',
@@ -214,7 +193,7 @@ export function FacturasTable({ onView, onPrint, clienteId }: FacturasTableProps
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Abrir menú</span>
+                <span className="sr-only">Abrir menu</span>
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -248,7 +227,15 @@ export function FacturasTable({ onView, onPrint, clienteId }: FacturasTableProps
   ]
 
   if (loading) {
-    return <div className="text-center py-8 text-muted-foreground">Cargando facturas...</div>
+    return <div className="text-center py-8 text-muted-foreground">Cargando comprobantes...</div>
+  }
+
+  if (errorMessage) {
+    return <div className="text-center py-8 text-destructive">{errorMessage}</div>
+  }
+
+  if (facturas.length === 0) {
+    return <div className="text-center py-8 text-muted-foreground">No hay comprobantes para mostrar.</div>
   }
 
   return (
@@ -256,11 +243,12 @@ export function FacturasTable({ onView, onPrint, clienteId }: FacturasTableProps
       columns={columns}
       data={facturas}
       searchKey="numero_factura"
-      searchPlaceholder="Buscar por número de factura..."
+      searchPlaceholder="Buscar por numero de comprobante..."
       enableRowSelection={false}
-      enableColumnVisibility={true}
-      enablePagination={true}
+      enableColumnVisibility
+      enablePagination
       pageSize={15}
     />
   )
 }
+

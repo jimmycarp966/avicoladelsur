@@ -306,6 +306,7 @@ export async function obtenerInventarioSucursalAction(
   params: ObtenerInventarioSucursalParams
 ): Promise<ApiResponse<Array<{
   productoId: string
+  codigo: string
   nombre: string
   cantidadActual: number
   bajoStock: boolean
@@ -330,6 +331,7 @@ export async function obtenerInventarioSucursalAction(
         producto_id,
         cantidad_disponible,
         productos (
+          codigo,
           nombre
         )
       `)
@@ -351,6 +353,7 @@ export async function obtenerInventarioSucursalAction(
       if (!acc[productoId]) {
         acc[productoId] = {
           productoId,
+          codigo: (lote as any).productos?.codigo || '-',
           nombre: (lote as any).productos?.nombre || 'Producto desconocido',
           cantidadActual: 0,
           bajoStock: false,

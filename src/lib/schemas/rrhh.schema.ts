@@ -280,26 +280,60 @@ export const asistenciaSchema = z.object({
 export const licenciaSchema = z.object({
   empleado_id: z
     .string()
-    .uuid('ID de empleado inválido'),
+    .uuid('ID de empleado invalido'),
 
   tipo: z.enum(['vacaciones', 'enfermedad', 'maternidad', 'estudio', 'otro']),
 
   fecha_inicio: z
     .string()
     .refine((val) => !isNaN(Date.parse(val)), {
-      message: 'Fecha de inicio inválida',
+      message: 'Fecha de inicio invalida',
     }),
 
   fecha_fin: z
     .string()
     .refine((val) => !isNaN(Date.parse(val)), {
-      message: 'Fecha de fin inválida',
+      message: 'Fecha de fin invalida',
     }),
+
+  fecha_sintomas: z
+    .string()
+    .refine((val) => !isNaN(Date.parse(val)), {
+      message: 'Fecha/hora de inicio invalida',
+    }),
+
+  diagnostico_reportado: z
+    .string()
+    .max(500, 'El diagnostico debe tener maximo 500 caracteres')
+    .optional(),
+
+  excepcion_plazo: z.boolean().default(false),
+
+  motivo_excepcion: z
+    .string()
+    .max(500, 'El motivo de excepcion debe tener maximo 500 caracteres')
+    .optional(),
 
   observaciones: z
     .string()
-    .max(500, 'Las observaciones deben tener máximo 500 caracteres')
+    .max(500, 'Las observaciones deben tener maximo 500 caracteres')
     .optional()
+}).superRefine((data, ctx) => {
+  if (new Date(data.fecha_fin) < new Date(data.fecha_inicio)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['fecha_fin'],
+      message: 'La fecha de fin no puede ser anterior a la fecha de inicio',
+    })
+  }
+
+  if (data.excepcion_plazo && !data.motivo_excepcion?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['motivo_excepcion'],
+      message: 'Debe indicar el motivo de la excepcion de plazo',
+    })
+  }
 })
 
 // Esquema para adelantos
@@ -483,7 +517,7 @@ export type NovedadRRHHFormData = z.input<typeof novedadRRHHSchema>
 // Para formularios usamos el tipo de ENTRADA (z.input) para que campos con default,
 // como `estado`, puedan ser opcionales al enviar y compatibles con React Hook Form.
 export type AsistenciaFormData = z.input<typeof asistenciaSchema>
-export type LicenciaFormData = z.infer<typeof licenciaSchema>
+export type LicenciaFormData = z.input<typeof licenciaSchema>
 export type AdelantoFormData = z.infer<typeof adelantoSchema>
 export type DescuentoFormData = z.infer<typeof descuentoSchema>
 export type EvaluacionFormData = z.input<typeof evaluacionSchema>

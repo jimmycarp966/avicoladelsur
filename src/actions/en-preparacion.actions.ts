@@ -26,7 +26,7 @@ export async function obtenerPresupuestosEnPreparacionAction() {
         )
       `)
       .eq('estado', 'en_almacen')
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: true })
 
     if (error) {
       devError('[en-preparacion] Error obteniendo presupuestos:', error)

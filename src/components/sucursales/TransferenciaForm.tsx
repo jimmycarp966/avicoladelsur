@@ -23,9 +23,11 @@ import {
     SelectValue,
 } from '@/components/ui/select'
 import { Card, CardContent } from '@/components/ui/card'
+import { Textarea } from '@/components/ui/textarea'
 import { crearTransferenciaAction, listarSucursalesAction, obtenerAlmacenCentralAction, obtenerStockPorSucursalAction, obtenerProductosAlmacenCentralAction } from '@/actions/sucursales-transferencias.actions'
 import { toast } from 'sonner'
 import { Loader2, Plus, Trash2, Search } from 'lucide-react'
+import { useUserStore } from '@/store/userStore'
 
 const formSchema = z.object({
     sucursal_origen_id: z.string().min(1, 'Seleccione origen'),
@@ -43,6 +45,7 @@ type FormValues = z.infer<typeof formSchema>
 export function TransferenciaForm() {
     const router = useRouter()
     const searchParams = useSearchParams()
+    const { user } = useUserStore()
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [sucursales, setSucursales] = useState<any[]>([])
     const [almacenCentral, setAlmacenCentral] = useState<any>(null)
@@ -71,6 +74,7 @@ export function TransferenciaForm() {
     })
 
     const sucursalOrigenId = form.watch('sucursal_origen_id')
+    const solicitadoPor = `${user?.nombre || ''} ${user?.apellido || ''}`.trim() || 'Sistema'
 
     useEffect(() => {
         loadAlmacenCentral()
@@ -221,11 +225,17 @@ export function TransferenciaForm() {
         setIsSubmitting(true)
         try {
             // Preparar FormData
+            const observacionesUsuario = values.observaciones?.trim()
+            const lineaSolicitante = `Solicitado por: ${solicitadoPor}`
+            const observacionesFinal = observacionesUsuario
+                ? `${lineaSolicitante}\n${observacionesUsuario}`
+                : lineaSolicitante
+
             const formData = new FormData()
             formData.append('sucursal_origen_id', values.sucursal_origen_id)
             formData.append('sucursal_destino_id', values.sucursal_destino_id)
             if (values.motivo) formData.append('motivo', values.motivo)
-            if (values.observaciones) formData.append('observaciones', values.observaciones)
+            formData.append('observaciones', observacionesFinal)
             formData.append('items', JSON.stringify(values.items))
 
             const result = await crearTransferenciaAction(formData)
@@ -316,6 +326,30 @@ export function TransferenciaForm() {
                                 </FormItem>
                             )}
                         />
+
+                        <div className="md:col-span-2 grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                                <FormLabel>Solicitado Por (automatico)</FormLabel>
+                                <Input value={solicitadoPor} readOnly className="bg-muted" />
+                            </div>
+                            <FormField
+                                control={form.control}
+                                name="observaciones"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Informacion General</FormLabel>
+                                        <FormControl>
+                                            <Textarea
+                                                placeholder="Detalle adicional para la transferencia..."
+                                                className="min-h-[84px]"
+                                                {...field}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
                     </CardContent>
                 </Card>
 

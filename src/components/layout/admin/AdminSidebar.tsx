@@ -110,7 +110,7 @@ const navigation = [
       { name: 'Presupuestos', href: '/ventas/presupuestos' },
       { name: 'Clientes', href: '/ventas/clientes' },
       { name: 'Listas de Precios', href: '/ventas/listas-precios' },
-      { name: 'Facturas', href: '/ventas/facturas' },
+      { name: 'Comprobantes', href: '/ventas/comprobantes' },
       { name: 'Reclamos', href: '/ventas/reclamos' },
       { name: 'Bot WhatsApp', href: '/admin/bot-chat' },
     ],

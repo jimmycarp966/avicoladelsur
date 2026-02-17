@@ -12,6 +12,12 @@ const recepcionSchema = z.object({
   unidad_medida: z.string().default('kg'),
   motivo: z.string().min(1),
   destino_produccion: z.boolean().optional().default(false),
+  proveedor_id: z.string().uuid().optional(),
+  factura_proveedor_id: z.string().uuid().optional(),
+  numero_comprobante_ref: z.string().trim().max(100).optional(),
+  tipo_comprobante_ref: z.string().trim().max(50).optional(),
+  fecha_comprobante: z.string().trim().optional(),
+  monto_compra: z.number().nonnegative().optional(),
 })
 
 export async function POST(request: NextRequest) {
@@ -55,6 +61,24 @@ export async function POST(request: NextRequest) {
     if (data.destino_produccion) {
       formData.append('destino_produccion', 'true')
     }
+    if (data.proveedor_id) {
+      formData.append('proveedor_id', data.proveedor_id)
+    }
+    if (data.factura_proveedor_id) {
+      formData.append('factura_proveedor_id', data.factura_proveedor_id)
+    }
+    if (data.numero_comprobante_ref) {
+      formData.append('numero_comprobante_ref', data.numero_comprobante_ref)
+    }
+    if (data.tipo_comprobante_ref) {
+      formData.append('tipo_comprobante_ref', data.tipo_comprobante_ref)
+    }
+    if (data.fecha_comprobante) {
+      formData.append('fecha_comprobante', data.fecha_comprobante)
+    }
+    if (typeof data.monto_compra === 'number') {
+      formData.append('monto_compra', data.monto_compra.toString())
+    }
 
     // Llamar Server Action según tipo
     const result = data.tipo === 'ingreso'
@@ -63,7 +87,11 @@ export async function POST(request: NextRequest) {
 
     if (!result.success) {
       return NextResponse.json(
-        { success: false, message: result.error || 'Error al registrar recepción' },
+        {
+          success: false,
+          message: result.error || 'Error al registrar recepción',
+          error: result.error || 'Error al registrar recepción',
+        },
         { status: 400 }
       )
     }

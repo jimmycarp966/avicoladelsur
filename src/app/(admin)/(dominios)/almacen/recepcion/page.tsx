@@ -1,6 +1,4 @@
 import { Suspense } from 'react'
-import { Package, ArrowDownCircle, ArrowUpCircle, Calendar, Filter } from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/server'
 import { RecepcionAlmacenForm } from './recepcion-almacen-form'
 import { RecepcionAlmacenLista } from './recepcion-almacen-lista'
@@ -40,10 +38,25 @@ async function RecepcionAlmacenContent({
     ? [...new Set(productos.map(p => p.categoria).filter(Boolean))]
     : []
 
-  // Obtener proveedores únicos de lotes disponibles
-  const proveedores = lotes
+  // Obtener proveedores para filtros por lotes existentes
+  const proveedoresFiltro = lotes
     ? [...new Set(lotes.map(l => l.proveedor).filter(Boolean))]
     : []
+
+  // Obtener proveedores activos del maestro de tesorería
+  const { data: proveedoresTesoreria } = await supabase
+    .from('proveedores')
+    .select('id, nombre')
+    .eq('activo', true)
+    .order('nombre')
+
+  // Obtener facturas pendientes/parciales para vincular recepción
+  const { data: facturasProveedorPendientes } = await supabase
+    .from('proveedores_facturas')
+    .select('id, proveedor_id, numero_factura, estado, monto_total, monto_pagado, fecha_emision')
+    .in('estado', ['pendiente', 'parcial'])
+    .order('fecha_emision', { ascending: false })
+    .limit(300)
 
   // Obtener recepciones con filtros
   const tipo = searchParams?.tipo
@@ -56,7 +69,9 @@ async function RecepcionAlmacenContent({
       *,
       producto:productos(nombre, codigo),
       lote:lotes(numero_lote),
-      usuario:usuarios(nombre, apellido)
+      usuario:usuarios(nombre, apellido),
+      proveedor:proveedores(id, nombre),
+      factura_proveedor:proveedores_facturas(id, numero_factura, estado)
     `)
     .order('created_at', { ascending: false })
     .limit(100)
@@ -93,7 +108,9 @@ async function RecepcionAlmacenContent({
         productos={productos || []} 
         lotes={lotes || []}
         categorias={categorias}
-        proveedores={proveedores}
+        proveedoresFiltro={proveedoresFiltro}
+        proveedoresTesoreria={proveedoresTesoreria || []}
+        facturasProveedorPendientes={facturasProveedorPendientes || []}
       />
 
       {/* Lista de recepciones */}
@@ -119,4 +136,3 @@ export default async function RecepcionAlmacenPage({
     </Suspense>
   )
 }
-

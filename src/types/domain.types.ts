@@ -531,6 +531,27 @@ export interface Licencia extends BaseEntity {
   tipo: 'vacaciones' | 'enfermedad' | 'maternidad' | 'estudio' | 'otro'
   fecha_inicio: string
   fecha_fin: string
+  fecha_sintomas?: string
+  diagnostico_reportado?: string
+  excepcion_plazo?: boolean
+  motivo_excepcion?: string
+  fecha_presentacion_certificado?: string
+  fecha_limite_presentacion?: string
+  presentado_en_termino?: boolean
+  certificado_url?: string
+  certificado_storage_path?: string
+  certificado_nombre_archivo?: string
+  certificado_mime_type?: string
+  certificado_tamano_bytes?: number
+  estado_revision?: 'pendiente' | 'aprobado' | 'rechazado'
+  revision_manual_required?: boolean
+  revisado_por?: string
+  fecha_revision?: string
+  ia_certificado_valido?: boolean
+  ia_confianza?: number
+  ia_observaciones?: string
+  ia_nombre_detectado?: string
+  ia_diagnostico_detectado?: string
   dias_total: number
   aprobado: boolean
   aprobado_por?: string

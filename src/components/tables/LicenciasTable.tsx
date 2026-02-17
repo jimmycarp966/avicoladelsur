@@ -1,10 +1,10 @@
 'use client'
 
 import { ColumnDef } from '@tanstack/react-table'
-import { DataTable, SortableHeader, StatusBadge } from '@/components/ui/data-table'
+import { DataTable, SortableHeader } from '@/components/ui/data-table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Edit, Eye, CheckCircle, XCircle, Calendar, MoreHorizontal } from 'lucide-react'
+import { Eye, CheckCircle, XCircle, MoreHorizontal } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,7 +47,10 @@ export function LicenciasTable({ licencias, onView, onApprove, onReject }: Licen
     const fin = new Date(licencia.fecha_fin)
 
     if (!licencia.aprobado) {
-      return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Pendiente</Badge>
+      if (licencia.estado_revision === 'rechazado') {
+        return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">Rechazada</Badge>
+      }
+      return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Pendiente RRHH</Badge>
     }
 
     if (hoy < inicio) {
@@ -61,15 +64,33 @@ export function LicenciasTable({ licencias, onView, onApprove, onReject }: Licen
     return <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">Finalizada</Badge>
   }
 
+  const getRevisionBadge = (licencia: Licencia) => {
+    switch (licencia.estado_revision) {
+      case 'aprobado':
+        return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Aprobado RRHH</Badge>
+      case 'rechazado':
+        return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Rechazado RRHH</Badge>
+      default:
+        return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Pendiente RRHH</Badge>
+    }
+  }
+
+  const getIABadge = (licencia: Licencia) => {
+    if (licencia.ia_certificado_valido === true) {
+      return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">IA valida</Badge>
+    }
+    if (licencia.ia_certificado_valido === false) {
+      return <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100">IA observar</Badge>
+    }
+    return <Badge variant="outline">Sin IA</Badge>
+  }
+
   const columns: ColumnDef<Licencia>[] = [
     {
       accessorKey: 'empleado.usuario.nombre',
-      header: ({ column }) => (
-        <SortableHeader column={column}>Empleado</SortableHeader>
-      ),
+      header: ({ column }) => <SortableHeader column={column}>Empleado</SortableHeader>,
       cell: ({ row }) => {
         const empleado = row.original.empleado
-        // Usar nombre/apellido de usuario si existe, sino usar campos directos de empleado
         const nombre = empleado?.usuario?.nombre || empleado?.nombre || ''
         const apellido = empleado?.usuario?.apellido || empleado?.apellido || ''
         const legajo = empleado?.legajo || ''
@@ -77,79 +98,71 @@ export function LicenciasTable({ licencias, onView, onApprove, onReject }: Licen
 
         return (
           <div>
-            <div className="font-semibold text-foreground text-base">
-              {nombreCompleto || 'Sin nombre'}
-            </div>
-            {legajo && (
-              <div className="text-sm text-muted-foreground">Legajo: {legajo}</div>
-            )}
+            <div className="font-semibold text-foreground text-base">{nombreCompleto || 'Sin nombre'}</div>
+            {legajo && <div className="text-sm text-muted-foreground">Legajo: {legajo}</div>}
           </div>
         )
       },
     },
     {
       accessorKey: 'tipo',
-      header: ({ column }) => (
-        <SortableHeader column={column}>Tipo</SortableHeader>
-      ),
-      cell: ({ row }) => {
-        const tipo = row.getValue('tipo') as string
-        return getTipoBadge(tipo)
-      },
+      header: ({ column }) => <SortableHeader column={column}>Tipo</SortableHeader>,
+      cell: ({ row }) => getTipoBadge(row.getValue('tipo') as string),
     },
     {
       accessorKey: 'fecha_inicio',
-      header: ({ column }) => (
-        <SortableHeader column={column}>Fecha Inicio</SortableHeader>
-      ),
-      cell: ({ row }) => (
-        <div className="text-sm text-muted-foreground">
-          {formatDate(row.getValue('fecha_inicio'))}
-        </div>
-      ),
+      header: ({ column }) => <SortableHeader column={column}>Fecha Inicio</SortableHeader>,
+      cell: ({ row }) => <div className="text-sm text-muted-foreground">{formatDate(row.getValue('fecha_inicio'))}</div>,
     },
     {
       accessorKey: 'fecha_fin',
-      header: ({ column }) => (
-        <SortableHeader column={column}>Fecha Fin</SortableHeader>
-      ),
-      cell: ({ row }) => (
-        <div className="text-sm text-muted-foreground">
-          {formatDate(row.getValue('fecha_fin'))}
-        </div>
-      ),
+      header: ({ column }) => <SortableHeader column={column}>Fecha Fin</SortableHeader>,
+      cell: ({ row }) => <div className="text-sm text-muted-foreground">{formatDate(row.getValue('fecha_fin'))}</div>,
     },
     {
       accessorKey: 'dias_total',
-      header: ({ column }) => (
-        <SortableHeader column={column}>Días</SortableHeader>
-      ),
+      header: ({ column }) => <SortableHeader column={column}>Dias</SortableHeader>,
       cell: ({ row }) => {
         const dias = row.getValue('dias_total') as number
         return (
           <div className="font-medium text-center">
-            {dias} día{dias !== 1 ? 's' : ''}
+            {dias} dia{dias !== 1 ? 's' : ''}
           </div>
         )
       },
     },
     {
+      id: 'certificado',
+      header: 'Certificado',
+      cell: ({ row }) =>
+        row.original.certificado_url ? (
+          <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">Cargado</Badge>
+        ) : (
+          <Badge variant="destructive">Falta</Badge>
+        ),
+    },
+    {
+      id: 'auditoria_ia',
+      header: 'Auditoria IA',
+      cell: ({ row }) => getIABadge(row.original),
+    },
+    {
+      id: 'revision_rrhh',
+      header: 'Revision RRHH',
+      cell: ({ row }) => getRevisionBadge(row.original),
+    },
+    {
       accessorKey: 'aprobado',
-      header: ({ column }) => (
-        <SortableHeader column={column}>Estado</SortableHeader>
-      ),
-      cell: ({ row }) => {
-        const licencia = row.original
-        return getEstadoLicencia(licencia)
-      },
+      header: ({ column }) => <SortableHeader column={column}>Estado</SortableHeader>,
+      cell: ({ row }) => getEstadoLicencia(row.original),
     },
     {
       accessorKey: 'aprobado_por',
       header: 'Aprobado Por',
       cell: ({ row }) => {
         const aprobador = row.original.aprobado_por as any
-        const nombre = aprobador && typeof aprobador === 'object' ? (aprobador.nombre || '') : ''
-        const apellido = aprobador && typeof aprobador === 'object' ? (aprobador.apellido || '') : ''
+        const nombre = aprobador && typeof aprobador === 'object' ? aprobador.nombre || '' : ''
+        const apellido = aprobador && typeof aprobador === 'object' ? aprobador.apellido || '' : ''
         const nombreCompleto = `${nombre} ${apellido}`.trim()
 
         return (
@@ -168,7 +181,7 @@ export function LicenciasTable({ licencias, onView, onApprove, onReject }: Licen
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Abrir menú</span>
+                <span className="sr-only">Abrir menu</span>
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>

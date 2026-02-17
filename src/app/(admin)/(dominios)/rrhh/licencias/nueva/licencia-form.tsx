@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -10,7 +10,18 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { CalendarDays, Calculator, Users, ArrowLeft, Loader2, Save } from 'lucide-react'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  CalendarDays,
+  Calculator,
+  Users,
+  ArrowLeft,
+  Loader2,
+  Save,
+  ShieldCheck,
+  Upload,
+  AlertCircle,
+} from 'lucide-react'
 import Link from 'next/link'
 import { licenciaSchema, type LicenciaFormData } from '@/lib/schemas/rrhh.schema'
 import { crearLicenciaAction } from '@/actions/rrhh.actions'
@@ -23,22 +34,27 @@ export function NuevaLicenciaForm() {
   const { showToast } = useNotificationStore()
   const [isLoading, setIsLoading] = useState(false)
   const [empleados, setEmpleados] = useState<Empleado[]>([])
+  const [certificadoFile, setCertificadoFile] = useState<File | null>(null)
   const [diasCalculados, setDiasCalculados] = useState<number>(0)
 
   const {
-    register,
     handleSubmit,
     watch,
     setValue,
+    register,
     formState: { errors },
   } = useForm<LicenciaFormData>({
     resolver: zodResolver(licenciaSchema),
+    defaultValues: {
+      excepcion_plazo: false,
+    },
   })
 
   const fechaInicio = watch('fecha_inicio')
   const fechaFin = watch('fecha_fin')
+  const fechaSintomas = watch('fecha_sintomas')
+  const excepcionPlazo = watch('excepcion_plazo')
 
-  // Calcular días automáticamente
   useEffect(() => {
     if (fechaInicio && fechaFin) {
       const inicio = new Date(fechaInicio)
@@ -50,12 +66,10 @@ export function NuevaLicenciaForm() {
     }
   }, [fechaInicio, fechaFin])
 
-  // Cargar empleados activos
   useEffect(() => {
     const loadEmpleados = async () => {
       const supabase = createClient()
-
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('rrhh_empleados')
         .select(`
           *,
@@ -66,59 +80,78 @@ export function NuevaLicenciaForm() {
         .eq('activo', true)
         .order('created_at')
 
-      if (data) {
-        setEmpleados(data)
-      }
+      if (data) setEmpleados(data)
     }
 
-    loadEmpleados()
+    void loadEmpleados()
   }, [])
+
+  const empleadoSeleccionado = empleados.find((e) => e.id === watch('empleado_id'))
+
+  const estadoPlazo = useMemo(() => {
+    if (!fechaSintomas) return null
+    const inicio = new Date(fechaSintomas)
+    if (Number.isNaN(inicio.getTime())) return null
+    const limite = new Date(inicio.getTime() + 24 * 60 * 60 * 1000)
+    const ahora = new Date()
+    const restanteMs = limite.getTime() - ahora.getTime()
+    return {
+      limite,
+      enTermino: restanteMs >= 0,
+      horasRestantes: Math.round(restanteMs / (1000 * 60 * 60)),
+    }
+  }, [fechaSintomas])
 
   const onSubmit = async (data: LicenciaFormData) => {
     try {
-      setIsLoading(true)
+      if (!certificadoFile) {
+        showToast('error', 'Debes adjuntar el certificado en imagen', 'Certificado requerido')
+        return
+      }
 
-      const result = await crearLicenciaAction(data)
+      setIsLoading(true)
+      const payload = new FormData()
+      payload.append('empleado_id', data.empleado_id)
+      payload.append('tipo', data.tipo)
+      payload.append('fecha_inicio', data.fecha_inicio)
+      payload.append('fecha_fin', data.fecha_fin)
+      payload.append('fecha_sintomas', data.fecha_sintomas)
+      payload.append('observaciones', data.observaciones || '')
+      payload.append('diagnostico_reportado', data.diagnostico_reportado || '')
+      payload.append('excepcion_plazo', data.excepcion_plazo ? 'true' : 'false')
+      payload.append('motivo_excepcion', data.motivo_excepcion || '')
+      payload.append('certificado', certificadoFile)
+
+      const result = await crearLicenciaAction(payload)
 
       if (result.success) {
         showToast(
           'success',
-          result.message || 'La solicitud de licencia ha sido creada exitosamente',
+          result.message || 'La solicitud de licencia fue creada correctamente',
           'Licencia creada'
         )
         router.push('/rrhh/licencias')
       } else {
-        showToast(
-          'error',
-          result.error || 'Ha ocurrido un error inesperado',
-          'Error al crear licencia'
-        )
+        showToast('error', result.error || 'No se pudo crear la licencia', 'Error al crear licencia')
       }
     } catch (error) {
-      console.error('Error en onSubmit:', error)
-      showToast(
-        'error',
-        'Ha ocurrido un error inesperado al crear la licencia',
-        'Error inesperado'
-      )
+      console.error('Error en onSubmit licencia:', error)
+      showToast('error', 'Error inesperado al crear la licencia', 'Error inesperado')
     } finally {
       setIsLoading(false)
     }
   }
 
-  const empleadoSeleccionado = empleados.find(e => e.id === watch('empleado_id'))
-
   const tiposLicencia = [
-    { value: 'vacaciones', label: 'Vacaciones', icon: '🏖️', description: 'Período de descanso anual' },
-    { value: 'enfermedad', label: 'Enfermedad', icon: '🏥', description: 'Licencia por enfermedad' },
-    { value: 'maternidad', label: 'Maternidad', icon: '👶', description: 'Licencia por maternidad/paternidad' },
-    { value: 'estudio', label: 'Estudio', icon: '📚', description: 'Licencia por estudios' },
-    { value: 'otro', label: 'Otro', icon: '📋', description: 'Otro tipo de licencia' },
+    { value: 'vacaciones', label: 'Vacaciones', description: 'Periodo de descanso anual' },
+    { value: 'enfermedad', label: 'Enfermedad', description: 'Licencia por enfermedad' },
+    { value: 'maternidad', label: 'Maternidad', description: 'Licencia por maternidad/paternidad' },
+    { value: 'estudio', label: 'Estudio', description: 'Licencia por estudios' },
+    { value: 'otro', label: 'Otro', description: 'Otro tipo de licencia' },
   ]
 
   return (
     <div className="max-w-4xl mx-auto">
-      {/* Botón volver */}
       <div className="mb-6">
         <Button variant="ghost" asChild className="mb-4">
           <Link href="/rrhh/licencias">
@@ -129,24 +162,18 @@ export function NuevaLicenciaForm() {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        {/* Información básica */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="w-5 h-5 text-blue-600" />
-              Información de la Licencia
+              Informacion de la Licencia
             </CardTitle>
-            <CardDescription>
-              Detalles del empleado y tipo de licencia solicitada
-            </CardDescription>
+            <CardDescription>Seleccion del empleado y datos generales de la solicitud</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="empleado_id">Empleado *</Label>
-              <Select
-                value={watch('empleado_id') || ''}
-                onValueChange={(value) => setValue('empleado_id', value)}
-              >
+              <Select value={watch('empleado_id') || ''} onValueChange={(value) => setValue('empleado_id', value)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar empleado" />
                 </SelectTrigger>
@@ -154,125 +181,179 @@ export function NuevaLicenciaForm() {
                   {empleados.map((empleado) => {
                     const nombre = empleado.usuario?.nombre || ''
                     const apellido = empleado.usuario?.apellido || ''
-                    const nombreCompleto = `${nombre} ${apellido}`.trim()
                     return (
                       <SelectItem key={empleado.id} value={empleado.id}>
-                        {nombreCompleto} - {empleado.legajo || 'Sin legajo'} ({empleado.sucursal?.nombre})
+                        {`${nombre} ${apellido}`.trim()} - {empleado.legajo || 'Sin legajo'} ({empleado.sucursal?.nombre})
                       </SelectItem>
                     )
                   })}
                 </SelectContent>
               </Select>
-              {errors.empleado_id && (
-                <p className="text-sm text-red-600">{errors.empleado_id.message}</p>
-              )}
+              {errors.empleado_id && <p className="text-sm text-red-600">{errors.empleado_id.message}</p>}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="tipo">Tipo de Licencia *</Label>
-              <Select
-                value={watch('tipo') || ''}
-                onValueChange={(value) => setValue('tipo', value as any)}
-              >
+              <Select value={watch('tipo') || ''} onValueChange={(value) => setValue('tipo', value as any)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar tipo de licencia" />
                 </SelectTrigger>
                 <SelectContent>
                   {tiposLicencia.map((tipo) => (
                     <SelectItem key={tipo.value} value={tipo.value}>
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">{tipo.icon}</span>
-                        <div>
-                          <div className="font-medium">{tipo.label}</div>
-                          <div className="text-xs text-muted-foreground">{tipo.description}</div>
-                        </div>
+                      <div>
+                        <div className="font-medium">{tipo.label}</div>
+                        <div className="text-xs text-muted-foreground">{tipo.description}</div>
                       </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {errors.tipo && (
-                <p className="text-sm text-red-600">{errors.tipo.message}</p>
-              )}
+              {errors.tipo && <p className="text-sm text-red-600">{errors.tipo.message}</p>}
             </div>
 
-            {/* Información del empleado seleccionado */}
             {empleadoSeleccionado && (
-              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
-                  <Users className="w-4 h-4 text-blue-600" />
-                  <span className="font-medium text-blue-900">Empleado Seleccionado</span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+                <div className="font-medium text-blue-900 mb-2">Empleado Seleccionado</div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
-                    <span className="font-medium">Nombre:</span> {empleadoSeleccionado.usuario?.nombre} {empleadoSeleccionado.usuario?.apellido}
+                    Nombre: {empleadoSeleccionado.usuario?.nombre} {empleadoSeleccionado.usuario?.apellido}
                   </div>
-                  <div>
-                    <span className="font-medium">Legajo:</span> {empleadoSeleccionado.legajo || 'Sin asignar'}
-                  </div>
-                  <div>
-                    <span className="font-medium">Sucursal:</span> {empleadoSeleccionado.sucursal?.nombre || 'Sin asignar'}
-                  </div>
+                  <div>Legajo: {empleadoSeleccionado.legajo || 'Sin asignar'}</div>
+                  <div>Sucursal: {empleadoSeleccionado.sucursal?.nombre || 'Sin asignar'}</div>
                 </div>
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Fechas y duración */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <CalendarDays className="w-5 h-5 text-green-600" />
-              Fechas y Duración
+              Fechas, Diagnostico y Plazo 24h
             </CardTitle>
             <CardDescription>
-              Período de la licencia y cálculo automático de días
+              El certificado debe presentarse dentro de 24 horas desde el inicio informado (salvo excepcion)
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="fecha_inicio">Fecha de Inicio *</Label>
-                <Input
-                  id="fecha_inicio"
-                  type="date"
-                  {...register('fecha_inicio')}
-                />
-                {errors.fecha_inicio && (
-                  <p className="text-sm text-red-600">{errors.fecha_inicio.message}</p>
-                )}
+                <Input id="fecha_inicio" type="date" {...register('fecha_inicio')} />
+                {errors.fecha_inicio && <p className="text-sm text-red-600">{errors.fecha_inicio.message}</p>}
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="fecha_fin">Fecha de Fin *</Label>
+                <Input id="fecha_fin" type="date" {...register('fecha_fin')} />
+                {errors.fecha_fin && <p className="text-sm text-red-600">{errors.fecha_fin.message}</p>}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="fecha_sintomas">Inicio del hecho (control 24h) *</Label>
+                <Input id="fecha_sintomas" type="datetime-local" {...register('fecha_sintomas')} />
+                {errors.fecha_sintomas && <p className="text-sm text-red-600">{errors.fecha_sintomas.message}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="diagnostico_reportado">Diagnostico reportado</Label>
                 <Input
-                  id="fecha_fin"
-                  type="date"
-                  {...register('fecha_fin')}
+                  id="diagnostico_reportado"
+                  placeholder="Ej: Gastroenteritis aguda"
+                  {...register('diagnostico_reportado')}
                 />
-                {errors.fecha_fin && (
-                  <p className="text-sm text-red-600">{errors.fecha_fin.message}</p>
+                {errors.diagnostico_reportado && (
+                  <p className="text-sm text-red-600">{errors.diagnostico_reportado.message}</p>
                 )}
               </div>
             </div>
 
-            {/* Cálculo de días */}
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Calculator className="w-5 h-5 text-green-600" />
-                  <span className="font-medium text-green-900">Cálculo de Días</span>
+                  <span className="font-medium text-green-900">Duracion de licencia</span>
                 </div>
-                <div className="text-right">
-                  <div className="text-2xl font-bold text-green-600">{diasCalculados}</div>
-                  <div className="text-sm text-green-700">día{diasCalculados !== 1 ? 's' : ''} hábiles</div>
-                </div>
+                <div className="text-2xl font-bold text-green-700">{diasCalculados}</div>
               </div>
-              {fechaInicio && fechaFin && (
-                <div className="mt-2 text-sm text-green-700">
-                  Desde {new Date(fechaInicio).toLocaleDateString()} hasta {new Date(fechaFin).toLocaleDateString()}
-                </div>
+              <div className="text-sm text-green-700 mt-1">dia{diasCalculados !== 1 ? 's' : ''}</div>
+            </div>
+
+            {estadoPlazo && (
+              <div
+                className={`rounded-lg p-4 border ${
+                  estadoPlazo.enTermino ? 'bg-blue-50 border-blue-200' : 'bg-orange-50 border-orange-200'
+                }`}
+              >
+                <p className={`text-sm font-medium ${estadoPlazo.enTermino ? 'text-blue-900' : 'text-orange-900'}`}>
+                  Limite de presentacion: {estadoPlazo.limite.toLocaleString()}
+                </p>
+                <p className={`text-sm ${estadoPlazo.enTermino ? 'text-blue-700' : 'text-orange-700'}`}>
+                  {estadoPlazo.enTermino
+                    ? `En termino. Restan aprox ${estadoPlazo.horasRestantes} horas.`
+                    : 'Fuera de termino: marque excepcion para continuar.'}
+                </p>
+              </div>
+            )}
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="excepcion_plazo"
+                checked={!!excepcionPlazo}
+                onCheckedChange={(checked) => setValue('excepcion_plazo', checked === true)}
+              />
+              <Label htmlFor="excepcion_plazo" className="cursor-pointer">
+                Aplicar excepcion de plazo (fuera de 24h)
+              </Label>
+            </div>
+
+            {excepcionPlazo && (
+              <div className="space-y-2">
+                <Label htmlFor="motivo_excepcion">Motivo de excepcion *</Label>
+                <Textarea
+                  id="motivo_excepcion"
+                  rows={2}
+                  placeholder="Detalle de la excepcion autorizada por RRHH"
+                  {...register('motivo_excepcion')}
+                />
+                {errors.motivo_excepcion && (
+                  <p className="text-sm text-red-600">{errors.motivo_excepcion.message}</p>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-purple-600" />
+              Certificado y Auditoria IA
+            </CardTitle>
+            <CardDescription>
+              Sin certificado no se valida. La IA analiza imagen y RRHH revisa manualmente en estado pendiente.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="certificado">Certificado medico (imagen) *</Label>
+              <Input
+                id="certificado"
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(event) => setCertificadoFile(event.target.files?.[0] || null)}
+              />
+              {certificadoFile ? (
+                <p className="text-sm text-muted-foreground">
+                  <Upload className="w-4 h-4 inline mr-1" />
+                  {certificadoFile.name} ({Math.round(certificadoFile.size / 1024)} KB)
+                </p>
+              ) : (
+                <p className="text-sm text-red-600">Adjuntar certificado es obligatorio.</p>
               )}
             </div>
 
@@ -280,42 +361,30 @@ export function NuevaLicenciaForm() {
               <Label htmlFor="observaciones">Observaciones</Label>
               <Textarea
                 id="observaciones"
-                placeholder="Motivo detallado de la licencia..."
+                placeholder="Notas internas para RRHH..."
                 rows={3}
                 {...register('observaciones')}
               />
-              {errors.observaciones && (
-                <p className="text-sm text-red-600">{errors.observaciones.message}</p>
-              )}
+              {errors.observaciones && <p className="text-sm text-red-600">{errors.observaciones.message}</p>}
             </div>
           </CardContent>
         </Card>
 
-        {/* Información importante */}
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <div className="flex items-start gap-3">
-            <div className="p-1 bg-yellow-100 rounded-lg">
-              <CalendarDays className="w-5 h-5 text-yellow-600" />
-            </div>
+            <AlertCircle className="w-5 h-5 text-yellow-700 mt-0.5" />
             <div>
-              <h3 className="font-semibold text-yellow-900">Importante</h3>
-              <p className="text-yellow-700 text-sm mt-1">
-                La licencia será creada en estado "Pendiente de aprobación". Un supervisor debe aprobarla
-                antes de que sea efectiva. Durante el período de licencia, el empleado no generará
-                registros de asistencia y podrá afectar cálculos de presentismo.
+              <h3 className="font-semibold text-yellow-900">Flujo de validacion</h3>
+              <p className="text-yellow-800 text-sm mt-1">
+                1) Se valida carga del certificado. 2) IA audita nombre/diagnostico de la imagen.
+                3) RRHH realiza revision manual y mantiene estado pendiente hasta resolucion.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Botones de acción */}
         <div className="flex justify-end gap-4">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => router.back()}
-            disabled={isLoading}
-          >
+          <Button type="button" variant="outline" onClick={() => router.back()} disabled={isLoading}>
             Cancelar
           </Button>
           <Button type="submit" disabled={isLoading}>
@@ -336,3 +405,4 @@ export function NuevaLicenciaForm() {
     </div>
   )
 }
+

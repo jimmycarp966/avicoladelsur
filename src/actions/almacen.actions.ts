@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { useNotificationStore } from '@/store/notificationStore'
 import { getNowArgentina } from '@/lib/utils'
 import { devError } from '@/lib/utils/logger'
@@ -387,7 +387,10 @@ export async function registrarRecepcionIngresoAction(formData: FormData): Promi
     const supabase = await createClient()
 
     // Obtener usuario actual
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser()
     if (userError || !user) {
       return { success: false, error: 'Usuario no autenticado' }
     }
@@ -407,26 +410,154 @@ export async function registrarRecepcionIngresoAction(formData: FormData): Promi
     const producto_id = formData.get('producto_id') as string
     const lote_id = formData.get('lote_id') as string
     const cantidad = parseFloat(formData.get('cantidad') as string)
-    const unidad_medida = formData.get('unidad_medida') as string || 'kg'
-    const motivo = formData.get('motivo') as string || 'compra'
+    const unidad_medida = (formData.get('unidad_medida') as string) || 'kg'
+    const motivo = (formData.get('motivo') as string) || 'compra'
+
+    const proveedor_id_raw = formData.get('proveedor_id')
+    const factura_proveedor_id_raw = formData.get('factura_proveedor_id')
+    const numero_comprobante_ref_raw = formData.get('numero_comprobante_ref')
+    const tipo_comprobante_ref_raw = formData.get('tipo_comprobante_ref')
+    const fecha_comprobante_raw = formData.get('fecha_comprobante')
+    const monto_compra_raw = formData.get('monto_compra')
+
+    const proveedor_id =
+      typeof proveedor_id_raw === 'string' && proveedor_id_raw.trim() ? proveedor_id_raw.trim() : null
+    let factura_proveedor_id =
+      typeof factura_proveedor_id_raw === 'string' && factura_proveedor_id_raw.trim()
+        ? factura_proveedor_id_raw.trim()
+        : null
+    let numero_comprobante_ref =
+      typeof numero_comprobante_ref_raw === 'string' && numero_comprobante_ref_raw.trim()
+        ? numero_comprobante_ref_raw.trim()
+        : null
+    const tipo_comprobante_ref =
+      typeof tipo_comprobante_ref_raw === 'string' && tipo_comprobante_ref_raw.trim()
+        ? tipo_comprobante_ref_raw.trim()
+        : 'factura'
+    const fecha_comprobante =
+      typeof fecha_comprobante_raw === 'string' && fecha_comprobante_raw.trim()
+        ? fecha_comprobante_raw.trim()
+        : null
+    const monto_compra =
+      typeof monto_compra_raw === 'string' && monto_compra_raw.trim()
+        ? parseFloat(monto_compra_raw)
+        : null
 
     if (!producto_id || !cantidad || !motivo) {
       return { success: false, error: 'Faltan datos requeridos' }
     }
 
-    // Insertar recepción
-    const { error: insertError } = await supabase
-      .from('recepcion_almacen')
-      .insert({
-        tipo: 'ingreso',
-        producto_id,
-        lote_id: lote_id || null,
-        cantidad,
-        unidad_medida,
-        motivo,
-        destino_produccion: false,
-        usuario_id: user.id,
-      })
+    const esCompra = motivo === 'compra'
+    if (esCompra && !proveedor_id) {
+      return { success: false, error: 'Debe seleccionar proveedor para registrar compras y deuda' }
+    }
+
+    if (factura_proveedor_id) {
+      const { data: facturaExistente, error: facturaError } = await supabase
+        .from('proveedores_facturas')
+        .select('id, proveedor_id, numero_factura')
+        .eq('id', factura_proveedor_id)
+        .single()
+
+      if (facturaError || !facturaExistente) {
+        return { success: false, error: 'La factura seleccionada no existe o no esta disponible' }
+      }
+
+      if (proveedor_id && facturaExistente.proveedor_id !== proveedor_id) {
+        return { success: false, error: 'La factura seleccionada no pertenece al proveedor indicado' }
+      }
+
+      if (!numero_comprobante_ref) {
+        numero_comprobante_ref = facturaExistente.numero_factura
+      }
+    } else if (esCompra) {
+      if (!numero_comprobante_ref) {
+        return { success: false, error: 'Debe informar numero de comprobante para compras nuevas' }
+      }
+
+      if (!monto_compra || Number.isNaN(monto_compra) || monto_compra <= 0) {
+        return { success: false, error: 'Debe informar un monto de compra mayor a cero' }
+      }
+
+      const fechaEmision = fecha_comprobante || new Date().toISOString().slice(0, 10)
+
+      const payloadFactura = {
+        proveedor_id,
+        numero_factura: numero_comprobante_ref,
+        tipo_comprobante: tipo_comprobante_ref || 'factura',
+        fecha_emision: fechaEmision,
+        monto_total: monto_compra,
+        monto_pagado: 0,
+        estado: 'pendiente',
+        descripcion: 'Generada automaticamente desde recepcion de almacen',
+        creado_por: user.id,
+      }
+
+      let facturaNueva: { id: string } | null = null
+      let facturaNuevaError: any = null
+
+      try {
+        const adminClient = createAdminClient()
+        const result = await adminClient
+          .from('proveedores_facturas')
+          .insert(payloadFactura)
+          .select('id')
+          .single()
+
+        facturaNueva = result.data
+        facturaNuevaError = result.error
+      } catch (adminClientError) {
+        devError('createAdminClient no disponible, intentando con cliente autenticado:', adminClientError)
+        const fallback = await supabase
+          .from('proveedores_facturas')
+          .insert(payloadFactura)
+          .select('id')
+          .single()
+
+        facturaNueva = fallback.data
+        facturaNuevaError = fallback.error
+      }
+
+      if (facturaNuevaError) {
+        if ((facturaNuevaError as any).code !== '23505') {
+          throw facturaNuevaError
+        }
+
+        // Si ya existe la factura para ese proveedor/comprobante, la reutilizamos.
+        const { data: facturaDuplicada, error: facturaDuplicadaError } = await supabase
+          .from('proveedores_facturas')
+          .select('id')
+          .eq('proveedor_id', proveedor_id)
+          .eq('numero_factura', numero_comprobante_ref)
+          .single()
+
+        if (facturaDuplicadaError || !facturaDuplicada) {
+          throw facturaNuevaError
+        }
+
+        factura_proveedor_id = facturaDuplicada.id
+      } else {
+        factura_proveedor_id = facturaNueva.id
+      }
+    }
+
+    // Insertar recepcion
+    const { error: insertError } = await supabase.from('recepcion_almacen').insert({
+      tipo: 'ingreso',
+      producto_id,
+      lote_id: lote_id || null,
+      cantidad,
+      unidad_medida,
+      motivo,
+      proveedor_id,
+      factura_proveedor_id,
+      numero_comprobante_ref,
+      tipo_comprobante_ref,
+      fecha_comprobante,
+      monto_compra: !monto_compra || Number.isNaN(monto_compra) ? null : monto_compra,
+      destino_produccion: false,
+      usuario_id: user.id,
+    })
 
     if (insertError) throw insertError
 
@@ -440,20 +571,23 @@ export async function registrarRecepcionIngresoAction(formData: FormData): Promi
     }
 
     revalidatePath('/(admin)/(dominios)/almacen/recepcion')
+    revalidatePath('/tesoreria/proveedores')
+    if (proveedor_id) {
+      revalidatePath(`/tesoreria/proveedores/${proveedor_id}`)
+    }
 
     return {
       success: true,
-      message: 'Recepción de ingreso registrada exitosamente',
+      message: 'Recepcion de ingreso registrada y sincronizada con proveedores',
     }
   } catch (error: any) {
-    devError('Error al registrar recepción ingreso:', error)
+    devError('Error al registrar recepcion ingreso:', error)
     return {
       success: false,
-      error: error.message || 'Error al registrar recepción',
+      error: error.message || 'Error al registrar recepcion',
     }
   }
 }
-
 // Registrar recepción de egreso
 export async function registrarRecepcionEgresoAction(formData: FormData): Promise<ApiResponse> {
   try {

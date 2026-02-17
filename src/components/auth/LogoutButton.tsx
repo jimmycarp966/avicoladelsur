@@ -56,16 +56,11 @@ export function LogoutButton({
   // Variante para DropdownMenuItem
   if (variant === 'menuItem') {
     return (
-      <div
-        role="menuitem"
-        tabIndex={0}
-        className={`flex items-center gap-2 text-destructive focus:text-destructive cursor-pointer px-2 py-1.5 rounded-sm text-sm outline-none focus:bg-accent focus:text-accent-foreground ${className}`}
+      <button
+        type="button"
+        className={`flex w-full items-center gap-2 text-destructive focus:text-destructive cursor-pointer px-2 py-1.5 rounded-sm text-sm outline-none focus:bg-accent focus:text-accent-foreground ${className}`}
         onClick={handleLogout}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            handleLogout(e)
-          }
-        }}
+        onMouseDown={(e) => e.preventDefault()}
       >
         {isLoggingOut ? (
           <>
@@ -78,7 +73,7 @@ export function LogoutButton({
             <span>{label}</span>
           </>
         )}
-      </div>
+      </button>
     )
   }
 
