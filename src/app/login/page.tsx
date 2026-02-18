@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/actions/auth.actions'
-import { LoginForm } from '@/components/auth/LoginForm'
-import { LoginBackground } from '@/components/auth/LoginBackground'
+import { ModernLoginForm } from '@/components/auth/ModernLoginForm'
+import { ModernLoginLayout } from '@/components/auth/ModernLoginLayout'
 import { createClient } from '@/lib/supabase/server'
 import { getSucursalUsuario } from '@/lib/utils'
 
@@ -11,7 +11,7 @@ export default async function LoginPage() {
   // Verificar si hay configuración de Supabase
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
     return (
-      <div 
+      <div
         className="login-page min-h-screen flex items-center justify-center bg-primary py-12 px-4 sm:px-6 lg:px-8"
         style={{ backgroundColor: '#2F7058' }}
       >
@@ -39,7 +39,7 @@ export default async function LoginPage() {
   if (user) {
     const supabase = await createClient()
     const { data: { user: authUser } } = await supabase.auth.getUser()
-    
+
     // Verificar si tiene sucursal asignada
     if (authUser) {
       const sucursalId = await getSucursalUsuario(supabase, authUser.id)
@@ -66,20 +66,8 @@ export default async function LoginPage() {
   }
 
   return (
-    <>
-      <LoginBackground />
-      <div 
-        className="login-page min-h-screen flex items-center justify-center bg-primary py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden"
-        style={{ backgroundColor: '#2F7058' }}
-      >
-        {/* Elementos decorativos sutiles de fondo */}
-        <div className="absolute top-0 left-0 w-96 h-96 bg-white/5 rounded-full blur-3xl -z-10"></div>
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-secondary/10 rounded-full blur-3xl -z-10"></div>
-        
-        <div className="max-w-md w-full space-y-8 relative z-10">
-          <LoginForm />
-        </div>
-      </div>
-    </>
+    <ModernLoginLayout>
+      <ModernLoginForm />
+    </ModernLoginLayout>
   )
 }
