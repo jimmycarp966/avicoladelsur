@@ -1,9 +1,9 @@
-# 🚀 Avícola del Sur ERP - Sistema Integral de Gestión
+﻿# 🚀 Avícola del Sur ERP - Sistema Integral de Gestión
 
-**Versión:** Febrero 2026 (v2.3.2)  
+**Versión:** Febrero 2026 (v2.4.0)  
 **Estado:** ✅ PRODUCCIÓN  
-**Docs relacionadas:** [Architecture Summary](./ARCHITECTURE_SUMMARY.md) · [Architecture Deep-Dive](./ARCHITECTURE.md) · [Supabase Setup](./SUPABASE_SETUP.md)  
-**Última actualización:** 15 de Febrero 2026
+**Docs relacionadas:** [Architecture Summary](./ARCHITECTURE_SUMMARY.md) · [Architecture Deep-Dive](./ARCHITECTURE.md) · [Supabase Setup](./SUPABASE_SETUP.md) · [INIT Context](./INIT.md)  
+**Última actualización:** 18 de Febrero 2026
 
 **Plataforma unificada** de gestión avícola que integra WMS (Almacén), TMS (Reparto), CRM (Ventas), Carrito Web Público y ERP (Finanzas/RRHH). Potenciada por **Google Gemini AI** para decisiones inteligentes en tiempo real dentro de una arquitectura **server-authoritative** sobre Supabase.
 
@@ -15,13 +15,37 @@
 
 | Sección | Contenido |
 | --- | --- |
-| [Pilares del Sistema](#-pilares-del-sistema-auditoría-enero-2026) | Diferenciales funcionales e IA |
+| [Pilares del Sistema](#-pilares-del-sistema-auditoria-enero-2026) | Diferenciales funcionales e IA |
+| [Novedades 2026-02-18](#-novedades-2026-02-18) | Tesoreria por sucursal, reparto y combustible |
 | [Inicio Rápido](#-inicio-rápido) | Onboarding completo (prerrequisitos + setup + scripts) |
 | [Arquitectura](#-arquitectura-del-sistema) | Stack, módulos y dominios |
 | [Características del Sistema](#-características-del-sistema---completo) | Roadmap de features clave |
 | [Troubleshooting](#-troubleshooting-rápido) | Errores comunes y soluciones |
 
-## ✨ Pilares del Sistema (Auditoría Enero 2026)
+## 🆕 Novedades 2026-02-18
+
+- **Tesoreria**:
+  - Se unifica el acceso operativo de cajas con la nueva vista `/tesoreria/por-sucursal`.
+  - En movimientos/flujo se renombra "deposito bancario" por "transferencia".
+  - En cuentas corrientes se agrega "promesas del dia" y `hora_proximo_contacto` (uso operativo GMT-3).
+- **Reparto / Vehiculos**:
+  - Se agrega validacion de vigencia de seguro, mas campos `fecha_vto_senasa` y `fecha_vto_vtv`.
+  - Se incorpora `km_inicial` del vehiculo (carga unica) y tracking de kilometraje por reparto.
+  - Nueva planilla de programacion de mantenimiento por vehiculo.
+  - Nuevos campos de combustible: capacidad de tanque y litros actuales.
+- **Checklist diario de vehiculo**:
+  - Aceite de motor en porcentaje (0-100 en incrementos de 10).
+  - Limpieza interior/exterior con escala mala | buena | excelente.
+  - Luces con campo libre de observacion.
+  - Presion de neumaticos en PSI numerico.
+- **Cierre de reparto y consumo**:
+  - Al finalizar ruta, se pregunta si se cargo combustible.
+  - Si se cargo, se registran litros y se calcula `consumo_km_l = km_recorridos / litros_cargados`.
+  - Estos datos quedan persistidos en el reporte de ruta.
+- **Migracion SQL aplicada**:
+  - `supabase/migrations/20260218110000_reparto_tesoreria_combustible_recordatorios.sql`
+
+## ✨ Pilares del Sistema (Auditoria Enero 2026)
 
 ### 🧠 Inteligencia Artificial Aplicada (Gemini)
 - **Validación de Peso**: Gemini 2.5 Flash detecta errores de tipeo en balanzas en tiempo real con análisis de anomalías.
@@ -1672,3 +1696,4 @@ Para soporte técnico contactar al equipo de desarrollo.
 ---
 
 **Avícola del Sur ERP** - Transformando la gestión avícola con tecnología moderna.
+

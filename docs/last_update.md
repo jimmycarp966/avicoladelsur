@@ -1,20 +1,22 @@
 # Evidencia de Actualizacion
-**Fecha y Hora:** 17 de febrero de 2026 - 12:20
+**Fecha y Hora:** 18 de febrero de 2026
 
 ## Archivos Modificados
+- `README.md`
 - `docs/CHANGELOG.md`
 - `docs/last_update.md`
+- `AGENTS.md`
+- `INIT.md`
 
 ## Resumen del Cambio
-Se actualizo la documentacion para registrar la entrega operativa del 17/02/2026, incluyendo:
+Se actualizo la documentacion para registrar la entrega operativa del 18/02/2026, incluyendo:
 
-- Validacion IA de certificados en licencias RRHH y flujo pendiente para auditoria manual.
-- Regla de plazo de presentacion de certificado dentro de 24 hs (gestionado por RRHH).
-- Sincronizacion entre recepcion de almacen y movimientos de proveedores.
-- Refactor UX/UI de pagina `almacen/recepcion`.
-- Filtros y activacion de notificaciones por area.
-- Renombre funcional de facturacion a comprobantes y nueva numeracion `COMP-000000001` para nuevas emisiones.
-- Ajustes en sucursales, transferencias, orden en `en preparacion` y cierre de sesion.
+- Unificacion de tesoreria por sucursal y ajustes de navegacion.
+- Renombre de "deposito bancario" a "transferencia".
+- Promesas del dia y hora de recordatorio (`hora_proximo_contacto`) en cuentas corrientes.
+- Cambios de reparto/vehiculos: `km_inicial`, combustible, vencimientos SENASA/VTV y mantenimiento.
+- Checklist diario actualizado y calculo de consumo `km/l` al cierre de ruta.
+- Confirmacion de migracion SQL ejecutada en Supabase.
 
 ## Nota Operativa
-Esta actualizacion documenta cambios ya implementados en codigo y migraciones dentro del commit `6055937e`.
+Esta actualizacion documenta cambios ya implementados en codigo y base de datos, consolidados en el commit `0678c2d7`.

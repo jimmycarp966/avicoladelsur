@@ -1,7 +1,7 @@
 # AGENTS.md - Guía para Agentes de IA
 
 > Documento de referencia para agentes de IA que trabajan en el proyecto Avícola del Sur ERP.
-> **Última actualización:** Febrero 2026
+> **Última actualización:** 18 de febrero de 2026
 
 ---
 
@@ -359,6 +359,7 @@ OPENROUTESERVICE_API_KEY=
 | Documento | Descripción |
 |-----------|-------------|
 | `README.md` | Documentación completa del sistema |
+| `INIT.md` | Contexto operativo resumido para sesiones `/init` |
 | `ARCHITECTURE_SUMMARY.md` | Resumen de arquitectura técnica |
 | `ARCHITECTURE.MD` | Arquitectura profunda con diagramas |
 | `CLAUDE.md` | Guía específica para Claude Code |

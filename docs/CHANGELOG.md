@@ -1,4 +1,39 @@
-﻿# Changelog - AvÃ­cola del Sur ERP
+﻿# Changelog - Avicola del Sur ERP
+## 2026-02-18 - Codex
+**Feat: Tesoreria por sucursal + combustible y mantenimiento de reparto**
+
+Se documentan los cambios funcionales y de datos implementados para tesoreria, reparto y vehiculos:
+
+- **Tesoreria**:
+  - Vista operativa unificada en `/tesoreria/por-sucursal` y ajustes de navegacion.
+  - Renombre funcional de "deposito bancario" a "transferencia" en el flujo de movimientos.
+  - "Promesas del dia" en cuentas corrientes y nuevo campo horario `hora_proximo_contacto` (operativa GMT-3).
+- **Reparto / Cierre de ruta**:
+  - Al finalizar una ruta se registra si hubo carga de combustible.
+  - Si hubo carga, se registran litros y se calcula consumo `km/l` con formula `km_recorridos / litros_cargados`.
+  - El resultado queda persistido para reportes de ruta.
+- **Vehiculos y checklist**:
+  - Validaciones de vigencia para seguro y campos independientes de vencimiento `SENASA` y `VTV`.
+  - Nuevo dato de `km_inicial` por vehiculo (carga unica), mas capacidad/litros actuales de combustible.
+  - Nueva pagina de programacion de mantenimiento por vehiculo.
+  - Checklist actualizado: aceite en pasos de 10, limpieza interior/exterior (mala|buena|excelente), luces observacion libre y presion PSI numerica.
+
+**Migracion SQL aplicada:**
+- `supabase/migrations/20260218110000_reparto_tesoreria_combustible_recordatorios.sql`
+
+**Archivos principales modificados:**
+- `src/actions/reparto.actions.ts`
+- `src/actions/reportes-reparto.actions.ts`
+- `src/actions/tesoreria.actions.ts`
+- `src/app/(admin)/(dominios)/reparto/vehiculos/[id]/mantenimiento/page.tsx`
+- `src/app/(admin)/(dominios)/tesoreria/por-sucursal/page.tsx`
+- `src/app/(repartidor)/ruta/[ruta_id]/ruta-hoja-content.tsx`
+- `src/components/tables/VehiculosTable.tsx`
+- `src/lib/schemas/reparto.schema.ts`
+- `src/types/domain.types.ts`
+- `supabase/migrations/20260218110000_reparto_tesoreria_combustible_recordatorios.sql`
+
+---
 ## 2026-02-17 - Codex
 **Feat: Cierre operativo transversal (RRHH, Ventas, Almacen, Sucursales, Notificaciones)**
 
@@ -456,5 +491,7 @@ Se refinÃ³ el proceso de "Nueva Orden de ProducciÃ³n" implementando un flujo
 **Archivos modificados:**
 - `src/app/(admin)/(dominios)/almacen/produccion/nueva/page.tsx`
 - `ARCHITECTURE_SUMMARY.md`
+
+
 
 
