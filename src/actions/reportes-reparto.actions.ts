@@ -38,6 +38,10 @@ export async function obtenerKpisReparto(
         distancia_real_km,
         tiempo_real_min,
         peso_total_kg,
+        km_recorridos,
+        litros_cargados,
+        consumo_km_l,
+        carga_combustible,
         vehiculo_id,
         repartidor_id,
         detalles_ruta(id, estado_entrega, distancia_parcial_km, tiempo_estimado_parcial_min)
@@ -73,6 +77,15 @@ export async function obtenerKpisReparto(
       rutas?.reduce((sum, r) => sum + (r.tiempo_real_min || 0), 0) / (rutas?.length || 1) || 0
 
     const kmTotales = rutas?.reduce((sum, r) => sum + Number(r.distancia_real_km || 0), 0) || 0
+    const kmTotalesReales = rutas?.reduce((sum, r) => sum + Number(r.km_recorridos || 0), 0) || 0
+    const litrosTotales = rutas?.reduce((sum, r) => sum + Number(r.litros_cargados || 0), 0) || 0
+    const rutasConCargaCombustible = rutas?.filter((r) => r.carga_combustible).length || 0
+    const consumosValidos = (rutas || [])
+      .map((r) => Number(r.consumo_km_l || 0))
+      .filter((v) => v > 0)
+    const consumoPromedioKmL = consumosValidos.length > 0
+      ? consumosValidos.reduce((a, b) => a + b, 0) / consumosValidos.length
+      : 0
     const eficienciaRuta =
       totalEntregas > 0 ? kmTotales / totalEntregas : 0 // km por entrega
 
@@ -123,7 +136,11 @@ export async function obtenerKpisReparto(
         tasaExito: totalEntregas > 0 ? (entregasExitosas / totalEntregas) * 100 : 0,
         tiempoPromedioEntrega,
         kmTotales,
+        kmTotalesReales,
         eficienciaRuta,
+        litrosTotales,
+        rutasConCargaCombustible,
+        consumoPromedioKmL,
         recaudacionPorVehiculo: Object.entries(recaudacionPorVehiculo).map(([id, monto]) => ({
           vehiculo_id: id,
           recaudacion: monto,

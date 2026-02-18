@@ -2,15 +2,50 @@ import { listarCajasAction } from '@/actions/tesoreria.actions'
 import { CajaForm } from '@/components/forms/CajaForm'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { PageHeader } from '@/components/ui/page-header'
+import { Button } from '@/components/ui/button'
+import Link from 'next/link'
 import { Wallet } from 'lucide-react'
+import { TesoreriaPorSucursalContent } from '../sucursales/page'
 
 export const revalidate = 300 // Revalida cada 5 minutos
 
-export default async function CajasPage() {
+export default async function CajasPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ view?: string; sucursal?: string; desde?: string; hasta?: string }>
+}) {
+  const resolvedSearchParams = (await searchParams) || {}
+  const view = resolvedSearchParams.view || 'cajas'
+
+  if (view === 'por-sucursal') {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild variant="outline" size="sm">
+            <Link href="/tesoreria/cajas">Vista Cajas</Link>
+          </Button>
+          <Button asChild size="sm">
+            <Link href="/tesoreria/cajas?view=por-sucursal">Vista Por Sucursal</Link>
+          </Button>
+        </div>
+        <TesoreriaPorSucursalContent searchParams={resolvedSearchParams} />
+      </div>
+    )
+  }
+
   const cajas = await listarCajasAction()
 
   return (
     <div className="space-y-8">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button asChild size="sm">
+          <Link href="/tesoreria/cajas">Vista Cajas</Link>
+        </Button>
+        <Button asChild variant="outline" size="sm">
+          <Link href="/tesoreria/cajas?view=por-sucursal">Vista Por Sucursal</Link>
+        </Button>
+      </div>
+
       {/* Header Estandarizado */}
       <PageHeader
         title="Cajas"

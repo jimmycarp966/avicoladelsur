@@ -10,28 +10,26 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
 import { registrarChecklistVehiculoAction } from '@/actions/reparto.actions'
 import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
 
 const checklistSchema = z.object({
-  aceite_motor: z.boolean(),
-  luces: z.boolean(),
+  aceite_motor_porcentaje: z.number().int().min(0).max(100).refine((v) => v % 10 === 0, 'Debe ir de 10 en 10'),
   frenos: z.boolean(),
-  presion_neumaticos: z.boolean(),
-  limpieza_interior: z.boolean(),
-  limpieza_exterior: z.boolean(),
+  luces_observacion: z.string().max(500).optional(),
+  presion_neumaticos_psi: z.number().min(0).max(120),
+  limpieza_interior_estado: z.enum(['mala', 'buena', 'excelente']),
+  limpieza_exterior_estado: z.enum(['mala', 'buena', 'excelente']),
   combustible: z.number().min(0).max(100).optional(),
   kilometraje: z.number().int().min(0).optional(),
   observaciones: z.string().max(500).optional(),
 })
 
 type ChecklistFormData = z.infer<typeof checklistSchema>
-
-import { useRouter } from 'next/navigation'
-
-// ... existing imports
 
 interface ChecklistInicioFormProps {
   rutaId: string
@@ -46,20 +44,19 @@ export function ChecklistInicioForm({ rutaId, vehiculoId, onComplete, redirectTo
   const { register, handleSubmit, formState: { errors }, watch, setValue } = useForm<ChecklistFormData>({
     resolver: zodResolver(checklistSchema),
     defaultValues: {
-      aceite_motor: false,
-      luces: false,
+      aceite_motor_porcentaje: 50,
       frenos: false,
-      presion_neumaticos: false,
-      limpieza_interior: false,
-      limpieza_exterior: false,
-    }
+      luces_observacion: '',
+      presion_neumaticos_psi: 32,
+      limpieza_interior_estado: 'buena',
+      limpieza_exterior_estado: 'buena',
+    },
   })
 
   const onSubmit = async (data: ChecklistFormData) => {
     setLoading(true)
 
     try {
-      // Obtener usuario actual
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
 
@@ -68,10 +65,17 @@ export function ChecklistInicioForm({ rutaId, vehiculoId, onComplete, redirectTo
         return
       }
 
-      // Registrar checklist
       const result = await registrarChecklistVehiculoAction({
         vehiculo_id: vehiculoId,
-        ...data,
+        frenos: data.frenos,
+        aceite_motor_porcentaje: data.aceite_motor_porcentaje,
+        luces_observacion: data.luces_observacion,
+        presion_neumaticos_psi: data.presion_neumaticos_psi,
+        limpieza_interior_estado: data.limpieza_interior_estado,
+        limpieza_exterior_estado: data.limpieza_exterior_estado,
+        combustible: data.combustible,
+        kilometraje: data.kilometraje,
+        observaciones: data.observaciones,
       })
 
       if (!result.success) {
@@ -79,7 +83,6 @@ export function ChecklistInicioForm({ rutaId, vehiculoId, onComplete, redirectTo
         return
       }
 
-      // Obtener el ID del checklist recién creado
       const { data: checklistData, error: checklistError } = await supabase
         .from('checklists_vehiculos')
         .select('id')
@@ -94,7 +97,6 @@ export function ChecklistInicioForm({ rutaId, vehiculoId, onComplete, redirectTo
         return
       }
 
-      // Vincular checklist a la ruta
       const { error: updateError } = await supabase
         .from('rutas_reparto')
         .update({ checklist_inicio_id: checklistData.id })
@@ -128,78 +130,92 @@ export function ChecklistInicioForm({ rutaId, vehiculoId, onComplete, redirectTo
           <CardTitle className="text-lg">Checklist de Inicio de Ruta</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Checks básicos */}
           <div className="space-y-3">
             <Label className="text-base font-semibold">Verificaciones</Label>
-            <div className="space-y-2">
-              {[
-                { key: 'aceite_motor', label: 'Aceite de motor' },
-                { key: 'luces', label: 'Luces' },
-                { key: 'frenos', label: 'Frenos' },
-                { key: 'presion_neumaticos', label: 'Presión de neumáticos' },
-                { key: 'limpieza_interior', label: 'Limpieza interior' },
-                { key: 'limpieza_exterior', label: 'Limpieza exterior' },
-              ].map((item) => (
-                <div key={item.key} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={item.key}
-                    checked={watch(item.key as keyof ChecklistFormData) as boolean}
-                    onCheckedChange={(checked) => setValue(item.key as keyof ChecklistFormData, checked as boolean)}
-                  />
-                  <Label htmlFor={item.key} className="font-normal cursor-pointer">
-                    {item.label}
-                  </Label>
-                </div>
-              ))}
+
+            <div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="aceite_motor_porcentaje">Aceite motor (%)</Label>
+                <span className="text-sm font-semibold">{watch('aceite_motor_porcentaje')}%</span>
+              </div>
+              <Input
+                id="aceite_motor_porcentaje"
+                type="range"
+                min="0"
+                max="100"
+                step="10"
+                value={watch('aceite_motor_porcentaje')}
+                onChange={(e) => setValue('aceite_motor_porcentaje', Number(e.target.value), { shouldValidate: true })}
+              />
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox id="frenos" checked={watch('frenos')} onCheckedChange={(checked) => setValue('frenos', checked === true)} />
+              <Label htmlFor="frenos" className="font-normal cursor-pointer">Frenos</Label>
+            </div>
+
+            <div>
+              <Label htmlFor="luces_observacion">Luces (observacion)</Label>
+              <Input id="luces_observacion" {...register('luces_observacion')} placeholder="Ej: revisar luz de giro" />
+            </div>
+
+            <div>
+              <Label htmlFor="presion_neumaticos_psi">Presion neumaticos (PSI)</Label>
+              <Input id="presion_neumaticos_psi" type="number" min="0" max="120" step="1" {...register('presion_neumaticos_psi', { valueAsNumber: true })} />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Limpieza interior</Label>
+                <Select value={watch('limpieza_interior_estado')} onValueChange={(value) => setValue('limpieza_interior_estado', value as any)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="mala">Mala</SelectItem>
+                    <SelectItem value="buena">Buena</SelectItem>
+                    <SelectItem value="excelente">Excelente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Limpieza exterior</Label>
+                <Select value={watch('limpieza_exterior_estado')} onValueChange={(value) => setValue('limpieza_exterior_estado', value as any)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="mala">Mala</SelectItem>
+                    <SelectItem value="buena">Buena</SelectItem>
+                    <SelectItem value="excelente">Excelente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
           <Separator />
 
-          {/* Combustible y kilometraje */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="combustible">Combustible (%)</Label>
-              <Input
-                id="combustible"
-                type="number"
-                min="0"
-                max="100"
-                {...register('combustible', { valueAsNumber: true })}
-                placeholder="0-100"
-              />
-              {errors.combustible && (
-                <p className="text-sm text-red-500">{errors.combustible.message}</p>
-              )}
+              <Input id="combustible" type="number" min="0" max="100" {...register('combustible', { setValueAs: (v) => v === '' ? undefined : Number(v) })} placeholder="0-100" />
             </div>
             <div>
               <Label htmlFor="kilometraje">Kilometraje</Label>
-              <Input
-                id="kilometraje"
-                type="number"
-                min="0"
-                {...register('kilometraje', { valueAsNumber: true })}
-                placeholder="km"
-              />
-              {errors.kilometraje && (
-                <p className="text-sm text-red-500">{errors.kilometraje.message}</p>
-              )}
+              <Input id="kilometraje" type="number" min="0" {...register('kilometraje', { setValueAs: (v) => v === '' ? undefined : Number(v) })} placeholder="km" />
             </div>
           </div>
 
-          {/* Observaciones */}
           <div>
             <Label htmlFor="observaciones">Observaciones</Label>
-            <Textarea
-              id="observaciones"
-              {...register('observaciones')}
-              placeholder="Notas adicionales..."
-              rows={3}
-            />
-            {errors.observaciones && (
-              <p className="text-sm text-red-500">{errors.observaciones.message}</p>
-            )}
+            <Textarea id="observaciones" {...register('observaciones')} placeholder="Notas adicionales..." rows={3} />
           </div>
+
+          {(errors.aceite_motor_porcentaje || errors.presion_neumaticos_psi || errors.combustible || errors.kilometraje) && (
+            <div className="text-sm text-red-500 space-y-1">
+              {errors.aceite_motor_porcentaje && <p>{errors.aceite_motor_porcentaje.message}</p>}
+              {errors.presion_neumaticos_psi && <p>{errors.presion_neumaticos_psi.message}</p>}
+              {errors.combustible && <p>{errors.combustible.message}</p>}
+              {errors.kilometraje && <p>{errors.kilometraje.message}</p>}
+            </div>
+          )}
 
           <div className="flex gap-2 pt-4">
             <Button type="submit" disabled={loading} className="flex-1">
@@ -211,4 +227,3 @@ export function ChecklistInicioForm({ rutaId, vehiculoId, onComplete, redirectTo
     </form>
   )
 }
-

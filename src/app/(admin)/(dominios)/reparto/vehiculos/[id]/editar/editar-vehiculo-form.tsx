@@ -23,13 +23,22 @@ const editarVehiculoSchema = z.object({
   tipo_vehiculo: z.enum(['Camion', 'Furgon', 'Camioneta', 'Moto', 'Pickup']),
   capacidad_kg: z.number().positive('La capacidad debe ser mayor a 0'),
   fecha_vto_seguro: z.string().optional(),
-  seguro_vigente: z.boolean(),
+  fecha_vto_senasa: z.string().optional(),
+  fecha_vto_vtv: z.string().optional(),
+  km_inicial: z.number().min(0, 'El km inicial no puede ser negativo').optional(),
+  capacidad_tanque_litros: z.number().min(0, 'La capacidad no puede ser negativa').optional(),
+  combustible_actual_litros: z.number().min(0, 'El combustible no puede ser negativo').optional(),
   activo: z.boolean(),
+}).refine((data) => {
+  if (data.capacidad_tanque_litros === undefined || data.combustible_actual_litros === undefined) return true
+  return data.combustible_actual_litros <= data.capacidad_tanque_litros
+}, {
+  message: 'El combustible actual no puede superar la capacidad del tanque',
+  path: ['combustible_actual_litros'],
 })
 
 type EditarVehiculoFormData = z.infer<typeof editarVehiculoSchema>
 
-// Tipos de vehículo disponibles
 const tiposVehiculo = ['Camion', 'Furgon', 'Camioneta', 'Moto', 'Pickup'] as const
 type TipoVehiculo = typeof tiposVehiculo[number]
 
@@ -65,22 +74,25 @@ export function EditarVehiculoForm({ vehiculoId }: EditarVehiculoFormProps) {
       if (result.success && result.data) {
         const data = result.data as Vehiculo
         setVehiculo(data)
-        // Cargar datos en el formulario
         setValue('patente', data.patente)
         setValue('marca', data.marca || '')
         setValue('modelo', data.modelo || '')
         setValue('tipo_vehiculo', (data.tipo_vehiculo as TipoVehiculo) || 'Camioneta')
         setValue('capacidad_kg', data.capacidad_kg)
         setValue('fecha_vto_seguro', data.fecha_vto_seguro || '')
-        setValue('seguro_vigente', data.seguro_vigente ?? true)
+        setValue('fecha_vto_senasa', data.fecha_vto_senasa || '')
+        setValue('fecha_vto_vtv', data.fecha_vto_vtv || '')
+        setValue('km_inicial', data.km_inicial)
+        setValue('capacidad_tanque_litros', data.capacidad_tanque_litros)
+        setValue('combustible_actual_litros', data.combustible_actual_litros)
         setValue('activo', data.activo ?? true)
       } else {
-        showToast('error', result.error || 'Error al cargar vehículo')
+        showToast('error', result.error || 'Error al cargar vehiculo')
         router.push('/reparto/vehiculos')
       }
     } catch (error: any) {
-      console.error('Error cargando vehículo:', error)
-      showToast('error', 'Error al cargar vehículo')
+      console.error('Error cargando vehiculo:', error)
+      showToast('error', 'Error al cargar vehiculo')
       router.push('/reparto/vehiculos')
     } finally {
       setIsLoadingData(false)
@@ -98,19 +110,23 @@ export function EditarVehiculoForm({ vehiculoId }: EditarVehiculoFormProps) {
         tipo_vehiculo: data.tipo_vehiculo,
         capacidad_kg: data.capacidad_kg,
         fecha_vto_seguro: data.fecha_vto_seguro || undefined,
-        seguro_vigente: data.seguro_vigente,
+        fecha_vto_senasa: data.fecha_vto_senasa || undefined,
+        fecha_vto_vtv: data.fecha_vto_vtv || undefined,
+        km_inicial: data.km_inicial,
+        capacidad_tanque_litros: data.capacidad_tanque_litros,
+        combustible_actual_litros: data.combustible_actual_litros,
         activo: data.activo,
       })
 
       if (result.success) {
-        showToast('success', result.message || 'Vehículo actualizado exitosamente')
+        showToast('success', result.message || 'Vehiculo actualizado exitosamente')
         router.push('/reparto/vehiculos')
       } else {
-        showToast('error', result.error || 'Error al actualizar vehículo')
+        showToast('error', result.error || 'Error al actualizar vehiculo')
       }
     } catch (error: any) {
-      console.error('Error actualizando vehículo:', error)
-      showToast('error', error.message || 'Error al actualizar vehículo')
+      console.error('Error actualizando vehiculo:', error)
+      showToast('error', error.message || 'Error al actualizar vehiculo')
     } finally {
       setIsLoading(false)
     }
@@ -122,7 +138,7 @@ export function EditarVehiculoForm({ vehiculoId }: EditarVehiculoFormProps) {
         <CardContent className="pt-6">
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            <span className="ml-2">Cargando vehículo...</span>
+            <span className="ml-2">Cargando vehiculo...</span>
           </div>
         </CardContent>
       </Card>
@@ -134,7 +150,7 @@ export function EditarVehiculoForm({ vehiculoId }: EditarVehiculoFormProps) {
       <Card>
         <CardContent className="pt-6">
           <div className="text-center py-8">
-            <p className="text-muted-foreground">Vehículo no encontrado</p>
+            <p className="text-muted-foreground">Vehiculo no encontrado</p>
           </div>
         </CardContent>
       </Card>
@@ -145,34 +161,19 @@ export function EditarVehiculoForm({ vehiculoId }: EditarVehiculoFormProps) {
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Información del Vehículo</CardTitle>
-          <CardDescription>
-            Modifica los datos del vehículo
-          </CardDescription>
+          <CardTitle>Informacion del Vehiculo</CardTitle>
+          <CardDescription>Modifica los datos del vehiculo</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <Label htmlFor="patente">Patente *</Label>
-              <Input
-                id="patente"
-                {...register('patente')}
-                placeholder="ABC123"
-                className={errors.patente ? 'border-red-500' : ''}
-              />
-              {errors.patente && (
-                <p className="text-sm text-red-500 mt-1">{errors.patente.message}</p>
-              )}
+              <Input id="patente" {...register('patente')} placeholder="ABC123" className={errors.patente ? 'border-red-500' : ''} />
+              {errors.patente && <p className="text-sm text-red-500 mt-1">{errors.patente.message}</p>}
             </div>
-
             <div>
-              <Label htmlFor="tipo_vehiculo">Tipo de Vehículo *</Label>
-              <Select
-                value={watch('tipo_vehiculo')}
-                onValueChange={(value) => {
-                  setValue('tipo_vehiculo', value as TipoVehiculo)
-                }}
-              >
+              <Label htmlFor="tipo_vehiculo">Tipo de Vehiculo *</Label>
+              <Select value={watch('tipo_vehiculo')} onValueChange={(value) => setValue('tipo_vehiculo', value as TipoVehiculo)}>
                 <SelectTrigger id="tipo_vehiculo" className={errors.tipo_vehiculo ? 'border-red-500' : ''}>
                   <SelectValue placeholder="Selecciona un tipo" />
                 </SelectTrigger>
@@ -184,101 +185,73 @@ export function EditarVehiculoForm({ vehiculoId }: EditarVehiculoFormProps) {
                   <SelectItem value="Pickup">Pickup</SelectItem>
                 </SelectContent>
               </Select>
-              {errors.tipo_vehiculo && (
-                <p className="text-sm text-red-500 mt-1">{errors.tipo_vehiculo.message}</p>
-              )}
+              {errors.tipo_vehiculo && <p className="text-sm text-red-500 mt-1">{errors.tipo_vehiculo.message}</p>}
             </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <Label htmlFor="marca">Marca *</Label>
-              <Input
-                id="marca"
-                {...register('marca')}
-                placeholder="Toyota"
-                className={errors.marca ? 'border-red-500' : ''}
-              />
-              {errors.marca && (
-                <p className="text-sm text-red-500 mt-1">{errors.marca.message}</p>
-              )}
+              <Input id="marca" {...register('marca')} placeholder="Toyota" className={errors.marca ? 'border-red-500' : ''} />
+              {errors.marca && <p className="text-sm text-red-500 mt-1">{errors.marca.message}</p>}
             </div>
-
             <div>
               <Label htmlFor="modelo">Modelo *</Label>
-              <Input
-                id="modelo"
-                {...register('modelo')}
-                placeholder="Hilux"
-                className={errors.modelo ? 'border-red-500' : ''}
-              />
-              {errors.modelo && (
-                <p className="text-sm text-red-500 mt-1">{errors.modelo.message}</p>
-              )}
+              <Input id="modelo" {...register('modelo')} placeholder="Hilux" className={errors.modelo ? 'border-red-500' : ''} />
+              {errors.modelo && <p className="text-sm text-red-500 mt-1">{errors.modelo.message}</p>}
             </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <Label htmlFor="capacidad_kg">Capacidad (kg) *</Label>
-              <Input
-                id="capacidad_kg"
-                type="number"
-                step="0.01"
-                min="0.01"
-                {...register('capacidad_kg', { valueAsNumber: true })}
-                placeholder="1000"
-                className={errors.capacidad_kg ? 'border-red-500' : ''}
-              />
-              {errors.capacidad_kg && (
-                <p className="text-sm text-red-500 mt-1">{errors.capacidad_kg.message}</p>
-              )}
+              <Input id="capacidad_kg" type="number" step="0.01" min="0.01" {...register('capacidad_kg', { valueAsNumber: true })} placeholder="1000" className={errors.capacidad_kg ? 'border-red-500' : ''} />
+              {errors.capacidad_kg && <p className="text-sm text-red-500 mt-1">{errors.capacidad_kg.message}</p>}
             </div>
-
             <div>
-              <Label htmlFor="fecha_vto_seguro">Fecha Vencimiento Seguro</Label>
-              <Input
-                id="fecha_vto_seguro"
-                type="date"
-                {...register('fecha_vto_seguro')}
-              />
+              <Label htmlFor="km_inicial">Km inicial</Label>
+              <Input id="km_inicial" type="number" min="0" step="1" {...register('km_inicial', { setValueAs: (v) => v === '' ? undefined : Number(v) })} placeholder="0" />
+              {errors.km_inicial && <p className="text-sm text-red-500 mt-1">{errors.km_inicial.message}</p>}
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <div>
+              <Label htmlFor="fecha_vto_seguro">Vencimiento seguro</Label>
+              <Input id="fecha_vto_seguro" type="date" {...register('fecha_vto_seguro')} />
+            </div>
+            <div>
+              <Label htmlFor="fecha_vto_senasa">Vencimiento SENASA</Label>
+              <Input id="fecha_vto_senasa" type="date" {...register('fecha_vto_senasa')} />
+            </div>
+            <div>
+              <Label htmlFor="fecha_vto_vtv">Vencimiento VTV</Label>
+              <Input id="fecha_vto_vtv" type="date" {...register('fecha_vto_vtv')} />
             </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="seguro_vigente"
-                checked={watch('seguro_vigente')}
-                onCheckedChange={(checked) => setValue('seguro_vigente', checked)}
-              />
-              <Label htmlFor="seguro_vigente" className="cursor-pointer">
-                Seguro vigente
-              </Label>
+            <div>
+              <Label htmlFor="capacidad_tanque_litros">Capacidad tanque (L)</Label>
+              <Input id="capacidad_tanque_litros" type="number" min="0" step="0.01" {...register('capacidad_tanque_litros', { setValueAs: (v) => v === '' ? undefined : Number(v) })} placeholder="80" />
+              {errors.capacidad_tanque_litros && <p className="text-sm text-red-500 mt-1">{errors.capacidad_tanque_litros.message}</p>}
             </div>
+            <div>
+              <Label htmlFor="combustible_actual_litros">Combustible actual (L)</Label>
+              <Input id="combustible_actual_litros" type="number" min="0" step="0.01" {...register('combustible_actual_litros', { setValueAs: (v) => v === '' ? undefined : Number(v) })} placeholder="20" />
+              {errors.combustible_actual_litros && <p className="text-sm text-red-500 mt-1">{errors.combustible_actual_litros.message}</p>}
+            </div>
+          </div>
 
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="activo"
-                checked={watch('activo')}
-                onCheckedChange={(checked) => setValue('activo', checked)}
-              />
-              <Label htmlFor="activo" className="cursor-pointer">
-                Vehículo activo
-              </Label>
-            </div>
+          <div className="flex items-center space-x-2">
+            <Switch id="activo" checked={watch('activo')} onCheckedChange={(checked) => setValue('activo', checked)} />
+            <Label htmlFor="activo" className="cursor-pointer">Vehiculo activo</Label>
           </div>
         </CardContent>
       </Card>
 
-      {/* Botones de Acción */}
       <div className="flex justify-end gap-4">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => router.back()}
-          disabled={isLoading}
-        >
+        <Button type="button" variant="outline" onClick={() => router.back()} disabled={isLoading}>
           Cancelar
         </Button>
         <Button type="submit" disabled={isLoading} className="bg-primary hover:bg-primary/90">
@@ -290,7 +263,7 @@ export function EditarVehiculoForm({ vehiculoId }: EditarVehiculoFormProps) {
           ) : (
             <>
               <Save className="mr-2 h-4 w-4" />
-              Actualizar Vehículo
+              Actualizar Vehiculo
             </>
           )}
         </Button>
@@ -298,4 +271,3 @@ export function EditarVehiculoForm({ vehiculoId }: EditarVehiculoFormProps) {
     </form>
   )
 }
-

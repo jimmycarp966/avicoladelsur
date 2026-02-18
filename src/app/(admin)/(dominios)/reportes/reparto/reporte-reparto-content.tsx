@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Truck, CheckCircle, XCircle, Clock, MapPin, TrendingUp } from 'lucide-react'
+import { Truck, CheckCircle, XCircle, Clock, MapPin, TrendingUp, Fuel } from 'lucide-react'
 import { KpiCard } from '@/components/reportes/KpiCard'
 import { ReportFilters } from '@/components/reportes/ReportFilters'
 import { ExportButton } from '@/components/reportes/ExportButton'
@@ -180,6 +180,28 @@ export function ReporteRepartoContent({
           decimals={2}
           icon={TrendingUp}
           description="Km por entrega"
+        />
+        <KpiCard
+          title="Litros Cargados"
+          value={kpis?.litrosTotales || 0}
+          format="number"
+          decimals={2}
+          icon={Fuel}
+        />
+        <KpiCard
+          title="Consumo Promedio"
+          value={kpis?.consumoPromedioKmL || 0}
+          format="number"
+          decimals={2}
+          icon={Fuel}
+          description="Km por litro"
+        />
+        <KpiCard
+          title="Rutas con Carga"
+          value={kpis?.rutasConCargaCombustible || 0}
+          format="number"
+          decimals={0}
+          icon={Truck}
         />
       </div>
 

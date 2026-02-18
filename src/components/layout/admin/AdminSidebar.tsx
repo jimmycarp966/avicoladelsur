@@ -141,7 +141,7 @@ const navigation = [
       { name: 'Cierres de Caja', href: '/tesoreria/cierre-caja' },
       { name: 'Tesoro', href: '/tesoreria/tesoro' },
       { name: 'Gastos', href: '/tesoreria/gastos' },
-      { name: 'Por Sucursal', href: '/tesoreria/sucursales' },
+      { name: 'Por Sucursal', href: '/tesoreria/por-sucursal' },
     ],
   },
   {

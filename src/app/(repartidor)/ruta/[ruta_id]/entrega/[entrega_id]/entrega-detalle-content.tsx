@@ -32,7 +32,7 @@ import {
   Home,
 } from 'lucide-react'
 import Link from 'next/link'
-import { actualizarEstadoEntrega, finalizarRutaAction } from '@/actions/reparto.actions'
+import { actualizarEstadoEntrega } from '@/actions/reparto.actions'
 import { createClient } from '@/lib/supabase/client'
 
 interface EntregaDetalleContentProps {
@@ -276,12 +276,6 @@ export function EntregaDetalleContent({ entrega, resumenCuenta }: EntregaDetalle
         })
         setShowRutaCompletadaModal(true)
 
-        // Intentar finalizar la ruta automáticamente
-        try {
-          await finalizarRutaAction(entrega.ruta_id)
-        } catch (err) {
-          console.log('No se pudo finalizar la ruta automáticamente:', err)
-        }
       } else {
         // Hay más entregas - ir al siguiente cliente
         toast.success('Entrega completada - Siguiente cliente')
@@ -890,7 +884,7 @@ export function EntregaDetalleContent({ entrega, resumenCuenta }: EntregaDetalle
 
             {/* Mensaje */}
             <p className="text-center text-muted-foreground">
-              La ruta ha sido marcada como completada. Puedes volver al inicio o revisar el resumen.
+              Ya puedes volver a la hoja de ruta para finalizar y registrar combustible.
             </p>
 
             {/* Botones */}

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
@@ -16,7 +16,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { MessageSquare, Loader2, Phone, Calendar, CheckCircle, Clock, X } from 'lucide-react'
+import { MessageSquare, Loader2, Phone, Calendar, CheckCircle, Clock } from 'lucide-react'
 import {
     listarRecordatoriosClienteAction,
     crearRecordatorioAction,
@@ -39,6 +39,7 @@ interface Recordatorio {
     estado: string
     resultado: string | null
     fecha_proximo_contacto: string | null
+    hora_proximo_contacto?: string | null
     creador?: { nombre: string; apellido: string }
 }
 
@@ -81,8 +82,7 @@ export function RecordatoriosDialog({ clienteId, clienteNombre }: RecordatoriosD
             if (result.success) {
                 toast.success('Recordatorio creado')
                 fetchRecordatorios()
-                    // Reset form
-                    ; (e.target as HTMLFormElement).reset()
+                ; (e.target as HTMLFormElement).reset()
             } else {
                 toast.error(result.error)
             }
@@ -134,7 +134,7 @@ export function RecordatoriosDialog({ clienteId, clienteNombre }: RecordatoriosD
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <MessageSquare className="h-5 w-5" />
-                        Gestión de Cobranza
+                        Gestion de Cobranza
                     </DialogTitle>
                     <DialogDescription>
                         Historial y recordatorios de pago para <strong>{clienteNombre}</strong>
@@ -142,11 +142,10 @@ export function RecordatoriosDialog({ clienteId, clienteNombre }: RecordatoriosD
                 </DialogHeader>
 
                 <div className="space-y-4">
-                    {/* Formulario nuevo recordatorio */}
                     <form onSubmit={handleSubmit} className="space-y-3 p-4 bg-muted/50 rounded-lg">
                         <h4 className="font-medium text-sm">Nuevo Recordatorio</h4>
 
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-3 gap-3">
                             <div className="space-y-1">
                                 <Label htmlFor="tipo" className="text-xs">Tipo</Label>
                                 <Select name="tipo" defaultValue="llamada">
@@ -154,21 +153,31 @@ export function RecordatoriosDialog({ clienteId, clienteNombre }: RecordatoriosD
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="llamada">📞 Llamada</SelectItem>
-                                        <SelectItem value="whatsapp">💬 WhatsApp</SelectItem>
-                                        <SelectItem value="visita">🚗 Visita</SelectItem>
-                                        <SelectItem value="email">📧 Email</SelectItem>
-                                        <SelectItem value="otro">📝 Otro</SelectItem>
+                                        <SelectItem value="llamada">Llamada</SelectItem>
+                                        <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                                        <SelectItem value="visita">Visita</SelectItem>
+                                        <SelectItem value="email">Email</SelectItem>
+                                        <SelectItem value="otro">Otro</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
 
                             <div className="space-y-1">
-                                <Label htmlFor="fecha_proximo_contacto" className="text-xs">Próximo Contacto</Label>
+                                <Label htmlFor="fecha_proximo_contacto" className="text-xs">Proximo Contacto</Label>
                                 <Input
                                     id="fecha_proximo_contacto"
                                     name="fecha_proximo_contacto"
                                     type="date"
+                                    className="h-8"
+                                />
+                            </div>
+
+                            <div className="space-y-1">
+                                <Label htmlFor="hora_proximo_contacto" className="text-xs">Hora (GMT-3)</Label>
+                                <Input
+                                    id="hora_proximo_contacto"
+                                    name="hora_proximo_contacto"
+                                    type="time"
                                     className="h-8"
                                 />
                             </div>
@@ -179,7 +188,7 @@ export function RecordatoriosDialog({ clienteId, clienteNombre }: RecordatoriosD
                             <Textarea
                                 id="nota"
                                 name="nota"
-                                placeholder="Ej: Llamé a las 10am, prometió pagar el viernes..."
+                                placeholder="Ej: Llamo a las 10:00, prometio pagar el viernes..."
                                 rows={2}
                                 required
                             />
@@ -197,7 +206,6 @@ export function RecordatoriosDialog({ clienteId, clienteNombre }: RecordatoriosD
                         </Button>
                     </form>
 
-                    {/* Historial */}
                     <div className="space-y-2">
                         <h4 className="font-medium text-sm flex items-center gap-2">
                             <Clock className="h-4 w-4" />
@@ -218,8 +226,7 @@ export function RecordatoriosDialog({ clienteId, clienteNombre }: RecordatoriosD
                                     {recordatorios.map((rec) => (
                                         <div
                                             key={rec.id}
-                                            className={`p-3 rounded-lg border ${rec.estado === 'completado' ? 'bg-green-50 border-green-200' : 'bg-white'
-                                                }`}
+                                            className={`p-3 rounded-lg border ${rec.estado === 'completado' ? 'bg-green-50 border-green-200' : 'bg-white'}`}
                                         >
                                             <div className="flex items-start justify-between gap-2">
                                                 <div className="flex-1">
@@ -237,7 +244,8 @@ export function RecordatoriosDialog({ clienteId, clienteNombre }: RecordatoriosD
                                                     <p className="text-sm">{rec.nota}</p>
                                                     {rec.fecha_proximo_contacto && (
                                                         <p className="text-xs text-blue-600 mt-1">
-                                                            📅 Próximo contacto: {new Date(rec.fecha_proximo_contacto).toLocaleDateString('es-AR')}
+                                                            Proximo contacto: {new Date(rec.fecha_proximo_contacto).toLocaleDateString('es-AR')}
+                                                            {rec.hora_proximo_contacto ? ` ${rec.hora_proximo_contacto.slice(0, 5)}hs` : ''}
                                                         </p>
                                                     )}
                                                     {rec.creador && (

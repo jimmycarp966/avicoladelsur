@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Edit, Truck, Wrench, FileCheck, Calendar, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Edit, Wrench, FileCheck, AlertTriangle, Gauge, Fuel } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -16,8 +16,8 @@ interface VehiculoDetallePageProps {
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
-  title: 'Detalle Vehículo - Avícola del Sur ERP',
-  description: 'Información detallada del vehículo',
+  title: 'Detalle Vehiculo - Avicola del Sur ERP',
+  description: 'Informacion detallada del vehiculo',
 }
 
 const getEstadoConfig = (estado: string) => {
@@ -28,6 +28,28 @@ const getEstadoConfig = (estado: string) => {
     averiado: { label: 'Averiado', variant: 'destructive' as const, color: 'bg-red-100 text-red-800' },
   }
   return configs[estado as keyof typeof configs] || { label: estado, variant: 'outline' as const, color: 'bg-gray-100 text-gray-800' }
+}
+
+function esVigente(fecha?: string | null) {
+  if (!fecha) return true
+  const hoy = new Date()
+  hoy.setHours(0, 0, 0, 0)
+  const venc = new Date(fecha)
+  venc.setHours(0, 0, 0, 0)
+  return venc >= hoy
+}
+
+function DocumentoItem({ label, fecha }: { label: string; fecha?: string | null }) {
+  const vigente = esVigente(fecha)
+  return (
+    <div>
+      <p className="text-sm text-muted-foreground">{label}</p>
+      <div className="flex items-center gap-2 mt-1">
+        <Badge variant={vigente ? 'default' : 'destructive'}>{vigente ? 'VIGENTE' : 'VENCIDO'}</Badge>
+        {fecha && <span className="text-sm">{formatDate(fecha)}</span>}
+      </div>
+    </div>
+  )
 }
 
 export default async function VehiculoDetallePage({ params }: VehiculoDetallePageProps) {
@@ -41,7 +63,6 @@ export default async function VehiculoDetallePage({ params }: VehiculoDetallePag
   const vehiculo = result.data
   const estadoConfig = getEstadoConfig(vehiculo.estado)
 
-  // Obtener historial de mantenimientos y checklists
   const supabase = await createClient()
   const { data: mantenimientos } = await supabase
     .from('checklists_vehiculos')
@@ -75,7 +96,7 @@ export default async function VehiculoDetallePage({ params }: VehiculoDetallePag
           <Button variant="outline" asChild>
             <Link href={`/reparto/vehiculos/${id}/mantenimiento`}>
               <Wrench className="mr-2 h-4 w-4" />
-              Mantenimiento
+              Programar mantenimiento
             </Link>
           </Button>
           <Button variant="outline" asChild>
@@ -88,10 +109,9 @@ export default async function VehiculoDetallePage({ params }: VehiculoDetallePag
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        {/* Información General */}
         <Card>
           <CardHeader>
-            <CardTitle>Información General</CardTitle>
+            <CardTitle>Informacion General</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
@@ -112,65 +132,50 @@ export default async function VehiculoDetallePage({ params }: VehiculoDetallePag
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Estado</p>
-              <Badge variant={estadoConfig.variant} className={estadoConfig.color}>
-                {estadoConfig.label}
-              </Badge>
+              <Badge variant={estadoConfig.variant} className={estadoConfig.color}>{estadoConfig.label}</Badge>
             </div>
-            {vehiculo.año && (
-              <div>
-                <p className="text-sm text-muted-foreground">Año</p>
-                <p className="font-medium">{vehiculo.año}</p>
-              </div>
-            )}
+            <div>
+              <p className="text-sm text-muted-foreground">Activo</p>
+              <Badge variant={vehiculo.activo ? 'default' : 'secondary'}>{vehiculo.activo ? 'Si' : 'No'}</Badge>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Seguro y Documentación */}
         <Card>
           <CardHeader>
-            <CardTitle>Seguro y Documentación</CardTitle>
+            <CardTitle>Documentacion y Combustible</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Seguro Vigente</p>
-              <Badge variant={vehiculo.seguro_vigente ? 'default' : 'destructive'}>
-                {vehiculo.seguro_vigente ? 'Vigente' : 'Vencido'}
-              </Badge>
+            <DocumentoItem label="Seguro" fecha={vehiculo.fecha_vto_seguro} />
+            <DocumentoItem label="SENASA" fecha={vehiculo.fecha_vto_senasa} />
+            <DocumentoItem label="VTV" fecha={vehiculo.fecha_vto_vtv} />
+
+            <div className="pt-2 border-t">
+              <p className="text-sm text-muted-foreground flex items-center gap-1">
+                <Gauge className="h-4 w-4" /> Kilometraje
+              </p>
+              <p className="font-medium">{vehiculo.kilometraje?.toLocaleString() || vehiculo.km_inicial?.toLocaleString() || '-'} km</p>
             </div>
-            {vehiculo.fecha_vto_seguro && (
-              <div>
-                <p className="text-sm text-muted-foreground">Vencimiento Seguro</p>
-                <p className="font-medium">{formatDate(vehiculo.fecha_vto_seguro)}</p>
-                {new Date(vehiculo.fecha_vto_seguro) < new Date() && (
-                  <Badge variant="destructive" className="mt-2">
-                    <AlertTriangle className="mr-1 h-3 w-3" />
-                    Vencido
-                  </Badge>
-                )}
-              </div>
-            )}
-            {vehiculo.kilometraje && (
-              <div>
-                <p className="text-sm text-muted-foreground">Kilometraje</p>
-                <p className="font-medium">{vehiculo.kilometraje.toLocaleString()} km</p>
-              </div>
-            )}
+
             <div>
-              <p className="text-sm text-muted-foreground">Activo</p>
-              <Badge variant={vehiculo.activo ? 'default' : 'secondary'}>
-                {vehiculo.activo ? 'Sí' : 'No'}
-              </Badge>
+              <p className="text-sm text-muted-foreground flex items-center gap-1">
+                <Fuel className="h-4 w-4" /> Combustible
+              </p>
+              <p className="font-medium">
+                {vehiculo.combustible_actual_litros !== undefined && vehiculo.capacidad_tanque_litros !== undefined
+                  ? `${Number(vehiculo.combustible_actual_litros).toFixed(1)} / ${Number(vehiculo.capacidad_tanque_litros).toFixed(1)} L`
+                  : 'Sin datos'}
+              </p>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Historial de Mantenimientos y Checklists */}
       {mantenimientos && mantenimientos.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Historial Reciente</CardTitle>
-            <CardDescription>Últimos mantenimientos y checklists</CardDescription>
+            <CardDescription>Ultimos mantenimientos y checklists</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
@@ -187,14 +192,10 @@ export default async function VehiculoDetallePage({ params }: VehiculoDetallePag
                 {mantenimientos.map((mant: any) => (
                   <TableRow key={mant.id}>
                     <TableCell>{formatDate(mant.fecha_check)}</TableCell>
-                    <TableCell>
-                      {mant.usuario?.nombre} {mant.usuario?.apellido}
-                    </TableCell>
+                    <TableCell>{mant.usuario?.nombre} {mant.usuario?.apellido}</TableCell>
                     <TableCell>{mant.kilometraje ? `${mant.kilometraje.toLocaleString()} km` : '-'}</TableCell>
                     <TableCell>
-                      <Badge variant={mant.aprobado ? 'default' : 'secondary'}>
-                        {mant.aprobado ? 'Aprobado' : 'Pendiente'}
-                      </Badge>
+                      <Badge variant={mant.aprobado ? 'default' : 'secondary'}>{mant.aprobado ? 'Aprobado' : 'Pendiente'}</Badge>
                     </TableCell>
                     <TableCell className="max-w-xs truncate">{mant.observaciones || '-'}</TableCell>
                   </TableRow>
@@ -207,4 +208,3 @@ export default async function VehiculoDetallePage({ params }: VehiculoDetallePag
     </div>
   )
 }
-

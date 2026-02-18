@@ -548,7 +548,7 @@ export async function registrarDepositoBancarioAction(formData: FormData) {
       .single()
 
     if (!usuario || !['admin', 'vendedor', 'encargado_sucursal'].includes(usuario.rol)) {
-      return { success: false, error: 'No tienes permisos para registrar depósitos' }
+      return { success: false, error: 'No tienes permisos para registrar transferencias' }
     }
 
     // Parsear datos
@@ -571,7 +571,7 @@ export async function registrarDepositoBancarioAction(formData: FormData) {
       .insert({
         tipo: 'transferencia',
         monto: -monto, // Negativo porque es salida del tesoro
-        descripcion: `Depósito bancario - Transacción: ${numero_transaccion}`,
+        descripcion: `Transferencia bancaria - Transacción: ${numero_transaccion}`,
         origen_tipo: 'deposito',
         origen_id: null,
       })
@@ -582,11 +582,11 @@ export async function registrarDepositoBancarioAction(formData: FormData) {
 
     return {
       success: true,
-      message: 'Depósito bancario registrado exitosamente',
+      message: 'Transferencia bancaria registrada exitosamente',
     }
   } catch (error: any) {
     devError('Error en registrarDepositoBancarioAction:', error)
-    return { success: false, error: error.message || 'Error al registrar depósito' }
+    return { success: false, error: error.message || 'Error al registrar transferencia' }
   }
 }
 
@@ -1360,6 +1360,7 @@ export async function registrarRetiroSucursalAction(formData: FormData) {
     if (retiroError) throw retiroError
 
     revalidatePath('/(admin)/(dominios)/tesoreria/sucursales')
+    revalidatePath('/(admin)/(dominios)/tesoreria/cajas')
     revalidatePath('/(admin)/(dominios)/tesoreria/validar-rutas')
     revalidatePath('/sucursal/dashboard')
 
@@ -1608,6 +1609,7 @@ export async function listarRecordatoriosClienteAction(clienteId: string) {
       `)
       .eq('cliente_id', clienteId)
       .order('fecha', { ascending: false })
+      .order('hora_proximo_contacto', { ascending: false, nullsFirst: false })
 
     if (error) throw error
 
@@ -1633,6 +1635,7 @@ export async function crearRecordatorioAction(formData: FormData) {
     const nota = formData.get('nota') as string
     const tipo = formData.get('tipo') as string || 'llamada'
     const fecha_proximo_contacto = formData.get('fecha_proximo_contacto') as string || null
+    const hora_proximo_contacto = formData.get('hora_proximo_contacto') as string || null
     const resultado = formData.get('resultado') as string || null
 
     if (!cliente_id) {
@@ -1650,6 +1653,7 @@ export async function crearRecordatorioAction(formData: FormData) {
         tipo,
         fecha: getTodayArgentina(),
         fecha_proximo_contacto: fecha_proximo_contacto || null,
+        hora_proximo_contacto: hora_proximo_contacto || null,
         resultado,
         estado: 'pendiente',
         created_by: user.id,
@@ -1669,6 +1673,39 @@ export async function crearRecordatorioAction(formData: FormData) {
   } catch (error: any) {
     devError('Error en crearRecordatorioAction:', error)
     return { success: false, error: error.message || 'Error al crear recordatorio' }
+  }
+}
+
+// Obtener promesas de pago del dia (pendientes y ordenadas por hora)
+export async function obtenerPromesasDelDiaAction() {
+  try {
+    const supabase = await createClient()
+    const hoy = getTodayArgentina()
+
+    const { data, error } = await supabase
+      .from('clientes_recordatorios')
+      .select(`
+        id,
+        cliente_id,
+        nota,
+        tipo,
+        estado,
+        fecha_proximo_contacto,
+        hora_proximo_contacto,
+        created_at,
+        cliente:clientes(id, nombre, telefono, whatsapp)
+      `)
+      .eq('estado', 'pendiente')
+      .eq('fecha_proximo_contacto', hoy)
+      .order('hora_proximo_contacto', { ascending: true, nullsFirst: false })
+      .order('created_at', { ascending: true })
+
+    if (error) throw error
+
+    return { success: true, data: data || [] }
+  } catch (error: any) {
+    devError('Error en obtenerPromesasDelDiaAction:', error)
+    return { success: false, error: error.message || 'Error al obtener promesas del dia' }
   }
 }
 

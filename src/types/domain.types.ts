@@ -67,6 +67,12 @@ export interface Vehiculo extends BaseEntity {
   tipo_vehiculo: string
   seguro_vigente: boolean
   fecha_vto_seguro?: string
+  fecha_vto_senasa?: string
+  fecha_vto_vtv?: string
+  km_inicial?: number
+  capacidad_tanque_litros?: number
+  combustible_actual_litros?: number
+  kilometraje?: number
   activo: boolean
 }
 
@@ -168,12 +174,19 @@ export interface ChecklistVehiculo extends BaseEntity {
   vehiculo_id: string
   usuario_id: string
   fecha_check: string
+  // Campos legacy
   aceite_motor: boolean
   luces: boolean
   frenos: boolean
   presion_neumaticos: boolean
   limpieza_interior: boolean
   limpieza_exterior: boolean
+  // Campos nuevos
+  aceite_motor_porcentaje?: number
+  luces_observacion?: string
+  presion_neumaticos_psi?: number
+  limpieza_interior_estado?: 'mala' | 'buena' | 'excelente'
+  limpieza_exterior_estado?: 'mala' | 'buena' | 'excelente'
   combustible?: number
   kilometraje?: number
   observaciones?: string
@@ -197,6 +210,12 @@ export interface RutaReparto extends BaseEntity {
   tiempo_real_min?: number
   peso_total_kg?: number
   costo_combustible?: number
+  km_inicio_ruta?: number
+  km_fin_ruta?: number
+  km_recorridos?: number
+  carga_combustible?: boolean
+  litros_cargados?: number
+  consumo_km_l?: number
   observaciones?: string
   checklist_inicio_id?: string
   checklist_fin_id?: string

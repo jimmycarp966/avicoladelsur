@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -21,8 +22,9 @@ import {
 } from 'lucide-react'
 import { obtenerSucursalesAction } from '@/actions/sucursales.actions'
 import { obtenerRetirosEnTransitoAction } from '@/actions/tesoreria.actions'
-import { format } from 'date-fns'
+import { format, subDays } from 'date-fns'
 import { formatCurrency } from '@/lib/utils'
+import { getTodayArgentina } from '@/lib/utils'
 
 
 interface FiltrosTesoreria {
@@ -138,15 +140,18 @@ function TesoreriaSkeleton() {
   )
 }
 
-export default async function TesoreriaSucursalesPage({
+export async function TesoreriaPorSucursalContent({
   searchParams
 }: {
   searchParams: { sucursal?: string; desde?: string; hasta?: string }
 }) {
+  const fechaHastaDefault = searchParams.hasta || getTodayArgentina()
+  const fechaDesdeDefault = searchParams.desde || format(subDays(new Date(`${fechaHastaDefault}T00:00:00`), 7), 'yyyy-MM-dd')
+
   const filtros: FiltrosTesoreria = {
     sucursalId: searchParams.sucursal || 'todas',
-    fechaDesde: searchParams.desde || format(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
-    fechaHasta: searchParams.hasta || format(new Date(), 'yyyy-MM-dd')
+    fechaDesde: fechaDesdeDefault,
+    fechaHasta: fechaHastaDefault,
   }
 
   const [reportesData, sucursalesResult, retirosEnTransitoResult] = await Promise.all([
@@ -437,7 +442,7 @@ function ReportesTesoreriaConsolidados({ data, fechaDesde, fechaHasta }: { data:
                   </div>
                   <div>
                     <Button variant="outline" size="sm" asChild>
-                      <a href={`/tesoreria/sucursales?sucursal=${sucursal.id}&desde=${fechaDesde}&hasta=${fechaHasta}`}>
+                      <a href={`/tesoreria/cajas?view=por-sucursal&sucursal=${sucursal.id}&desde=${fechaDesde}&hasta=${fechaHasta}`}>
                         Ver Detalle
                       </a>
                     </Button>
@@ -450,6 +455,19 @@ function ReportesTesoreriaConsolidados({ data, fechaDesde, fechaHasta }: { data:
       </Card>
     </div>
   )
+}
+
+export default async function TesoreriaSucursalesPage({
+  searchParams
+}: {
+  searchParams: { sucursal?: string; desde?: string; hasta?: string }
+}) {
+  const params = new URLSearchParams()
+  if (searchParams?.sucursal) params.set('sucursal', searchParams.sucursal)
+  if (searchParams?.desde) params.set('desde', searchParams.desde)
+  if (searchParams?.hasta) params.set('hasta', searchParams.hasta)
+  const suffix = params.toString()
+  redirect(`/tesoreria/cajas?view=por-sucursal${suffix ? `&${suffix}` : ''}`)
 }
 
 function ReporteTesoreriaSucursalEspecifica({ data }: { data: any }) {

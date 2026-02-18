@@ -141,18 +141,30 @@ export interface CrearVehiculoParams {
   capacidad_kg: number
   tipo_vehiculo?: string
   fecha_vto_seguro?: string
+  fecha_vto_senasa?: string
+  fecha_vto_vtv?: string
+  km_inicial?: number
+  capacidad_tanque_litros?: number
+  combustible_actual_litros?: number
   seguro_vigente?: boolean
   activo?: boolean
 }
 
 export interface ChecklistVehiculoParams {
   vehiculo_id: string
-  aceite_motor: boolean
-  luces: boolean
+  // Legacy
+  aceite_motor?: boolean
+  luces?: boolean
   frenos: boolean
-  presion_neumaticos: boolean
-  limpieza_interior: boolean
-  limpieza_exterior: boolean
+  presion_neumaticos?: boolean
+  limpieza_interior?: boolean
+  limpieza_exterior?: boolean
+  // Nuevo formato
+  aceite_motor_porcentaje?: number
+  luces_observacion?: string
+  presion_neumaticos_psi?: number
+  limpieza_interior_estado?: 'mala' | 'buena' | 'excelente'
+  limpieza_exterior_estado?: 'mala' | 'buena' | 'excelente'
   combustible?: number
   kilometraje?: number
   observaciones?: string

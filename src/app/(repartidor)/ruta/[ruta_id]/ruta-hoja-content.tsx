@@ -164,8 +164,20 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
       return
     }
 
+    const confirmarFinalizar = window.confirm('Se finalizara la ruta. Queres continuar?')
+    if (!confirmarFinalizar) {
+      return
+    }
+
+    const cargarCombustible = window.confirm(
+      'Vas a cargar combustible al finalizar?\\nAceptar = Si\\nCancelar = No'
+    )
+
     setLoading(true)
-    const result = await finalizarRutaAction(ruta.id, ruta.checklist_fin_id)
+    const result = await finalizarRutaAction(ruta.id, {
+      checklistFinId: ruta.checklist_fin_id,
+      cargaCombustible: cargarCombustible,
+    })
     setLoading(false)
 
     if (result.success) {

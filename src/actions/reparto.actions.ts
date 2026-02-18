@@ -16,19 +16,29 @@ import type {
   RutaActivaResponse
 } from '@/types/api.types'
 
+function esDocumentoVigente(fechaVto?: string | null): boolean {
+  if (!fechaVto) return true
+  const hoy = new Date(getTodayArgentina())
+  hoy.setHours(0, 0, 0, 0)
+  const fecha = new Date(fechaVto)
+  fecha.setHours(0, 0, 0, 0)
+  return fecha >= hoy
+}
+
 // Crear vehículo
 export async function crearVehiculoAction(
   params: CrearVehiculoParams
 ): Promise<ApiResponse<{ vehiculoId: string }>> {
   try {
     const supabase = await createClient()
+    const seguroVigente = esDocumentoVigente(params.fecha_vto_seguro)
 
     const { data, error } = await supabase
       .from('vehiculos')
       .insert({
         ...params,
         tipo_vehiculo: params.tipo_vehiculo || 'Camioneta',
-        seguro_vigente: true,
+        seguro_vigente: seguroVigente,
         activo: true,
       })
       .select()
@@ -65,13 +75,32 @@ export async function registrarChecklistVehiculoAction(
       throw new Error('Usuario no autenticado')
     }
 
+    const estadoInterior = params.limpieza_interior_estado
+    const estadoExterior = params.limpieza_exterior_estado
+    const lucesObservacion = params.luces_observacion?.trim() || null
+
     const { data, error } = await supabase
       .from('checklists_vehiculos')
       .insert({
-        ...params,
+        vehiculo_id: params.vehiculo_id,
+        aceite_motor: params.aceite_motor ?? (params.aceite_motor_porcentaje !== undefined ? params.aceite_motor_porcentaje > 0 : false),
+        luces: params.luces ?? Boolean(lucesObservacion),
+        frenos: params.frenos ?? false,
+        presion_neumaticos: params.presion_neumaticos ?? (params.presion_neumaticos_psi !== undefined ? params.presion_neumaticos_psi > 0 : false),
+        limpieza_interior: params.limpieza_interior ?? (estadoInterior ? estadoInterior !== 'mala' : false),
+        limpieza_exterior: params.limpieza_exterior ?? (estadoExterior ? estadoExterior !== 'mala' : false),
+        aceite_motor_porcentaje: params.aceite_motor_porcentaje ?? null,
+        luces_observacion: lucesObservacion,
+        presion_neumaticos_psi: params.presion_neumaticos_psi ?? null,
+        limpieza_interior_estado: estadoInterior ?? null,
+        limpieza_exterior_estado: estadoExterior ?? null,
+        combustible: params.combustible ?? null,
+        kilometraje: params.kilometraje ?? null,
+        observaciones: params.observaciones || null,
+        fotos_url: params.fotos_url ?? null,
         usuario_id: user.id,
-        fecha_check: getTodayArgentina(), // Fecha actual
-        aprobado: true, // Por defecto aprobado, se puede cambiar según lógica
+        fecha_check: getTodayArgentina(),
+        aprobado: true,
       })
       .select()
       .single()
@@ -83,17 +112,16 @@ export async function registrarChecklistVehiculoAction(
     return {
       success: true,
       data: { checklistId: data.id },
-      message: 'Checklist de vehículo registrado exitosamente',
+      message: 'Checklist de vehiculo registrado exitosamente',
     }
   } catch (error: any) {
     devError('Error al registrar checklist:', error)
     return {
       success: false,
-      error: error.message || 'Error al registrar checklist de vehículo',
+      error: error.message || 'Error al registrar checklist de vehiculo',
     }
   }
 }
-
 // Crear ruta
 export async function crearRutaAction(
   params: CrearRutaParams
@@ -465,42 +493,39 @@ export async function iniciarRutaAction(
 }
 
 // Finalizar ruta (con checklist fin)
+type FinalizarRutaOptions = {
+  checklistFinId?: string
+  cargaCombustible?: boolean
+}
+
 export async function finalizarRutaAction(
   rutaId: string,
-  checklistFinId?: string
+  checklistFinIdOrOptions?: string | FinalizarRutaOptions
 ): Promise<ApiResponse> {
   try {
     const supabase = await createClient()
 
-    // Verificar que todas las entregas estén completas
-    // Para pedidos simples: verificar detalles_ruta.estado_entrega
-    // Para pedidos agrupados: verificar entregas.estado_entrega
+    const options: FinalizarRutaOptions = typeof checklistFinIdOrOptions === 'string'
+      ? { checklistFinId: checklistFinIdOrOptions }
+      : (checklistFinIdOrOptions || {})
+
     const { data: detalles, error: detallesError } = await supabase
       .from('detalles_ruta')
-      .select(`
-        id,
-        estado_entrega,
-        pedido:pedidos(cliente_id)
-      `)
+      .select('id, estado_entrega, pedido:pedidos(cliente_id)')
       .eq('ruta_id', rutaId)
 
     if (detallesError) throw detallesError
 
-    // Verificar entregas pendientes en detalles_ruta (pedidos simples)
-    let entregasPendientes = detalles?.filter(d => {
-      // Si el pedido tiene cliente_id, es un pedido simple - verificar estado_entrega del detalle
+    let entregasPendientes = detalles?.filter((d) => {
       if (d.pedido?.cliente_id) {
         return d.estado_entrega !== 'entregado' && d.estado_entrega !== 'fallido' && d.estado_entrega !== 'rechazado'
       }
-      // Si no tiene cliente_id, es un pedido agrupado - ignorar este detalle (se verifica abajo)
       return false
     }) || []
 
-    // Para pedidos agrupados, verificar la tabla entregas
-    const pedidosAgrupados = detalles?.filter(d => !d.pedido?.cliente_id).map(d => d.id) || []
+    const pedidosAgrupados = detalles?.filter((d) => !d.pedido?.cliente_id).map((d) => d.id) || []
 
     if (pedidosAgrupados.length > 0) {
-      // Obtener las entregas individuales de los pedidos agrupados en esta ruta
       const { data: entregasIndividuales, error: entregasError } = await supabase
         .from('entregas')
         .select('id, estado_entrega, pedido_id')
@@ -508,11 +533,11 @@ export async function finalizarRutaAction(
           .from('detalles_ruta')
           .select('pedido_id')
           .eq('ruta_id', rutaId)
-          .then(r => r.data?.map(d => d.pedido_id) || [])
+          .then((r) => r.data?.map((d) => d.pedido_id) || [])
         )
 
       if (!entregasError && entregasIndividuales) {
-        const entregasAgrupPendientes = entregasIndividuales.filter(e =>
+        const entregasAgrupPendientes = entregasIndividuales.filter((e) =>
           e.estado_entrega !== 'entregado' && e.estado_entrega !== 'fallido' && e.estado_entrega !== 'rechazado'
         )
         entregasPendientes = [...entregasPendientes, ...entregasAgrupPendientes]
@@ -523,14 +548,58 @@ export async function finalizarRutaAction(
       throw new Error('No se puede finalizar la ruta. Todas las entregas deben estar completas.')
     }
 
-    // Calcular tiempo real y distancia
     const { data: ruta, error: rutaError } = await supabase
       .from('rutas_reparto')
-      .select('*')
+      .select('*, vehiculo:vehiculos(id, km_inicial, capacidad_tanque_litros, combustible_actual_litros)')
       .eq('id', rutaId)
       .single()
 
     if (rutaError) throw rutaError
+
+    const checklistFinId = options.checklistFinId || ruta.checklist_fin_id || null
+    const checklistInicioId = ruta.checklist_inicio_id || null
+
+    let checklistInicio: any = null
+    let checklistFin: any = null
+    const checklistIds = [checklistInicioId, checklistFinId].filter(Boolean) as string[]
+    if (checklistIds.length > 0) {
+      const { data: checklists } = await supabase
+        .from('checklists_vehiculos')
+        .select('id, kilometraje, combustible')
+        .in('id', checklistIds)
+
+      checklistInicio = checklists?.find((c: any) => c.id === checklistInicioId) || null
+      checklistFin = checklists?.find((c: any) => c.id === checklistFinId) || null
+    }
+
+    const kmInicio = checklistInicio?.kilometraje ?? ruta.km_inicio_ruta ?? ruta.vehiculo?.km_inicial ?? null
+    const kmFin = checklistFin?.kilometraje ?? ruta.km_fin_ruta ?? null
+
+    if (kmInicio !== null && kmFin !== null && kmFin < kmInicio) {
+      throw new Error('El kilometraje final no puede ser menor al kilometraje inicial.')
+    }
+
+    const kmRecorridos = kmInicio !== null && kmFin !== null ? kmFin - kmInicio : null
+    const cargarCombustible = options.cargaCombustible === true
+
+    const capacidadTanque = Number(ruta.vehiculo?.capacidad_tanque_litros || 0)
+    const combustibleFinPorcentaje = checklistFin?.combustible
+    let litrosCargados: number | null = null
+    let consumoKmL: number | null = null
+    let combustibleActualLitros: number | null = ruta.vehiculo?.combustible_actual_litros ?? null
+
+    if (cargarCombustible) {
+      if (capacidadTanque <= 0 || combustibleFinPorcentaje === null || combustibleFinPorcentaje === undefined) {
+        throw new Error('Para calcular consumo debes configurar capacidad del tanque y combustible en checklist fin.')
+      }
+
+      const litrosRestantes = capacidadTanque * (Number(combustibleFinPorcentaje) / 100)
+      litrosCargados = Math.max(capacidadTanque - litrosRestantes, 0)
+      consumoKmL = kmRecorridos !== null && litrosCargados > 0 ? kmRecorridos / litrosCargados : null
+      combustibleActualLitros = capacidadTanque
+    } else if (capacidadTanque > 0 && combustibleFinPorcentaje !== null && combustibleFinPorcentaje !== undefined) {
+      combustibleActualLitros = capacidadTanque * (Number(combustibleFinPorcentaje) / 100)
+    }
 
     const tiempoInicio = new Date(ruta.created_at)
     const tiempoFin = new Date()
@@ -539,6 +608,12 @@ export async function finalizarRutaAction(
     const updateData: any = {
       estado: 'completada',
       tiempo_real_min: tiempoRealMin,
+      km_inicio_ruta: kmInicio,
+      km_fin_ruta: kmFin,
+      km_recorridos: kmRecorridos,
+      carga_combustible: cargarCombustible,
+      litros_cargados: cargarCombustible ? litrosCargados : null,
+      consumo_km_l: cargarCombustible ? consumoKmL : null,
       updated_at: getNowArgentina().toISOString(),
     }
 
@@ -553,11 +628,25 @@ export async function finalizarRutaAction(
 
     if (updateError) throw updateError
 
+    const vehiculoUpdate: any = {}
+    if (combustibleActualLitros !== null && !Number.isNaN(combustibleActualLitros)) {
+      vehiculoUpdate.combustible_actual_litros = Number(combustibleActualLitros.toFixed(2))
+    }
+    if (kmFin !== null) vehiculoUpdate.kilometraje = kmFin
+    if (ruta.vehiculo?.km_inicial === null && kmInicio !== null) vehiculoUpdate.km_inicial = kmInicio
+
+    if (Object.keys(vehiculoUpdate).length > 0) {
+      await supabase.from('vehiculos').update(vehiculoUpdate).eq('id', ruta.vehiculo_id)
+    }
+
     revalidatePath('/(admin)/(dominios)/reparto/rutas')
+    revalidatePath('/(repartidor)/ruta')
 
     return {
       success: true,
-      message: 'Ruta finalizada exitosamente',
+      message: consumoKmL
+        ? 'Ruta finalizada exitosamente. Consumo estimado: ' + consumoKmL.toFixed(2) + ' km/l'
+        : 'Ruta finalizada exitosamente',
     }
   } catch (error: any) {
     devError('Error al finalizar ruta:', error)
@@ -1223,10 +1312,15 @@ export async function actualizarVehiculoAction(
     if (params.capacidad_kg) updateData.capacidad_kg = params.capacidad_kg
     if (params.fecha_vto_seguro !== undefined) {
       updateData.fecha_vto_seguro = params.fecha_vto_seguro || null
+      updateData.seguro_vigente = esDocumentoVigente(params.fecha_vto_seguro)
     }
-    if (params.seguro_vigente !== undefined) {
-      updateData.seguro_vigente = params.seguro_vigente
+    if (params.fecha_vto_senasa !== undefined) {
+      updateData.fecha_vto_senasa = params.fecha_vto_senasa || null
     }
+    if (params.fecha_vto_vtv !== undefined) updateData.fecha_vto_vtv = params.fecha_vto_vtv || null
+    if (params.km_inicial !== undefined) updateData.km_inicial = params.km_inicial
+    if (params.capacidad_tanque_litros !== undefined) updateData.capacidad_tanque_litros = params.capacidad_tanque_litros
+    if (params.combustible_actual_litros !== undefined) updateData.combustible_actual_litros = params.combustible_actual_litros
     if (params.activo !== undefined) {
       updateData.activo = params.activo
     }
@@ -2322,3 +2416,4 @@ export async function recalcularETAsAction(
     }
   }
 }
+
