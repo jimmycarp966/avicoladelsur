@@ -16,6 +16,7 @@ import { ArrowLeft, Loader2, Save, Star, User, Building } from 'lucide-react'
 import Link from 'next/link'
 import { evaluacionSchema, type EvaluacionFormData } from '@/lib/schemas/rrhh.schema'
 import { crearEvaluacionAction } from '@/actions/rrhh.actions'
+import { MetricasSoportePanel } from '@/components/rrhh/MetricasSoportePanel'
 import { useNotificationStore } from '@/store/notificationStore'
 import { createClient } from '@/lib/supabase/client'
 import type { Empleado, Sucursal } from '@/types/domain.types'
@@ -336,6 +337,13 @@ export function NuevaEvaluacionForm() {
           </CardContent>
         </Card>
 
+        {/* Panel de Soporte de Decisión — Huella Digital Operativa */}
+        <MetricasSoportePanel
+          empleadoId={watch('empleado_id')}
+          mes={watch('periodo_mes')}
+          anio={watch('periodo_anio')}
+        />
+
         {/* Criterios de evaluación */}
         <Card>
           <CardHeader>
@@ -375,11 +383,10 @@ export function NuevaEvaluacionForm() {
                       {Array.from({ length: 5 }, (_, i) => (
                         <Star
                           key={i}
-                          className={`w-4 h-4 ${
-                            i < (watch(criterio.name) || 3)
+                          className={`w-4 h-4 ${i < (watch(criterio.name) || 3)
                               ? 'text-yellow-400 fill-current'
                               : 'text-gray-300'
-                          }`}
+                            }`}
                         />
                       ))}
                     </div>
@@ -400,11 +407,10 @@ export function NuevaEvaluacionForm() {
                     {Array.from({ length: 5 }, (_, i) => (
                       <Star
                         key={i}
-                        className={`w-5 h-5 ${
-                          i < Math.round(promedioCalculado)
+                        className={`w-5 h-5 ${i < Math.round(promedioCalculado)
                             ? 'text-yellow-400 fill-current'
                             : 'text-gray-300'
-                        }`}
+                          }`}
                       />
                     ))}
                   </div>
