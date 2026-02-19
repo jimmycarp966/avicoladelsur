@@ -1,6 +1,8 @@
 import { Suspense } from 'react'
 import { CalcularLiquidacionesForm } from './calcular-liquidaciones-form'
 import { LiquidacionesFormSkeleton } from './liquidaciones-form-skeleton'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
+import type { Empleado } from '@/types/domain.types'
 
 export const dynamic = 'force-dynamic'
 export const metadata = {
@@ -8,7 +10,43 @@ export const metadata = {
   description: 'Calcular liquidaciones de sueldo mensuales para empleados',
 }
 
-export default function CalcularLiquidacionesPage() {
+async function getEmpleadosActivosParaCalculo(): Promise<Empleado[]> {
+  const supabase = await createClient()
+
+  const { data: authResult, error: authError } = await supabase.auth.getUser()
+  if (authError || !authResult.user) return []
+
+  const { data: userData } = await supabase
+    .from('usuarios')
+    .select('rol, activo')
+    .eq('id', authResult.user.id)
+    .maybeSingle()
+
+  const isAdmin = !!userData?.activo && userData.rol === 'admin'
+  const db = isAdmin ? createAdminClient() : supabase
+
+  const { data, error } = await db
+    .from('rrhh_empleados')
+    .select(`
+      *,
+      usuario:usuarios(id, nombre, apellido, email),
+      sucursal:sucursales(id, nombre),
+      categoria:rrhh_categorias(id, nombre, sueldo_basico)
+    `)
+    .eq('activo', true)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('Error cargando empleados para calcular liquidaciones:', error)
+    return []
+  }
+
+  return (data || []) as Empleado[]
+}
+
+export default async function CalcularLiquidacionesPage() {
+  const initialEmpleados = await getEmpleadosActivosParaCalculo()
+
   return (
     <div className="space-y-6">
       <div className="relative overflow-hidden rounded-lg bg-gradient-to-br from-primary/5 via-white to-secondary/5 p-6 shadow-sm border border-primary/10">
@@ -20,7 +58,7 @@ export default function CalcularLiquidacionesPage() {
       </div>
 
       <Suspense fallback={<LiquidacionesFormSkeleton />}>
-        <CalcularLiquidacionesForm />
+        <CalcularLiquidacionesForm initialEmpleados={initialEmpleados} />
       </Suspense>
     </div>
   )

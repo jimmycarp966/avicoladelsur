@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -11,45 +11,26 @@ import { ArrowLeft, Calculator, Loader2, Users, AlertCircle } from 'lucide-react
 import Link from 'next/link'
 import { calcularLiquidacionMensualAction } from '@/actions/rrhh.actions'
 import { useNotificationStore } from '@/store/notificationStore'
-import { createClient } from '@/lib/supabase/client'
 import type { Empleado } from '@/types/domain.types'
 
 interface EmpleadoSeleccionado extends Empleado {
   selected: boolean
 }
 
-export function CalcularLiquidacionesForm() {
+interface CalcularLiquidacionesFormProps {
+  initialEmpleados: Empleado[]
+}
+
+export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidacionesFormProps) {
   const router = useRouter()
   const { showToast } = useNotificationStore()
   const [isLoading, setIsLoading] = useState(false)
-  const [empleados, setEmpleados] = useState<EmpleadoSeleccionado[]>([])
+  const [empleados, setEmpleados] = useState<EmpleadoSeleccionado[]>(
+    () => initialEmpleados.map((emp) => ({ ...emp, selected: false }))
+  )
   const [mes, setMes] = useState(new Date().getMonth() + 1)
   const [anio, setAnio] = useState(new Date().getFullYear())
   const [selectAll, setSelectAll] = useState(false)
-
-  // Cargar empleados activos
-  useEffect(() => {
-    const loadEmpleados = async () => {
-      const supabase = createClient()
-
-      const { data, error } = await supabase
-        .from('rrhh_empleados')
-        .select(`
-          *,
-          usuario:usuarios(id, nombre, apellido, email),
-          sucursal:sucursales(id, nombre),
-          categoria:rrhh_categorias(id, nombre, sueldo_basico)
-        `)
-        .eq('activo', true)
-        .order('created_at')
-
-      if (data) {
-        setEmpleados(data.map(emp => ({ ...emp, selected: false })))
-      }
-    }
-
-    loadEmpleados()
-  }, [])
 
   const handleSelectAll = (checked: boolean) => {
     setSelectAll(checked)
@@ -83,12 +64,14 @@ export function CalcularLiquidacionesForm() {
       setIsLoading(true)
       let successCount = 0
       let errorCount = 0
+      const liquidacionIds: string[] = []
 
       for (const empleado of empleadosSeleccionados) {
         try {
           const result = await calcularLiquidacionMensualAction(empleado.id, mes, anio)
-          if (result.success) {
+          if (result.success && result.data?.liquidacionId) {
             successCount++
+            liquidacionIds.push(result.data.liquidacionId)
           } else {
             errorCount++
             console.error(`Error calculando liquidación para ${empleado.usuario?.nombre}:`, result.error)
@@ -105,7 +88,12 @@ export function CalcularLiquidacionesForm() {
           `Se calcularon ${successCount} liquidaciones exitosamente${errorCount > 0 ? ` (${errorCount} errores)` : ''}`,
           'Cálculo completado'
         )
-        router.push('/rrhh/liquidaciones')
+        if (successCount === 1 && liquidacionIds.length === 1) {
+          router.push(`/rrhh/liquidaciones/${liquidacionIds[0]}`)
+        } else {
+          router.push('/rrhh/liquidaciones')
+        }
+        router.refresh()
       } else {
         showToast(
           'error',

@@ -7,6 +7,20 @@ function normalizeIdentity(value: string): string {
   return value.replace(/[^0-9A-Za-z]+/g, '').toUpperCase()
 }
 
+function normalizeTimestampValue(value: string | number): string {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    if (value > 1e10) return new Date(value).toISOString()
+    if (value > 1e9) return new Date(value * 1000).toISOString()
+    return String(value)
+  }
+
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  if (/^\d{13}$/.test(trimmed)) return new Date(Number(trimmed)).toISOString()
+  if (/^\d{10}$/.test(trimmed)) return new Date(Number(trimmed) * 1000).toISOString()
+  return trimmed
+}
+
 function getStringValue(record: Record<string, unknown>, keys: string[]): string | null {
   for (const key of keys) {
     const value = record[key]
@@ -19,6 +33,19 @@ function getStringValue(record: Record<string, unknown>, keys: string[]): string
         return new Date(value).toISOString()
       }
       return String(value)
+    }
+  }
+  return null
+}
+
+function getTimestampValue(record: Record<string, unknown>, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = record[key]
+    if (typeof value === 'string' && value.trim()) {
+      return normalizeTimestampValue(value)
+    }
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return normalizeTimestampValue(value)
     }
   }
   return null
@@ -75,7 +102,7 @@ function isAttendanceEvent(record: Record<string, unknown>): boolean {
 }
 
 function inferTimestamp(record: Record<string, unknown>): string | null {
-  return getStringValue(record, [
+  return getTimestampValue(record, [
     'eventTime',
     'time',
     'timestamp',
@@ -191,7 +218,7 @@ export function normalizeHikAttendanceEvents(events: Record<string, unknown>[]):
 }
 
 export function timestampToLocalHour(input: string): string {
-  const date = new Date(input)
+  const date = new Date(normalizeTimestampValue(input))
   if (Number.isNaN(date.getTime())) return input
 
   return new Intl.DateTimeFormat('es-AR', {

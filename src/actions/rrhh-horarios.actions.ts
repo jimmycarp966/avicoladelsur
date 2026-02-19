@@ -52,6 +52,20 @@ function readString(record: Record<string, unknown>, key: string): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
+function normalizeTimestampValue(value: string | number): string {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    if (value > 1e10) return new Date(value).toISOString()
+    if (value > 1e9) return new Date(value * 1000).toISOString()
+    return String(value)
+  }
+
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  if (/^\d{13}$/.test(trimmed)) return new Date(Number(trimmed)).toISOString()
+  if (/^\d{10}$/.test(trimmed)) return new Date(Number(trimmed) * 1000).toISOString()
+  return trimmed
+}
+
 function extractRawEventTimestamp(raw: Record<string, unknown>): string | undefined {
   const candidates = [
     'occurTime',
@@ -71,17 +85,17 @@ function extractRawEventTimestamp(raw: Record<string, unknown>): string | undefi
 
   for (const key of candidates) {
     const value = raw[key]
-    if (typeof value === 'string' && value.trim()) return value.trim()
+    if (typeof value === 'string' && value.trim()) return normalizeTimestampValue(value)
     // API cloud HikConnect devuelve occurTime como epoch en milisegundos (número de 13 dígitos, UTC)
-    if (typeof value === 'number' && Number.isFinite(value) && value > 1e10) {
-      return new Date(value).toISOString()
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return normalizeTimestampValue(value)
     }
   }
   return undefined
 }
 
 function isTimestampOnBusinessDate(timestamp: string, date: string): boolean {
-  const parsed = new Date(timestamp)
+  const parsed = new Date(normalizeTimestampValue(timestamp))
   if (Number.isNaN(parsed.getTime())) return false
   const eventDate = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Argentina/Buenos_Aires',
@@ -153,8 +167,8 @@ async function checkAdmin(supabase: SupabaseClient): Promise<boolean> {
 }
 
 // Hora corte mañana/tarde (Argentina). Marcaciones antes de este horario = turno mañana.
-// Configurable via HIK_SPLIT_TURNO_HORA (default 16 para cubrir salidas ~13:30)
-const MIDDAY_HORA_ARG = Number(process.env.HIK_SPLIT_TURNO_HORA || '16')
+// Configurable via HIK_SPLIT_TURNO_HORA (default 14 para reflejar entradas de tarde desde 14:00)
+const MIDDAY_HORA_ARG = Number(process.env.HIK_SPLIT_TURNO_HORA || '14')
 
 function getHoraArgentina(date: Date): number {
   return parseInt(

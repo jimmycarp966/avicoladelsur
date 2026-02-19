@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { LiquidacionesTable } from '@/components/tables/LiquidacionesTable'
 import { Button } from '@/components/ui/button'
 import { Calculator, FileText } from 'lucide-react'
@@ -9,8 +9,21 @@ import { ejecutarLiquidacionAutomatica } from '@/lib/services/rrhh-liquidaciones
 
 async function getLiquidaciones() {
   const supabase = await createClient()
+  const adminSupabase = createAdminClient()
 
-  const { data, error } = await supabase
+  const { data: authResult, error: authError } = await supabase.auth.getUser()
+  if (authError || !authResult.user) return []
+
+  const { data: userData } = await supabase
+    .from('usuarios')
+    .select('rol, activo')
+    .eq('id', authResult.user.id)
+    .maybeSingle()
+
+  const isAdmin = !!userData?.activo && userData.rol === 'admin'
+  const db = isAdmin ? adminSupabase : supabase
+
+  const { data, error } = await db
     .from('rrhh_liquidaciones')
     .select(`
       *,
@@ -20,7 +33,7 @@ async function getLiquidaciones() {
         usuario:usuarios(nombre, apellido)
       )
     `)
-    .order('fecha_liquidacion', { ascending: false })
+    .order('created_at', { ascending: false })
     .limit(50)
 
   if (error) {

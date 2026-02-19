@@ -11,7 +11,7 @@ import {
 } from '@/lib/services/rrhh-horarios.service'
 
 const ARG_TZ = 'America/Argentina/Buenos_Aires'
-const MIDDAY_HORA_ARG = Number(process.env.HIK_SPLIT_TURNO_HORA || '16')
+const MIDDAY_HORA_ARG = Number(process.env.HIK_SPLIT_TURNO_HORA || '14')
 const HORA_LIMITE_ENTRADA = process.env.HORA_LIMITE_ENTRADA || '08:00'
 
 export type RrhhLiquidacionAutoRunSource = 'cron' | 'ui_fallback' | 'manual'
@@ -147,6 +147,20 @@ function readString(record: Record<string, unknown>, key: string): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
+function normalizeTimestampValue(value: string | number): string {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    if (value > 1e10) return new Date(value).toISOString()
+    if (value > 1e9) return new Date(value * 1000).toISOString()
+    return String(value)
+  }
+
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  if (/^\d{13}$/.test(trimmed)) return new Date(Number(trimmed)).toISOString()
+  if (/^\d{10}$/.test(trimmed)) return new Date(Number(trimmed) * 1000).toISOString()
+  return trimmed
+}
+
 function extractHikPersonName(raw: Record<string, unknown>): string | undefined {
   const direct =
     readString(raw, 'personName') ||
@@ -195,9 +209,9 @@ function extractRawEventTimestamp(raw: Record<string, unknown>): string | undefi
 
   for (const key of candidates) {
     const value = raw[key]
-    if (typeof value === 'string' && value.trim()) return value.trim()
-    if (typeof value === 'number' && Number.isFinite(value) && value > 1e10) {
-      return new Date(value).toISOString()
+    if (typeof value === 'string' && value.trim()) return normalizeTimestampValue(value)
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return normalizeTimestampValue(value)
     }
   }
 
@@ -205,7 +219,7 @@ function extractRawEventTimestamp(raw: Record<string, unknown>): string | undefi
 }
 
 function isTimestampOnBusinessDate(timestamp: string, date: string): boolean {
-  const parsed = new Date(timestamp)
+  const parsed = new Date(normalizeTimestampValue(timestamp))
   if (Number.isNaN(parsed.getTime())) return false
   const eventDate = new Intl.DateTimeFormat('en-CA', {
     timeZone: ARG_TZ,
