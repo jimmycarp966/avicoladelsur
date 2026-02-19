@@ -601,6 +601,31 @@ export interface Adelanto extends BaseEntity {
   aprobador?: Usuario
 }
 
+export interface AdelantoPlan extends BaseEntity {
+  empleado_id: string
+  tipo: 'dinero' | 'producto'
+  monto_total: number
+  descripcion?: string
+  fecha_inicio: string
+  cantidad_cuotas: number
+  estado: 'activo' | 'finalizado' | 'cancelado'
+  created_by?: string
+  empleado?: Empleado
+  cuotas?: AdelantoCuota[]
+}
+
+export interface AdelantoCuota extends BaseEntity {
+  plan_id: string
+  nro_cuota: number
+  periodo_mes: number
+  periodo_anio: number
+  monto_cuota: number
+  estado: 'pendiente' | 'aplicada' | 'cancelada'
+  liquidacion_id?: string
+  plan?: AdelantoPlan
+  liquidacion?: Liquidacion
+}
+
 // Liquidaciones de sueldo
 export interface Liquidacion extends BaseEntity {
   empleado_id: string
@@ -621,6 +646,25 @@ export interface Liquidacion extends BaseEntity {
   adelantos_total: number
   total_neto: number
   estado: 'borrador' | 'calculada' | 'aprobada' | 'pagada'
+  puesto_override?: string
+  dias_base?: number
+  horas_jornada?: number
+  valor_jornal?: number
+  valor_hora?: number
+  dias_cajero?: number
+  diferencia_turno_cajero?: number
+  total_cajero?: number
+  total_sin_descuentos?: number
+  adelanto_mercaderia_total?: number
+  adelanto_efectivo_total?: number
+  descuento_presentismo?: number
+  control_30_limite?: number
+  control_30_anticipos?: number
+  control_30_superado?: boolean
+  orden_pago?: number
+  pago_autorizado?: boolean
+  motivo_no_autorizado?: string
+  total_por_dia?: number
   aprobado_por?: string
   fecha_aprobacion?: string
   pagado: boolean
@@ -632,6 +676,49 @@ export interface Liquidacion extends BaseEntity {
   aprobador?: Usuario
   creador?: Usuario
   detalles?: LiquidacionDetalle[]
+  jornadas?: LiquidacionJornada[]
+  cuotas?: AdelantoCuota[]
+}
+
+export interface LiquidacionReglaPeriodo extends BaseEntity {
+  periodo_mes: number
+  periodo_anio: number
+  dias_base_galpon: number
+  dias_base_sucursales: number
+  dias_base_rrhh: number
+  activo: boolean
+}
+
+export interface LiquidacionReglaPuesto extends BaseEntity {
+  puesto_codigo: string
+  categoria_id?: string
+  grupo_base_dias: 'galpon' | 'sucursales' | 'rrhh'
+  horas_jornada: number
+  tarifa_turno_especial: number
+  habilita_cajero: boolean
+  tarifa_diferencia_cajero: number
+  activo: boolean
+}
+
+export interface LiquidacionJornada extends BaseEntity {
+  liquidacion_id: string
+  empleado_id: string
+  fecha: string
+  turno: string
+  tarea?: string
+  horas_mensuales: number
+  horas_adicionales: number
+  turno_especial_unidades: number
+  tarifa_hora_base: number
+  tarifa_hora_extra: number
+  tarifa_turno_especial: number
+  monto_mensual?: number
+  monto_extra?: number
+  monto_turno_especial?: number
+  origen: 'auto_hik' | 'auto_asistencia' | 'manual'
+  observaciones?: string
+  liquidacion?: Liquidacion
+  empleado?: Empleado
 }
 
 // Detalles de liquidación

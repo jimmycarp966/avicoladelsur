@@ -894,7 +894,39 @@ export async function rechazarAdelantoAction(adelantoId: string): Promise<ApiRes
 
 // ========== LIQUIDACIONES ==========
 
-export async function calcularLiquidacionMensualAction(
+async function getAuthenticatedAdminUserId(): Promise<string | null> {
+  const supabase = await createClient()
+  const adminSupabase = createAdminClient()
+
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError || !user) return null
+
+  const { data: userRow, error: roleError } = await adminSupabase
+    .from('usuarios')
+    .select('rol, activo')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (roleError || !userRow?.activo || userRow.rol !== 'admin') return null
+  return user.id
+}
+
+type UpsertLiquidacionJornadaInput = {
+  id?: string
+  fecha: string
+  turno?: string
+  tarea?: string
+  horas_mensuales?: number
+  horas_adicionales?: number
+  turno_especial_unidades?: number
+  tarifa_hora_base?: number
+  tarifa_hora_extra?: number
+  tarifa_turno_especial?: number
+  origen?: 'auto_hik' | 'auto_asistencia' | 'manual'
+  observaciones?: string
+}
+
+export async function prepararLiquidacionMensualAction(
   empleadoId: string,
   mes: number,
   anio: number
@@ -902,7 +934,6 @@ export async function calcularLiquidacionMensualAction(
   try {
     const supabase = await createClient()
 
-    // Obtener el usuario actual
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
       return {
@@ -911,19 +942,35 @@ export async function calcularLiquidacionMensualAction(
       }
     }
 
-    const { data, error } = await supabase
-      .rpc('fn_calcular_liquidacion_mensual', {
+    let data: string | null = null
+    let error: any = null
+
+    const v2Result = await supabase.rpc('fn_rrhh_preparar_liquidacion_mensual', {
+      p_empleado_id: empleadoId,
+      p_mes: mes,
+      p_anio: anio,
+      p_created_by: user.id,
+    })
+
+    data = v2Result.data as string | null
+    error = v2Result.error
+
+    if (error && String(error.message || '').toLowerCase().includes('fn_rrhh_preparar_liquidacion_mensual')) {
+      const legacyResult = await supabase.rpc('fn_calcular_liquidacion_mensual', {
         p_empleado_id: empleadoId,
         p_mes: mes,
         p_anio: anio,
         p_created_by: user.id,
       })
+      data = legacyResult.data as string | null
+      error = legacyResult.error
+    }
 
     if (error) {
-      devError('Error al calcular liquidación:', error)
+      devError('Error al calcular liquidacion:', error)
       return {
         success: false,
-        error: 'Error al calcular liquidación: ' + error.message,
+        error: 'Error al calcular liquidacion: ' + error.message,
       }
     }
 
@@ -931,11 +978,290 @@ export async function calcularLiquidacionMensualAction(
 
     return {
       success: true,
-      data: { liquidacionId: data },
-      message: 'Liquidación calculada exitosamente',
+      data: { liquidacionId: data as string },
+      message: 'Liquidacion calculada exitosamente',
     }
   } catch (error) {
-    devError('Error en calcularLiquidacionMensual:', error)
+    devError('Error en prepararLiquidacionMensualAction:', error)
+    return {
+      success: false,
+      error: 'Error interno del servidor',
+    }
+  }
+}
+
+export async function calcularLiquidacionMensualAction(
+  empleadoId: string,
+  mes: number,
+  anio: number
+): Promise<ApiResponse<{ liquidacionId: string }>> {
+  return prepararLiquidacionMensualAction(empleadoId, mes, anio)
+}
+
+export async function recalcularLiquidacionAction(
+  liquidacionId: string
+): Promise<ApiResponse<{ liquidacionId: string }>> {
+  try {
+    const supabase = await createClient()
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return {
+        success: false,
+        error: 'Usuario no autenticado',
+      }
+    }
+
+    const { data, error } = await supabase.rpc('fn_rrhh_recalcular_liquidacion', {
+      p_liquidacion_id: liquidacionId,
+      p_actor: user.id,
+    })
+
+    if (error) {
+      devError('Error al recalcular liquidacion:', error)
+      return {
+        success: false,
+        error: 'Error al recalcular liquidacion: ' + error.message,
+      }
+    }
+
+    revalidatePath('/rrhh/liquidaciones')
+    revalidatePath(`/rrhh/liquidaciones/${liquidacionId}`)
+
+    return {
+      success: true,
+      data: { liquidacionId: data as string },
+      message: 'Liquidacion recalculada exitosamente',
+    }
+  } catch (error) {
+    devError('Error en recalcularLiquidacionAction:', error)
+    return {
+      success: false,
+      error: 'Error interno del servidor',
+    }
+  }
+}
+
+export async function upsertLiquidacionJornadaAction(
+  liquidacionId: string,
+  jornadaData: UpsertLiquidacionJornadaInput
+): Promise<ApiResponse<{ jornadaId: string; liquidacionId: string }>> {
+  try {
+    const adminUserId = await getAuthenticatedAdminUserId()
+    if (!adminUserId) {
+      return {
+        success: false,
+        error: 'No autorizado',
+      }
+    }
+
+    const supabase = createAdminClient()
+
+    const { data: liquidacion, error: liqError } = await supabase
+      .from('rrhh_liquidaciones')
+      .select('id, empleado_id')
+      .eq('id', liquidacionId)
+      .maybeSingle()
+
+    if (liqError || !liquidacion?.id) {
+      return {
+        success: false,
+        error: 'Liquidacion no encontrada',
+      }
+    }
+
+    const payload = {
+      liquidacion_id: liquidacion.id,
+      empleado_id: liquidacion.empleado_id,
+      fecha: jornadaData.fecha,
+      turno: jornadaData.turno || 'general',
+      tarea: jornadaData.tarea || null,
+      horas_mensuales: jornadaData.horas_mensuales ?? 0,
+      horas_adicionales: jornadaData.horas_adicionales ?? 0,
+      turno_especial_unidades: jornadaData.turno_especial_unidades ?? 0,
+      tarifa_hora_base: jornadaData.tarifa_hora_base ?? 0,
+      tarifa_hora_extra: jornadaData.tarifa_hora_extra ?? 0,
+      tarifa_turno_especial: jornadaData.tarifa_turno_especial ?? 0,
+      origen: jornadaData.origen || 'manual',
+      observaciones: jornadaData.observaciones || null,
+    }
+
+    let jornadaId = jornadaData.id
+
+    if (jornadaData.id) {
+      const { data, error } = await supabase
+        .from('rrhh_liquidacion_jornadas')
+        .update(payload)
+        .eq('id', jornadaData.id)
+        .eq('liquidacion_id', liquidacionId)
+        .select('id')
+        .maybeSingle()
+
+      if (error || !data?.id) {
+        devError('Error al actualizar jornada de liquidacion:', error)
+        return {
+          success: false,
+          error: 'No se pudo actualizar la jornada',
+        }
+      }
+
+      jornadaId = data.id
+    } else {
+      const { data, error } = await supabase
+        .from('rrhh_liquidacion_jornadas')
+        .insert(payload)
+        .select('id')
+        .single()
+
+      if (error || !data?.id) {
+        devError('Error al crear jornada de liquidacion:', error)
+        return {
+          success: false,
+          error: 'No se pudo crear la jornada',
+        }
+      }
+
+      jornadaId = data.id
+    }
+
+    const recalcResult = await recalcularLiquidacionAction(liquidacionId)
+    if (!recalcResult.success) {
+      return {
+        success: false,
+        error: recalcResult.error || 'No se pudo recalcular la liquidacion luego de guardar la jornada',
+      }
+    }
+
+    revalidatePath(`/rrhh/liquidaciones/${liquidacionId}`)
+
+    return {
+      success: true,
+      data: { jornadaId: jornadaId as string, liquidacionId },
+      message: 'Jornada guardada y liquidacion recalculada',
+    }
+  } catch (error) {
+    devError('Error en upsertLiquidacionJornadaAction:', error)
+    return {
+      success: false,
+      error: 'Error interno del servidor',
+    }
+  }
+}
+
+export async function autorizarPagoLiquidacionAction(
+  liquidacionId: string,
+  autorizado: boolean,
+  motivo?: string
+): Promise<ApiResponse<void>> {
+  try {
+    const adminUserId = await getAuthenticatedAdminUserId()
+    if (!adminUserId) {
+      return {
+        success: false,
+        error: 'No autorizado',
+      }
+    }
+
+    const supabase = createAdminClient()
+
+    const updatePayload: Record<string, unknown> = {
+      pago_autorizado: autorizado,
+      motivo_no_autorizado: autorizado ? null : (motivo?.trim() || 'No autorizado por RRHH'),
+    }
+
+    const { data, error } = await supabase
+      .from('rrhh_liquidaciones')
+      .update(updatePayload)
+      .eq('id', liquidacionId)
+      .select('id')
+      .maybeSingle()
+
+    if (error || !data?.id) {
+      devError('Error al autorizar pago de liquidacion:', error)
+      return {
+        success: false,
+        error: 'Error al guardar autorizacion: ' + (error?.message || 'Liquidacion no encontrada'),
+      }
+    }
+
+    revalidatePath('/rrhh/liquidaciones')
+    revalidatePath(`/rrhh/liquidaciones/${liquidacionId}`)
+
+    return {
+      success: true,
+      message: autorizado ? 'Pago autorizado' : 'Pago marcado como no autorizado',
+    }
+  } catch (error) {
+    devError('Error en autorizarPagoLiquidacionAction:', error)
+    return {
+      success: false,
+      error: 'Error interno del servidor',
+    }
+  }
+}
+
+export async function actualizarLiquidacionControlAction(
+  liquidacionId: string,
+  payload: {
+    puesto_override?: string | null
+    dias_cajero?: number
+    diferencia_turno_cajero?: number
+    orden_pago?: number | null
+    observaciones?: string | null
+  }
+): Promise<ApiResponse<{ liquidacionId: string }>> {
+  try {
+    const adminUserId = await getAuthenticatedAdminUserId()
+    if (!adminUserId) {
+      return {
+        success: false,
+        error: 'No autorizado',
+      }
+    }
+
+    const supabase = createAdminClient()
+
+    const updatePayload: Record<string, unknown> = {
+      puesto_override: payload.puesto_override ?? null,
+      dias_cajero: payload.dias_cajero ?? 0,
+      diferencia_turno_cajero: payload.diferencia_turno_cajero ?? 0,
+      orden_pago: payload.orden_pago ?? null,
+      observaciones: payload.observaciones ?? null,
+    }
+
+    const { data, error } = await supabase
+      .from('rrhh_liquidaciones')
+      .update(updatePayload)
+      .eq('id', liquidacionId)
+      .select('id')
+      .maybeSingle()
+
+    if (error || !data?.id) {
+      devError('Error actualizando control de liquidacion:', error)
+      return {
+        success: false,
+        error: 'No se pudo actualizar los datos de control de liquidacion',
+      }
+    }
+
+    const recalcResult = await recalcularLiquidacionAction(liquidacionId)
+    if (!recalcResult.success) {
+      return {
+        success: false,
+        error: recalcResult.error || 'No se pudo recalcular la liquidacion',
+      }
+    }
+
+    revalidatePath('/rrhh/liquidaciones')
+    revalidatePath(`/rrhh/liquidaciones/${liquidacionId}`)
+
+    return {
+      success: true,
+      data: { liquidacionId },
+      message: 'Datos de control actualizados',
+    }
+  } catch (error) {
+    devError('Error en actualizarLiquidacionControlAction:', error)
     return {
       success: false,
       error: 'Error interno del servidor',
@@ -993,7 +1319,35 @@ export async function aprobarLiquidacionAction(liquidacionId: string): Promise<A
 
 export async function marcarLiquidacionPagadaAction(liquidacionId: string): Promise<ApiResponse<void>> {
   try {
+    const adminUserId = await getAuthenticatedAdminUserId()
+    if (!adminUserId) {
+      return {
+        success: false,
+        error: 'No autorizado',
+      }
+    }
+
     const supabase = createAdminClient()
+
+    const { data: liquidacionActual, error: fetchError } = await supabase
+      .from('rrhh_liquidaciones')
+      .select('id, control_30_superado, pago_autorizado')
+      .eq('id', liquidacionId)
+      .maybeSingle()
+
+    if (fetchError || !liquidacionActual?.id) {
+      return {
+        success: false,
+        error: 'Liquidacion no encontrada',
+      }
+    }
+
+    if (liquidacionActual.control_30_superado && !liquidacionActual.pago_autorizado) {
+      return {
+        success: false,
+        error: 'La liquidacion supera el control del 30% y requiere autorizacion manual de pago',
+      }
+    }
 
     const { data, error } = await supabase
       .from('rrhh_liquidaciones')
@@ -1001,6 +1355,7 @@ export async function marcarLiquidacionPagadaAction(liquidacionId: string): Prom
         estado: 'pagada',
         pagado: true,
         fecha_pago: new Date().toISOString(),
+        pago_autorizado: liquidacionActual.pago_autorizado || !liquidacionActual.control_30_superado,
       })
       .eq('id', liquidacionId)
       .select('id')
@@ -1015,6 +1370,7 @@ export async function marcarLiquidacionPagadaAction(liquidacionId: string): Prom
     }
 
     revalidatePath('/rrhh/liquidaciones')
+    revalidatePath(`/rrhh/liquidaciones/${liquidacionId}`)
 
     return {
       success: true,

@@ -4,10 +4,11 @@ import { ColumnDef } from '@tanstack/react-table'
 import { DataTable, SortableHeader, StatusBadge } from '@/components/ui/data-table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Edit, Eye, CheckCircle, DollarSign, MoreHorizontal } from 'lucide-react'
+import { Edit, Eye, CheckCircle, DollarSign, MoreHorizontal, FileSpreadsheet } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -15,6 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { formatDate } from '@/lib/utils'
 import type { Liquidacion } from '@/types/domain.types'
+import Link from 'next/link'
 
 interface LiquidacionesTableProps {
   liquidaciones: Liquidacion[]
@@ -114,6 +116,39 @@ export function LiquidacionesTable({ liquidaciones, onView, onEdit, onApprove, o
       },
     },
     {
+      accessorKey: 'control_30_superado',
+      header: ({ column }) => (
+        <SortableHeader column={column}>Control 30%</SortableHeader>
+      ),
+      cell: ({ row }) => {
+        const superado = !!row.original.control_30_superado
+        const limite = row.original.control_30_limite || 0
+        const anticipos = row.original.control_30_anticipos || 0
+        return (
+          <div className="space-y-1">
+            <Badge variant={superado ? 'destructive' : 'outline'}>
+              {superado ? 'Superado' : 'OK'}
+            </Badge>
+            <div className="text-xs text-muted-foreground">
+              ${anticipos.toLocaleString()} / ${limite.toLocaleString()}
+            </div>
+          </div>
+        )
+      },
+    },
+    {
+      accessorKey: 'pago_autorizado',
+      header: ({ column }) => (
+        <SortableHeader column={column}>Autorización</SortableHeader>
+      ),
+      cell: ({ row }) => {
+        const autorizado = !!row.original.pago_autorizado
+        return (
+          <StatusBadge status={autorizado ? 'aprobado' : 'pendiente'} />
+        )
+      },
+    },
+    {
       accessorKey: 'estado',
       header: ({ column }) => (
         <SortableHeader column={column}>Estado</SortableHeader>
@@ -169,6 +204,15 @@ export function LiquidacionesTable({ liquidaciones, onView, onEdit, onApprove, o
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuGroup>
+                <DropdownMenuItem asChild>
+                  <Link href={`/rrhh/liquidaciones/${liquidacion.id}`}>
+                    <FileSpreadsheet className="mr-2 h-4 w-4" />
+                    Ver planilla
+                  </Link>
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
               <DropdownMenuSeparator />
               {onView && (
                 <DropdownMenuItem onClick={() => onView(liquidacion)}>
