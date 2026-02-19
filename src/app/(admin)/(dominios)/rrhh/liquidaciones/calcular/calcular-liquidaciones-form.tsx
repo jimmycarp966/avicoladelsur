@@ -281,9 +281,13 @@ export function CalcularLiquidacionesForm() {
             <CardContent>
               <div className="space-y-3 max-h-96 overflow-y-auto">
                 {empleados.map((empleado) => {
-                  const nombre = empleado.usuario?.nombre || ''
-                  const apellido = empleado.usuario?.apellido || ''
-                  const nombreCompleto = `${nombre} ${apellido}`.trim()
+                  const nombreUsuario = `${empleado.usuario?.nombre || ''} ${empleado.usuario?.apellido || ''}`.trim()
+                  const nombreEmpleado = `${empleado.nombre || ''} ${empleado.apellido || ''}`.trim()
+                  const nombreCompleto =
+                    nombreUsuario ||
+                    nombreEmpleado ||
+                    empleado.usuario?.email ||
+                    (empleado.legajo ? `Empleado ${empleado.legajo}` : 'Sin nombre')
 
                   return (
                     <div
@@ -297,7 +301,7 @@ export function CalcularLiquidacionesForm() {
                         />
                         <div>
                           <div className="font-medium">
-                            {nombreCompleto || 'Sin nombre'}
+                            {nombreCompleto}
                           </div>
                           <div className="text-sm text-muted-foreground">
                             Legajo: {empleado.legajo || 'Sin asignar'} •

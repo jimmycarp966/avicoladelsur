@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Calculator, FileText } from 'lucide-react'
 import Link from 'next/link'
 import type { Liquidacion } from '@/types/domain.types'
+import { ejecutarLiquidacionAutomatica } from '@/lib/services/rrhh-liquidaciones-automaticas'
 
 async function getLiquidaciones() {
   const supabase = await createClient()
@@ -30,8 +31,34 @@ async function getLiquidaciones() {
   return data as Liquidacion[]
 }
 
+async function ejecutarFallbackMesVencido(): Promise<void> {
+  if (process.env.RRHH_AUTO_LIQUIDACIONES_UI_FALLBACK === 'false') {
+    return
+  }
+
+  try {
+    const result = await ejecutarLiquidacionAutomatica({ source: 'ui_fallback' })
+    if (result.estado === 'error') {
+      console.error('[RRHH AUTO LIQ] Fallback UI con error:', result.error || result.mensaje)
+      return
+    }
+
+    if (result.estado === 'success') {
+      console.log('[RRHH AUTO LIQ] Fallback UI ejecutado:', {
+        periodo_mes: result.periodo_mes,
+        periodo_anio: result.periodo_anio,
+        liquidaciones: result.liquidaciones,
+        sync: result.sync,
+      })
+    }
+  } catch (error) {
+    console.error('[RRHH AUTO LIQ] Fallback UI no pudo ejecutarse:', error)
+  }
+}
+
 export const dynamic = 'force-dynamic'
 export default async function LiquidacionesPage() {
+  await ejecutarFallbackMesVencido()
   const liquidaciones = await getLiquidaciones()
 
   return (

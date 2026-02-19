@@ -722,6 +722,38 @@ export interface LiquidacionJornada extends BaseEntity {
 }
 
 // Detalles de liquidación
+export type LiquidacionAutoRunFuente = 'cron' | 'ui_fallback' | 'manual'
+export type LiquidacionAutoRunEstado = 'success' | 'error' | 'skipped'
+
+export interface LiquidacionAutoRunSyncResumen {
+  dias_procesados: number
+  registros_sincronizados: number
+  dias_con_error: number
+}
+
+export interface LiquidacionAutoRunResumen {
+  empleados_objetivo: number
+  liquidaciones_creadas: number
+  liquidaciones_recalculadas: number
+  liquidaciones_omitidas_estado: number
+  errores: number
+}
+
+export interface LiquidacionAutoRunResult {
+  run_id?: string
+  periodo_mes: number
+  periodo_anio: number
+  fuente: LiquidacionAutoRunFuente
+  estado: LiquidacionAutoRunEstado
+  started_at: string
+  finished_at: string
+  mensaje: string
+  sync: LiquidacionAutoRunSyncResumen
+  liquidaciones: LiquidacionAutoRunResumen
+  warnings: string[]
+  error?: string
+}
+
 export interface LiquidacionDetalle extends BaseEntity {
   liquidacion_id: string
   tipo: string
