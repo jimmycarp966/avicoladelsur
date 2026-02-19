@@ -250,7 +250,7 @@ avicola-del-sur/
 │   │   │   │   │   ├── liquidaciones/  # Cálculo de nómina
 │   │   │   │   │   ├── adelantos/      # Adelantos controlados
 │   │   │   │   │   ├── mensajes/       # Mensajería interna
-│   │   │   │   │   └── evaluaciones/   # Evaluaciones de desempeño
+│   │   │   │   │   └── evaluaciones/   # Evaluaciones con Huella Digital Operativa
 │   │   │   │   │
 │   │   │   │   ├── sucursales/    # Multi-sucursal
 │   │   │   │   │   ├── transferencias/ # Traslados de stock
@@ -483,6 +483,12 @@ interface ApiResponse<T> {
 
 ## 📝 Cambios Recientes (Febrero 2026)
 
+### 2026-02-18 · Huella Digital Operativa (RRHH)
+- **Feature**: Nuevo panel de "Decisión Support" en evaluaciones de desempeño.
+- **Backend**: RPC `fn_obtener_metricas_evaluacion` que cruza datos de 5 módulos.
+- **UI**: Visualización de semáforos (asistencia, rendimiento, actitud, responsabilidad, equipo).
+- **Acceso**: RRHH → Evaluaciones → Nueva (aparece al seleccionar empleado y periodo).
+
 ### 2026-02-15 · Fix UI Sidebar Móvil
 - **Fix**: Espacio en blanco al final del sidebar en dispositivos móviles
 - **Cambio**: Asegurar `h-full` en `AdminSidebar` y fondo correcto en el contenedor de `AdminLayout`
@@ -537,6 +543,6 @@ interface ApiResponse<T> {
 
 ---
 
-*Documento actualizado: 15 de Febrero de 2026*
-*Versión del sistema: v2.3*
+*Documento actualizado: 18 de Febrero de 2024*
+*Versión del sistema: v2.4 (Huella Digital Edition)*
 *Estado: Producción ✅*

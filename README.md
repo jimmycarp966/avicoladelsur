@@ -1,9 +1,9 @@
 ﻿# 🚀 Avícola del Sur ERP - Sistema Integral de Gestión
 
-**Versión:** Febrero 2026 (v2.4.0)  
+**Versión:** Febrero 2026 (v2.4.1)  
 **Estado:** ✅ PRODUCCIÓN  
 **Docs relacionadas:** [Architecture Summary](./ARCHITECTURE_SUMMARY.md) · [Architecture Deep-Dive](./ARCHITECTURE.md) · [Supabase Setup](./SUPABASE_SETUP.md) · [INIT Context](./INIT.md)  
-**Última actualización:** 18 de Febrero 2026
+**Última actualización:** 18 de Febrero 2026 (22:00)
 
 **Plataforma unificada** de gestión avícola que integra WMS (Almacén), TMS (Reparto), CRM (Ventas), Carrito Web Público y ERP (Finanzas/RRHH). Potenciada por **Google Gemini AI** para decisiones inteligentes en tiempo real dentro de una arquitectura **server-authoritative** sobre Supabase.
 
@@ -42,8 +42,12 @@
   - Al finalizar ruta, se pregunta si se cargo combustible.
   - Si se cargo, se registran litros y se calcula `consumo_km_l = km_recorridos / litros_cargados`.
   - Estos datos quedan persistidos en el reporte de ruta.
+- **RRHH / Evaluaciones**:
+  - Implementación de **Huella Digital Operativa**: Un panel de soporte de decisión que extrae métricas objetivas del ERP (asistencia, ventas, producción, caja) para fundamentar las evaluaciones de personal.
+  - Nuevo semáforo de deuda de clientes integrado en la ficha de empleado.
+  - Registro automático de cierre de turno de almacén.
 - **Migracion SQL aplicada**:
-  - `supabase/migrations/20260218110000_reparto_tesoreria_combustible_recordatorios.sql`
+  - `supabase/migrations/20260218_huella_digital_operativa.sql`
 
 ## ✨ Pilares del Sistema (Auditoria Enero 2026)
 
@@ -411,7 +415,7 @@ scripts/                         # Scripts de automatización
 - **Liquidaciones automáticas**: Cálculo mensual con horas extras, producción y descuentos
 - **Adelantos controlados**: Gestión de adelantos en dinero/productos con límite automático del 30% del sueldo básico
 - **Licencias y descansos**: Gestión de vacaciones, enfermedad, maternidad, estudio
-- **Evaluaciones de desempeño**: Sistema por sucursal con 5 criterios (escala 1-5). Propuesta de **Objetivación vía Huella Digital Operativa** implementada (ver `RRHH_PROPUESTA_EVALUACIONES.md`).
+- **Evaluaciones de desempeño**: Sistema por sucursal con 5 criterios (escala 1-5). **Huella Digital Operativa** implementada: panel automático que sugiere puntajes basados en datos reales de asistencia, ventas y responsabilidad.
 - **Novedades internas**: Comunicación segmentada (general, sucursal, categoría)
 - **Reportes avanzados**: 6 tipos de reportes exportables (Excel/CSV)
 

@@ -115,7 +115,7 @@ export function NuevaEvaluacionForm() {
       const { data: sucursalesData } = await supabase
         .from('sucursales')
         .select('*')
-        .eq('activo', true)
+        .eq('active', true)
         .order('nombre')
 
       if (sucursalesData) {
@@ -215,9 +215,9 @@ export function NuevaEvaluacionForm() {
                   </SelectTrigger>
                   <SelectContent>
                     {empleados.map((empleado) => {
-                      const nombre = empleado.usuario?.nombre || ''
-                      const apellido = empleado.usuario?.apellido || ''
-                      const nombreCompleto = `${nombre} ${apellido}`.trim()
+                      const nombre = empleado.usuario?.nombre || empleado.nombre || ''
+                      const apellido = empleado.usuario?.apellido || empleado.apellido || ''
+                      const nombreCompleto = `${apellido} ${nombre}`.trim() || 'Sin nombre'
                       return (
                         <SelectItem key={empleado.id} value={empleado.id}>
                           {nombreCompleto} - {empleado.legajo || 'Sin legajo'} ({empleado.sucursal?.nombre})
@@ -384,8 +384,8 @@ export function NuevaEvaluacionForm() {
                         <Star
                           key={i}
                           className={`w-4 h-4 ${i < (watch(criterio.name) || 3)
-                              ? 'text-yellow-400 fill-current'
-                              : 'text-gray-300'
+                            ? 'text-yellow-400 fill-current'
+                            : 'text-gray-300'
                             }`}
                         />
                       ))}
@@ -408,8 +408,8 @@ export function NuevaEvaluacionForm() {
                       <Star
                         key={i}
                         className={`w-5 h-5 ${i < Math.round(promedioCalculado)
-                            ? 'text-yellow-400 fill-current'
-                            : 'text-gray-300'
+                          ? 'text-yellow-400 fill-current'
+                          : 'text-gray-300'
                           }`}
                       />
                     ))}

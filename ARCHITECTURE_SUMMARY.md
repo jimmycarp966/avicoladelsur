@@ -1,8 +1,8 @@
 # 🏗️ Arquitectura del Sistema - Avícola del Sur ERP
 
-**Última Actualización:** 15 de Febrero 2026 (18:00)  
+**Última Actualización:** 18 de Febrero 2026 (21:00)  
 **Estado:** ✅ PRODUCCIÓN  
-**Versión:** v2.3  
+**Versión:** v2.4  
 **Docs relacionadas:** [README](./README.md) · [Architecture Deep-Dive](./ARCHITECTURE.MD) · [Supabase Setup](./SUPABASE_SETUP.md)
 
 ---
@@ -42,6 +42,7 @@ Sistema ERP modular completo para Avícola del Sur que unifica **Almacén (WMS)*
 5. **Memory Bank Inteligente**: El bot de WhatsApp aprende de cada conversación, extrayendo hechos y preferencias automáticamente para personalizar la atención.
 6. **Sistema de Remitos**: Generación automática de documentos PDF para entregas, traslados y producción con numeración secuencial.
 7. **Pesaje Acumulativo**: Escaner de balanza con soporte para múltiples bolsas, acumulación de pesos y barra de progreso visual.
+8. **Evaluación RRHH Objetivada**: Sistema de "Huella Digital Operativa" que extrae métricas reales del ERP (asistencia, ventas, producción, caja) para fundamentar evaluaciones de personal.
 
 ---
 
@@ -385,7 +386,10 @@ El archivo `middleware.ts` actúa como firewall de aplicación:
 
 ---
 
-## 📝 Cambios Recientes
+### 2026-02-18 · Sistema de Huella Digital Operativa (RRHH)
+- **Feature**: Nuevo panel de soporte de decisión en el formulario de evaluación de RRHH.
+- **Backend**: RPC `fn_obtener_metricas_evaluacion` que analiza 5 dimensiones objetivas.
+- **Frontend**: Componente `MetricasSoportePanel` con semáforos orientativos y sugerencias automáticas.
 
 ### 2026-02-15 · Fix UI Sidebar Móvil
 - **Fix**: Espacio en blanco al final del sidebar en dispositivos móviles
