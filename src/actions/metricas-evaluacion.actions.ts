@@ -179,7 +179,7 @@ async function obtenerMetricasFallback(
         const { data: pedidos } = await adminSupabase
             .from('pedidos')
             .select('id, total, estado')
-            .eq('vendedor_id', empleado.usuario_id)
+            .eq('usuario_vendedor', empleado.usuario_id)
             .gte('fecha_pedido', fechaInicio)
             .lte('fecha_pedido', fechaFin)
 
