@@ -153,7 +153,8 @@ async function checkAdmin(supabase: SupabaseClient): Promise<boolean> {
 }
 
 // Hora corte mañana/tarde (Argentina). Marcaciones antes de este horario = turno mañana.
-const MIDDAY_HORA_ARG = 13
+// Configurable via HIK_SPLIT_TURNO_HORA (default 16 para cubrir salidas ~13:30)
+const MIDDAY_HORA_ARG = Number(process.env.HIK_SPLIT_TURNO_HORA || '16')
 
 function getHoraArgentina(date: Date): number {
   return parseInt(
@@ -178,6 +179,34 @@ function splitTurnos(sortedTimes: Date[]): { manana: Date[]; tarde: Date[] } {
     }
   }
   return { manana, tarde }
+}
+
+/**
+ * Busca empleado por nombre parcial: todos los tokens del nombre DB
+ * deben estar presentes en el nombre Hik (maneja segundos nombres).
+ * Ej: "Irma Zelaya" (DB) matchea "Irma Rosa Zelaya" (Hik).
+ */
+function findEmployeeByPartialName(
+  hikNameKey: string,
+  employeeByName: Map<string, EmpleadoLookup>,
+): EmpleadoLookup | undefined {
+  if (!hikNameKey) return undefined
+  const hikWords = new Set(hikNameKey.split(' ').filter(Boolean))
+  let bestMatch: EmpleadoLookup | undefined
+  let bestScore = 0
+
+  for (const [dbName, emp] of employeeByName.entries()) {
+    const dbWords = dbName.split(' ').filter(Boolean)
+    if (dbWords.length === 0) continue
+    const matched = dbWords.filter(w => hikWords.has(w)).length
+    const score = matched / dbWords.length
+    // Todos los tokens del nombre DB deben aparecer en el nombre Hik
+    if (score === 1 && matched > bestScore) {
+      bestScore = matched
+      bestMatch = emp
+    }
+  }
+  return bestMatch
 }
 
 function buildDailyRows(
@@ -213,6 +242,7 @@ function buildDailyRows(
     const empleado = employeeMap.get(employeeNoKey)
       || (employeeNoDigits ? employeeMap.get(employeeNoDigits) : undefined)
       || (hikNameKey ? employeeByName.get(hikNameKey) : undefined)
+      || findEmployeeByPartialName(hikNameKey, employeeByName)
 
     const nombre = `${empleado?.usuario?.nombre || empleado?.nombre || ''} ${empleado?.usuario?.apellido || empleado?.apellido || ''}`.trim() || row.hikName || ''
     const sortedTimes = row.timestamps
