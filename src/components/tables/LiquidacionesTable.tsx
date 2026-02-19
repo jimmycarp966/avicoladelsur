@@ -53,13 +53,15 @@ export function LiquidacionesTable({ liquidaciones, onView, onEdit, onApprove, o
         // Usar nombre/apellido de usuario si existe, sino usar campos directos de empleado
         const nombre = empleado?.usuario?.nombre || empleado?.nombre || ''
         const apellido = empleado?.usuario?.apellido || empleado?.apellido || ''
+        const email = empleado?.usuario?.email || ''
         const legajo = empleado?.legajo || ''
         const nombreCompleto = `${nombre} ${apellido}`.trim()
+        const etiquetaEmpleado = nombreCompleto || email || 'Sin nombre'
 
         return (
           <div>
             <div className="font-semibold text-foreground text-base">
-              {nombreCompleto || 'Sin nombre'}
+              {etiquetaEmpleado}
             </div>
             {legajo && (
               <div className="text-sm text-muted-foreground">Legajo: {legajo}</div>

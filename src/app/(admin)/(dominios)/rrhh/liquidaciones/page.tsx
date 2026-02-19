@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { LiquidacionesTable } from '@/components/tables/LiquidacionesTable'
 import { Button } from '@/components/ui/button'
-import { Calculator, FileText } from 'lucide-react'
+import { Calculator, FileText, Settings } from 'lucide-react'
 import Link from 'next/link'
 import type { Liquidacion } from '@/types/domain.types'
 import { ejecutarLiquidacionAutomatica } from '@/lib/services/rrhh-liquidaciones-automaticas'
@@ -30,7 +30,9 @@ async function getLiquidaciones() {
       empleado:rrhh_empleados(
         id,
         legajo,
-        usuario:usuarios(nombre, apellido)
+        nombre,
+        apellido,
+        usuario:usuarios(nombre, apellido, email)
       )
     `)
     .order('created_at', { ascending: false })
@@ -89,6 +91,12 @@ export default async function LiquidacionesPage() {
             <Link href="/rrhh/liquidaciones/calcular">
               <Calculator className="w-4 h-4 mr-2" />
               Calcular Liquidaciones
+            </Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href="/rrhh/liquidaciones/configuracion">
+              <Settings className="w-4 h-4 mr-2" />
+              Configuracion
             </Link>
           </Button>
           <Button variant="outline" asChild>

@@ -2,61 +2,107 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Calculator, Loader2, Users, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
-import { calcularLiquidacionMensualAction } from '@/actions/rrhh.actions'
+import { ArrowLeft, AlertCircle, Calculator, Loader2, Users } from 'lucide-react'
+import { calcularLiquidacionConAjustesAction } from '@/actions/rrhh.actions'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
 import { useNotificationStore } from '@/store/notificationStore'
 import type { Empleado } from '@/types/domain.types'
 
 interface EmpleadoSeleccionado extends Empleado {
   selected: boolean
+  ajuste_manual: {
+    horas_adicionales: number
+    turno_especial_unidades: number
+    observaciones: string
+  }
 }
 
 interface CalcularLiquidacionesFormProps {
   initialEmpleados: Empleado[]
 }
 
+function toPositiveNumber(value: string): number {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed < 0) return 0
+  return parsed
+}
+
 export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidacionesFormProps) {
   const router = useRouter()
   const { showToast } = useNotificationStore()
+
   const [isLoading, setIsLoading] = useState(false)
   const [empleados, setEmpleados] = useState<EmpleadoSeleccionado[]>(
-    () => initialEmpleados.map((emp) => ({ ...emp, selected: false }))
+    () =>
+      initialEmpleados.map((emp) => ({
+        ...emp,
+        selected: false,
+        ajuste_manual: {
+          horas_adicionales: 0,
+          turno_especial_unidades: 0,
+          observaciones: '',
+        },
+      }))
   )
   const [mes, setMes] = useState(new Date().getMonth() + 1)
   const [anio, setAnio] = useState(new Date().getFullYear())
   const [selectAll, setSelectAll] = useState(false)
 
+  const empleadosSeleccionados = empleados.filter((emp) => emp.selected)
+
   const handleSelectAll = (checked: boolean) => {
     setSelectAll(checked)
-    setEmpleados(prev => prev.map(emp => ({ ...emp, selected: checked })))
+    setEmpleados((prev) => prev.map((emp) => ({ ...emp, selected: checked })))
   }
 
   const handleSelectEmpleado = (empleadoId: string, checked: boolean) => {
-    setEmpleados(prev => prev.map(emp =>
-      emp.id === empleadoId ? { ...emp, selected: checked } : emp
-    ))
-    // Verificar si todos están seleccionados
-    const updatedEmpleados = empleados.map(emp =>
+    setEmpleados((prev) =>
+      prev.map((emp) => (emp.id === empleadoId ? { ...emp, selected: checked } : emp))
+    )
+
+    const updatedEmpleados = empleados.map((emp) =>
       emp.id === empleadoId ? { ...emp, selected: checked } : emp
     )
-    setSelectAll(updatedEmpleados.every(emp => emp.selected))
+    setSelectAll(updatedEmpleados.every((emp) => emp.selected))
   }
 
-  const empleadosSeleccionados = empleados.filter(emp => emp.selected)
+  const handleAjusteManual = (
+    empleadoId: string,
+    field: 'horas_adicionales' | 'turno_especial_unidades' | 'observaciones',
+    value: string
+  ) => {
+    setEmpleados((prev) =>
+      prev.map((emp) => {
+        if (emp.id !== empleadoId) return emp
+
+        if (field === 'observaciones') {
+          return {
+            ...emp,
+            ajuste_manual: { ...emp.ajuste_manual, observaciones: value },
+          }
+        }
+
+        return {
+          ...emp,
+          ajuste_manual: {
+            ...emp.ajuste_manual,
+            [field]: toPositiveNumber(value),
+          },
+        }
+      })
+    )
+  }
 
   const handleCalcular = async () => {
     if (empleadosSeleccionados.length === 0) {
-      showToast(
-        'error',
-        'Debe seleccionar al menos un empleado',
-        'Error de validación'
-      )
+      showToast('error', 'Debe seleccionar al menos un empleado', 'Error de validacion')
       return
     }
 
@@ -68,13 +114,19 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
 
       for (const empleado of empleadosSeleccionados) {
         try {
-          const result = await calcularLiquidacionMensualAction(empleado.id, mes, anio)
+          const result = await calcularLiquidacionConAjustesAction(
+            empleado.id,
+            mes,
+            anio,
+            empleado.ajuste_manual
+          )
+
           if (result.success && result.data?.liquidacionId) {
             successCount++
             liquidacionIds.push(result.data.liquidacionId)
           } else {
             errorCount++
-            console.error(`Error calculando liquidación para ${empleado.usuario?.nombre}:`, result.error)
+            console.error(`Error calculando liquidacion para ${empleado.usuario?.nombre}:`, result.error)
           }
         } catch (error) {
           errorCount++
@@ -86,28 +138,22 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
         showToast(
           'success',
           `Se calcularon ${successCount} liquidaciones exitosamente${errorCount > 0 ? ` (${errorCount} errores)` : ''}`,
-          'Cálculo completado'
+          'Calculo completado'
         )
+
         if (successCount === 1 && liquidacionIds.length === 1) {
           router.push(`/rrhh/liquidaciones/${liquidacionIds[0]}`)
         } else {
           router.push('/rrhh/liquidaciones')
         }
+
         router.refresh()
       } else {
-        showToast(
-          'error',
-          'No se pudo calcular ninguna liquidación',
-          'Error en el cálculo'
-        )
+        showToast('error', 'No se pudo calcular ninguna liquidacion', 'Error en el calculo')
       }
     } catch (error) {
       console.error('Error en handleCalcular:', error)
-      showToast(
-        'error',
-        'Ha ocurrido un error inesperado al calcular las liquidaciones',
-        'Error inesperado'
-      )
+      showToast('error', 'Ha ocurrido un error inesperado al calcular las liquidaciones', 'Error inesperado')
     } finally {
       setIsLoading(false)
     }
@@ -127,12 +173,10 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
     { value: 11, label: 'Noviembre' },
     { value: 12, label: 'Diciembre' },
   ]
-
   const anios = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i)
 
   return (
     <div className="max-w-6xl mx-auto">
-      {/* Botón volver */}
       <div className="mb-6">
         <Button variant="ghost" asChild className="mb-4">
           <Link href="/rrhh/liquidaciones">
@@ -143,30 +187,26 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Panel de configuración */}
         <div className="lg:col-span-1 space-y-6">
-          {/* Período */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                Período de Liquidación
+                <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                Periodo de Liquidacion
               </CardTitle>
-              <CardDescription>
-                Selecciona el mes y año para calcular las liquidaciones
-              </CardDescription>
+              <CardDescription>Selecciona el mes y anio para calcular las liquidaciones</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Mes</label>
-                <Select value={mes.toString()} onValueChange={(value) => setMes(parseInt(value))}>
+                <Select value={mes.toString()} onValueChange={(value) => setMes(Number(value))}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {meses.map((mes) => (
-                      <SelectItem key={mes.value} value={mes.value.toString()}>
-                        {mes.label}
+                    {meses.map((item) => (
+                      <SelectItem key={item.value} value={item.value.toString()}>
+                        {item.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -174,15 +214,15 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Año</label>
-                <Select value={anio.toString()} onValueChange={(value) => setAnio(parseInt(value))}>
+                <label className="text-sm font-medium">Anio</label>
+                <Select value={anio.toString()} onValueChange={(value) => setAnio(Number(value))}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {anios.map((anio) => (
-                      <SelectItem key={anio} value={anio.toString()}>
-                        {anio}
+                    {anios.map((item) => (
+                      <SelectItem key={item} value={item.toString()}>
+                        {item}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -198,7 +238,6 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
             </CardContent>
           </Card>
 
-          {/* Resumen y acción */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -206,24 +245,18 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
                 Calcular Liquidaciones
               </CardTitle>
               <CardDescription>
-                Se calcularán las liquidaciones para el período {meses.find(m => m.value === mes)?.label} {anio}
+                Se calcularan las liquidaciones para el periodo {meses.find((m) => m.value === mes)?.label} {anio}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {empleadosSeleccionados.length === 0 && (
                 <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                   <AlertCircle className="w-4 h-4 text-yellow-600" />
-                  <span className="text-sm text-yellow-800">
-                    Selecciona al menos un empleado para continuar
-                  </span>
+                  <span className="text-sm text-yellow-800">Selecciona al menos un empleado para continuar</span>
                 </div>
               )}
 
-              <Button
-                onClick={handleCalcular}
-                disabled={isLoading || empleadosSeleccionados.length === 0}
-                className="w-full"
-              >
+              <Button onClick={handleCalcular} disabled={isLoading || empleadosSeleccionados.length === 0} className="w-full">
                 {isLoading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -240,7 +273,6 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
           </Card>
         </div>
 
-        {/* Lista de empleados */}
         <div className="lg:col-span-2">
           <Card>
             <CardHeader>
@@ -250,16 +282,10 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
                     <Users className="w-5 h-5 text-blue-600" />
                     Empleados Activos
                   </CardTitle>
-                  <CardDescription>
-                    Selecciona los empleados para calcular sus liquidaciones
-                  </CardDescription>
+                  <CardDescription>Selecciona los empleados para calcular sus liquidaciones</CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="select-all"
-                    checked={selectAll}
-                    onCheckedChange={handleSelectAll}
-                  />
+                  <Checkbox id="select-all" checked={selectAll} onCheckedChange={handleSelectAll} />
                   <label htmlFor="select-all" className="text-sm font-medium">
                     Seleccionar todos
                   </label>
@@ -267,7 +293,7 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
               </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3 max-h-96 overflow-y-auto">
+              <div className="space-y-3 max-h-[38rem] overflow-y-auto pr-1">
                 {empleados.map((empleado) => {
                   const nombreUsuario = `${empleado.usuario?.nombre || ''} ${empleado.usuario?.apellido || ''}`.trim()
                   const nombreEmpleado = `${empleado.nombre || ''} ${empleado.apellido || ''}`.trim()
@@ -278,42 +304,72 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
                     (empleado.legajo ? `Empleado ${empleado.legajo}` : 'Sin nombre')
 
                   return (
-                    <div
-                      key={empleado.id}
-                      className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Checkbox
-                          checked={empleado.selected}
-                          onCheckedChange={(checked) => handleSelectEmpleado(empleado.id, checked as boolean)}
-                        />
-                        <div>
-                          <div className="font-medium">
-                            {nombreCompleto}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            Legajo: {empleado.legajo || 'Sin asignar'} •
-                            Sucursal: {empleado.sucursal?.nombre || 'Sin asignar'}
+                    <div key={empleado.id} className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <Checkbox
+                            checked={empleado.selected}
+                            onCheckedChange={(checked) => handleSelectEmpleado(empleado.id, checked as boolean)}
+                          />
+                          <div>
+                            <div className="font-medium">{nombreCompleto}</div>
+                            <div className="text-sm text-muted-foreground">
+                              Legajo: {empleado.legajo || 'Sin asignar'} - Sucursal: {empleado.sucursal?.nombre || 'Sin asignar'}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-medium text-green-600">
-                          ${empleado.sueldo_actual?.toLocaleString() || empleado.categoria?.sueldo_basico.toLocaleString() || '0'}
+                        <div className="text-right">
+                          <div className="font-medium text-green-600">
+                            $
+                            {empleado.sueldo_actual?.toLocaleString() ||
+                              empleado.categoria?.sueldo_basico.toLocaleString() ||
+                              '0'}
+                          </div>
+                          <div className="text-xs text-muted-foreground">{empleado.categoria?.nombre || 'Sin categoria'}</div>
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          {empleado.categoria?.nombre || 'Sin categoría'}
-                        </div>
                       </div>
+
+                      {empleado.selected && (
+                        <div className="mt-3 rounded-md border bg-white p-3 space-y-3">
+                          <div className="text-xs font-medium text-muted-foreground">Ajuste manual opcional RRHH</div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <label className="text-xs">Horas adicionales manuales</label>
+                              <Input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                value={empleado.ajuste_manual.horas_adicionales}
+                                onChange={(e) => handleAjusteManual(empleado.id, 'horas_adicionales', e.target.value)}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-xs">Turnos especiales manuales</label>
+                              <Input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                value={empleado.ajuste_manual.turno_especial_unidades}
+                                onChange={(e) => handleAjusteManual(empleado.id, 'turno_especial_unidades', e.target.value)}
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-xs">Observaciones del ajuste</label>
+                            <Textarea
+                              rows={2}
+                              value={empleado.ajuste_manual.observaciones}
+                              onChange={(e) => handleAjusteManual(empleado.id, 'observaciones', e.target.value)}
+                              placeholder="Opcional: motivo o detalle del ajuste manual"
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )
                 })}
 
-                {empleados.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No hay empleados activos para mostrar
-                  </div>
-                )}
+                {empleados.length === 0 && <div className="text-center py-8 text-muted-foreground">No hay empleados activos para mostrar</div>}
               </div>
             </CardContent>
           </Card>
@@ -322,3 +378,4 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
     </div>
   )
 }
+

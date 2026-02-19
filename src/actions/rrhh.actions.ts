@@ -6,7 +6,7 @@ import { getGeminiModel } from '@/lib/ai/runtime'
 import { GEMINI_MODEL_FLASH } from '@/lib/constants/gemini-models'
 import { devError } from '@/lib/utils/logger'
 import type { ApiResponse } from '@/types/api.types'
-import type { Empleado } from '@/types/domain.types'
+import type { Empleado, LiquidacionReglaPeriodo, LiquidacionReglaPuesto } from '@/types/domain.types'
 
 // ===========================================
 // RRHH - ACCIONES DEL SERVIDOR
@@ -926,6 +926,33 @@ type UpsertLiquidacionJornadaInput = {
   observaciones?: string
 }
 
+type CalculoLiquidacionAjusteManualInput = {
+  horas_adicionales?: number
+  turno_especial_unidades?: number
+  observaciones?: string
+}
+
+type GuardarReglaPeriodoInput = {
+  periodo_mes: number
+  periodo_anio: number
+  dias_base_galpon: number
+  dias_base_sucursales: number
+  dias_base_rrhh: number
+  activo?: boolean
+}
+
+type GuardarReglaPuestoInput = {
+  id?: string
+  puesto_codigo: string
+  categoria_id?: string | null
+  grupo_base_dias: 'galpon' | 'sucursales' | 'rrhh'
+  horas_jornada: number
+  tarifa_turno_especial: number
+  habilita_cajero: boolean
+  tarifa_diferencia_cajero: number
+  activo?: boolean
+}
+
 export async function prepararLiquidacionMensualAction(
   empleadoId: string,
   mes: number,
@@ -996,6 +1023,126 @@ export async function calcularLiquidacionMensualAction(
   anio: number
 ): Promise<ApiResponse<{ liquidacionId: string }>> {
   return prepararLiquidacionMensualAction(empleadoId, mes, anio)
+}
+
+export async function calcularLiquidacionConAjustesAction(
+  empleadoId: string,
+  mes: number,
+  anio: number,
+  ajustesManual?: CalculoLiquidacionAjusteManualInput
+): Promise<ApiResponse<{ liquidacionId: string }>> {
+  try {
+    const horasAdicionales = Number(ajustesManual?.horas_adicionales ?? 0)
+    const turnoEspecialUnidades = Number(ajustesManual?.turno_especial_unidades ?? 0)
+    const observaciones = ajustesManual?.observaciones?.trim() || ''
+
+    if (horasAdicionales < 0 || turnoEspecialUnidades < 0) {
+      return {
+        success: false,
+        error: 'Las horas adicionales y turnos especiales no pueden ser negativos',
+      }
+    }
+
+    const calculoResult = await prepararLiquidacionMensualAction(empleadoId, mes, anio)
+    if (!calculoResult.success || !calculoResult.data?.liquidacionId) {
+      return calculoResult
+    }
+
+    const liquidacionId = calculoResult.data.liquidacionId
+    const requiereAjusteManual =
+      horasAdicionales > 0 || turnoEspecialUnidades > 0 || observaciones.length > 0
+
+    if (!requiereAjusteManual) {
+      return calculoResult
+    }
+
+    const adminUserId = await getAuthenticatedAdminUserId()
+    if (!adminUserId) {
+      return {
+        success: false,
+        error: 'Solo administradores pueden aplicar ajustes manuales de liquidacion',
+      }
+    }
+
+    const adminSupabase = createAdminClient()
+
+    const { data: liquidacion, error: liquidacionError } = await adminSupabase
+      .from('rrhh_liquidaciones')
+      .select('id, valor_hora, valor_hora_extra')
+      .eq('id', liquidacionId)
+      .maybeSingle()
+
+    if (liquidacionError || !liquidacion?.id) {
+      devError('Error obteniendo liquidacion para ajustes manuales:', liquidacionError)
+      return {
+        success: false,
+        error: 'No se pudo obtener la liquidacion para aplicar ajustes',
+      }
+    }
+
+    const { data: ajusteExistente } = await adminSupabase
+      .from('rrhh_liquidacion_jornadas')
+      .select('id')
+      .eq('liquidacion_id', liquidacionId)
+      .eq('origen', 'manual')
+      .eq('turno', 'ajuste_rrhh')
+      .limit(1)
+      .maybeSingle()
+
+    const { data: jornadasReferencia } = await adminSupabase
+      .from('rrhh_liquidacion_jornadas')
+      .select('tarifa_hora_extra, tarifa_turno_especial')
+      .eq('liquidacion_id', liquidacionId)
+      .order('created_at', { ascending: false })
+      .limit(30)
+
+    const tarifaHoraExtra =
+      (jornadasReferencia || []).find((row) => Number(row.tarifa_hora_extra || 0) > 0)?.tarifa_hora_extra ||
+      liquidacion.valor_hora_extra ||
+      liquidacion.valor_hora ||
+      0
+
+    const tarifaTurnoEspecial =
+      (jornadasReferencia || []).find((row) => Number(row.tarifa_turno_especial || 0) > 0)?.tarifa_turno_especial ||
+      0
+
+    const fechaAjuste = `${anio}-${String(mes).padStart(2, '0')}-01`
+    const ajusteResult = await upsertLiquidacionJornadaAction(liquidacionId, {
+      id: ajusteExistente?.id,
+      fecha: fechaAjuste,
+      turno: 'ajuste_rrhh',
+      tarea: 'ajuste_manual_rrhh',
+      horas_mensuales: 0,
+      horas_adicionales: horasAdicionales,
+      turno_especial_unidades: turnoEspecialUnidades,
+      tarifa_hora_base: liquidacion.valor_hora || 0,
+      tarifa_hora_extra: Number(tarifaHoraExtra || 0),
+      tarifa_turno_especial: Number(tarifaTurnoEspecial || 0),
+      origen: 'manual',
+      observaciones: observaciones || 'Ajuste manual desde calcular liquidaciones',
+    })
+
+    if (!ajusteResult.success) {
+      return {
+        success: false,
+        error: ajusteResult.error || 'No se pudo guardar el ajuste manual',
+      }
+    }
+
+    revalidatePath(`/rrhh/liquidaciones/${liquidacionId}`)
+
+    return {
+      success: true,
+      data: { liquidacionId },
+      message: 'Liquidacion calculada con ajuste manual aplicado',
+    }
+  } catch (error) {
+    devError('Error en calcularLiquidacionConAjustesAction:', error)
+    return {
+      success: false,
+      error: 'Error interno del servidor',
+    }
+  }
 }
 
 export async function recalcularLiquidacionAction(
@@ -1141,6 +1288,228 @@ export async function upsertLiquidacionJornadaAction(
     }
   } catch (error) {
     devError('Error en upsertLiquidacionJornadaAction:', error)
+    return {
+      success: false,
+      error: 'Error interno del servidor',
+    }
+  }
+}
+
+export async function obtenerConfiguracionLiquidacionAction(
+  periodoMes: number,
+  periodoAnio: number
+): Promise<ApiResponse<{ reglaPeriodo: LiquidacionReglaPeriodo | null; reglasPuesto: LiquidacionReglaPuesto[] }>> {
+  try {
+    const adminUserId = await getAuthenticatedAdminUserId()
+    if (!adminUserId) {
+      return {
+        success: false,
+        error: 'No autorizado',
+      }
+    }
+
+    const supabase = createAdminClient()
+
+    const { data: reglaPeriodo, error: periodoError } = await supabase
+      .from('rrhh_liquidacion_reglas_periodo')
+      .select('*')
+      .eq('periodo_mes', periodoMes)
+      .eq('periodo_anio', periodoAnio)
+      .maybeSingle()
+
+    if (periodoError) {
+      devError('Error obteniendo regla de periodo de liquidacion:', periodoError)
+      return {
+        success: false,
+        error: 'No se pudo obtener la regla de periodo',
+      }
+    }
+
+    const { data: reglasPuesto, error: puestosError } = await supabase
+      .from('rrhh_liquidacion_reglas_puesto')
+      .select('*')
+      .order('puesto_codigo', { ascending: true })
+
+    if (puestosError) {
+      devError('Error obteniendo reglas por puesto de liquidacion:', puestosError)
+      return {
+        success: false,
+        error: 'No se pudieron obtener las reglas por puesto',
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        reglaPeriodo: (reglaPeriodo || null) as LiquidacionReglaPeriodo | null,
+        reglasPuesto: (reglasPuesto || []) as LiquidacionReglaPuesto[],
+      },
+    }
+  } catch (error) {
+    devError('Error en obtenerConfiguracionLiquidacionAction:', error)
+    return {
+      success: false,
+      error: 'Error interno del servidor',
+    }
+  }
+}
+
+export async function guardarReglaPeriodoAction(
+  payload: GuardarReglaPeriodoInput
+): Promise<ApiResponse<{ reglaPeriodoId: string }>> {
+  try {
+    const adminUserId = await getAuthenticatedAdminUserId()
+    if (!adminUserId) {
+      return {
+        success: false,
+        error: 'No autorizado',
+      }
+    }
+
+    if (payload.periodo_mes < 1 || payload.periodo_mes > 12 || payload.periodo_anio < 2000) {
+      return {
+        success: false,
+        error: 'Periodo inválido',
+      }
+    }
+
+    if (payload.dias_base_galpon <= 0 || payload.dias_base_sucursales <= 0 || payload.dias_base_rrhh <= 0) {
+      return {
+        success: false,
+        error: 'Los días base deben ser mayores a cero',
+      }
+    }
+
+    const supabase = createAdminClient()
+    const { data, error } = await supabase
+      .from('rrhh_liquidacion_reglas_periodo')
+      .upsert(
+        {
+          periodo_mes: payload.periodo_mes,
+          periodo_anio: payload.periodo_anio,
+          dias_base_galpon: payload.dias_base_galpon,
+          dias_base_sucursales: payload.dias_base_sucursales,
+          dias_base_rrhh: payload.dias_base_rrhh,
+          activo: payload.activo ?? true,
+        },
+        { onConflict: 'periodo_mes,periodo_anio' }
+      )
+      .select('id')
+      .single()
+
+    if (error || !data?.id) {
+      devError('Error guardando regla de periodo:', error)
+      return {
+        success: false,
+        error: 'No se pudo guardar la regla de periodo',
+      }
+    }
+
+    revalidatePath('/rrhh/liquidaciones')
+    revalidatePath('/rrhh/liquidaciones/configuracion')
+
+    return {
+      success: true,
+      data: { reglaPeriodoId: data.id },
+      message: 'Regla de periodo guardada',
+    }
+  } catch (error) {
+    devError('Error en guardarReglaPeriodoAction:', error)
+    return {
+      success: false,
+      error: 'Error interno del servidor',
+    }
+  }
+}
+
+export async function guardarReglaPuestoAction(
+  payload: GuardarReglaPuestoInput
+): Promise<ApiResponse<{ reglaPuestoId: string }>> {
+  try {
+    const adminUserId = await getAuthenticatedAdminUserId()
+    if (!adminUserId) {
+      return {
+        success: false,
+        error: 'No autorizado',
+      }
+    }
+
+    const puestoCodigo = payload.puesto_codigo.trim()
+    if (!puestoCodigo) {
+      return {
+        success: false,
+        error: 'El código de puesto es obligatorio',
+      }
+    }
+
+    if (payload.horas_jornada <= 0) {
+      return {
+        success: false,
+        error: 'Las horas de jornada deben ser mayores a cero',
+      }
+    }
+
+    if (payload.tarifa_turno_especial < 0 || payload.tarifa_diferencia_cajero < 0) {
+      return {
+        success: false,
+        error: 'Las tarifas no pueden ser negativas',
+      }
+    }
+
+    const supabase = createAdminClient()
+    const insertPayload = {
+      puesto_codigo: puestoCodigo,
+      categoria_id: payload.categoria_id || null,
+      grupo_base_dias: payload.grupo_base_dias,
+      horas_jornada: payload.horas_jornada,
+      tarifa_turno_especial: payload.tarifa_turno_especial,
+      habilita_cajero: payload.habilita_cajero,
+      tarifa_diferencia_cajero: payload.tarifa_diferencia_cajero,
+      activo: payload.activo ?? true,
+    }
+
+    let data: { id: string } | null = null
+    let error: { message?: string } | null = null
+
+    if (payload.id) {
+      const updateResult = await supabase
+        .from('rrhh_liquidacion_reglas_puesto')
+        .update(insertPayload)
+        .eq('id', payload.id)
+        .select('id')
+        .single()
+
+      data = updateResult.data
+      error = updateResult.error
+    } else {
+      const upsertResult = await supabase
+        .from('rrhh_liquidacion_reglas_puesto')
+        .upsert(insertPayload, { onConflict: 'puesto_codigo' })
+        .select('id')
+        .single()
+
+      data = upsertResult.data
+      error = upsertResult.error
+    }
+
+    if (error || !data?.id) {
+      devError('Error guardando regla de puesto:', error)
+      return {
+        success: false,
+        error: 'No se pudo guardar la regla de puesto',
+      }
+    }
+
+    revalidatePath('/rrhh/liquidaciones')
+    revalidatePath('/rrhh/liquidaciones/configuracion')
+
+    return {
+      success: true,
+      data: { reglaPuestoId: data.id },
+      message: 'Regla de puesto guardada',
+    }
+  } catch (error) {
+    devError('Error en guardarReglaPuestoAction:', error)
     return {
       success: false,
       error: 'Error interno del servidor',

@@ -1,15 +1,28 @@
 ﻿import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
 import type { Liquidacion, LiquidacionJornada, AdelantoCuota } from '@/types/domain.types'
 import { LiquidacionDetalleClient } from './liquidacion-detalle-client'
 
 async function getLiquidacionDetalle(liquidacionId: string) {
   const supabase = await createClient()
+  const adminSupabase = createAdminClient()
 
-  const { data: liquidacion, error } = await supabase
+  const { data: authResult, error: authError } = await supabase.auth.getUser()
+  if (authError || !authResult.user) return null
+
+  const { data: userData } = await supabase
+    .from('usuarios')
+    .select('rol, activo')
+    .eq('id', authResult.user.id)
+    .maybeSingle()
+
+  const isAdmin = !!userData?.activo && userData.rol === 'admin'
+  const db = isAdmin ? adminSupabase : supabase
+
+  const { data: liquidacion, error } = await db
     .from('rrhh_liquidaciones')
     .select(`
       *,
@@ -30,14 +43,14 @@ async function getLiquidacionDetalle(liquidacionId: string) {
     return null
   }
 
-  const { data: jornadas } = await supabase
+  const { data: jornadas } = await db
     .from('rrhh_liquidacion_jornadas')
     .select('*')
     .eq('liquidacion_id', liquidacionId)
     .order('fecha', { ascending: true })
     .order('created_at', { ascending: true })
 
-  const { data: cuotas } = await supabase
+  const { data: cuotas } = await db
     .from('rrhh_adelanto_cuotas')
     .select(`
       *,
