@@ -746,6 +746,13 @@ export interface HorarioDiarioEmpleado {
   empleado_id?: string
   dni?: string
   empleado_nombre?: string
+  // Turno mañana (antes de las 13:00 hora Argentina)
+  hora_entrada_manana?: string
+  hora_salida_manana?: string
+  // Turno tarde (13:00 en adelante)
+  hora_entrada_tarde?: string
+  hora_salida_tarde?: string
+  // Primera entrada y última salida del día (para sync con rrhh_asistencia)
   hora_entrada?: string
   hora_salida?: string
   mapeado: boolean
