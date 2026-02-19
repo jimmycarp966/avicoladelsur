@@ -213,6 +213,37 @@ export function MetricasSoportePanel({ empleadoId, mes, anio }: MetricasSoporteP
                     Datos objetivos del ERP para {metricas.periodo.mes}/{metricas.periodo.anio}.
                     Las sugerencias son orientativas, vos tenés la última palabra.
                 </p>
+                <details className="mt-2">
+                    <summary className="text-xs text-blue-600 cursor-pointer hover:text-blue-800 font-medium">
+                        ¿Qué es esto y cómo lo uso?
+                    </summary>
+                    <div className="mt-2 p-3 bg-white/70 rounded-md border border-blue-100 text-xs text-muted-foreground space-y-2">
+                        <p>
+                            La <strong>Huella Digital Operativa</strong> recopila automáticamente datos del sistema
+                            para ayudarte a evaluar al empleado con información objetiva.
+                        </p>
+                        <p><strong>¿De dónde salen los datos?</strong></p>
+                        <ul className="list-disc pl-4 space-y-1">
+                            <li><strong>Puntualidad:</strong> Registros de asistencia cargados en RRHH → Asistencia</li>
+                            <li><strong>Rendimiento:</strong> Pedidos, rutas de reparto y órdenes de producción del mes</li>
+                            <li><strong>Responsabilidad:</strong> Cierres de caja y descuentos/multas registrados</li>
+                            <li><strong>Trabajo en Equipo:</strong> Novedades del período (evaluar manualmente la colaboración)</li>
+                            <li><strong>Actitud:</strong> Sanciones e historial de evaluaciones anteriores</li>
+                        </ul>
+                        <p><strong>¿Cómo interpreto los indicadores?</strong></p>
+                        <ul className="list-disc pl-4 space-y-1">
+                            <li>🟢 <strong>Verde:</strong> El empleado está dentro de lo esperado</li>
+                            <li>🟡 <strong>Amarillo:</strong> Hay algo que merece atención</li>
+                            <li>🔴 <strong>Rojo:</strong> Situación crítica que requiere acción</li>
+                            <li><strong>Sugerencia X/5:</strong> Puntaje orientativo calculado automáticamente. Podés usarlo como guía o cambiarlo</li>
+                        </ul>
+                        <p className="italic">
+                            Nota: Los datos de puntualidad dependen de la carga manual en Asistencia.
+                            Las marcaciones de Hik-Connect (huella digital) se ven en Horarios pero
+                            aún no se sincronizan automáticamente con Asistencia.
+                        </p>
+                    </div>
+                </details>
             </CardHeader>
             <CardContent className="space-y-3">
                 {/* 1. PUNTUALIDAD */}
