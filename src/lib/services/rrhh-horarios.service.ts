@@ -13,7 +13,11 @@ function getStringValue(record: Record<string, unknown>, keys: string[]): string
     if (typeof value === 'string' && value.trim()) {
       return value.trim()
     }
-    if (typeof value === 'number') {
+    // Epoch en milisegundos (API cloud HikConnect devuelve occurTime como número de 13 dígitos)
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      if (value > 1e10) {
+        return new Date(value).toISOString()
+      }
       return String(value)
     }
   }

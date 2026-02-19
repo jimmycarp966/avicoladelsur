@@ -72,6 +72,10 @@ function extractRawEventTimestamp(raw: Record<string, unknown>): string | undefi
   for (const key of candidates) {
     const value = raw[key]
     if (typeof value === 'string' && value.trim()) return value.trim()
+    // API cloud HikConnect devuelve occurTime como epoch en milisegundos (número de 13 dígitos, UTC)
+    if (typeof value === 'number' && Number.isFinite(value) && value > 1e10) {
+      return new Date(value).toISOString()
+    }
   }
   return undefined
 }
