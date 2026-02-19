@@ -99,8 +99,13 @@ export async function obtenerMetricasEvaluacionAction(
         })
 
         if (error) {
-            // Si la RPC no existe, hacer fallback con queries directas
-            if (error.message.includes('function') || error.code === '42883') {
+            // Fallback si la RPC no existe (42883) o tiene errores internos de SQL (42703, etc.)
+            const rpcFailed =
+                error.code === '42883' ||
+                error.code === '42703' ||
+                error.message.includes('function') ||
+                error.message.includes('column')
+            if (rpcFailed) {
                 return await obtenerMetricasFallback(empleadoId, mes, anio)
             }
             devError('Error al obtener métricas de evaluación:', error)
