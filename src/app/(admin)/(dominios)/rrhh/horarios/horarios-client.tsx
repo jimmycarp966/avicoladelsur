@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
-import { RefreshCw, Clock3, UserCheck, UserX, Database } from 'lucide-react'
+import { RefreshCw, Clock3, UserCheck, UserX, Database, CheckSquare } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -55,6 +55,7 @@ export function HorariosClient() {
       mapeados,
       noMapeados,
       completos,
+      sincronizados: data?.sincronizados || 0,
     }
   }, [data])
 
@@ -84,7 +85,18 @@ export function HorariosClient() {
         <StatCard title="Personas Detectadas" value={stats.totalRegistros} subtitle="Con al menos una marcación" icon={Clock3} variant="info" />
         <StatCard title="Mapeados" value={stats.mapeados} subtitle="Vinculados a empleados RRHH" icon={UserCheck} variant="success" />
         <StatCard title="No Mapeados" value={stats.noMapeados} subtitle="Sin match por documento" icon={UserX} variant="warning" />
+        <StatCard title="Sincronizados" value={stats.sincronizados} subtitle="Escritos en Asistencia" icon={CheckSquare} variant="success" />
       </div>
+
+      {stats.sincronizados > 0 && (
+        <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700 flex items-center gap-2">
+          <CheckSquare className="w-4 h-4 flex-shrink-0" />
+          <span>
+            <strong>{stats.sincronizados}</strong> marcaciones se sincronizaron automáticamente con <strong>Asistencia</strong> (RRHH → Asistencia).
+            Los registros editados manualmente no se sobrescriben.
+          </span>
+        </div>
+      )}
 
       <Card>
         <CardHeader>

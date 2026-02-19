@@ -757,6 +757,7 @@ export interface HorariosHoyData {
   total_eventos: number
   registros: HorarioDiarioEmpleado[]
   warnings: string[]
+  sincronizados?: number
 }
 
 // Lista de Precios

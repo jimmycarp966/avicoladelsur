@@ -1,7 +1,7 @@
 'use server'
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { devError } from '@/lib/utils/logger'
 import type { ApiResponse } from '@/types/api.types'
 import type { HorariosHoyData, HorarioEventoNormalizado } from '@/types/domain.types'
@@ -212,6 +212,124 @@ function buildDailyRows(
   })
 }
 
+// ========== SINCRONIZACIÓN HIK → ASISTENCIA ==========
+
+const HORA_LIMITE_ENTRADA = process.env.HORA_LIMITE_ENTRADA || '08:00'
+
+function calcularEstadoYRetraso(horaEntrada: string | undefined): {
+  estado: 'presente' | 'tarde'
+  retraso_minutos: number
+} {
+  if (!horaEntrada) return { estado: 'presente', retraso_minutos: 0 }
+
+  const [limH, limM] = HORA_LIMITE_ENTRADA.split(':').map(Number)
+  const [entH, entM] = horaEntrada.split(':').map(Number)
+
+  if (isNaN(limH) || isNaN(limM) || isNaN(entH) || isNaN(entM)) {
+    return { estado: 'presente', retraso_minutos: 0 }
+  }
+
+  const limiteMin = limH * 60 + limM
+  const entradaMin = entH * 60 + entM
+  const diferencia = entradaMin - limiteMin
+
+  if (diferencia <= 0) {
+    return { estado: 'presente', retraso_minutos: 0 }
+  }
+
+  return { estado: 'tarde', retraso_minutos: diferencia }
+}
+
+async function sincronizarAsistenciaDesdeHik(
+  registros: HorariosHoyData['registros'],
+  fecha: string,
+): Promise<{ sincronizados: number; errores: number; warnings: string[] }> {
+  const mapeados = registros.filter(r => r.mapeado && r.empleado_id)
+  if (mapeados.length === 0) return { sincronizados: 0, errores: 0, warnings: [] }
+
+  const adminSupabase = createAdminClient()
+  const syncWarnings: string[] = []
+  let sincronizados = 0
+  let errores = 0
+
+  // Verificar registros existentes editados manualmente para no sobrescribirlos
+  const empleadoIds = mapeados.map(r => r.empleado_id!)
+  const { data: existentes } = await adminSupabase
+    .from('rrhh_asistencia')
+    .select('empleado_id, observaciones')
+    .in('empleado_id', empleadoIds)
+    .eq('fecha', fecha)
+
+  const manualesSet = new Set<string>()
+  if (existentes) {
+    for (const reg of existentes) {
+      const obs = (reg.observaciones || '').toLowerCase()
+      // Si fue cargado manualmente (no tiene marca de HikConnect), no sobrescribir
+      if (obs && !obs.includes('hikconnect') && !obs.includes('hik-connect')) {
+        manualesSet.add(reg.empleado_id)
+      }
+    }
+  }
+
+  for (const registro of mapeados) {
+    if (manualesSet.has(registro.empleado_id!)) {
+      continue // No sobrescribir registros manuales
+    }
+
+    const { estado, retraso_minutos } = calcularEstadoYRetraso(registro.hora_entrada)
+
+    // Construir timestamps completos para hora_entrada y hora_salida
+    let horaEntradaTs: string | null = null
+    let horaSalidaTs: string | null = null
+
+    if (registro.hora_entrada) {
+      horaEntradaTs = `${fecha}T${registro.hora_entrada}:00-03:00`
+    }
+    if (registro.hora_salida) {
+      horaSalidaTs = `${fecha}T${registro.hora_salida}:00-03:00`
+    }
+
+    // Calcular horas trabajadas
+    let horasTrabajadas: number | null = null
+    if (horaEntradaTs && horaSalidaTs) {
+      const entrada = new Date(horaEntradaTs)
+      const salida = new Date(horaSalidaTs)
+      if (!isNaN(entrada.getTime()) && !isNaN(salida.getTime())) {
+        horasTrabajadas = Math.round(((salida.getTime() - entrada.getTime()) / 3600000) * 100) / 100
+      }
+    }
+
+    const { error } = await adminSupabase
+      .from('rrhh_asistencia')
+      .upsert(
+        {
+          empleado_id: registro.empleado_id!,
+          fecha,
+          hora_entrada: horaEntradaTs,
+          hora_salida: horaSalidaTs,
+          horas_trabajadas: horasTrabajadas,
+          estado,
+          retraso_minutos,
+          observaciones: 'Sincronizado desde HikConnect',
+        },
+        { onConflict: 'empleado_id,fecha' },
+      )
+
+    if (error) {
+      errores++
+      devError(`Error sincronizando asistencia para empleado ${registro.empleado_id}:`, error)
+    } else {
+      sincronizados++
+    }
+  }
+
+  if (errores > 0) {
+    syncWarnings.push(`${errores} registros no pudieron sincronizarse con Asistencia.`)
+  }
+
+  return { sincronizados, errores, warnings: syncWarnings }
+}
+
 export async function obtenerHorariosHoyDesdeHikAction(fecha?: string): Promise<ApiResponse<HorariosHoyData>> {
   try {
     const missingConfig = validateHikConnectConfig()
@@ -282,7 +400,7 @@ export async function obtenerHorariosHoyDesdeHikAction(fecha?: string): Promise<
       if (error) {
         devError('Error consultando empleados para mapeo de horarios:', error)
       } else {
-        ;(empleados || []).forEach((empleado) => {
+        ; (empleados || []).forEach((empleado) => {
           const typed = empleado as EmpleadoLookup
           employeeById.set(typed.id, typed)
 
@@ -348,6 +466,14 @@ export async function obtenerHorariosHoyDesdeHikAction(fecha?: string): Promise<
       )
     }
 
+    // Sincronizar marcaciones mapeadas con rrhh_asistencia
+    let sincronizados = 0
+    if (mappedCount > 0) {
+      const syncResult = await sincronizarAsistenciaDesdeHik(registros, range.date)
+      sincronizados = syncResult.sincronizados
+      warnings.push(...syncResult.warnings)
+    }
+
     return {
       success: true,
       data: {
@@ -355,8 +481,9 @@ export async function obtenerHorariosHoyDesdeHikAction(fecha?: string): Promise<
         total_eventos: rawEventsForDate.length,
         registros,
         warnings: [...hikResponse.warnings, ...warnings],
+        sincronizados,
       },
-      message: 'Horarios del dia obtenidos desde Hik-Connect',
+      message: `Horarios obtenidos. ${sincronizados} registros sincronizados con Asistencia.`,
     }
   } catch (error) {
     safeLogHikError(error)
