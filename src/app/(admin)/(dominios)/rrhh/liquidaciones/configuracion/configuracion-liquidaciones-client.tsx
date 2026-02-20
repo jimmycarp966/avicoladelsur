@@ -14,7 +14,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useNotificationStore } from '@/store/notificationStore'
@@ -121,11 +130,26 @@ export function ConfiguracionLiquidacionesClient() {
   const [savingPeriodo, setSavingPeriodo] = useState(false)
   const [savingPuestoId, setSavingPuestoId] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [modoPersonalizado, setModoPersonalizado] = useState(false)
   const [reglaPeriodo, setReglaPeriodo] = useState<ReglaPeriodoEditable>(
     defaultReglaPeriodo(now.getMonth() + 1, now.getFullYear()),
   )
   const [reglasPuesto, setReglasPuesto] = useState<ReglaPuestoEditable[]>([])
   const [nuevaRegla, setNuevaRegla] = useState<ReglaPuestoEditable>(defaultReglaPuesto())
+  const [categorias, setCategorias] = useState<{ id: string; nombre: string }[]>([])
+
+  const codigosExistentes = useMemo(
+    () => new Set(reglasPuesto.map((r) => r.puesto_codigo.toLowerCase())),
+    [reglasPuesto],
+  )
+  const categoriasSinRegla = useMemo(
+    () => categorias.filter((c) => !codigosExistentes.has(c.nombre.toLowerCase())),
+    [categorias, codigosExistentes],
+  )
+  const categoriasCubiertas = useMemo(
+    () => categorias.filter((c) => codigosExistentes.has(c.nombre.toLowerCase())),
+    [categorias, codigosExistentes],
+  )
 
   const meses = [
     { value: 1, label: 'Enero' },
@@ -167,6 +191,7 @@ export function ConfiguracionLiquidacionesClient() {
       }
 
       setReglasPuesto((result.data.reglasPuesto || []).map(mapReglaPuesto))
+      setCategorias(result.data.categorias ?? [])
     } finally {
       setLoading(false)
     }
@@ -226,6 +251,7 @@ export function ConfiguracionLiquidacionesClient() {
 
       if (!regla.id) {
         setNuevaRegla(defaultReglaPuesto())
+        setModoPersonalizado(false)
         setDialogOpen(false)
       }
 
@@ -417,13 +443,9 @@ export function ConfiguracionLiquidacionesClient() {
                       <TableRow key={regla.id || `regla-${index}`}>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <Input
-                              value={regla.puesto_codigo}
-                              className="h-8 w-28 text-sm"
-                              onChange={(e) =>
-                                updateReglaPuesto(index, { puesto_codigo: e.target.value })
-                              }
-                            />
+                            <span className="font-mono text-sm font-medium px-2 py-0.5 bg-muted rounded">
+                              {regla.puesto_codigo}
+                            </span>
                             {/* CFG-4: badge "Sin guardar" */}
                             {regla._dirty && (
                               <Badge
@@ -552,7 +574,16 @@ export function ConfiguracionLiquidacionesClient() {
       </Card>
 
       {/* CFG-3: Dialog para nueva regla de puesto */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open)
+          if (!open) {
+            setModoPersonalizado(false)
+            setNuevaRegla(defaultReglaPuesto())
+          }
+        }}
+      >
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Nueva Regla de Puesto</DialogTitle>
@@ -561,12 +592,56 @@ export function ConfiguracionLiquidacionesClient() {
           <div className="space-y-4 pt-2">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1 col-span-2">
-                <label className="text-sm font-medium">Código de puesto</label>
-                <Input
-                  value={nuevaRegla.puesto_codigo}
-                  onChange={(e) => setNuevaRegla((prev) => ({ ...prev, puesto_codigo: e.target.value }))}
-                  placeholder="ej: limpieza, deposito, admin"
-                />
+                <label className="text-sm font-medium">Puesto</label>
+                <Select
+                  onValueChange={(value) => {
+                    if (value === '__personalizado__') {
+                      setModoPersonalizado(true)
+                      setNuevaRegla((prev) => ({ ...prev, puesto_codigo: '' }))
+                    } else {
+                      setModoPersonalizado(false)
+                      setNuevaRegla((prev) => ({ ...prev, puesto_codigo: value }))
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar puesto..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categoriasSinRegla.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel>Categorías sin regla</SelectLabel>
+                        {categoriasSinRegla.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.nombre.toLowerCase()}>
+                            {cat.nombre}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                    {categoriasCubiertas.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel>Ya configuradas</SelectLabel>
+                        {categoriasCubiertas.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.nombre.toLowerCase()} disabled>
+                            {cat.nombre} ✓
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                    <SelectSeparator />
+                    <SelectItem value="__personalizado__">Personalizado (escribir código)...</SelectItem>
+                  </SelectContent>
+                </Select>
+                {modoPersonalizado && (
+                  <Input
+                    value={nuevaRegla.puesto_codigo}
+                    onChange={(e) =>
+                      setNuevaRegla((prev) => ({ ...prev, puesto_codigo: e.target.value.toLowerCase() }))
+                    }
+                    placeholder="ej: deposito, ayudante_zona"
+                    className="mt-2"
+                  />
+                )}
               </div>
 
               <div className="space-y-1">
@@ -679,7 +754,14 @@ export function ConfiguracionLiquidacionesClient() {
                 )}
                 Guardar nueva regla
               </Button>
-              <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setDialogOpen(false)
+                  setModoPersonalizado(false)
+                  setNuevaRegla(defaultReglaPuesto())
+                }}
+              >
                 Cancelar
               </Button>
             </div>

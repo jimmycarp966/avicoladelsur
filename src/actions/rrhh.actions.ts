@@ -1316,7 +1316,7 @@ export async function upsertLiquidacionJornadaAction(
 export async function obtenerConfiguracionLiquidacionAction(
   periodoMes: number,
   periodoAnio: number
-): Promise<ApiResponse<{ reglaPeriodo: LiquidacionReglaPeriodo | null; reglasPuesto: LiquidacionReglaPuesto[] }>> {
+): Promise<ApiResponse<{ reglaPeriodo: LiquidacionReglaPeriodo | null; reglasPuesto: LiquidacionReglaPuesto[]; categorias: { id: string; nombre: string }[] }>> {
   try {
     const adminUserId = await getAuthenticatedAdminUserId()
     if (!adminUserId) {
@@ -1356,11 +1356,18 @@ export async function obtenerConfiguracionLiquidacionAction(
       }
     }
 
+    const { data: categorias } = await supabase
+      .from('rrhh_categorias')
+      .select('id, nombre')
+      .eq('activo', true)
+      .order('nombre')
+
     return {
       success: true,
       data: {
         reglaPeriodo: (reglaPeriodo || null) as LiquidacionReglaPeriodo | null,
         reglasPuesto: (reglasPuesto || []) as LiquidacionReglaPuesto[],
+        categorias: (categorias ?? []) as { id: string; nombre: string }[],
       },
     }
   } catch (error) {
