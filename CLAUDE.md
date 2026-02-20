@@ -79,6 +79,10 @@ src/
 
 5. **RRHH** (`src/app/(admin)/(dominios)/rrhh/`)
    - Empleados, asistencia, liquidaciones, adelantos, novedades, licencias
+   - Liquidaciones calculadas por RPC: `fn_rrhh_preparar_liquidacion_mensual` → `fn_rrhh_recalcular_liquidacion`
+   - `rrhh_liquidacion_reglas_puesto.tipo_calculo`: `'hora'` (paga por horas reales) | `'turno'` (paga 1 jornal por día presente, sin horas extra — usado para repartidores)
+   - `rrhh_liquidaciones.puesto_hs_extra`: puesto cuya tarifa se aplica a las horas extra cuando el empleado hace trabajo inter-rol
+   - Filtro de período en `/rrhh/liquidaciones` via `searchParams` URL (`?mes=X&anio=Y`) → query al servidor sin límite; sin filtro → últimas 50
 
 ### Roles del Sistema
 
