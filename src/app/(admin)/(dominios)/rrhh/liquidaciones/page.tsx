@@ -11,8 +11,9 @@ import Link from 'next/link'
 import type { Liquidacion } from '@/types/domain.types'
 import { ejecutarLiquidacionAutomatica } from '@/lib/services/rrhh-liquidaciones-automaticas'
 import { LiquidacionesTableWrapper } from './_components/LiquidacionesTableWrapper'
+import { PeriodFilterBar } from './_components/PeriodFilterBar'
 
-async function getLiquidaciones() {
+async function getLiquidaciones(periodoMes?: number, periodoAnio?: number) {
   const supabase = await createClient()
   const adminSupabase = createAdminClient()
 
@@ -28,7 +29,7 @@ async function getLiquidaciones() {
   const isAdmin = !!userData?.activo && userData.rol === 'admin'
   const db = isAdmin ? adminSupabase : supabase
 
-  const { data, error } = await db
+  let query = db
     .from('rrhh_liquidaciones')
     .select(`
       *,
@@ -40,8 +41,18 @@ async function getLiquidaciones() {
         usuario:usuarios(nombre, apellido, email)
       )
     `)
-    .order('created_at', { ascending: false })
-    .limit(50)
+    .order('periodo_anio', { ascending: false })
+    .order('periodo_mes', { ascending: false })
+
+  if (periodoMes && periodoAnio) {
+    query = query.eq('periodo_mes', periodoMes).eq('periodo_anio', periodoAnio)
+  } else if (periodoAnio && !periodoMes) {
+    query = query.eq('periodo_anio', periodoAnio)
+  } else {
+    query = query.limit(50)
+  }
+
+  const { data, error } = await query
 
   if (error) {
     console.error('Error fetching liquidaciones:', error)
@@ -77,9 +88,17 @@ async function ejecutarFallbackMesVencido(): Promise<void> {
 }
 
 export const dynamic = 'force-dynamic'
-export default async function LiquidacionesPage() {
+export default async function LiquidacionesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mes?: string; anio?: string }>
+}) {
+  const params = await searchParams
+  const periodoMes = params.mes ? Number(params.mes) : undefined
+  const periodoAnio = params.anio ? Number(params.anio) : new Date().getFullYear()
+
   await ejecutarFallbackMesVencido()
-  const liquidaciones = await getLiquidaciones()
+  const liquidaciones = await getLiquidaciones(periodoMes, periodoAnio)
 
   const totalAprobadas = liquidaciones.filter((l) => l.estado === 'aprobada').length
   const totalPendientes = liquidaciones.filter(
@@ -146,7 +165,8 @@ export default async function LiquidacionesPage() {
       </div>
 
       {/* Tabla de liquidaciones con filtros y bulk actions */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
+      <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
+        <PeriodFilterBar periodoMes={periodoMes} periodoAnio={periodoAnio} />
         <LiquidacionesTableWrapper liquidaciones={liquidaciones} />
       </div>
     </div>

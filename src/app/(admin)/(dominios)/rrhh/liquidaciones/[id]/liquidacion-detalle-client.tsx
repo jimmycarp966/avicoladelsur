@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useNotificationStore } from '@/store/notificationStore'
 import {
   aprobarLiquidacionAction,
@@ -22,7 +23,7 @@ import {
   recalcularLiquidacionAction,
   upsertLiquidacionJornadaAction,
 } from '@/actions/rrhh.actions'
-import type { AdelantoCuota, Liquidacion, LiquidacionJornada } from '@/types/domain.types'
+import type { AdelantoCuota, Liquidacion, LiquidacionJornada, LiquidacionReglaPuesto } from '@/types/domain.types'
 
 type CuotaWithPlan = AdelantoCuota & {
   plan?: {
@@ -37,6 +38,7 @@ type Props = {
   liquidacion: Liquidacion
   jornadas: LiquidacionJornada[]
   cuotas: CuotaWithPlan[]
+  puestosDisponibles: Pick<LiquidacionReglaPuesto, 'puesto_codigo'>[]
 }
 
 function toNum(value: string): number {
@@ -71,7 +73,7 @@ function getOrigenBadge(origen: string | null | undefined) {
   }
 }
 
-export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas }: Props) {
+export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puestosDisponibles }: Props) {
   const router = useRouter()
   const { showToast } = useNotificationStore()
 
@@ -87,6 +89,7 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas }: Prop
 
   const [control, setControl] = useState({
     puesto_override: liquidacion.puesto_override || '',
+    puesto_hs_extra: liquidacion.puesto_hs_extra ?? null as string | null,
     dias_cajero: liquidacion.dias_cajero || 0,
     diferencia_turno_cajero: liquidacion.diferencia_turno_cajero || 0,
     orden_pago: liquidacion.orden_pago || 0,
@@ -197,6 +200,7 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas }: Prop
     try {
       const result = await actualizarLiquidacionControlAction(liquidacion.id, {
         puesto_override: control.puesto_override || null,
+        puesto_hs_extra: control.puesto_hs_extra || null,
         dias_cajero: control.dias_cajero,
         diferencia_turno_cajero: control.diferencia_turno_cajero,
         orden_pago: control.orden_pago || null,
@@ -403,6 +407,27 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas }: Prop
                   value={control.puesto_override}
                   onChange={(e) => setControl((p) => ({ ...p, puesto_override: e.target.value }))}
                 />
+              </div>
+              <div>
+                <Label>Puesto para horas extra</Label>
+                <Select
+                  value={control.puesto_hs_extra ?? 'mismo'}
+                  onValueChange={(v) =>
+                    setControl((p) => ({ ...p, puesto_hs_extra: v === 'mismo' ? null : v }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Mismo puesto (por defecto)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="mismo">Mismo puesto (por defecto)</SelectItem>
+                    {puestosDisponibles.map((p) => (
+                      <SelectItem key={p.puesto_codigo} value={p.puesto_codigo}>
+                        {p.puesto_codigo}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label>Orden de pago</Label>

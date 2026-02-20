@@ -669,6 +669,7 @@ export interface Liquidacion extends BaseEntity {
   fecha_aprobacion?: string
   pagado: boolean
   fecha_pago?: string
+  puesto_hs_extra?: string | null
   observaciones?: string
   created_by?: string
   // Relaciones calculadas
@@ -697,6 +698,7 @@ export interface LiquidacionReglaPuesto extends BaseEntity {
   tarifa_turno_especial: number
   habilita_cajero: boolean
   tarifa_diferencia_cajero: number
+  tipo_calculo: 'hora' | 'turno'
   activo: boolean
 }
 

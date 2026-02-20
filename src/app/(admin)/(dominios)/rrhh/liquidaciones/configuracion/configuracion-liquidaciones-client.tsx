@@ -40,6 +40,7 @@ type ReglaPuestoEditable = {
   tarifa_turno_especial: number
   habilita_cajero: boolean
   tarifa_diferencia_cajero: number
+  tipo_calculo: 'hora' | 'turno'
   activo: boolean
   _dirty?: boolean
 }
@@ -78,6 +79,7 @@ function defaultReglaPuesto(): ReglaPuestoEditable {
     tarifa_turno_especial: 0,
     habilita_cajero: false,
     tarifa_diferencia_cajero: 0,
+    tipo_calculo: 'hora',
     activo: true,
   }
 }
@@ -92,6 +94,7 @@ function mapReglaPuesto(regla: LiquidacionReglaPuesto): ReglaPuestoEditable {
     tarifa_turno_especial: Number(regla.tarifa_turno_especial || 0),
     habilita_cajero: !!regla.habilita_cajero,
     tarifa_diferencia_cajero: Number(regla.tarifa_diferencia_cajero || 0),
+    tipo_calculo: regla.tipo_calculo || 'hora',
     activo: !!regla.activo,
     _dirty: false,
   }
@@ -240,6 +243,7 @@ export function ConfiguracionLiquidacionesClient() {
         tarifa_turno_especial: regla.tarifa_turno_especial,
         habilita_cajero: regla.habilita_cajero,
         tarifa_diferencia_cajero: regla.tarifa_diferencia_cajero,
+        tipo_calculo: regla.tipo_calculo,
         activo: regla.activo,
       })
 
@@ -503,6 +507,7 @@ export function ConfiguracionLiquidacionesClient() {
                   <TableRow>
                     <TableHead>Puesto</TableHead>
                     <TableHead>Grupo días</TableHead>
+                    <TableHead>Tipo cálculo</TableHead>
                     <TableHead className="text-right">Hs jornada</TableHead>
                     <TableHead className="text-right">Tarifa especial</TableHead>
                     <TableHead>Cajero</TableHead>
@@ -550,6 +555,22 @@ export function ConfiguracionLiquidacionesClient() {
                                   {gi.label}
                                 </SelectItem>
                               ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={regla.tipo_calculo}
+                            onValueChange={(value) =>
+                              updateReglaPuesto(index, { tipo_calculo: value as 'hora' | 'turno' })
+                            }
+                          >
+                            <SelectTrigger className="h-8 w-28 text-sm">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="hora">Por hora</SelectItem>
+                              <SelectItem value="turno">Por turno</SelectItem>
                             </SelectContent>
                           </Select>
                         </TableCell>
@@ -738,6 +759,24 @@ export function ConfiguracionLiquidacionesClient() {
                         {gi.label}
                       </SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Tipo de cálculo</label>
+                <Select
+                  value={nuevaRegla.tipo_calculo}
+                  onValueChange={(value) =>
+                    setNuevaRegla((prev) => ({ ...prev, tipo_calculo: value as 'hora' | 'turno' }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hora">Por hora</SelectItem>
+                    <SelectItem value="turno">Por turno (ej: repartidor)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

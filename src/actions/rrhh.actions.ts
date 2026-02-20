@@ -968,6 +968,7 @@ type GuardarReglaPuestoInput = {
   tarifa_turno_especial: number
   habilita_cajero: boolean
   tarifa_diferencia_cajero: number
+  tipo_calculo?: 'hora' | 'turno'
   activo?: boolean
 }
 
@@ -1490,6 +1491,7 @@ export async function guardarReglaPuestoAction(
       tarifa_turno_especial: payload.tarifa_turno_especial,
       habilita_cajero: payload.habilita_cajero,
       tarifa_diferencia_cajero: payload.tarifa_diferencia_cajero,
+      tipo_calculo: payload.tipo_calculo ?? 'hora',
       activo: payload.activo ?? true,
     }
 
@@ -1598,6 +1600,7 @@ export async function actualizarLiquidacionControlAction(
   liquidacionId: string,
   payload: {
     puesto_override?: string | null
+    puesto_hs_extra?: string | null
     dias_cajero?: number
     diferencia_turno_cajero?: number
     orden_pago?: number | null
@@ -1617,6 +1620,7 @@ export async function actualizarLiquidacionControlAction(
 
     const updatePayload: Record<string, unknown> = {
       puesto_override: payload.puesto_override ?? null,
+      puesto_hs_extra: payload.puesto_hs_extra ?? null,
       dias_cajero: payload.dias_cajero ?? 0,
       diferencia_turno_cajero: payload.diferencia_turno_cajero ?? 0,
       orden_pago: payload.orden_pago ?? null,

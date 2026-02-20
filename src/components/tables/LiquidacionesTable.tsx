@@ -52,26 +52,14 @@ const ESTADOS_OPTIONS = [
 ]
 
 export function LiquidacionesTable({ liquidaciones, onView, onEdit, onApprove, onPay }: LiquidacionesTableProps) {
-  const currentYear = new Date().getFullYear()
-  const [filtroAnio, setFiltroAnio] = useState<string>(currentYear.toString())
-  const [filtroMes, setFiltroMes] = useState<string>('todos')
   const [filtroEstado, setFiltroEstado] = useState<string>('todos')
-
-  const aniosDisponibles = useMemo(() => {
-    const set = new Set<number>()
-    liquidaciones.forEach((l) => set.add(l.periodo_anio))
-    set.add(currentYear)
-    return Array.from(set).sort((a, b) => b - a)
-  }, [liquidaciones, currentYear])
 
   const liquidacionesFiltradas = useMemo(() => {
     return liquidaciones.filter((l) => {
-      if (filtroAnio !== 'todos' && l.periodo_anio !== Number(filtroAnio)) return false
-      if (filtroMes !== 'todos' && l.periodo_mes !== Number(filtroMes)) return false
       if (filtroEstado !== 'todos' && l.estado !== filtroEstado) return false
       return true
     })
-  }, [liquidaciones, filtroAnio, filtroMes, filtroEstado])
+  }, [liquidaciones, filtroEstado])
 
   const getEstadoBadge = (estado: string) => {
     switch (estado) {
@@ -291,36 +279,8 @@ export function LiquidacionesTable({ liquidaciones, onView, onEdit, onApprove, o
 
   return (
     <div className="space-y-4">
-      {/* MM-1: Barra de filtros */}
+      {/* Filtro de estado (año/mes vienen del servidor via URL) */}
       <div className="flex flex-wrap items-center gap-3">
-        <Select value={filtroAnio} onValueChange={setFiltroAnio}>
-          <SelectTrigger className="w-[110px]">
-            <SelectValue placeholder="Año" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos</SelectItem>
-            {aniosDisponibles.map((anio) => (
-              <SelectItem key={anio} value={anio.toString()}>
-                {anio}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select value={filtroMes} onValueChange={setFiltroMes}>
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="Mes" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos los meses</SelectItem>
-            {MESES.map((mes) => (
-              <SelectItem key={mes.value} value={mes.value.toString()}>
-                {mes.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
         <Select value={filtroEstado} onValueChange={setFiltroEstado}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Estado" />

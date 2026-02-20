@@ -4,7 +4,7 @@ import { ArrowLeft, Check } from 'lucide-react'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import type { Liquidacion, LiquidacionJornada, AdelantoCuota } from '@/types/domain.types'
+import type { Liquidacion, LiquidacionJornada, AdelantoCuota, LiquidacionReglaPuesto } from '@/types/domain.types'
 import { LiquidacionDetalleClient } from './liquidacion-detalle-client'
 
 async function getLiquidacionDetalle(liquidacionId: string) {
@@ -61,10 +61,17 @@ async function getLiquidacionDetalle(liquidacionId: string) {
     .order('periodo_anio', { ascending: false })
     .order('periodo_mes', { ascending: false })
 
+  const { data: puestos } = await adminSupabase
+    .from('rrhh_liquidacion_reglas_puesto')
+    .select('puesto_codigo')
+    .eq('activo', true)
+    .order('puesto_codigo', { ascending: true })
+
   return {
     liquidacion: liquidacion as Liquidacion,
     jornadas: (jornadas || []) as LiquidacionJornada[],
     cuotas: (cuotas || []) as AdelantoCuota[],
+    puestosDisponibles: (puestos || []) as Pick<LiquidacionReglaPuesto, 'puesto_codigo'>[],
   }
 }
 
@@ -175,6 +182,7 @@ export default async function LiquidacionDetallePage({
         liquidacion={data.liquidacion}
         jornadas={data.jornadas}
         cuotas={data.cuotas}
+        puestosDisponibles={data.puestosDisponibles}
       />
     </div>
   )
