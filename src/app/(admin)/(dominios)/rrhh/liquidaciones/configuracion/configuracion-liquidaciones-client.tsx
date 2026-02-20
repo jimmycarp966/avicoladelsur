@@ -2,17 +2,21 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Loader2, RefreshCw, Save } from 'lucide-react'
+import { ArrowLeft, Building2, Loader2, Plus, RefreshCw, Save, Store, Users } from 'lucide-react'
 import {
   guardarReglaPeriodoAction,
   guardarReglaPuestoAction,
   obtenerConfiguracionLiquidacionAction,
 } from '@/actions/rrhh.actions'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useNotificationStore } from '@/store/notificationStore'
 import type { LiquidacionReglaPuesto } from '@/types/domain.types'
 
@@ -28,6 +32,7 @@ type ReglaPuestoEditable = {
   habilita_cajero: boolean
   tarifa_diferencia_cajero: number
   activo: boolean
+  _dirty?: boolean
 }
 
 type ReglaPeriodoEditable = {
@@ -79,8 +84,33 @@ function mapReglaPuesto(regla: LiquidacionReglaPuesto): ReglaPuestoEditable {
     habilita_cajero: !!regla.habilita_cajero,
     tarifa_diferencia_cajero: Number(regla.tarifa_diferencia_cajero || 0),
     activo: !!regla.activo,
+    _dirty: false,
   }
 }
+
+const GRUPO_INFO = {
+  galpon: {
+    label: 'Galpón',
+    description: 'Empleados de campo y producción',
+    icon: Building2,
+    colorClass: 'bg-orange-50 border-orange-200 text-orange-800',
+    iconClass: 'text-orange-600',
+  },
+  sucursales: {
+    label: 'Sucursales',
+    description: 'Personal de tiendas y puntos de venta',
+    icon: Store,
+    colorClass: 'bg-blue-50 border-blue-200 text-blue-800',
+    iconClass: 'text-blue-600',
+  },
+  rrhh: {
+    label: 'RRHH / Oficina',
+    description: 'Personal administrativo',
+    icon: Users,
+    colorClass: 'bg-green-50 border-green-200 text-green-800',
+    iconClass: 'text-green-600',
+  },
+} as const
 
 export function ConfiguracionLiquidacionesClient() {
   const { showToast } = useNotificationStore()
@@ -90,8 +120,9 @@ export function ConfiguracionLiquidacionesClient() {
   const [loading, setLoading] = useState(false)
   const [savingPeriodo, setSavingPeriodo] = useState(false)
   const [savingPuestoId, setSavingPuestoId] = useState<string | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
   const [reglaPeriodo, setReglaPeriodo] = useState<ReglaPeriodoEditable>(
-    defaultReglaPeriodo(now.getMonth() + 1, now.getFullYear())
+    defaultReglaPeriodo(now.getMonth() + 1, now.getFullYear()),
   )
   const [reglasPuesto, setReglasPuesto] = useState<ReglaPuestoEditable[]>([])
   const [nuevaRegla, setNuevaRegla] = useState<ReglaPuestoEditable>(defaultReglaPuesto())
@@ -143,6 +174,7 @@ export function ConfiguracionLiquidacionesClient() {
 
   useEffect(() => {
     void loadConfiguracion(periodoMes, periodoAnio)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [periodoMes, periodoAnio])
 
   const handleGuardarPeriodo = async () => {
@@ -194,6 +226,7 @@ export function ConfiguracionLiquidacionesClient() {
 
       if (!regla.id) {
         setNuevaRegla(defaultReglaPuesto())
+        setDialogOpen(false)
       }
 
       await loadConfiguracion(periodoMes, periodoAnio)
@@ -203,7 +236,9 @@ export function ConfiguracionLiquidacionesClient() {
   }
 
   const updateReglaPuesto = (index: number, patch: Partial<ReglaPuestoEditable>) => {
-    setReglasPuesto((prev) => prev.map((item, idx) => (idx === index ? { ...item, ...patch } : item)))
+    setReglasPuesto((prev) =>
+      prev.map((item, idx) => (idx === index ? { ...item, ...patch, _dirty: true } : item)),
+    )
   }
 
   return (
@@ -250,261 +285,372 @@ export function ConfiguracionLiquidacionesClient() {
         </div>
       </div>
 
+      {/* CFG-2: Regla de Período — mini-cards por grupo */}
       <Card>
         <CardHeader>
-          <CardTitle>Regla de Periodo</CardTitle>
-          <CardDescription>Dias base que se usan para el calculo mensual del periodo seleccionado.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="space-y-1">
-              <label className="text-sm">Dias base Galpon</label>
-              <Input
-                type="number"
-                min={1}
-                value={reglaPeriodo.dias_base_galpon}
-                onChange={(e) =>
-                  setReglaPeriodo((prev) => ({ ...prev, dias_base_galpon: Math.max(1, toNumber(e.target.value)) }))
-                }
-              />
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Regla de Período</CardTitle>
+              <CardDescription>
+                Días base utilizados para el cálculo mensual del período seleccionado.
+              </CardDescription>
             </div>
-            <div className="space-y-1">
-              <label className="text-sm">Dias base Sucursales</label>
-              <Input
-                type="number"
-                min={1}
-                value={reglaPeriodo.dias_base_sucursales}
-                onChange={(e) =>
-                  setReglaPeriodo((prev) => ({ ...prev, dias_base_sucursales: Math.max(1, toNumber(e.target.value)) }))
-                }
+            <div className="flex items-center gap-2">
+              <Switch
+                id="periodo-activo"
+                checked={reglaPeriodo.activo}
+                onCheckedChange={(value) => setReglaPeriodo((prev) => ({ ...prev, activo: value }))}
               />
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm">Dias base RRHH</label>
-              <Input
-                type="number"
-                min={1}
-                value={reglaPeriodo.dias_base_rrhh}
-                onChange={(e) =>
-                  setReglaPeriodo((prev) => ({ ...prev, dias_base_rrhh: Math.max(1, toNumber(e.target.value)) }))
-                }
-              />
+              <label htmlFor="periodo-activo" className="text-sm font-medium">
+                Activa
+              </label>
             </div>
           </div>
-
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="periodo-activo"
-              checked={reglaPeriodo.activo}
-              onCheckedChange={(value) => setReglaPeriodo((prev) => ({ ...prev, activo: !!value }))}
-            />
-            <label htmlFor="periodo-activo" className="text-sm">
-              Regla de periodo activa
-            </label>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {(
+              [
+                {
+                  key: 'dias_base_galpon' as const,
+                  grupo: 'galpon',
+                  value: reglaPeriodo.dias_base_galpon,
+                },
+                {
+                  key: 'dias_base_sucursales' as const,
+                  grupo: 'sucursales',
+                  value: reglaPeriodo.dias_base_sucursales,
+                },
+                {
+                  key: 'dias_base_rrhh' as const,
+                  grupo: 'rrhh',
+                  value: reglaPeriodo.dias_base_rrhh,
+                },
+              ] as const
+            ).map(({ key, grupo, value }) => {
+              const info = GRUPO_INFO[grupo]
+              const Icon = info.icon
+              return (
+                <div
+                  key={key}
+                  className={`rounded-lg border p-4 space-y-3 ${info.colorClass}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Icon className={`w-5 h-5 ${info.iconClass}`} />
+                    <span className="font-semibold text-sm">{info.label}</span>
+                  </div>
+                  <p className="text-xs opacity-75">{info.description}</p>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium">Días base</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={value}
+                      className="bg-white/80"
+                      onChange={(e) =>
+                        setReglaPeriodo((prev) => ({
+                          ...prev,
+                          [key]: Math.max(1, toNumber(e.target.value)),
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+              )
+            })}
           </div>
 
           <Button onClick={handleGuardarPeriodo} disabled={savingPeriodo}>
-            {savingPeriodo ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-            Guardar regla de periodo
+            {savingPeriodo ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Save className="w-4 h-4 mr-2" />
+            )}
+            Guardar regla de período
           </Button>
         </CardContent>
       </Card>
 
+      {/* CFG-1: Reglas por Puesto como tabla */}
       <Card>
         <CardHeader>
-          <CardTitle>Reglas por Puesto</CardTitle>
-          <CardDescription>
-            Define jornada laboral, tarifa de turno especial y parametros de cajero por puesto.
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Reglas por Puesto</CardTitle>
+              <CardDescription>
+                Define jornada laboral, tarifa de turno especial y parámetros de cajero por puesto.
+              </CardDescription>
+            </div>
+            {/* CFG-3: Botón nueva regla → Dialog */}
+            <Button onClick={() => setDialogOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Nueva Regla
+            </Button>
+          </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {reglasPuesto.length === 0 && !loading && (
-            <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-              No hay reglas de puesto cargadas.
+        <CardContent>
+          {reglasPuesto.length === 0 && !loading ? (
+            <div className="rounded-md border border-dashed p-6 text-sm text-muted-foreground text-center">
+              No hay reglas de puesto cargadas. Haga clic en &quot;Nueva Regla&quot; para agregar una.
+            </div>
+          ) : (
+            <div className="rounded-md border overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Puesto</TableHead>
+                    <TableHead>Grupo días</TableHead>
+                    <TableHead className="text-right">Hs jornada</TableHead>
+                    <TableHead className="text-right">Tarifa especial</TableHead>
+                    <TableHead>Cajero</TableHead>
+                    <TableHead className="text-right">Tarifa cajero</TableHead>
+                    <TableHead>Activo</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {reglasPuesto.map((regla, index) => {
+                    const rowSavingId = regla.id || ''
+                    const isSaving = savingPuestoId === rowSavingId
+
+                    return (
+                      <TableRow key={regla.id || `regla-${index}`}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              value={regla.puesto_codigo}
+                              className="h-8 w-28 text-sm"
+                              onChange={(e) =>
+                                updateReglaPuesto(index, { puesto_codigo: e.target.value })
+                              }
+                            />
+                            {/* CFG-4: badge "Sin guardar" */}
+                            {regla._dirty && (
+                              <Badge
+                                variant="outline"
+                                className="text-xs bg-yellow-50 text-yellow-700 border-yellow-200 whitespace-nowrap"
+                              >
+                                Sin guardar
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={regla.grupo_base_dias}
+                            onValueChange={(value) =>
+                              updateReglaPuesto(index, { grupo_base_dias: value as GrupoBaseDias })
+                            }
+                          >
+                            <SelectTrigger className="h-8 w-32 text-sm">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Object.entries(GRUPO_INFO).map(([key, gi]) => (
+                                <SelectItem key={key} value={key}>
+                                  {gi.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            value={regla.horas_jornada}
+                            className="h-8 w-20 text-sm text-right ml-auto"
+                            onChange={(e) =>
+                              updateReglaPuesto(index, {
+                                horas_jornada: Math.max(0, toNumber(e.target.value)),
+                              })
+                            }
+                          />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            value={regla.tarifa_turno_especial}
+                            className="h-8 w-24 text-sm text-right ml-auto"
+                            onChange={(e) =>
+                              updateReglaPuesto(index, {
+                                tarifa_turno_especial: Math.max(0, toNumber(e.target.value)),
+                              })
+                            }
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5">
+                            <Switch
+                              checked={regla.habilita_cajero}
+                              onCheckedChange={(v) => updateReglaPuesto(index, { habilita_cajero: v })}
+                            />
+                            {regla.habilita_cajero ? (
+                              <Badge
+                                variant="outline"
+                                className="text-xs bg-green-50 text-green-700 border-green-200"
+                              >
+                                Sí
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-xs">
+                                No
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {regla.habilita_cajero ? (
+                            <Input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              value={regla.tarifa_diferencia_cajero}
+                              className="h-8 w-24 text-sm text-right ml-auto"
+                              onChange={(e) =>
+                                updateReglaPuesto(index, {
+                                  tarifa_diferencia_cajero: Math.max(0, toNumber(e.target.value)),
+                                })
+                              }
+                            />
+                          ) : (
+                            <span className="text-muted-foreground text-sm">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Switch
+                            checked={regla.activo}
+                            onCheckedChange={(v) => updateReglaPuesto(index, { activo: v })}
+                          />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant={regla._dirty ? 'default' : 'outline'}
+                            onClick={() => handleGuardarPuesto(regla)}
+                            disabled={isSaving}
+                          >
+                            {isSaving ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Save className="w-4 h-4" />
+                            )}
+                            <span className="ml-1.5">Guardar</span>
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
             </div>
           )}
-
-          {reglasPuesto.map((regla, index) => {
-            const rowSavingId = regla.id || ''
-            const isSaving = savingPuestoId === rowSavingId
-
-            return (
-              <div key={regla.id || `regla-${index}`} className="rounded-md border p-3 space-y-3">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-xs">Puesto codigo</label>
-                    <Input
-                      value={regla.puesto_codigo}
-                      onChange={(e) => updateReglaPuesto(index, { puesto_codigo: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs">Grupo base dias</label>
-                    <Select
-                      value={regla.grupo_base_dias}
-                      onValueChange={(value) => updateReglaPuesto(index, { grupo_base_dias: value as GrupoBaseDias })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="galpon">Galpon</SelectItem>
-                        <SelectItem value="sucursales">Sucursales</SelectItem>
-                        <SelectItem value="rrhh">RRHH</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs">Horas jornada</label>
-                    <Input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={regla.horas_jornada}
-                      onChange={(e) => updateReglaPuesto(index, { horas_jornada: Math.max(0, toNumber(e.target.value)) })}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs">Tarifa turno especial</label>
-                    <Input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={regla.tarifa_turno_especial}
-                      onChange={(e) =>
-                        updateReglaPuesto(index, { tarifa_turno_especial: Math.max(0, toNumber(e.target.value)) })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs">Tarifa diferencia cajero</label>
-                    <Input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={regla.tarifa_diferencia_cajero}
-                      onChange={(e) =>
-                        updateReglaPuesto(index, { tarifa_diferencia_cajero: Math.max(0, toNumber(e.target.value)) })
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id={`habilita-cajero-${regla.id || index}`}
-                      checked={regla.habilita_cajero}
-                      onCheckedChange={(value) => updateReglaPuesto(index, { habilita_cajero: !!value })}
-                    />
-                    <label htmlFor={`habilita-cajero-${regla.id || index}`} className="text-xs">
-                      Habilita cajero
-                    </label>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id={`activo-${regla.id || index}`}
-                      checked={regla.activo}
-                      onCheckedChange={(value) => updateReglaPuesto(index, { activo: !!value })}
-                    />
-                    <label htmlFor={`activo-${regla.id || index}`} className="text-xs">
-                      Activo
-                    </label>
-                  </div>
-
-                  <Button size="sm" onClick={() => handleGuardarPuesto(regla)} disabled={isSaving}>
-                    {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                    Guardar
-                  </Button>
-                </div>
-              </div>
-            )
-          })}
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Nueva Regla de Puesto</CardTitle>
-          <CardDescription>Agrega un nuevo puesto para controlar jornada y extras desde RRHH.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <div className="space-y-1">
-              <label className="text-xs">Puesto codigo</label>
-              <Input
-                value={nuevaRegla.puesto_codigo}
-                onChange={(e) => setNuevaRegla((prev) => ({ ...prev, puesto_codigo: e.target.value }))}
-                placeholder="ej: limpieza"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs">Grupo base dias</label>
-              <Select
-                value={nuevaRegla.grupo_base_dias}
-                onValueChange={(value) => setNuevaRegla((prev) => ({ ...prev, grupo_base_dias: value as GrupoBaseDias }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="galpon">Galpon</SelectItem>
-                  <SelectItem value="sucursales">Sucursales</SelectItem>
-                  <SelectItem value="rrhh">RRHH</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs">Horas jornada</label>
-              <Input
-                type="number"
-                min={0}
-                step="0.01"
-                value={nuevaRegla.horas_jornada}
-                onChange={(e) => setNuevaRegla((prev) => ({ ...prev, horas_jornada: Math.max(0, toNumber(e.target.value)) }))}
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs">Tarifa turno especial</label>
-              <Input
-                type="number"
-                min={0}
-                step="0.01"
-                value={nuevaRegla.tarifa_turno_especial}
-                onChange={(e) =>
-                  setNuevaRegla((prev) => ({ ...prev, tarifa_turno_especial: Math.max(0, toNumber(e.target.value)) }))
-                }
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs">Tarifa diferencia cajero</label>
-              <Input
-                type="number"
-                min={0}
-                step="0.01"
-                value={nuevaRegla.tarifa_diferencia_cajero}
-                onChange={(e) =>
-                  setNuevaRegla((prev) => ({
-                    ...prev,
-                    tarifa_diferencia_cajero: Math.max(0, toNumber(e.target.value)),
-                  }))
-                }
-              />
-            </div>
-          </div>
+      {/* CFG-3: Dialog para nueva regla de puesto */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Nueva Regla de Puesto</DialogTitle>
+          </DialogHeader>
 
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Checkbox
+          <div className="space-y-4 pt-2">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1 col-span-2">
+                <label className="text-sm font-medium">Código de puesto</label>
+                <Input
+                  value={nuevaRegla.puesto_codigo}
+                  onChange={(e) => setNuevaRegla((prev) => ({ ...prev, puesto_codigo: e.target.value }))}
+                  placeholder="ej: limpieza, deposito, admin"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Grupo base días</label>
+                <Select
+                  value={nuevaRegla.grupo_base_dias}
+                  onValueChange={(value) =>
+                    setNuevaRegla((prev) => ({ ...prev, grupo_base_dias: value as GrupoBaseDias }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(GRUPO_INFO).map(([key, gi]) => (
+                      <SelectItem key={key} value={key}>
+                        {gi.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Horas jornada</label>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={nuevaRegla.horas_jornada}
+                  onChange={(e) =>
+                    setNuevaRegla((prev) => ({
+                      ...prev,
+                      horas_jornada: Math.max(0, toNumber(e.target.value)),
+                    }))
+                  }
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Tarifa turno especial</label>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={nuevaRegla.tarifa_turno_especial}
+                  onChange={(e) =>
+                    setNuevaRegla((prev) => ({
+                      ...prev,
+                      tarifa_turno_especial: Math.max(0, toNumber(e.target.value)),
+                    }))
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 p-3 border rounded-md">
+              <Switch
                 id="nueva-habilita-cajero"
                 checked={nuevaRegla.habilita_cajero}
-                onCheckedChange={(value) => setNuevaRegla((prev) => ({ ...prev, habilita_cajero: !!value }))}
+                onCheckedChange={(v) => setNuevaRegla((prev) => ({ ...prev, habilita_cajero: v }))}
               />
-              <label htmlFor="nueva-habilita-cajero" className="text-xs">
-                Habilita cajero
+              <label htmlFor="nueva-habilita-cajero" className="text-sm font-medium">
+                Habilita modalidad cajero
               </label>
             </div>
+
+            {nuevaRegla.habilita_cajero && (
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Tarifa diferencia cajero</label>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={nuevaRegla.tarifa_diferencia_cajero}
+                  onChange={(e) =>
+                    setNuevaRegla((prev) => ({
+                      ...prev,
+                      tarifa_diferencia_cajero: Math.max(0, toNumber(e.target.value)),
+                    }))
+                  }
+                />
+              </div>
+            )}
 
             <div className="flex items-center gap-2">
               <Checkbox
@@ -512,23 +658,34 @@ export function ConfiguracionLiquidacionesClient() {
                 checked={nuevaRegla.activo}
                 onCheckedChange={(value) => setNuevaRegla((prev) => ({ ...prev, activo: !!value }))}
               />
-              <label htmlFor="nueva-activa" className="text-xs">
-                Activa
+              <label htmlFor="nueva-activa" className="text-sm">
+                Regla activa
               </label>
             </div>
 
-            <Button onClick={() => handleGuardarPuesto(nuevaRegla)} disabled={savingPuestoId === `nuevo-${nuevaRegla.puesto_codigo}`}>
-              {savingPuestoId === `nuevo-${nuevaRegla.puesto_codigo}` ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Save className="w-4 h-4 mr-2" />
-              )}
-              Guardar nuevo puesto
-            </Button>
+            <div className="flex gap-2 pt-2">
+              <Button
+                onClick={() => handleGuardarPuesto(nuevaRegla)}
+                disabled={
+                  savingPuestoId === `nuevo-${nuevaRegla.puesto_codigo}` ||
+                  !nuevaRegla.puesto_codigo.trim()
+                }
+                className="flex-1"
+              >
+                {savingPuestoId === `nuevo-${nuevaRegla.puesto_codigo}` ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4 mr-2" />
+                )}
+                Guardar nueva regla
+              </Button>
+              <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                Cancelar
+              </Button>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
-

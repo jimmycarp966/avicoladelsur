@@ -28,6 +28,12 @@ interface CalcularLiquidacionesFormProps {
   initialEmpleados: Empleado[]
 }
 
+type ProgressState = {
+  actual: number
+  total: number
+  nombreActual: string
+} | null
+
 function toPositiveNumber(value: string): number {
   const parsed = Number(value)
   if (!Number.isFinite(parsed) || parsed < 0) return 0
@@ -39,6 +45,7 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
   const { showToast } = useNotificationStore()
 
   const [isLoading, setIsLoading] = useState(false)
+  const [progress, setProgress] = useState<ProgressState>(null)
   const [empleados, setEmpleados] = useState<EmpleadoSeleccionado[]>(
     () =>
       initialEmpleados.map((emp) => ({
@@ -49,7 +56,7 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
           turno_especial_unidades: 0,
           observaciones: '',
         },
-      }))
+      })),
   )
   const [mes, setMes] = useState(new Date().getMonth() + 1)
   const [anio, setAnio] = useState(new Date().getFullYear())
@@ -63,20 +70,19 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
   }
 
   const handleSelectEmpleado = (empleadoId: string, checked: boolean) => {
-    setEmpleados((prev) =>
-      prev.map((emp) => (emp.id === empleadoId ? { ...emp, selected: checked } : emp))
-    )
-
-    const updatedEmpleados = empleados.map((emp) =>
-      emp.id === empleadoId ? { ...emp, selected: checked } : emp
-    )
-    setSelectAll(updatedEmpleados.every((emp) => emp.selected))
+    setEmpleados((prev) => {
+      const next = prev.map((emp) =>
+        emp.id === empleadoId ? { ...emp, selected: checked } : emp,
+      )
+      setSelectAll(next.every((emp) => emp.selected))
+      return next
+    })
   }
 
   const handleAjusteManual = (
     empleadoId: string,
     field: 'horas_adicionales' | 'turno_especial_unidades' | 'observaciones',
-    value: string
+    value: string,
   ) => {
     setEmpleados((prev) =>
       prev.map((emp) => {
@@ -96,7 +102,18 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
             [field]: toPositiveNumber(value),
           },
         }
-      })
+      }),
+    )
+  }
+
+  const getNombreEmpleado = (empleado: EmpleadoSeleccionado) => {
+    const nombreUsuario = `${empleado.usuario?.nombre || ''} ${empleado.usuario?.apellido || ''}`.trim()
+    const nombreEmpleado = `${empleado.nombre || ''} ${empleado.apellido || ''}`.trim()
+    return (
+      nombreUsuario ||
+      nombreEmpleado ||
+      empleado.usuario?.email ||
+      (empleado.legajo ? `Empleado ${empleado.legajo}` : 'Sin nombre')
     )
   }
 
@@ -112,13 +129,23 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
       let errorCount = 0
       const liquidacionIds: string[] = []
 
-      for (const empleado of empleadosSeleccionados) {
+      for (let i = 0; i < empleadosSeleccionados.length; i++) {
+        const empleado = empleadosSeleccionados[i]
+        const nombreCompleto = getNombreEmpleado(empleado)
+
+        // MM-4: Actualizar progreso por empleado
+        setProgress({
+          actual: i + 1,
+          total: empleadosSeleccionados.length,
+          nombreActual: nombreCompleto,
+        })
+
         try {
           const result = await calcularLiquidacionConAjustesAction(
             empleado.id,
             mes,
             anio,
-            empleado.ajuste_manual
+            empleado.ajuste_manual,
           )
 
           if (result.success && result.data?.liquidacionId) {
@@ -126,19 +153,19 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
             liquidacionIds.push(result.data.liquidacionId)
           } else {
             errorCount++
-            console.error(`Error calculando liquidacion para ${empleado.usuario?.nombre}:`, result.error)
           }
-        } catch (error) {
+        } catch {
           errorCount++
-          console.error(`Error procesando empleado ${empleado.id}:`, error)
         }
       }
+
+      setProgress(null)
 
       if (successCount > 0) {
         showToast(
           'success',
           `Se calcularon ${successCount} liquidaciones exitosamente${errorCount > 0 ? ` (${errorCount} errores)` : ''}`,
-          'Calculo completado'
+          'Calculo completado',
         )
 
         if (successCount === 1 && liquidacionIds.length === 1) {
@@ -151,8 +178,8 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
       } else {
         showToast('error', 'No se pudo calcular ninguna liquidacion', 'Error en el calculo')
       }
-    } catch (error) {
-      console.error('Error en handleCalcular:', error)
+    } catch {
+      setProgress(null)
       showToast('error', 'Ha ocurrido un error inesperado al calcular las liquidaciones', 'Error inesperado')
     } finally {
       setIsLoading(false)
@@ -175,6 +202,8 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
   ]
   const anios = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i)
 
+  const progressPct = progress ? Math.round((progress.actual / progress.total) * 100) : 0
+
   return (
     <div className="max-w-6xl mx-auto">
       <div className="mb-6">
@@ -194,7 +223,9 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
                 <div className="w-2 h-2 bg-blue-500 rounded-full" />
                 Periodo de Liquidacion
               </CardTitle>
-              <CardDescription>Selecciona el mes y anio para calcular las liquidaciones</CardDescription>
+              <CardDescription>
+                Selecciona el mes y año para calcular las liquidaciones
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -214,7 +245,7 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Anio</label>
+                <label className="text-sm font-medium">Año</label>
                 <Select value={anio.toString()} onValueChange={(value) => setAnio(Number(value))}>
                   <SelectTrigger>
                     <SelectValue />
@@ -245,18 +276,44 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
                 Calcular Liquidaciones
               </CardTitle>
               <CardDescription>
-                Se calcularan las liquidaciones para el periodo {meses.find((m) => m.value === mes)?.label} {anio}
+                Se calcularán las liquidaciones para{' '}
+                {meses.find((m) => m.value === mes)?.label} {anio}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {empleadosSeleccionados.length === 0 && (
                 <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <AlertCircle className="w-4 h-4 text-yellow-600" />
-                  <span className="text-sm text-yellow-800">Selecciona al menos un empleado para continuar</span>
+                  <AlertCircle className="w-4 h-4 text-yellow-600 shrink-0" />
+                  <span className="text-sm text-yellow-800">
+                    Selecciona al menos un empleado para continuar
+                  </span>
                 </div>
               )}
 
-              <Button onClick={handleCalcular} disabled={isLoading || empleadosSeleccionados.length === 0} className="w-full">
+              {/* MM-4: Barra de progreso durante el cálculo */}
+              {progress && (
+                <div className="space-y-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex justify-between text-sm text-blue-800">
+                    <span className="font-medium">
+                      Calculando {progress.actual} de {progress.total}
+                    </span>
+                    <span className="font-semibold">{progressPct}%</span>
+                  </div>
+                  <div className="w-full bg-blue-200 rounded-full h-2">
+                    <div
+                      className="h-2 rounded-full bg-blue-500 transition-all duration-300"
+                      style={{ width: `${progressPct}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-blue-700 truncate">{progress.nombreActual}</p>
+                </div>
+              )}
+
+              <Button
+                onClick={handleCalcular}
+                disabled={isLoading || empleadosSeleccionados.length === 0}
+                className="w-full"
+              >
                 {isLoading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -282,7 +339,9 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
                     <Users className="w-5 h-5 text-blue-600" />
                     Empleados Activos
                   </CardTitle>
-                  <CardDescription>Selecciona los empleados para calcular sus liquidaciones</CardDescription>
+                  <CardDescription>
+                    Selecciona los empleados para calcular sus liquidaciones
+                  </CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
                   <Checkbox id="select-all" checked={selectAll} onCheckedChange={handleSelectAll} />
@@ -295,26 +354,26 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
             <CardContent>
               <div className="space-y-3 max-h-[38rem] overflow-y-auto pr-1">
                 {empleados.map((empleado) => {
-                  const nombreUsuario = `${empleado.usuario?.nombre || ''} ${empleado.usuario?.apellido || ''}`.trim()
-                  const nombreEmpleado = `${empleado.nombre || ''} ${empleado.apellido || ''}`.trim()
-                  const nombreCompleto =
-                    nombreUsuario ||
-                    nombreEmpleado ||
-                    empleado.usuario?.email ||
-                    (empleado.legajo ? `Empleado ${empleado.legajo}` : 'Sin nombre')
+                  const nombreCompleto = getNombreEmpleado(empleado)
 
                   return (
-                    <div key={empleado.id} className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
+                    <div
+                      key={empleado.id}
+                      className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50"
+                    >
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
                           <Checkbox
                             checked={empleado.selected}
-                            onCheckedChange={(checked) => handleSelectEmpleado(empleado.id, checked as boolean)}
+                            onCheckedChange={(checked) =>
+                              handleSelectEmpleado(empleado.id, checked as boolean)
+                            }
                           />
                           <div>
                             <div className="font-medium">{nombreCompleto}</div>
                             <div className="text-sm text-muted-foreground">
-                              Legajo: {empleado.legajo || 'Sin asignar'} - Sucursal: {empleado.sucursal?.nombre || 'Sin asignar'}
+                              Legajo: {empleado.legajo || 'Sin asignar'} — Sucursal:{' '}
+                              {empleado.sucursal?.nombre || 'Sin asignar'}
                             </div>
                           </div>
                         </div>
@@ -325,13 +384,17 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
                               empleado.categoria?.sueldo_basico.toLocaleString() ||
                               '0'}
                           </div>
-                          <div className="text-xs text-muted-foreground">{empleado.categoria?.nombre || 'Sin categoria'}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {empleado.categoria?.nombre || 'Sin categoria'}
+                          </div>
                         </div>
                       </div>
 
                       {empleado.selected && (
                         <div className="mt-3 rounded-md border bg-white p-3 space-y-3">
-                          <div className="text-xs font-medium text-muted-foreground">Ajuste manual opcional RRHH</div>
+                          <div className="text-xs font-medium text-muted-foreground">
+                            Ajuste manual opcional RRHH
+                          </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div className="space-y-1">
                               <label className="text-xs">Horas adicionales manuales</label>
@@ -340,7 +403,9 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
                                 min={0}
                                 step="0.01"
                                 value={empleado.ajuste_manual.horas_adicionales}
-                                onChange={(e) => handleAjusteManual(empleado.id, 'horas_adicionales', e.target.value)}
+                                onChange={(e) =>
+                                  handleAjusteManual(empleado.id, 'horas_adicionales', e.target.value)
+                                }
                               />
                             </div>
                             <div className="space-y-1">
@@ -350,7 +415,13 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
                                 min={0}
                                 step="0.01"
                                 value={empleado.ajuste_manual.turno_especial_unidades}
-                                onChange={(e) => handleAjusteManual(empleado.id, 'turno_especial_unidades', e.target.value)}
+                                onChange={(e) =>
+                                  handleAjusteManual(
+                                    empleado.id,
+                                    'turno_especial_unidades',
+                                    e.target.value,
+                                  )
+                                }
                               />
                             </div>
                           </div>
@@ -359,7 +430,9 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
                             <Textarea
                               rows={2}
                               value={empleado.ajuste_manual.observaciones}
-                              onChange={(e) => handleAjusteManual(empleado.id, 'observaciones', e.target.value)}
+                              onChange={(e) =>
+                                handleAjusteManual(empleado.id, 'observaciones', e.target.value)
+                              }
                               placeholder="Opcional: motivo o detalle del ajuste manual"
                             />
                           </div>
@@ -369,7 +442,11 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
                   )
                 })}
 
-                {empleados.length === 0 && <div className="text-center py-8 text-muted-foreground">No hay empleados activos para mostrar</div>}
+                {empleados.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No hay empleados activos para mostrar
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -378,4 +455,3 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
     </div>
   )
 }
-

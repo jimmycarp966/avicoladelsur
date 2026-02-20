@@ -1658,23 +1658,21 @@ export async function actualizarLiquidacionControlAction(
 
 export async function aprobarLiquidacionAction(liquidacionId: string): Promise<ApiResponse<void>> {
   try {
-    const supabase = await createClient()
-    const adminSupabase = createAdminClient()
-
-    // Obtener el usuario actual
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) {
+    const adminUserId = await getAuthenticatedAdminUserId()
+    if (!adminUserId) {
       return {
         success: false,
-        error: 'Usuario no autenticado',
+        error: 'No autorizado',
       }
     }
+
+    const adminSupabase = createAdminClient()
 
     const { data, error } = await adminSupabase
       .from('rrhh_liquidaciones')
       .update({
         estado: 'aprobada',
-        aprobado_por: user.id,
+        aprobado_por: adminUserId,
         fecha_aprobacion: new Date().toISOString(),
       })
       .eq('id', liquidacionId)
