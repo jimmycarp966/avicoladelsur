@@ -691,7 +691,7 @@ export async function marcarAsistenciaAction(
       }
     }
 
-    revalidatePath('/rrhh/asistencia')
+    revalidatePath('/rrhh/horarios')
 
     return {
       success: true,
@@ -736,7 +736,7 @@ export async function actualizarAsistenciaAction(
       }
     }
 
-    revalidatePath('/rrhh/asistencia')
+    revalidatePath('/rrhh/horarios')
 
     return {
       success: true,

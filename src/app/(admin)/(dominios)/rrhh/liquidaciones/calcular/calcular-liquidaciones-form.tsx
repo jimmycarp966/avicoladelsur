@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, AlertCircle, Calculator, Loader2, Users } from 'lucide-react'
+import { AlertCircle, ArrowLeft, Calculator, ChevronDown, ChevronUp, Info, Loader2, Users } from 'lucide-react'
 import { calcularLiquidacionConAjustesAction } from '@/actions/rrhh.actions'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -46,6 +46,7 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
 
   const [isLoading, setIsLoading] = useState(false)
   const [progress, setProgress] = useState<ProgressState>(null)
+  const [instruccionesOpen, setInstruccionesOpen] = useState(false)
   const [empleados, setEmpleados] = useState<EmpleadoSeleccionado[]>(
     () =>
       initialEmpleados.map((emp) => ({
@@ -327,6 +328,94 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
                 )}
               </Button>
             </CardContent>
+          </Card>
+          <Card className="border-blue-200 bg-blue-50/50">
+            <CardHeader
+              className="cursor-pointer select-none pb-3"
+              onClick={() => setInstruccionesOpen((v) => !v)}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Info className="w-4 h-4 text-blue-600" />
+                  <CardTitle className="text-xs text-blue-800">¿Cómo se calcula?</CardTitle>
+                </div>
+                {instruccionesOpen ? (
+                  <ChevronUp className="w-4 h-4 text-blue-600" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-blue-600" />
+                )}
+              </div>
+            </CardHeader>
+
+            {instruccionesOpen && (
+              <CardContent className="pt-0 space-y-3 text-xs text-blue-900">
+                <div className="space-y-1">
+                  <p className="font-semibold">Fuente de datos</p>
+                  <p className="text-blue-800/80">
+                    El sistema lee los registros de asistencia del mes seleccionado (módulo Horarios).
+                    Solo considera días con estado <strong>Presente</strong> o <strong>Tarde</strong> que
+                    tengan horas cargadas.
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="font-semibold">Horas normales vs. adicionales</p>
+                  <div className="bg-white/60 rounded-md p-2 font-mono space-y-1 border border-blue-100">
+                    <p>hs_normales = MIN(hs_trabajadas, hs_jornada)</p>
+                    <p>hs_adicionales = MAX(hs_trabajadas − hs_jornada, 0)</p>
+                  </div>
+                  <p className="text-blue-800/80">
+                    La jornada se toma de la <strong>Regla de Puesto</strong> configurada para la
+                    categoría del empleado. Si no hay regla, usa 9 hs por defecto.
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="font-semibold">Montos</p>
+                  <div className="bg-white/60 rounded-md p-2 font-mono space-y-1 border border-blue-100">
+                    <p>valor_hora = sueldo ÷ días_base ÷ hs_jornada</p>
+                    <p>monto_normal = hs_normales × valor_hora</p>
+                    <p>monto_adicional = hs_adicionales × valor_hora</p>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="font-semibold">Descuentos automáticos</p>
+                  <ul className="list-disc list-inside text-blue-800/80 space-y-1">
+                    <li>
+                      <strong>Presentismo:</strong> si existe alguna falta sin aviso en el mes, se
+                      descuenta 1 jornal completo
+                    </li>
+                    <li>
+                      <strong>Adelantos:</strong> cuotas pendientes del período (dinero y mercadería)
+                      se descuentan del total
+                    </li>
+                    <li>
+                      <strong>Control 30%:</strong> si los adelantos superan el 30% del bruto, la
+                      planilla queda marcada como "superado" y requiere autorización
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="font-semibold">Ajuste manual</p>
+                  <p className="text-blue-800/80">
+                    Permite agregar horas adicionales o turnos especiales que no estén en la asistencia
+                    (ej: guardia puntual no registrada). Se suma al cálculo automático como una
+                    jornada extra de origen <em>manual</em>.
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="font-semibold">Recalcular</p>
+                  <p className="text-blue-800/80">
+                    Si ya existe una liquidación para el empleado en ese período, se
+                    <strong> actualiza</strong> (no se duplica). Podés calcular a mitad de mes y
+                    recalcular al cierre con la asistencia completa.
+                  </p>
+                </div>
+              </CardContent>
+            )}
           </Card>
         </div>
 

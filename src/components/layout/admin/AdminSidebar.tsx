@@ -179,7 +179,6 @@ const navigation = [
     children: [
       { name: 'Empleados', href: '/rrhh/empleados' },
       { name: 'Mensajes', href: '/rrhh/mensajes' },
-      { name: 'Asistencia', href: '/rrhh/asistencia' },
       { name: 'Horarios', href: '/rrhh/horarios' },
       { name: 'Liquidaciones', href: '/rrhh/liquidaciones' },
       { name: 'Adelantos', href: '/rrhh/adelantos' },

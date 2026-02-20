@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Building2, Loader2, Plus, RefreshCw, Save, Store, Users } from 'lucide-react'
+import { ArrowLeft, Building2, ChevronDown, ChevronUp, Info, Loader2, Plus, RefreshCw, Save, Store, Users } from 'lucide-react'
 import {
   guardarReglaPeriodoAction,
   guardarReglaPuestoAction,
@@ -124,6 +124,7 @@ const GRUPO_INFO = {
 export function ConfiguracionLiquidacionesClient() {
   const { showToast } = useNotificationStore()
   const now = useMemo(() => new Date(), [])
+  const [instruccionesOpen, setInstruccionesOpen] = useState(false)
   const [periodoMes, setPeriodoMes] = useState(now.getMonth() + 1)
   const [periodoAnio, setPeriodoAnio] = useState(now.getFullYear())
   const [loading, setLoading] = useState(false)
@@ -310,6 +311,82 @@ export function ConfiguracionLiquidacionesClient() {
           </Button>
         </div>
       </div>
+
+      {/* Panel de instrucciones colapsable */}
+      <Card className="border-blue-200 bg-blue-50/50">
+        <CardHeader
+          className="cursor-pointer select-none pb-3"
+          onClick={() => setInstruccionesOpen((v) => !v)}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Info className="w-4 h-4 text-blue-600" />
+              <CardTitle className="text-sm text-blue-800">¿Cómo funciona esta configuración?</CardTitle>
+            </div>
+            {instruccionesOpen ? (
+              <ChevronUp className="w-4 h-4 text-blue-600" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-blue-600" />
+            )}
+          </div>
+        </CardHeader>
+
+        {instruccionesOpen && (
+          <CardContent className="pt-0 space-y-4 text-sm text-blue-900">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <p className="font-semibold">Regla de Período</p>
+                <p className="text-blue-800/80">
+                  Define cuántos días hábiles tiene el mes según el grupo del empleado. Se usa para calcular
+                  el valor del jornal diario:
+                </p>
+                <div className="bg-white/60 rounded-md p-2 font-mono text-xs space-y-1 border border-blue-100">
+                  <p>valor_jornal = sueldo ÷ días_base</p>
+                  <p>valor_hora = valor_jornal ÷ horas_jornada</p>
+                </div>
+                <ul className="list-disc list-inside text-blue-800/80 space-y-1 text-xs">
+                  <li><strong>Galpón:</strong> empleados de producción y campo (ej: 27 días)</li>
+                  <li><strong>Sucursales:</strong> personal de tiendas (ej: 31 días)</li>
+                  <li><strong>RRHH / Oficina:</strong> administrativos (ej: 22 días hábiles)</li>
+                </ul>
+                <p className="text-xs text-blue-700">
+                  Si no existe regla para el período, el sistema usa los valores por defecto (27 / 31 / 22).
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <p className="font-semibold">Reglas por Puesto</p>
+                <p className="text-blue-800/80">
+                  Cada puesto define los parámetros de su jornada. El sistema empareja el puesto del
+                  empleado comparando en minúsculas la categoría del empleado con el código de puesto.
+                </p>
+                <ul className="list-disc list-inside text-blue-800/80 space-y-1 text-xs">
+                  <li>
+                    <strong>Grupo base días:</strong> determina qué días base usa para el jornal
+                  </li>
+                  <li>
+                    <strong>Horas jornada:</strong> tope diario de horas normales. Las horas que superen
+                    este tope se cuentan como adicionales y se pagan por separado
+                  </li>
+                  <li>
+                    <strong>Tarifa turno especial:</strong> monto fijo por unidad de turno especial
+                    registrado en la jornada
+                  </li>
+                  <li>
+                    <strong>Cajero:</strong> si está habilitado, permite cargar días como cajero en la
+                    planilla. El adicional se calcula como{' '}
+                    <span className="font-mono">días_cajero × tarifa_diferencia</span>
+                  </li>
+                </ul>
+                <p className="text-xs text-blue-700">
+                  El código de puesto debe coincidir (en minúsculas) con el nombre de categoría del
+                  empleado en RRHH. Usá el selector de categorías para evitar errores de tipeo.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        )}
+      </Card>
 
       {/* CFG-2: Regla de Período — mini-cards por grupo */}
       <Card>
