@@ -39,7 +39,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-inter);
+  --font-sans: var(--font-outfit);
 
   /* Colores principales */
   --color-primary: var(--primary);
@@ -95,7 +95,7 @@
 }
 
 :root {
-  --radius: 0.625rem;
+  --radius: 0.85rem;
 
   /* Colores de fondo - Profesional Corporativo */
   --background: #FAFAFA;
@@ -104,8 +104,8 @@
   /* Cards y superficies */
   --card: #ffffff;
   --card-foreground: #1F2937;
-  --card-border: rgba(0, 0, 0, 0.06);
-  --popover: #ffffff;
+  --card-border: rgba(0, 0, 0, 0.04);
+  --popover: rgba(255, 255, 255, 0.95);
   --popover-foreground: #1F2937;
 
   /* Primary - Verde oscuro de la página web */
@@ -318,20 +318,27 @@ body:has(.login-page) .login-page {
 
 .bg-gradient-header {
   background: #2F7058 !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12) !important;
+  box-shadow: 0 4px 20px -2px rgba(47, 112, 88, 0.15) !important;
 }
 
 .bg-gradient-sidebar {
-  background: #2F7058 !important;
-  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.08) !important;
+  background: linear-gradient(180deg, #2F7058 0%, #255a47 100%) !important;
+  box-shadow: 4px 0 24px -2px rgba(47, 112, 88, 0.2) !important;
 }
 
-/* Cards - Estilo Profesional Corporativo (base styles, hover handled by component) */
+/* Cards - Estilo Profesional Corporativo */
 [data-slot="card"] {
-  box-shadow: 0 2px 8px 0 rgba(0, 0, 0, 0.06),
-    0 1px 3px 0 rgba(0, 0, 0, 0.04) !important;
-  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.03),
+    0 2px 6px -1px rgba(0, 0, 0, 0.02) !important;
+  border: 1px solid rgba(0, 0, 0, 0.03) !important;
   background: #ffffff !important;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+[data-slot="card"]:hover {
+  box-shadow: 0 8px 24px -4px rgba(47, 112, 88, 0.08),
+    0 4px 12px -2px rgba(47, 112, 88, 0.04) !important;
+  transform: translateY(-2px);
 }
 
 /* Cards específicas del sistema */

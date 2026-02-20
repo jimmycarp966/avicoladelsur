@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { AdminSidebar } from './AdminSidebar'
 import { AdminHeader } from './AdminHeader'
+import { PageTransition } from '@/components/ui/page-transition'
 import { KeyboardShortcutsProvider } from '@/components/providers/KeyboardShortcutsProvider'
 import { cn } from '@/lib/utils'
 import type { Usuario } from '@/types/domain.types'
@@ -32,7 +33,7 @@ export function AdminLayout({ children, user }: AdminLayoutProps) {
         >
           {/* Overlay */}
           <div
-            className="fixed inset-0 bg-black/25"
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
             onClick={() => setSidebarOpen(false)}
           />
 
@@ -49,9 +50,11 @@ export function AdminLayout({ children, user }: AdminLayoutProps) {
             onMenuClick={() => setSidebarOpen(true)}
           />
 
-          <main className="py-4 sm:py-6 lg:py-10">
-            <div className="px-3 sm:px-4 md:px-6 lg:px-8">
-              {children}
+          <main className="py-4 sm:py-6 lg:py-10 h-full">
+            <div className="px-3 sm:px-4 md:px-6 lg:px-8 h-full">
+              <PageTransition>
+                {children}
+              </PageTransition>
             </div>
           </main>
         </div>

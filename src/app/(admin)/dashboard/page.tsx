@@ -11,6 +11,7 @@ import {
   ProductosPorCategoriaChart,
   EntregasPorDiaChart,
 } from '@/components/charts'
+import { FadeInStagger } from '@/components/ui/fade-in-stagger'
 import {
   Package,
   ShoppingCart,
@@ -28,9 +29,11 @@ import Link from 'next/link'
 import { obtenerMetricasEficienciaRutasAction } from '@/actions/dashboard.actions'
 import { IAWidgetsContainer } from '@/components/dashboard/IAWidgetsContainer'
 
+export const dynamic = 'force-dynamic'
+
 export const revalidate = 30 // Revalida cada 30 segundos
 
-export default async function AdminDashboard() {
+export default async function DashboardPage() {
   const user = await getCurrentUser()
 
   // Obtener métricas reales de la base de datos
@@ -242,8 +245,8 @@ export default async function AdminDashboard() {
               />
             ) : (
               <div className="space-y-4">
-                {recentActivity.map((activity) => (
-                  <div key={activity.id} className="flex items-center space-x-4">
+                {recentActivity.map((activity, index) => (
+                  <FadeInStagger key={activity.id} index={index} className="flex items-center space-x-4">
                     <div className="flex-shrink-0">
                       {activity.type === 'pedido' && (
                         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-info/10">
@@ -272,7 +275,7 @@ export default async function AdminDashboard() {
                       </p>
                       <p className="text-sm text-gray-500">{activity.time}</p>
                     </div>
-                  </div>
+                  </FadeInStagger>
                 ))}
               </div>
             )}

@@ -5,24 +5,21 @@ import {
     TrendingUp,
     TrendingDown,
     Minus,
-    CheckCircle2,
-    AlertTriangle,
-    XCircle,
-    Info,
     LucideIcon
 } from 'lucide-react'
+import { ClientCountUp } from './client-countup'
 
 const statCardVariants = cva(
-    'relative flex flex-col gap-3 rounded-2xl border p-6 transition-all duration-300 hover:shadow-xl hover:-translate-y-1',
+    'relative flex flex-col gap-3 rounded-2xl border p-6 transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_8px_30px_rgb(0,0,0,0.12)] bg-card overflow-hidden group',
     {
         variants: {
             variant: {
-                default: 'bg-card border-border/60 shadow-lg',
-                success: 'bg-gradient-to-br from-success/5 to-success/10 border-success/20 shadow-success/10',
-                warning: 'bg-gradient-to-br from-warning/10 to-warning/20 border-warning/30 shadow-warning/10',
-                danger: 'bg-gradient-to-br from-destructive/5 to-destructive/10 border-destructive/20 shadow-destructive/10',
-                info: 'bg-gradient-to-br from-info/5 to-info/10 border-info/20 shadow-info/10',
-                primary: 'bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20 shadow-primary/10',
+                default: 'border-border/60 shadow-lg hover:border-border',
+                success: 'border-success/20 shadow-success/10 hover:border-success/40 hover:shadow-success/20',
+                warning: 'border-warning/30 shadow-warning/10 hover:border-warning/50 hover:shadow-warning/20',
+                danger: 'border-destructive/20 shadow-destructive/10 hover:border-destructive/40 hover:shadow-destructive/20',
+                info: 'border-info/20 shadow-info/10 hover:border-info/40 hover:shadow-info/20',
+                primary: 'border-primary/20 shadow-primary/10 hover:border-primary/40 hover:shadow-primary/20 bg-gradient-to-br from-card to-primary/5',
             },
         },
         defaultVariants: {
@@ -98,7 +95,13 @@ function StatCard({
                     <p className="text-sm font-medium text-muted-foreground">{title}</p>
                     <div className="flex items-baseline gap-2">
                         <div className="text-3xl font-bold tracking-tight text-foreground">
-                            {value}
+                            {typeof value === 'number' ? (
+                                <ClientCountUp end={value} separator="," duration={2} />
+                            ) : typeof value === 'string' && !isNaN(Number(value)) ? (
+                                <ClientCountUp end={Number(value)} separator="," duration={2} />
+                            ) : (
+                                value
+                            )}
                         </div>
                         {trend && (
                             <div className={cn('flex items-center gap-0.5 text-sm font-medium', trendColor)}>
@@ -127,6 +130,9 @@ function StatCard({
                     {action}
                 </div>
             )}
+
+            {/* Efecto Glow en la esquina superior derecha */}
+            <div className="absolute -top-12 -right-12 h-32 w-32 rounded-full bg-gradient-to-br from-current/10 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 blur-2xl" />
         </div>
     )
 }

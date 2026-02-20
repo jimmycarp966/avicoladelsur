@@ -642,6 +642,7 @@ export function POSSucursal({
                             producto.stockDisponible <= 0 ||
                             cargandoPrecio === producto.id
                           }
+                          className="rounded-full w-8 h-8 p-0 bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg transition-all hover:scale-105 active:scale-95"
                         >
                           <Plus className="w-4 h-4" />
                         </Button>
@@ -701,7 +702,8 @@ export function POSSucursal({
 
 
         {/* Carrito */}
-        <Card>
+        <Card className="border-primary/20 shadow-xl bg-gradient-to-br from-white to-primary/5 dark:from-background dark:to-primary/10 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
               <ShoppingCart className="w-5 h-5" />
@@ -726,7 +728,7 @@ export function POSSucursal({
                     return (
                       <div
                         key={item.productoId}
-                        className="border rounded-lg p-3 space-y-2"
+                        className="bg-white/60 dark:bg-black/20 backdrop-blur-md border border-white/40 dark:border-white/10 rounded-xl p-3 space-y-2 shadow-sm transition-all hover:shadow-md"
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex-1 min-w-0">

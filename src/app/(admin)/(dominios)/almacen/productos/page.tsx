@@ -8,6 +8,8 @@ import { StatCard } from '@/components/ui/stat-card'
 import { ProductosTableSkeleton } from './productos-table-skeleton'
 import { ProductosTableWrapper } from './productos-table-wrapper'
 
+export const dynamic = 'force-dynamic'
+
 export const revalidate = 120 // Revalida cada 2 minutos
 
 export const metadata = {

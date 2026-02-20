@@ -111,7 +111,7 @@ export default function NavigationInteractivo({
         console.log('[NavigationInteractivo] 🔍 DEBUG calcularProximoCliente iniciado')
         console.log('[NavigationInteractivo] 🔍 DEBUG posicionActual:', posicionActual)
         console.log('[NavigationInteractivo] 🔍 DEBUG clientesPendientes.length:', clientesPendientes.length)
-        
+
         if (!posicionActual || clientesPendientes.length === 0) {
             console.log('[NavigationInteractivo] 🔍 DEBUG: No hay posición o clientes pendientes, retornando')
             return
@@ -170,7 +170,7 @@ export default function NavigationInteractivo({
         console.log('[NavigationInteractivo] 🔍 DEBUG obtenerRutasAlternativas iniciado')
         console.log('[NavigationInteractivo] 🔍 DEBUG cliente:', cliente)
         console.log('[NavigationInteractivo] 🔍 DEBUG posicionActual:', posicionActual)
-        
+
         if (!posicionActual) {
             console.log('[NavigationInteractivo] 🔍 DEBUG: No hay posicionActual, retornando')
             return
@@ -270,14 +270,14 @@ export default function NavigationInteractivo({
     // Render según fase
     if (fase === 'error') {
         return (
-            <div className="fixed inset-0 z-50 bg-background flex items-center justify-center p-4">
-                <Card className="max-w-md w-full">
-                    <CardContent className="pt-6 text-center">
-                        <AlertCircle className="h-16 w-16 text-destructive mx-auto mb-4" />
-                        <p className="text-destructive mb-4">{error}</p>
-                        <div className="flex gap-2 justify-center">
-                            <Button variant="outline" onClick={onClose}>Cerrar</Button>
-                            <Button onClick={() => {
+            <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
+                <Card className="max-w-md w-full shadow-2xl border-destructive/20 bg-white/95 dark:bg-background/95">
+                    <CardContent className="pt-8 pb-8 text-center">
+                        <AlertCircle className="h-20 w-20 text-destructive mx-auto mb-6 animate-pulse" />
+                        <p className="text-destructive font-medium text-lg mb-6">{error}</p>
+                        <div className="flex gap-3 justify-center">
+                            <Button variant="outline" size="lg" className="w-32 h-12" onClick={onClose}>Cerrar</Button>
+                            <Button size="lg" className="w-32 h-12 shadow-md active:scale-95 transition-all" onClick={() => {
                                 setError(null)
                                 setFase('calculando')
                             }}>
@@ -292,13 +292,17 @@ export default function NavigationInteractivo({
 
     if (fase === 'completado') {
         return (
-            <div className="fixed inset-0 z-50 bg-background flex items-center justify-center p-4">
-                <Card className="max-w-md w-full">
-                    <CardContent className="pt-6 text-center">
-                        <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto mb-4" />
-                        <p className="text-xl font-bold mb-2">¡Ruta Completada!</p>
-                        <p className="text-muted-foreground mb-4">Has completado todas las entregas.</p>
-                        <Button onClick={onClose}>Cerrar Navegación</Button>
+            <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
+                <Card className="max-w-md w-full shadow-2xl border-primary/20 bg-white/95 dark:bg-background/95">
+                    <CardContent className="pt-8 pb-8 text-center">
+                        <div className="p-4 bg-green-100 dark:bg-green-900/30 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <CheckCircle2 className="h-14 w-14 text-green-600 dark:text-green-400" />
+                        </div>
+                        <p className="text-2xl font-bold mb-3 text-foreground">¡Ruta Completada!</p>
+                        <p className="text-muted-foreground mb-8 text-lg">Has completado todas las entregas.</p>
+                        <Button size="lg" className="w-full h-14 text-lg font-bold shadow-lg shadow-primary/20 active:scale-95 transition-all" onClick={onClose}>
+                            Cerrar Navegación
+                        </Button>
                     </CardContent>
                 </Card>
             </div>
@@ -307,12 +311,12 @@ export default function NavigationInteractivo({
 
     if (fase === 'calculando') {
         return (
-            <div className="fixed inset-0 z-50 bg-background flex items-center justify-center">
-                <div className="text-center">
-                    <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
-                    <p className="text-lg font-medium">Calculando próximo cliente...</p>
-                    <p className="text-sm text-muted-foreground mt-2">
-                        Analizando horarios y distancias
+            <div className="fixed inset-0 z-50 bg-background/90 backdrop-blur-sm flex items-center justify-center animate-in fade-in duration-300">
+                <div className="text-center bg-white/80 dark:bg-black/40 p-10 rounded-3xl shadow-2xl border border-white/20">
+                    <Loader2 className="h-16 w-16 animate-spin text-primary mx-auto mb-6 drop-shadow-lg" />
+                    <p className="text-xl font-bold text-foreground">Calculando destino óptimo...</p>
+                    <p className="text-base text-muted-foreground mt-3 font-medium">
+                        Analizando horarios de apertura y distancias
                     </p>
                 </div>
             </div>
@@ -347,7 +351,7 @@ export default function NavigationInteractivo({
         console.log('[NavigationInteractivo] 🔍 DEBUG: clienteSugerido:', clienteSugerido)
         console.log('[NavigationInteractivo] 🔍 DEBUG: posicionActual:', posicionActual)
         console.log('[NavigationInteractivo] 🔍 DEBUG: rutaSeleccionada:', rutaSeleccionada)
-        
+
         // Crear un stop temporal con los datos del cliente sugerido
         const stopActual: DeliveryStop = {
             id: clienteSugerido.id,

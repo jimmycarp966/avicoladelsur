@@ -459,7 +459,7 @@ export function PesajeItemCard({
 
   return (
     <>
-      <Card className={estaPesado ? "border-green-200 bg-green-50/50" : ""}>
+      <Card className={`transition-all duration-300 hover:shadow-md ${estaPesado ? 'border-green-300 bg-green-50/80 shadow-[0_0_15px_rgba(34,197,94,0.15)]' : 'border-border/50 shadow-sm hover:border-primary/30'}`}>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -669,7 +669,7 @@ export function PesajeItemCard({
                   type="button"
                   disabled={estaPesado || estaActualizando || isAnalyzing || !pesoInput || parseFloat(pesoInput) <= 0}
                   onClick={handleAplicarPesoConValidacion}
-                  className="flex-1 md:flex-none whitespace-nowrap"
+                  className={`flex-1 md:flex-none whitespace-nowrap transition-all duration-300 ${!estaPesado && pesoInput && parseFloat(pesoInput) > 0 ? 'bg-primary hover:bg-primary/90 shadow-lg hover:shadow-xl hover:-translate-y-0.5 scale-100 hover:scale-[1.02] text-primary-foreground font-semibold' : ''}`}
                 >
                   {isAnalyzing ? (
                     <>

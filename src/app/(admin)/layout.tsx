@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/actions/auth.actions'
 import { AdminLayout } from '@/components/layout/admin/AdminLayout'
 
+export const dynamic = 'force-dynamic'
+
 const allowedRoles = ['admin', 'vendedor', 'almacenista']
 
 export default async function AdminLayoutWrapper({

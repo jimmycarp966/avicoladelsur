@@ -35,11 +35,13 @@ import {
     Plus,
     Trash2,
     Settings,
-    Target,
-    Percent,
     AlertTriangle,
-    Save
+    Save,
+    Loader2,
+    Percent,
+    Target
 } from 'lucide-react'
+
 import Link from 'next/link'
 import { toast } from 'sonner'
 import {

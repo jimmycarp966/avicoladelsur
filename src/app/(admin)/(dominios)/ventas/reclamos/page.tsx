@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { ReclamosTableWrapper } from './reclamos-table-wrapper'
 import { ReclamosFiltros } from './reclamos-filtros'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata = {
   title: 'Reclamos | Avícola del Sur',
   description: 'Gestión de reclamos de clientes',

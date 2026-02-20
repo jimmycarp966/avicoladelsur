@@ -242,60 +242,49 @@ function NavigationItem({ item, pathname, user, onClose, badges }: NavigationIte
   }
 
   return (
-    <div>
+    <div className="space-y-1">
       <Link
         href={item.href}
         onClick={handleMainClick}
         className={cn(
-          'group relative flex items-center rounded-lg px-4 py-3 text-sm font-medium transition-all duration-200',
+          "group relative flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
           isActive
-            ? 'bg-[#FCDE8D] text-[#2F7058] shadow-md'
-            : 'text-white hover:bg-white/10 hover:text-white'
+            ? "bg-white/10 text-white shadow-sm ring-1 ring-white/20"
+            : "text-white/70 hover:bg-white/5 hover:text-white"
         )}
       >
-        {/* Barra lateral amarillo/crema para item activo */}
-        {isActive && (
-          <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#FCDE8D] rounded-r-full"></div>
-        )}
-        <item.icon
-          className={cn(
-            'mr-3 h-5 w-5 flex-shrink-0 transition-all duration-200',
-            isActive ? 'text-[#2F7058]' : 'text-white/80 group-hover:text-white'
-          )}
-        />
-        <span className={cn(isActive && 'font-semibold', 'flex-1')}>{item.name}</span>
+        <div className="flex items-center gap-3">
+          <item.icon className={cn(
+            "h-5 w-5 shrink-0 transition-colors duration-200",
+            isActive ? "text-white" : "text-white/50 group-hover:text-white/80"
+          )} />
+          <span>{item.name}</span>
+        </div>
+
         {badgeCount > 0 && (
-          <Badge
-            variant="destructive"
-            className="ml-2 h-5 px-1.5 text-xs bg-red-500 hover:bg-red-600"
-          >
-            {badgeCount > 99 ? '99+' : badgeCount}
+          <Badge variant="destructive" className="ml-2 h-5 flex items-center justify-center rounded-full px-1.5 text-xs font-bold animate-pulse">
+            {badgeCount}
           </Badge>
         )}
       </Link>
 
-      {/* Submenú */}
-      {item.children && isActive && (
-        <div className="mt-2 ml-4 space-y-1 border-l-2 border-white/20 pl-4 animate-in fade-in slide-in-from-top-2 duration-200">
-          {item.children.map((child) => {
-            const childIsActive = pathname === child.href
-            const ChildIcon = child.icon
+      {hasChildren && isActive && (
+        <div className="pl-10 pr-3 py-1 space-y-1 animate-in slide-in-from-top-2 duration-200">
+          {item.children!.map((child) => {
+            const isChildActive = pathname === child.href
             return (
               <Link
-                key={child.href}
+                key={child.name}
                 href={child.href}
-                onClick={onClose}
+                onClick={() => onClose?.()}
                 className={cn(
-                  'group relative flex items-center rounded-lg py-2 px-3 text-sm font-medium transition-all duration-200 gap-2',
-                  childIsActive
-                    ? 'bg-white/15 text-white font-semibold'
-                    : 'text-white/70 hover:bg-white/10 hover:text-white'
+                  "relative flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-all duration-200",
+                  isChildActive
+                    ? "text-[#FCDE8D] font-medium"
+                    : "text-white/60 hover:text-white hover:bg-white/5"
                 )}
               >
-                {/* Icono del hijo si existe */}
-                {ChildIcon && <ChildIcon className="h-4 w-4" />}
-                {/* Punto amarillo/crema para submenu activo */}
-                {childIsActive && (
+                {isChildActive && (
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-[#FCDE8D] rounded-full -ml-6"></div>
                 )}
                 <span>{child.name}</span>

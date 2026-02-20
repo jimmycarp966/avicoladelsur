@@ -150,7 +150,7 @@ export function DataTable<TData, TValue>({
                   const rowData = row.original as any
                   // Intentar obtener el ID del objeto
                   let idToCopy = rowData.id
-                  
+
                   // Si no existe 'id', buscar campos que terminen en '_id'
                   if (!idToCopy) {
                     const idFields = Object.keys(rowData).filter(key => key.endsWith('_id'))
@@ -158,7 +158,7 @@ export function DataTable<TData, TValue>({
                       idToCopy = rowData[idFields[0]]
                     }
                   }
-                  
+
                   // Si aún no hay ID, buscar cualquier UUID en el objeto
                   if (!idToCopy) {
                     const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -169,12 +169,12 @@ export function DataTable<TData, TValue>({
                       }
                     }
                   }
-                  
+
                   // Si no se encuentra ningún ID, usar el primer valor del objeto
                   if (!idToCopy) {
                     idToCopy = Object.values(rowData)[0] || 'N/A'
                   }
-                  
+
                   navigator.clipboard.writeText(String(idToCopy))
                 }}
               >
@@ -284,7 +284,7 @@ export function DataTable<TData, TValue>({
               {table.getRowModel().rows.map((row) => (
                 <div
                   key={row.id}
-                  className={`p-4 space-y-3 ${onRowClick ? 'cursor-pointer hover:bg-muted/50' : ''}`}
+                  className={`p-4 space-y-3 transition-colors duration-200 ${onRowClick ? 'cursor-pointer hover:bg-primary/5 rounded-lg' : ''}`}
                   onClick={() => onRowClick?.(row.original)}
                 >
                   {row.getVisibleCells().map((cell, index) => {
@@ -373,9 +373,9 @@ export function DataTable<TData, TValue>({
                         {header.isPlaceholder
                           ? null
                           : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )}
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
                       </TableHead>
                     )
                   })}
@@ -388,7 +388,7 @@ export function DataTable<TData, TValue>({
                   <TableRow
                     key={row.id}
                     data-state={row.getIsSelected() && 'selected'}
-                    className={onRowClick ? 'cursor-pointer hover:bg-muted/50' : ''}
+                    className={onRowClick ? 'cursor-pointer hover:bg-primary/5 transition-colors duration-200' : 'hover:bg-muted/30 transition-colors duration-200'}
                     onClick={() => onRowClick?.(row.original)}
                   >
                     {row.getVisibleCells().map((cell) => (

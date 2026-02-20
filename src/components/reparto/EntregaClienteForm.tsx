@@ -180,9 +180,9 @@ export function EntregaClienteForm({ entrega, rutaId }: EntregaClienteFormProps)
   return (
     <div className="space-y-6">
       {/* Información del cliente */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+      <Card className="shadow-md border-primary/10 bg-white/95 dark:bg-background/95 backdrop-blur-sm">
+        <CardHeader className="bg-primary/5 pb-4 border-b">
+          <CardTitle className="flex items-center gap-2 text-primary">
             <User className="h-5 w-5" />
             Entrega #{entrega.orden_entrega}
           </CardTitle>
@@ -253,15 +253,17 @@ export function EntregaClienteForm({ entrega, rutaId }: EntregaClienteFormProps)
 
           {/* Navegación */}
           {cliente?.coordenadas && (
-            <Button variant="outline" size="sm" className="w-full" asChild>
-              <Link
-                href={`https://www.google.com/maps/dir/?api=1&destination=${cliente.coordenadas.lat},${cliente.coordenadas.lng}`}
-                target="_blank"
-              >
-                <Navigation className="mr-2 h-4 w-4" />
-                Abrir en Google Maps
-              </Link>
-            </Button>
+            <div className="pt-2">
+              <Button variant="default" size="lg" className="w-full h-12 text-base font-semibold shadow-md active:scale-[0.98] transition-all bg-blue-600 hover:bg-blue-700 text-white" asChild>
+                <Link
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${cliente.coordenadas.lat},${cliente.coordenadas.lng}`}
+                  target="_blank"
+                >
+                  <Navigation className="mr-2 h-5 w-5" />
+                  Navegar en Google Maps
+                </Link>
+              </Button>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -352,16 +354,16 @@ export function EntregaClienteForm({ entrega, rutaId }: EntregaClienteFormProps)
                 />
               </div>
 
-              <Button type="submit" disabled={pagoLoading} className="w-full">
+              <Button type="submit" disabled={pagoLoading} className="w-full h-12 text-base font-medium shadow-md active:scale-[0.98] transition-all">
                 {pagoLoading ? (
                   <>
-                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                    Guardando...
+                    <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
+                    Registrando...
                   </>
                 ) : (
                   <>
-                    <DollarSign className="mr-2 h-4 w-4" />
-                    Registrar cobro
+                    <DollarSign className="mr-2 h-5 w-5" />
+                    Confirmar Cobro
                   </>
                 )}
               </Button>
@@ -394,16 +396,16 @@ export function EntregaClienteForm({ entrega, rutaId }: EntregaClienteFormProps)
           )}
 
           {puedeEditar && (
-            <div className="flex gap-2">
+            <div className="flex gap-3 pt-2">
               <Button
                 onClick={handleMarcarEntregado}
                 disabled={estadoLoading}
-                className="flex-1 bg-green-600 hover:bg-green-700"
+                className="flex-1 h-14 bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-600/20 active:scale-95 transition-all text-base font-bold"
               >
                 {estadoLoading ? (
-                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
                 ) : (
-                  <CheckCircle className="mr-2 h-4 w-4" />
+                  <CheckCircle className="mr-2 h-5 w-5" />
                 )}
                 Entregado
               </Button>
@@ -411,12 +413,12 @@ export function EntregaClienteForm({ entrega, rutaId }: EntregaClienteFormProps)
                 onClick={handleMarcarFallido}
                 disabled={estadoLoading}
                 variant="destructive"
-                className="flex-1"
+                className="flex-1 h-14 shadow-lg shadow-red-600/20 active:scale-95 transition-all text-base font-bold"
               >
                 {estadoLoading ? (
-                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
                 ) : (
-                  <XCircle className="mr-2 h-4 w-4" />
+                  <XCircle className="mr-2 h-5 w-5" />
                 )}
                 Fallido
               </Button>
