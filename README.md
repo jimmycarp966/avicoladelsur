@@ -413,6 +413,10 @@ scripts/                         # Scripts de automatización
 - **Gestión de empleados**: CRUD completo con datos personales, laborales y bancarios
 - **Control de asistencia**: Registro diario con reglas críticas (1 falta sin aviso = pérdida presentismo + jornal)
 - **Liquidaciones automáticas**: Cálculo mensual con horas extras, producción y descuentos
+- **Configuración de liquidaciones**: Nueva sección `/rrhh/liquidaciones/configuracion` para definir días base por período y parámetros por puesto (jornada, turno especial y cajero)
+- **Ajustes manuales RRHH**: En `/rrhh/liquidaciones/calcular` se pueden cargar horas adicionales y turnos especiales manuales por empleado al momento del cálculo
+- **Planilla de liquidación robusta**: Corrección de acceso en `/rrhh/liquidaciones/[id]` para evitar 404 falsos por diferencias de permisos
+- **Fuente unificada de empleados en formularios RRHH**: Evaluaciones, licencias, asistencia y adelantos consumen la misma acción server-side que `/rrhh/empleados`
 - **Adelantos controlados**: Gestión de adelantos en dinero/productos con límite automático del 30% del sueldo básico
 - **Licencias y descansos**: Gestión de vacaciones, enfermedad, maternidad, estudio
 - **Evaluaciones de desempeño**: Sistema por sucursal con 5 criterios (escala 1-5). **Huella Digital Operativa** implementada: panel automático que sugiere puntajes basados en datos reales de asistencia, ventas y responsabilidad.
@@ -1677,6 +1681,7 @@ BOTPRESS_WEBHOOK_URL=https://your-botpress-webhook
 | [🤖 docs/IA_CAPABILITIES.md](./docs/IA_CAPABILITIES.md) | Inventario operativo de capacidades IA, estrategias y rutas canónicas |
 | [🗃️ SUPABASE_SETUP.md](./SUPABASE_SETUP.md) | Configuración de la base de datos Supabase |
 | [👔 RRHH_README.md](./RRHH_README.md) | Documentación del módulo de Recursos Humanos |
+| [🆕 docs/RRHH_ACTUALIZACIONES_2026-02.md](./docs/RRHH_ACTUALIZACIONES_2026-02.md) | Registro de cambios operativos recientes del módulo RRHH |
 | [🔑 credenciales.md](./credenciales.md) | Credenciales de acceso para testing |
 
 ---

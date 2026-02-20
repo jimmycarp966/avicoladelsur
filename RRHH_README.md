@@ -238,3 +238,26 @@ RRHH
 El módulo RRHH está **100% implementado y listo para producción**, siguiendo todas las reglas de negocio especificadas y manteniendo la consistencia con la arquitectura del ERP Avícola del Sur.
 
 **¡Listo para gestionar todo el personal de manera eficiente y automatizada!** 🎯
+
+## Actualizaciones operativas 2026-02-20
+
+Se documentan ajustes recientes para mejorar consistencia y soporte del modulo RRHH:
+
+- Fuente unica de empleados en formularios RRHH:
+  - Evaluaciones: `/rrhh/evaluaciones/nueva`
+  - Licencias: `/rrhh/licencias/nueva`
+  - Asistencia: `/rrhh/asistencia/marcar`
+  - Adelantos: `/rrhh/adelantos/nuevo`
+  - Todos consumen `obtenerEmpleadosActivosAction`, igual que `/rrhh/empleados`.
+- Fuente unificada de sucursales activas en evaluaciones con `obtenerSucursalesActivasAction`.
+- Correccion de acceso en detalle de liquidacion (`/rrhh/liquidaciones/[id]`) para evitar 404 falsos por RLS.
+- Nueva seccion de parametros de liquidacion en `/rrhh/liquidaciones/configuracion`:
+  - reglas por periodo (`rrhh_liquidacion_reglas_periodo`)
+  - reglas por puesto (`rrhh_liquidacion_reglas_puesto`)
+- Ajustes manuales al calcular liquidaciones (`/rrhh/liquidaciones/calcular`):
+  - horas adicionales
+  - turnos especiales
+  - observaciones de RRHH
+- Mejora de tabla de liquidaciones para identificar mejor al empleado (nombre -> email -> "Sin nombre").
+
+Referencia extendida: ver `docs/RRHH_ACTUALIZACIONES_2026-02.md`.
