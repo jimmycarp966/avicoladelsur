@@ -24,9 +24,8 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { licenciaSchema, type LicenciaFormData } from '@/lib/schemas/rrhh.schema'
-import { crearLicenciaAction } from '@/actions/rrhh.actions'
+import { crearLicenciaAction, obtenerEmpleadosActivosAction } from '@/actions/rrhh.actions'
 import { useNotificationStore } from '@/store/notificationStore'
-import { createClient } from '@/lib/supabase/client'
 import type { Empleado } from '@/types/domain.types'
 
 export function NuevaLicenciaForm() {
@@ -68,23 +67,16 @@ export function NuevaLicenciaForm() {
 
   useEffect(() => {
     const loadEmpleados = async () => {
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('rrhh_empleados')
-        .select(`
-          *,
-          usuario:usuarios(id, nombre, apellido, email),
-          sucursal:sucursales(id, nombre),
-          categoria:rrhh_categorias(id, nombre)
-        `)
-        .eq('activo', true)
-        .order('created_at')
-
-      if (data) setEmpleados(data)
+      const result = await obtenerEmpleadosActivosAction()
+      if (result.success) {
+        setEmpleados((result.data || []) as Empleado[])
+      } else {
+        showToast('error', result.error || 'No se pudieron cargar empleados', 'Error')
+      }
     }
 
     void loadEmpleados()
-  }, [])
+  }, [showToast])
 
   const empleadoSeleccionado = empleados.find((e) => e.id === watch('empleado_id'))
 
@@ -405,4 +397,3 @@ export function NuevaLicenciaForm() {
     </div>
   )
 }
-

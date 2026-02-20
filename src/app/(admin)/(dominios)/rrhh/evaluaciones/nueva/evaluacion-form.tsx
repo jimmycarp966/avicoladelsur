@@ -15,10 +15,13 @@ import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, Loader2, Save, Star, User, Building } from 'lucide-react'
 import Link from 'next/link'
 import { evaluacionSchema, type EvaluacionFormData } from '@/lib/schemas/rrhh.schema'
-import { crearEvaluacionAction } from '@/actions/rrhh.actions'
+import {
+  crearEvaluacionAction,
+  obtenerEmpleadosActivosAction,
+  obtenerSucursalesActivasAction,
+} from '@/actions/rrhh.actions'
 import { MetricasSoportePanel } from '@/components/rrhh/MetricasSoportePanel'
 import { useNotificationStore } from '@/store/notificationStore'
-import { createClient } from '@/lib/supabase/client'
 import type { Empleado, Sucursal } from '@/types/domain.types'
 
 interface EvaluacionCriteria {
@@ -93,38 +96,26 @@ export function NuevaEvaluacionForm() {
   // Cargar datos de referencia
   useEffect(() => {
     const loadReferenceData = async () => {
-      const supabase = createClient()
+      const [empleadosResult, sucursalesResult] = await Promise.all([
+        obtenerEmpleadosActivosAction(),
+        obtenerSucursalesActivasAction(),
+      ])
 
-      // Cargar empleados activos
-      const { data: empleadosData } = await supabase
-        .from('rrhh_empleados')
-        .select(`
-          *,
-          usuario:usuarios(id, nombre, apellido, email),
-          sucursal:sucursales(id, nombre),
-          categoria:rrhh_categorias(id, nombre)
-        `)
-        .eq('activo', true)
-        .order('created_at')
-
-      if (empleadosData) {
-        setEmpleados(empleadosData)
+      if (empleadosResult.success) {
+        setEmpleados((empleadosResult.data || []) as Empleado[])
+      } else {
+        showToast('error', empleadosResult.error || 'No se pudieron cargar empleados', 'Error')
       }
 
-      // Cargar sucursales activas
-      const { data: sucursalesData } = await supabase
-        .from('sucursales')
-        .select('*')
-        .eq('active', true)
-        .order('nombre')
-
-      if (sucursalesData) {
-        setSucursales(sucursalesData)
+      if (sucursalesResult.success) {
+        setSucursales((sucursalesResult.data || []) as Sucursal[])
+      } else {
+        showToast('error', sucursalesResult.error || 'No se pudieron cargar sucursales', 'Error')
       }
     }
 
-    loadReferenceData()
-  }, [])
+    void loadReferenceData()
+  }, [showToast])
 
   const onSubmit = async (data: EvaluacionFormData) => {
     try {

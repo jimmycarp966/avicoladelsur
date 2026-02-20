@@ -421,8 +421,26 @@ export async function eliminarEmpleadoAction(empleadoId: string): Promise<ApiRes
 export async function obtenerEmpleadosActivosAction(): Promise<ApiResponse<Empleado[]>> {
   try {
     const supabase = await createClient()
+    const adminSupabase = createAdminClient()
 
-    const { data, error } = await supabase
+    const { data: authResult, error: authError } = await supabase.auth.getUser()
+    if (authError || !authResult.user) {
+      return {
+        success: false,
+        error: 'Usuario no autenticado',
+      }
+    }
+
+    const { data: userData } = await supabase
+      .from('usuarios')
+      .select('rol, activo')
+      .eq('id', authResult.user.id)
+      .maybeSingle()
+
+    const isAdmin = !!userData?.activo && userData.rol === 'admin'
+    const db = isAdmin ? adminSupabase : supabase
+
+    const { data, error } = await db
       .from('rrhh_empleados')
       .select(`
         *,
@@ -2603,9 +2621,27 @@ export async function obtenerSucursalesActivasAction(): Promise<ApiResponse<Arra
 }>>> {
   try {
     const supabase = await createClient()
+    const adminSupabase = createAdminClient()
+
+    const { data: authResult, error: authError } = await supabase.auth.getUser()
+    if (authError || !authResult.user) {
+      return {
+        success: false,
+        error: 'Usuario no autenticado',
+      }
+    }
+
+    const { data: userData } = await supabase
+      .from('usuarios')
+      .select('rol, activo')
+      .eq('id', authResult.user.id)
+      .maybeSingle()
+
+    const isAdmin = !!userData?.activo && userData.rol === 'admin'
+    const db = isAdmin ? adminSupabase : supabase
 
     // Intentar con 'activo' primero (esquema RRHH)
-    let { data: sucursales, error } = await supabase
+    let { data: sucursales, error } = await db
       .from('sucursales')
       .select('id, nombre, direccion, telefono, activo')
       .eq('activo', true)
@@ -2613,7 +2649,7 @@ export async function obtenerSucursalesActivasAction(): Promise<ApiResponse<Arra
 
     // Si falla con 'activo', intentar con 'active' (esquema sucursales)
     if (error) {
-      const { data: sucursalesAlt, error: errorAlt } = await supabase
+      const { data: sucursalesAlt, error: errorAlt } = await db
         .from('sucursales')
         .select('id, nombre, direccion, telefono, active')
         .eq('active', true)

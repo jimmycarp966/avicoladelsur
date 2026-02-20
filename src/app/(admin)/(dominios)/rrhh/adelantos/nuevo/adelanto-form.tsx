@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowLeft, Loader2, Save, DollarSign, Package } from 'lucide-react'
 import Link from 'next/link'
 import { adelantoSchema, type AdelantoFormData } from '@/lib/schemas/rrhh.schema'
-import { crearAdelantoAction } from '@/actions/rrhh.actions'
+import { crearAdelantoAction, obtenerEmpleadosActivosAction } from '@/actions/rrhh.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 import { createClient } from '@/lib/supabase/client'
 import type { Empleado, Producto } from '@/types/domain.types'
@@ -43,38 +43,37 @@ export function NuevoAdelantoForm() {
 
   // Cargar datos de referencia
   useEffect(() => {
-    const loadReferenceData = async () => {
-      const supabase = createClient()
-
-      // Cargar empleados activos
-      const { data: empleadosData } = await supabase
-        .from('rrhh_empleados')
-        .select(`
-          *,
-          usuario:usuarios(id, nombre, apellido, email)
-        `)
-        .eq('activo', true)
-        .order('legajo')
-
-      if (empleadosData) {
-        setEmpleados(empleadosData as Empleado[])
-      }
-
-      // Cargar productos activos (solo si el tipo es producto)
-      if (tipoSeleccionado === 'producto') {
-        const { data: productosData } = await supabase
-          .from('productos')
-          .select('*')
-          .eq('activo', true)
-          .order('nombre')
-
-        if (productosData) {
-          setProductos(productosData as Producto[])
-        }
+    const loadEmpleados = async () => {
+      const result = await obtenerEmpleadosActivosAction()
+      if (result.success) {
+        setEmpleados((result.data || []) as Empleado[])
+      } else {
+        showToast('error', result.error || 'No se pudieron cargar empleados', 'Error')
       }
     }
 
-    loadReferenceData()
+    void loadEmpleados()
+  }, [showToast])
+
+  useEffect(() => {
+    const loadProductos = async () => {
+      if (tipoSeleccionado !== 'producto') {
+        return
+      }
+
+      const supabase = createClient()
+      const { data: productosData } = await supabase
+        .from('productos')
+        .select('*')
+        .eq('activo', true)
+        .order('nombre')
+
+      if (productosData) {
+        setProductos(productosData as Producto[])
+      }
+    }
+
+    void loadProductos()
   }, [tipoSeleccionado])
 
   // Resetear campos cuando cambia el tipo
