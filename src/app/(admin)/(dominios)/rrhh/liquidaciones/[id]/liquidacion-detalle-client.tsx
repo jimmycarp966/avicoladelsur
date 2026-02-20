@@ -410,6 +410,10 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
               </div>
               <div>
                 <Label>Puesto para horas extra</Label>
+                <p className="text-xs text-muted-foreground mb-1">
+                  Si el empleado hizo horas extra en otro rol (ej: almacenista cubriendo de repartidor),
+                  seleccionar ese puesto para que las horas adicionales se paguen a su tarifa.
+                </p>
                 <Select
                   value={control.puesto_hs_extra ?? 'mismo'}
                   onValueChange={(v) =>

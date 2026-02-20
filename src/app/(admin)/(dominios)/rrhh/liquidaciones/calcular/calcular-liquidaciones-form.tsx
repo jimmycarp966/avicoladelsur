@@ -359,10 +359,12 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
                 </div>
 
                 <div className="space-y-1">
-                  <p className="font-semibold">Horas normales vs. adicionales</p>
+                  <p className="font-semibold">Cálculo por hora (mayoría de puestos)</p>
                   <div className="bg-white/60 rounded-md p-2 font-mono space-y-1 border border-blue-100">
                     <p>hs_normales = MIN(hs_trabajadas, hs_jornada)</p>
                     <p>hs_adicionales = MAX(hs_trabajadas − hs_jornada, 0)</p>
+                    <p>valor_hora = sueldo ÷ días_base ÷ hs_jornada</p>
+                    <p>monto = hs_normales × valor_hora + hs_adicionales × valor_hora</p>
                   </div>
                   <p className="text-blue-800/80">
                     La jornada se toma de la <strong>Regla de Puesto</strong> configurada para la
@@ -371,12 +373,17 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
                 </div>
 
                 <div className="space-y-1">
-                  <p className="font-semibold">Montos</p>
+                  <p className="font-semibold">Cálculo por turno (ej: repartidores)</p>
                   <div className="bg-white/60 rounded-md p-2 font-mono space-y-1 border border-blue-100">
-                    <p>valor_hora = sueldo ÷ días_base ÷ hs_jornada</p>
-                    <p>monto_normal = hs_normales × valor_hora</p>
-                    <p>monto_adicional = hs_adicionales × valor_hora</p>
+                    <p>valor_jornal = sueldo ÷ días_base</p>
+                    <p>monto_dia = 1 × valor_jornal  (por cada día presente)</p>
+                    <p>sin horas adicionales</p>
                   </div>
+                  <p className="text-blue-800/80">
+                    Se activa cuando la Regla de Puesto tiene <strong>tipo de cálculo = Por turno</strong>.
+                    El reloj puede registrar entrada/salida pero el pago es siempre 1 jornal por día.
+                    Los turnos especiales (doble turno, cobertura) siguen usando la tarifa especial.
+                  </p>
                 </div>
 
                 <div className="space-y-1">

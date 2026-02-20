@@ -369,8 +369,14 @@ export function ConfiguracionLiquidacionesClient() {
                     <strong>Grupo base días:</strong> determina qué días base usa para el jornal
                   </li>
                   <li>
-                    <strong>Horas jornada:</strong> tope diario de horas normales. Las horas que superen
-                    este tope se cuentan como adicionales y se pagan por separado
+                    <strong>Tipo de cálculo:</strong>{' '}
+                    <em>Por hora</em> — paga horas reales con tope de jornada + adicionales.{' '}
+                    <em>Por turno</em> — paga 1 jornal completo por día presente, sin horas extra
+                    (usar para repartidores y puestos similares)
+                  </li>
+                  <li>
+                    <strong>Horas jornada:</strong> tope diario de horas normales (solo aplica a
+                    tipo <em>por hora</em>). Las horas que superen este tope se pagan por separado
                   </li>
                   <li>
                     <strong>Tarifa turno especial:</strong> monto fijo por unidad de turno especial
