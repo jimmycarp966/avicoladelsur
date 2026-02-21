@@ -959,6 +959,10 @@ type GuardarReglaPeriodoInput = {
   activo?: boolean
 }
 
+function getDaysInMonth(periodoMes: number, periodoAnio: number): number {
+  return new Date(periodoAnio, periodoMes, 0).getDate()
+}
+
 type GuardarReglaPuestoInput = {
   id?: string
   puesto_codigo: string
@@ -1399,12 +1403,14 @@ export async function guardarReglaPeriodoAction(
       }
     }
 
-    if (payload.dias_base_galpon <= 0 || payload.dias_base_sucursales <= 0 || payload.dias_base_rrhh <= 0) {
+    if (payload.dias_base_galpon <= 0 || payload.dias_base_rrhh <= 0) {
       return {
         success: false,
         error: 'Los días base deben ser mayores a cero',
       }
     }
+
+    const diasBaseSucursales = getDaysInMonth(payload.periodo_mes, payload.periodo_anio)
 
     const supabase = createAdminClient()
     const { data, error } = await supabase
@@ -1414,7 +1420,7 @@ export async function guardarReglaPeriodoAction(
           periodo_mes: payload.periodo_mes,
           periodo_anio: payload.periodo_anio,
           dias_base_galpon: payload.dias_base_galpon,
-          dias_base_sucursales: payload.dias_base_sucursales,
+          dias_base_sucursales: diasBaseSucursales,
           dias_base_rrhh: payload.dias_base_rrhh,
           activo: payload.activo ?? true,
         },

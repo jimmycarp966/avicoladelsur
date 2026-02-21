@@ -41,7 +41,7 @@ export function JornadaEditSheet({
         <SheetHeader>
           <SheetTitle>Editar Jornada</SheetTitle>
           <SheetDescription>
-            Turno general significa jornada normal del dia, sin clasificacion especial.
+            General es el turno habitual del dia cuando no aplica una clasificacion especial.
           </SheetDescription>
         </SheetHeader>
 
@@ -76,7 +76,7 @@ export function JornadaEditSheet({
                     <SelectItem value="otro">Otro (personalizado)</SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="text-[11px] text-muted-foreground">General = jornada normal del dia.</p>
+                <p className="text-[11px] text-muted-foreground">General = turno habitual del dia.</p>
                 {editingTurnoSelectValue === 'otro' && (
                   <Input
                     value={editingRow.turno || ''}
@@ -86,12 +86,13 @@ export function JornadaEditSheet({
                 )}
               </div>
               <div className="space-y-1">
-                <Label>Tarea</Label>
+                <Label>Puesto del dia</Label>
                 <Input
                   value={sanitizeTaskValue(editingRow.tarea)}
                   onChange={(e) => onUpdateRow({ tarea: e.target.value })}
-                  placeholder="Que tarea realizo"
+                  placeholder="Ej: caja, reposicion, reparto"
                 />
+                <p className="text-[11px] text-muted-foreground">Referencia del puesto cumplido ese dia.</p>
               </div>
             </div>
 

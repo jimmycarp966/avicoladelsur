@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -261,112 +262,7 @@ export function LiquidacionControlTab({
           </CardContent>
         </Card>
 
-        {/* Card 2: Ajustes manuales */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Ajustes manuales</CardTitle>
-            <CardDescription>Campos editables para ajustar la liquidacion antes de aprobar.</CardDescription>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FieldWithTooltip
-              label="Sobrescribir puesto"
-              tooltip="Si el empleado cambio de puesto este mes, seleccione el nuevo puesto aqui. Solo afecta esta liquidacion."
-            >
-              <Input
-                value={control.puesto_override}
-                onChange={(e) => setControl((p) => ({ ...p, puesto_override: e.target.value }))}
-              />
-            </FieldWithTooltip>
-
-            <FieldWithTooltip
-              label="Puesto para horas extra"
-              tooltip="Cuando el empleado hizo horas extra en otro rol (ej: almacenista cubriendo reparto), seleccionar ese puesto para que las horas adicionales se paguen a su tarifa."
-            >
-              <Select
-                value={control.puesto_hs_extra ?? 'mismo'}
-                onValueChange={(v) =>
-                  setControl((p) => ({ ...p, puesto_hs_extra: v === 'mismo' ? null : v }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Mismo puesto (por defecto)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="mismo">Mismo puesto (por defecto)</SelectItem>
-                  {puestosDisponibles.map((p) => (
-                    <SelectItem key={p.puesto_codigo} value={p.puesto_codigo}>
-                      {p.puesto_codigo}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FieldWithTooltip>
-
-            <FieldWithTooltip
-              label="Dias cajero"
-              tooltip="Cantidad de dias que trabajo como cajero para calcular el adicional por caja."
-            >
-              <Input
-                type="number"
-                step="0.01"
-                value={control.dias_cajero}
-                onChange={(e) => setControl((p) => ({ ...p, dias_cajero: toNum(e.target.value) }))}
-              />
-            </FieldWithTooltip>
-
-            <FieldWithTooltip
-              label="Diferencia turno cajero"
-              tooltip="Monto adicional por turno de caja. Se multiplica por los dias cajero."
-            >
-              <Input
-                type="number"
-                step="0.01"
-                value={control.diferencia_turno_cajero}
-                onChange={(e) =>
-                  setControl((p) => ({ ...p, diferencia_turno_cajero: toNum(e.target.value) }))
-                }
-              />
-            </FieldWithTooltip>
-
-            <FieldWithTooltip
-              label="Orden de pago"
-              tooltip="Numero secuencial para ordenar los pagos al momento de emitir."
-            >
-              <Input
-                type="number"
-                value={control.orden_pago}
-                onChange={(e) => setControl((p) => ({ ...p, orden_pago: toNum(e.target.value) }))}
-              />
-            </FieldWithTooltip>
-
-            <div className="space-y-1">
-              {/* observaciones no necesita tooltip */}
-            </div>
-
-            <div className="md:col-span-2 space-y-1">
-              <FieldWithTooltip
-                label="Observaciones"
-                tooltip="Notas internas sobre esta liquidacion. No se muestran al empleado."
-              >
-                <Textarea
-                  value={control.observaciones}
-                  onChange={(e) => setControl((p) => ({ ...p, observaciones: e.target.value }))}
-                />
-              </FieldWithTooltip>
-            </div>
-
-            <div className="md:col-span-2 flex gap-2 flex-wrap pt-1">
-              <Button onClick={handleSaveControl} disabled={loading}>
-                Guardar control
-              </Button>
-              <Button variant="outline" onClick={handleRecalcular} disabled={loading}>
-                Recalcular
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Card 3: Control 30% y Autorizacion */}
+        {/* Card 2: Control 30% y Autorizacion */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Control 30% y autorizacion</CardTitle>
@@ -448,7 +344,7 @@ export function LiquidacionControlTab({
           </CardContent>
         </Card>
 
-        {/* Card 4: Aprobar y pagar */}
+        {/* Card 3: Aprobar y pagar */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Aprobar y pagar</CardTitle>
@@ -479,6 +375,120 @@ export function LiquidacionControlTab({
             {payBlockedReason && (
               <p className="text-xs text-muted-foreground">{payBlockedReason}</p>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Card 4: Ajustes avanzados */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Ajustes avanzados</CardTitle>
+            <CardDescription>Opcional: ajustes tecnicos antes de aprobar.</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <Accordion type="single" collapsible className="w-full rounded-md border">
+              <AccordionItem value="advanced-controls" className="border-b-0 px-4">
+                <AccordionTrigger className="py-3 text-sm hover:no-underline">
+                  Editar ajustes manuales
+                </AccordionTrigger>
+                <AccordionContent className="pb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FieldWithTooltip
+                      label="Sobrescribir puesto"
+                      tooltip="Si el empleado cambio de puesto este mes, seleccione el nuevo puesto aqui. Solo afecta esta liquidacion."
+                    >
+                      <Input
+                        value={control.puesto_override}
+                        onChange={(e) => setControl((p) => ({ ...p, puesto_override: e.target.value }))}
+                      />
+                    </FieldWithTooltip>
+
+                    <FieldWithTooltip
+                      label="Puesto para horas extra"
+                      tooltip="Cuando el empleado hizo horas extra en otro rol (ej: almacenista cubriendo reparto), seleccionar ese puesto para que las horas adicionales se paguen a su tarifa."
+                    >
+                      <Select
+                        value={control.puesto_hs_extra ?? 'mismo'}
+                        onValueChange={(v) =>
+                          setControl((p) => ({ ...p, puesto_hs_extra: v === 'mismo' ? null : v }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Mismo puesto (por defecto)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="mismo">Mismo puesto (por defecto)</SelectItem>
+                          {puestosDisponibles.map((p) => (
+                            <SelectItem key={p.puesto_codigo} value={p.puesto_codigo}>
+                              {p.puesto_codigo}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FieldWithTooltip>
+
+                    <FieldWithTooltip
+                      label="Dias cajero"
+                      tooltip="Cantidad de dias que trabajo como cajero para calcular el adicional por caja."
+                    >
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={control.dias_cajero}
+                        onChange={(e) => setControl((p) => ({ ...p, dias_cajero: toNum(e.target.value) }))}
+                      />
+                    </FieldWithTooltip>
+
+                    <FieldWithTooltip
+                      label="Diferencia turno cajero"
+                      tooltip="Monto adicional por turno de caja. Se multiplica por los dias cajero."
+                    >
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={control.diferencia_turno_cajero}
+                        onChange={(e) =>
+                          setControl((p) => ({ ...p, diferencia_turno_cajero: toNum(e.target.value) }))
+                        }
+                      />
+                    </FieldWithTooltip>
+
+                    <FieldWithTooltip
+                      label="Orden de pago"
+                      tooltip="Numero secuencial para ordenar los pagos al momento de emitir."
+                    >
+                      <Input
+                        type="number"
+                        value={control.orden_pago}
+                        onChange={(e) => setControl((p) => ({ ...p, orden_pago: toNum(e.target.value) }))}
+                      />
+                    </FieldWithTooltip>
+
+                    <div className="space-y-1">{/* espacio para conservar grilla */}</div>
+
+                    <div className="md:col-span-2 space-y-1">
+                      <FieldWithTooltip
+                        label="Observaciones"
+                        tooltip="Notas internas sobre esta liquidacion. No se muestran al empleado."
+                      >
+                        <Textarea
+                          value={control.observaciones}
+                          onChange={(e) => setControl((p) => ({ ...p, observaciones: e.target.value }))}
+                        />
+                      </FieldWithTooltip>
+                    </div>
+
+                    <div className="md:col-span-2 flex gap-2 flex-wrap pt-1">
+                      <Button onClick={handleSaveControl} disabled={loading}>
+                        Guardar control
+                      </Button>
+                      <Button variant="outline" onClick={handleRecalcular} disabled={loading}>
+                        Recalcular
+                      </Button>
+                    </div>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </CardContent>
         </Card>
       </div>

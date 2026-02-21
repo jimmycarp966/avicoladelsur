@@ -209,7 +209,7 @@ export function LiquidacionJornadasTab({
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Detalle control hs</CardTitle>
+              <CardTitle>Detalle de jornadas</CardTitle>
               <CardDescription>
                 Haga clic en el icono de lapiz para editar una jornada. Cada guardado recalcula la liquidacion.
               </CardDescription>
@@ -254,7 +254,7 @@ export function LiquidacionJornadasTab({
               <div className="space-y-1">
                 <Label className="text-xs">Buscar</Label>
                 <Input
-                  placeholder="fecha, tarea, turno"
+                  placeholder="fecha, puesto, turno"
                   value={jornadaSearch}
                   onChange={(e) => setJornadaSearch(e.target.value)}
                 />
@@ -321,7 +321,7 @@ export function LiquidacionJornadasTab({
                 <TableRow>
                   <TableHead>Fecha</TableHead>
                   <TableHead>Turno</TableHead>
-                  <TableHead>Tarea</TableHead>
+                  <TableHead>Puesto del dia</TableHead>
                   <TableHead className="text-right">Hs Mens.</TableHead>
                   <TableHead className="text-right">Hs Adic.</TableHead>
                   <TableHead className="text-right">T. Especial</TableHead>
@@ -354,7 +354,7 @@ export function LiquidacionJornadasTab({
                       </TableCell>
                       <TableCell className="text-sm">{getTurnoLabel(row.turno)}</TableCell>
                       <TableCell className="text-sm max-w-[160px] truncate">
-                        {sanitizeTaskValue(row.tarea) || 'Sin tarea cargada'}
+                        {sanitizeTaskValue(row.tarea) || 'Sin puesto cargado'}
                       </TableCell>
                       <TableCell className="text-right text-sm tabular-nums">
                         {row.horas_mensuales ?? 0}

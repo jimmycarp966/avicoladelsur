@@ -1,7 +1,7 @@
 import type { LiquidacionJornada } from '@/types/domain.types'
 
 export const TURNO_OPTIONS = [
-  { value: 'general', label: 'General (jornada normal)' },
+  { value: 'general', label: 'General (turno habitual)' },
   { value: 'manana', label: 'Manana' },
   { value: 'tarde', label: 'Tarde' },
   { value: 'noche', label: 'Noche' },
@@ -9,7 +9,7 @@ export const TURNO_OPTIONS = [
   { value: 'domingo', label: 'Domingo' },
 ] as const
 
-export const TASK_TEMPLATES = ['Caja', 'Atencion al cliente', 'Reposicion', 'Reparto', 'Deposito', 'Limpieza'] as const
+export const TASK_TEMPLATES = ['Caja', 'Atencion al cliente', 'Reposicion', 'Reparto', 'Deposito', 'Encargado'] as const
 
 const TURNO_VALUE_SET = new Set<string>(TURNO_OPTIONS.map((opt) => opt.value))
 
@@ -41,7 +41,7 @@ export function getTurnoLabel(value?: string | null): string {
   if (!normalized) return 'General'
   const option = TURNO_OPTIONS.find((opt) => opt.value === normalized)
   if (option) {
-    return option.label.replace(' (jornada normal)', '')
+    return option.label.replace(' (turno habitual)', '')
   }
   return value?.trim() || 'General'
 }

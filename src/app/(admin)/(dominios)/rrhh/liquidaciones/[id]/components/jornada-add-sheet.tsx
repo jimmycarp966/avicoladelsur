@@ -100,7 +100,7 @@ export function JornadaAddSheet({
         <SheetHeader>
           <SheetTitle>Agregar jornada manual</SheetTitle>
           <SheetDescription>
-            Cargue los datos operativos. Las tarifas quedan en opciones avanzadas.
+            Cargue los datos operativos del dia. Las tarifas quedan en opciones avanzadas.
           </SheetDescription>
         </SheetHeader>
 
@@ -155,10 +155,10 @@ export function JornadaAddSheet({
               )}
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Tarea</Label>
+              <Label className="text-xs">Puesto del dia</Label>
               <Input
                 list="tareas-recientes-add"
-                placeholder="Que tarea realizo"
+                placeholder="Ej: caja, reposicion, reparto"
                 value={newRow.tarea}
                 onChange={(e) => updateNewRow({ tarea: e.target.value })}
               />
@@ -182,6 +182,9 @@ export function JornadaAddSheet({
                   </Button>
                 ))}
               </div>
+              <p className="text-[11px] text-muted-foreground">
+                Referencia del puesto cumplido ese dia.
+              </p>
             </div>
           </div>
 

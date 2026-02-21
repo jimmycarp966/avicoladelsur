@@ -59,12 +59,16 @@ function toNumber(value: string): number {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
+function getDaysInMonth(periodoMes: number, periodoAnio: number): number {
+  return new Date(periodoAnio, periodoMes, 0).getDate()
+}
+
 function defaultReglaPeriodo(periodoMes: number, periodoAnio: number): ReglaPeriodoEditable {
   return {
     periodo_mes: periodoMes,
     periodo_anio: periodoAnio,
     dias_base_galpon: 27,
-    dias_base_sucursales: 31,
+    dias_base_sucursales: getDaysInMonth(periodoMes, periodoAnio),
     dias_base_rrhh: 22,
     activo: true,
   }
@@ -186,7 +190,7 @@ export function ConfiguracionLiquidacionesClient() {
           periodo_mes: result.data.reglaPeriodo.periodo_mes,
           periodo_anio: result.data.reglaPeriodo.periodo_anio,
           dias_base_galpon: Number(result.data.reglaPeriodo.dias_base_galpon || 0),
-          dias_base_sucursales: Number(result.data.reglaPeriodo.dias_base_sucursales || 0),
+          dias_base_sucursales: getDaysInMonth(mes, anio),
           dias_base_rrhh: Number(result.data.reglaPeriodo.dias_base_rrhh || 0),
           activo: !!result.data.reglaPeriodo.activo,
         })
@@ -209,11 +213,12 @@ export function ConfiguracionLiquidacionesClient() {
   const handleGuardarPeriodo = async () => {
     try {
       setSavingPeriodo(true)
+      const diasBaseSucursales = getDaysInMonth(periodoMes, periodoAnio)
       const result = await guardarReglaPeriodoAction({
         periodo_mes: periodoMes,
         periodo_anio: periodoAnio,
         dias_base_galpon: reglaPeriodo.dias_base_galpon,
-        dias_base_sucursales: reglaPeriodo.dias_base_sucursales,
+        dias_base_sucursales: diasBaseSucursales,
         dias_base_rrhh: reglaPeriodo.dias_base_rrhh,
         activo: reglaPeriodo.activo,
       })
@@ -350,11 +355,11 @@ export function ConfiguracionLiquidacionesClient() {
                 </div>
                 <ul className="list-disc list-inside text-blue-800/80 space-y-1 text-xs">
                   <li><strong>Galpón:</strong> empleados de producción y campo (ej: 27 días)</li>
-                  <li><strong>Sucursales:</strong> personal de tiendas (ej: 31 días)</li>
+                  <li><strong>Sucursales:</strong> personal de tiendas (auto-calculado por mes calendario)</li>
                   <li><strong>RRHH / Oficina:</strong> administrativos (ej: 22 días hábiles)</li>
                 </ul>
                 <p className="text-xs text-blue-700">
-                  Si no existe regla para el período, el sistema usa los valores por defecto (27 / 31 / 22).
+                  Si no existe regla para el período, el sistema usa los valores por defecto (27 / calendario / 22).
                 </p>
               </div>
 
@@ -428,19 +433,22 @@ export function ConfiguracionLiquidacionesClient() {
                   key: 'dias_base_galpon' as const,
                   grupo: 'galpon',
                   value: reglaPeriodo.dias_base_galpon,
+                  autoCalculated: false,
                 },
                 {
                   key: 'dias_base_sucursales' as const,
                   grupo: 'sucursales',
-                  value: reglaPeriodo.dias_base_sucursales,
+                  value: getDaysInMonth(periodoMes, periodoAnio),
+                  autoCalculated: true,
                 },
                 {
                   key: 'dias_base_rrhh' as const,
                   grupo: 'rrhh',
                   value: reglaPeriodo.dias_base_rrhh,
+                  autoCalculated: false,
                 },
               ] as const
-            ).map(({ key, grupo, value }) => {
+            ).map(({ key, grupo, value, autoCalculated }) => {
               const info = GRUPO_INFO[grupo]
               const Icon = info.icon
               return (
@@ -459,14 +467,20 @@ export function ConfiguracionLiquidacionesClient() {
                       type="number"
                       min={1}
                       value={value}
-                      className="bg-white/80"
-                      onChange={(e) =>
+                      readOnly={autoCalculated}
+                      disabled={autoCalculated}
+                      className="bg-white/80 disabled:opacity-100 disabled:cursor-default"
+                      onChange={(e) => {
+                        if (autoCalculated) return
                         setReglaPeriodo((prev) => ({
                           ...prev,
                           [key]: Math.max(1, toNumber(e.target.value)),
                         }))
-                      }
+                      }}
                     />
+                    {autoCalculated && (
+                      <p className="text-[11px] opacity-80">Auto-calculado según el mes calendario.</p>
+                    )}
                   </div>
                 </div>
               )
