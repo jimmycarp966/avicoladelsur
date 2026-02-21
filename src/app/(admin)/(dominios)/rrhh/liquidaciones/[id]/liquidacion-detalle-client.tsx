@@ -41,6 +41,29 @@ type Props = {
   puestosDisponibles: Pick<LiquidacionReglaPuesto, 'puesto_codigo'>[]
 }
 
+type JornadaCalculoInput = Pick<
+  LiquidacionJornada,
+  | 'horas_mensuales'
+  | 'horas_adicionales'
+  | 'turno_especial_unidades'
+  | 'tarifa_hora_base'
+  | 'tarifa_hora_extra'
+  | 'tarifa_turno_especial'
+>
+
+type NewRowDraft = {
+  fecha: string
+  turno: string
+  tarea: string
+  horas_mensuales: number
+  horas_adicionales: number
+  turno_especial_unidades: number
+  tarifa_hora_base: number
+  tarifa_hora_extra: number
+  tarifa_turno_especial: number
+  observaciones: string
+}
+
 function toNum(value: string): number {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : 0
@@ -96,7 +119,7 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
     observaciones: liquidacion.observaciones || '',
   })
 
-  const [newRow, setNewRow] = useState({
+  const [newRow, setNewRow] = useState<NewRowDraft>({
     fecha: new Date().toISOString().slice(0, 10),
     turno: 'general',
     tarea: '',
@@ -108,8 +131,76 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
     tarifa_turno_especial: 0,
     observaciones: '',
   })
+  const [newRowError, setNewRowError] = useState<string | null>(null)
+  const [showAdvancedTarifas, setShowAdvancedTarifas] = useState(false)
 
   const [motivoNoAutorizado, setMotivoNoAutorizado] = useState(liquidacion.motivo_no_autorizado || '')
+
+  const isSucursalEmployee = useMemo(() => {
+    const categoriaNombre = liquidacion.empleado?.categoria?.nombre?.toLowerCase() || ''
+    return Boolean(liquidacion.empleado?.sucursal_id) || categoriaNombre.includes('sucursal')
+  }, [liquidacion.empleado?.categoria?.nombre, liquidacion.empleado?.sucursal_id])
+
+  const getRowBreakdown = (row: JornadaCalculoInput) => {
+    const base = (row.horas_mensuales || 0) * (row.tarifa_hora_base || 0)
+    const extra = (row.horas_adicionales || 0) * (row.tarifa_hora_extra || 0)
+    const especial = (row.turno_especial_unidades || 0) * (row.tarifa_turno_especial || 0)
+    const extraAplicado = isSucursalEmployee ? 0 : extra
+
+    return {
+      base,
+      extra,
+      extraAplicado,
+      especial,
+      total: base + extraAplicado + especial,
+    }
+  }
+
+  const newRowBreakdown = getRowBreakdown(newRow)
+  const editingRowBreakdown = editingRow ? getRowBreakdown(editingRow) : null
+
+  const updateNewRow = (patch: Partial<NewRowDraft>) => {
+    setNewRow((prev) => ({ ...prev, ...patch }))
+    if (newRowError) {
+      setNewRowError(null)
+    }
+  }
+
+  const validateNewRow = () => {
+    if (!newRow.fecha) return 'La fecha es obligatoria.'
+
+    const checks: Array<[string, number]> = [
+      ['hs mensuales', newRow.horas_mensuales],
+      ['hs adicionales', newRow.horas_adicionales],
+      ['turno especial', newRow.turno_especial_unidades],
+      ['tarifa base', newRow.tarifa_hora_base],
+      ['tarifa extra', newRow.tarifa_hora_extra],
+      ['tarifa especial', newRow.tarifa_turno_especial],
+    ]
+
+    const invalidNegative = checks.find(([, value]) => value < 0)
+    if (invalidNegative) return `El campo ${invalidNegative[0]} no puede ser negativo.`
+
+    const unidades =
+      (newRow.horas_mensuales || 0) + (newRow.horas_adicionales || 0) + (newRow.turno_especial_unidades || 0)
+    if (unidades <= 0) {
+      return 'Debe cargar al menos hs mensuales, hs adicionales o turno especial mayor a 0.'
+    }
+
+    if ((newRow.horas_mensuales || 0) > 0 && (newRow.tarifa_hora_base || 0) <= 0) {
+      return 'Si carga hs mensuales, la tarifa base debe ser mayor a 0.'
+    }
+
+    if (!isSucursalEmployee && (newRow.horas_adicionales || 0) > 0 && (newRow.tarifa_hora_extra || 0) <= 0) {
+      return 'Si carga hs adicionales, la tarifa extra debe ser mayor a 0.'
+    }
+
+    if ((newRow.turno_especial_unidades || 0) > 0 && (newRow.tarifa_turno_especial || 0) <= 0) {
+      return 'Si carga turno especial, la tarifa especial debe ser mayor a 0.'
+    }
+
+    return null
+  }
 
   const cuotasPeriodo = useMemo(() => {
     return cuotas.filter(
@@ -157,11 +248,18 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
   }
 
   const handleAddRow = async () => {
+    const validationError = validateNewRow()
+    if (validationError) {
+      setNewRowError(validationError)
+      showToast('error', validationError, 'Validacion')
+      return
+    }
+
     setLoading(true)
     try {
       const result = await upsertLiquidacionJornadaAction(liquidacion.id, {
         fecha: newRow.fecha,
-        turno: newRow.turno,
+        turno: newRow.turno.trim() || 'general',
         tarea: newRow.tarea,
         horas_mensuales: newRow.horas_mensuales,
         horas_adicionales: newRow.horas_adicionales,
@@ -180,12 +278,15 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
 
       setNewRow((prev) => ({
         ...prev,
+        turno: prev.turno || 'general',
         tarea: '',
         horas_mensuales: 0,
         horas_adicionales: 0,
         turno_especial_unidades: 0,
         observaciones: '',
       }))
+      setNewRowError(null)
+      setShowAdvancedTarifas(false)
       showToast('success', 'Fila agregada correctamente', 'Guardado')
       router.refresh()
     } catch {
@@ -286,10 +387,7 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
   }
 
   const rowTotal = (row: LiquidacionJornada) => {
-    const base = (row.horas_mensuales || 0) * (row.tarifa_hora_base || 0)
-    const extra = (row.horas_adicionales || 0) * (row.tarifa_hora_extra || 0)
-    const especial = (row.turno_especial_unidades || 0) * (row.tarifa_turno_especial || 0)
-    return base + extra + especial
+    return getRowBreakdown(row).total
   }
 
   const openEditSheet = (row: LiquidacionJornada) => {
@@ -546,6 +644,11 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
                 Haga clic en el ícono de lápiz para editar una jornada. Cada guardado recalcula la
                 liquidación.
               </CardDescription>
+              {isSucursalEmployee && (
+                <p className="text-xs text-muted-foreground">
+                  En empleados de sucursal, las hs adicionales son informativas y no impactan el total pagable.
+                </p>
+              )}
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="rounded-md border overflow-auto">
@@ -558,7 +661,7 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
                       <TableHead className="text-right">Hs Mens.</TableHead>
                       <TableHead className="text-right">Hs Adic.</TableHead>
                       <TableHead className="text-right">T. Especial</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
+                      <TableHead className="text-right">Total aplicado</TableHead>
                       <TableHead>Origen</TableHead>
                       <TableHead className="w-10" />
                     </TableRow>
@@ -609,15 +712,34 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
               </div>
 
               {/* Formulario nueva fila */}
-              <div className="border rounded-md p-4 space-y-3 bg-gray-50">
-                <p className="text-sm font-medium text-muted-foreground">Agregar jornada manual</p>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <div className="border rounded-md p-4 space-y-4 bg-slate-50/60">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold">Agregar jornada manual</p>
+                    <p className="text-xs text-muted-foreground">
+                      Cargue solo los datos operativos. Las tarifas quedan en opciones avanzadas.
+                    </p>
+                  </div>
+                  {isSucursalEmployee && (
+                    <Badge variant="outline" className="text-[11px]">
+                      Sucursal: hs adicionales informativas
+                    </Badge>
+                  )}
+                </div>
+
+                {newRowError && (
+                  <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                    {newRowError}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs">Fecha</Label>
                     <Input
                       type="date"
                       value={newRow.fecha}
-                      onChange={(e) => setNewRow((p) => ({ ...p, fecha: e.target.value }))}
+                      onChange={(e) => updateNewRow({ fecha: e.target.value })}
                     />
                   </div>
                   <div className="space-y-1">
@@ -625,26 +747,28 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
                     <Input
                       placeholder="ej: general"
                       value={newRow.turno}
-                      onChange={(e) => setNewRow((p) => ({ ...p, turno: e.target.value }))}
+                      onChange={(e) => updateNewRow({ turno: e.target.value })}
                     />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Tarea</Label>
                     <Input
-                      placeholder="Descripción"
+                      placeholder="Descripcion breve"
                       value={newRow.tarea}
-                      onChange={(e) => setNewRow((p) => ({ ...p, tarea: e.target.value }))}
+                      onChange={(e) => updateNewRow({ tarea: e.target.value })}
                     />
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs">Hs mensuales</Label>
                     <Input
                       type="number"
                       step="0.01"
+                      min="0"
                       value={newRow.horas_mensuales}
-                      onChange={(e) =>
-                        setNewRow((p) => ({ ...p, horas_mensuales: toNum(e.target.value) }))
-                      }
+                      onChange={(e) => updateNewRow({ horas_mensuales: toNum(e.target.value) })}
                     />
                   </div>
                   <div className="space-y-1">
@@ -652,10 +776,9 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
                     <Input
                       type="number"
                       step="0.01"
+                      min="0"
                       value={newRow.horas_adicionales}
-                      onChange={(e) =>
-                        setNewRow((p) => ({ ...p, horas_adicionales: toNum(e.target.value) }))
-                      }
+                      onChange={(e) => updateNewRow({ horas_adicionales: toNum(e.target.value) })}
                     />
                   </div>
                   <div className="space-y-1">
@@ -663,57 +786,118 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
                     <Input
                       type="number"
                       step="0.01"
+                      min="0"
                       value={newRow.turno_especial_unidades}
                       onChange={(e) =>
-                        setNewRow((p) => ({ ...p, turno_especial_unidades: toNum(e.target.value) }))
+                        updateNewRow({ turno_especial_unidades: toNum(e.target.value) })
                       }
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Tarifa base</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={newRow.tarifa_hora_base}
-                      onChange={(e) =>
-                        setNewRow((p) => ({ ...p, tarifa_hora_base: toNum(e.target.value) }))
-                      }
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Tarifa extra</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={newRow.tarifa_hora_extra}
-                      onChange={(e) =>
-                        setNewRow((p) => ({ ...p, tarifa_hora_extra: toNum(e.target.value) }))
-                      }
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Tarifa especial</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={newRow.tarifa_turno_especial}
-                      onChange={(e) =>
-                        setNewRow((p) => ({ ...p, tarifa_turno_especial: toNum(e.target.value) }))
-                      }
-                    />
-                  </div>
-                  <div className="space-y-1 col-span-2 md:col-span-3">
-                    <Label className="text-xs">Observaciones</Label>
-                    <Input
-                      placeholder="Opcional"
-                      value={newRow.observaciones}
-                      onChange={(e) => setNewRow((p) => ({ ...p, observaciones: e.target.value }))}
                     />
                   </div>
                 </div>
-                <Button onClick={handleAddRow} disabled={loading} size="sm">
-                  Agregar fila manual
-                </Button>
+
+                <div className="space-y-1">
+                  <Label className="text-xs">Observaciones</Label>
+                  <Textarea
+                    placeholder="Opcional"
+                    value={newRow.observaciones}
+                    onChange={(e) => updateNewRow({ observaciones: e.target.value })}
+                    rows={2}
+                  />
+                </div>
+
+                <div className="rounded-md border bg-white px-3 py-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Resumen automatico
+                  </p>
+                  <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Base</p>
+                      <p className="font-medium tabular-nums">{formatMoney(newRowBreakdown.base)}</p>
+                    </div>
+                    <div className={isSucursalEmployee ? 'text-muted-foreground' : ''}>
+                      <p className="text-xs">
+                        Extra {isSucursalEmployee ? '(informativo)' : ''}
+                      </p>
+                      <p className="font-medium tabular-nums">{formatMoney(newRowBreakdown.extra)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Especial</p>
+                      <p className="font-medium tabular-nums">{formatMoney(newRowBreakdown.especial)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Total aplicado</p>
+                      <p className="font-semibold tabular-nums">{formatMoney(newRowBreakdown.total)}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAdvancedTarifas((prev) => !prev)}
+                    disabled={loading}
+                  >
+                    {showAdvancedTarifas ? 'Ocultar tarifas avanzadas' : 'Mostrar tarifas avanzadas'}
+                  </Button>
+
+                  {showAdvancedTarifas && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 rounded-md border bg-white p-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Tarifa base</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={newRow.tarifa_hora_base}
+                          onChange={(e) => updateNewRow({ tarifa_hora_base: toNum(e.target.value) })}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Tarifa extra</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={newRow.tarifa_hora_extra}
+                          onChange={(e) => updateNewRow({ tarifa_hora_extra: toNum(e.target.value) })}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Tarifa especial</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={newRow.tarifa_turno_especial}
+                          onChange={(e) =>
+                            updateNewRow({ tarifa_turno_especial: toNum(e.target.value) })
+                          }
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Button onClick={handleAddRow} disabled={loading} size="sm">
+                    Agregar fila manual
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={loading}
+                    onClick={() =>
+                      updateNewRow({
+                        tarifa_hora_base: liquidacion.valor_hora || 0,
+                        tarifa_hora_extra: liquidacion.valor_hora || 0,
+                        tarifa_turno_especial: 0,
+                      })
+                    }
+                  >
+                    Restaurar tarifas sugeridas
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -873,10 +1057,22 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
                 />
               </div>
 
-              <div className="pt-2 border-t text-sm">
-                <div className="flex justify-between font-semibold">
-                  <span>Total jornada:</span>
-                  <span>{formatMoney(rowTotal(editingRow))}</span>
+              <div className="pt-2 border-t text-sm space-y-1">
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Base</span>
+                  <span>{formatMoney(editingRowBreakdown?.base)}</span>
+                </div>
+                <div className={`flex justify-between ${isSucursalEmployee ? 'text-muted-foreground' : ''}`}>
+                  <span>Extra {isSucursalEmployee ? '(informativo)' : ''}</span>
+                  <span>{formatMoney(editingRowBreakdown?.extra)}</span>
+                </div>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Especial</span>
+                  <span>{formatMoney(editingRowBreakdown?.especial)}</span>
+                </div>
+                <div className="flex justify-between font-semibold pt-1">
+                  <span>Total jornada aplicada:</span>
+                  <span>{formatMoney(editingRowBreakdown?.total)}</span>
                 </div>
               </div>
 
