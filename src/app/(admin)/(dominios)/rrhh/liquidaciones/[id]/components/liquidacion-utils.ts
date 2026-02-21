@@ -2,6 +2,9 @@ import type { LiquidacionJornada } from '@/types/domain.types'
 
 export const TURNO_OPTIONS = [
   { value: 'general', label: 'General (turno habitual)' },
+  { value: 'turno_completo', label: 'Turno completo' },
+  { value: 'medio_turno_manana', label: 'Medio turno manana' },
+  { value: 'medio_turno_tarde', label: 'Medio turno tarde' },
   { value: 'manana', label: 'Manana' },
   { value: 'tarde', label: 'Tarde' },
   { value: 'noche', label: 'Noche' },

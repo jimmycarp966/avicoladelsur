@@ -74,6 +74,8 @@ interface HorarioRowMapeado {
   hora_salida_tarde?: string
 }
 
+type TurnoAsistencia = 'turno_completo' | 'medio_turno_manana' | 'medio_turno_tarde' | 'general'
+
 interface RunOptions {
   mes?: number
   anio?: number
@@ -326,6 +328,21 @@ function calcHoras(entTs: string | null, salTs: string | null): number {
   return (s.getTime() - e.getTime()) / 3600000
 }
 
+function inferTurnoAsistencia(
+  horaEntradaManana: string | null,
+  horaSalidaManana: string | null,
+  horaEntradaTarde: string | null,
+  horaSalidaTarde: string | null,
+): TurnoAsistencia {
+  const tieneManana = Boolean(horaEntradaManana && horaSalidaManana)
+  const tieneTarde = Boolean(horaEntradaTarde && horaSalidaTarde)
+
+  if (tieneManana && tieneTarde) return 'turno_completo'
+  if (tieneManana) return 'medio_turno_manana'
+  if (tieneTarde) return 'medio_turno_tarde'
+  return 'general'
+}
+
 function isMissingRunsTableError(error: unknown): boolean {
   const message = String((error as { message?: string })?.message || '').toLowerCase()
   const code = String((error as { code?: string })?.code || '')
@@ -540,6 +557,7 @@ async function sincronizarAsistenciaDia(
 
     let horasTrabajadas: number | null = null
     const tieneDosTurnos = horaEntradaMTs && horaSalidaMTs && horaEntradaTTs && horaSalidaTTs
+    const turno = inferTurnoAsistencia(horaEntradaMTs, horaSalidaMTs, horaEntradaTTs, horaSalidaTTs)
 
     if (tieneDosTurnos) {
       const hManana = calcHoras(horaEntradaMTs, horaSalidaMTs)
@@ -558,6 +576,7 @@ async function sincronizarAsistenciaDia(
           hora_entrada: horaEntradaTs,
           hora_salida: horaSalidaTs,
           horas_trabajadas: horasTrabajadas,
+          turno,
           estado,
           retraso_minutos,
           observaciones: 'Sincronizado desde HikConnect',

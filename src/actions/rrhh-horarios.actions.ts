@@ -29,6 +29,8 @@ interface EmpleadoLookup {
   } | null
 }
 
+type TurnoAsistencia = 'turno_completo' | 'medio_turno_manana' | 'medio_turno_tarde' | 'general'
+
 function normalizeIdentity(value: string): string {
   return value.replace(/[^0-9A-Za-z]+/g, '').toUpperCase()
 }
@@ -328,6 +330,21 @@ function calcularEstadoYRetraso(horaEntrada: string | undefined): {
   return { estado: 'tarde', retraso_minutos: diferencia }
 }
 
+function inferTurnoAsistencia(
+  horaEntradaManana: string | null,
+  horaSalidaManana: string | null,
+  horaEntradaTarde: string | null,
+  horaSalidaTarde: string | null,
+): TurnoAsistencia {
+  const tieneManana = Boolean(horaEntradaManana && horaSalidaManana)
+  const tieneTarde = Boolean(horaEntradaTarde && horaSalidaTarde)
+
+  if (tieneManana && tieneTarde) return 'turno_completo'
+  if (tieneManana) return 'medio_turno_manana'
+  if (tieneTarde) return 'medio_turno_tarde'
+  return 'general'
+}
+
 async function sincronizarAsistenciaDesdeHik(
   registros: HorariosHoyData['registros'],
   fecha: string,
@@ -393,6 +410,7 @@ async function sincronizarAsistenciaDesdeHik(
     const horaSalidaTTs = registro.hora_salida_tarde ? `${fecha}T${registro.hora_salida_tarde}:00-03:00` : null
 
     const tieneDosTurnos = horaEntradaMTs && horaSalidaMTs && horaEntradaTTs && horaSalidaTTs
+    const turno = inferTurnoAsistencia(horaEntradaMTs, horaSalidaMTs, horaEntradaTTs, horaSalidaTTs)
     if (tieneDosTurnos) {
       const hManana = calcHoras(horaEntradaMTs, horaSalidaMTs)
       const hTarde = calcHoras(horaEntradaTTs, horaSalidaTTs)
@@ -410,6 +428,7 @@ async function sincronizarAsistenciaDesdeHik(
           hora_entrada: horaEntradaTs,
           hora_salida: horaSalidaTs,
           horas_trabajadas: horasTrabajadas,
+          turno,
           estado,
           retraso_minutos,
           observaciones: 'Sincronizado desde HikConnect',

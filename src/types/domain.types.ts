@@ -535,7 +535,15 @@ export interface Asistencia extends BaseEntity {
   hora_entrada?: string
   hora_salida?: string
   horas_trabajadas?: number
-  turno?: 'mañana' | 'tarde' | 'noche'
+  turno?:
+    | 'mañana'
+    | 'tarde'
+    | 'noche'
+    | 'manana'
+    | 'turno_completo'
+    | 'medio_turno_manana'
+    | 'medio_turno_tarde'
+    | 'general'
   estado: 'presente' | 'ausente' | 'tarde' | 'licencia'
   observaciones?: string
   retraso_minutos: number
