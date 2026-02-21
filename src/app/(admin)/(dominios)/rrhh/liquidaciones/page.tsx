@@ -12,6 +12,7 @@ import type { Liquidacion } from '@/types/domain.types'
 import { ejecutarLiquidacionAutomatica } from '@/lib/services/rrhh-liquidaciones-automaticas'
 import { LiquidacionesTableWrapper } from './_components/LiquidacionesTableWrapper'
 import { PeriodFilterBar } from './_components/PeriodFilterBar'
+import { RecalcularLiquidacionesButton } from './_components/RecalcularLiquidacionesButton'
 
 async function getLiquidaciones(periodoMes?: number, periodoAnio?: number) {
   const supabase = await createClient()
@@ -62,6 +63,38 @@ async function getLiquidaciones(periodoMes?: number, periodoAnio?: number) {
   return data as Liquidacion[]
 }
 
+async function getEmpleadosActivosParaRecalculo() {
+  const supabase = await createClient()
+  const adminSupabase = createAdminClient()
+
+  const { data: authResult, error: authError } = await supabase.auth.getUser()
+  if (authError || !authResult.user) return []
+
+  const { data: userData } = await supabase
+    .from('usuarios')
+    .select('rol, activo')
+    .eq('id', authResult.user.id)
+    .maybeSingle()
+
+  const isAdmin = !!userData?.activo && userData.rol === 'admin'
+  const db = isAdmin ? adminSupabase : supabase
+
+  const { data } = await db
+    .from('rrhh_empleados')
+    .select('id, legajo, nombre, apellido, usuario:usuarios(nombre, apellido, email)')
+    .eq('activo', true)
+
+  return (data || [])
+    .map((row) => {
+      const usuario = row.usuario as { nombre?: string | null; apellido?: string | null; email?: string | null } | null
+      const nombreUsuario = `${usuario?.nombre || ''} ${usuario?.apellido || ''}`.trim()
+      const nombreEmpleado = `${row.nombre || ''} ${row.apellido || ''}`.trim()
+      const nombre = nombreUsuario || nombreEmpleado || usuario?.email || (row.legajo ? `Legajo ${row.legajo}` : 'Sin nombre')
+      return { id: String(row.id), nombre }
+    })
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+}
+
 async function ejecutarFallbackMesVencido(): Promise<void> {
   if (process.env.RRHH_AUTO_LIQUIDACIONES_UI_FALLBACK === 'false') {
     return
@@ -99,6 +132,7 @@ export default async function LiquidacionesPage({
 
   await ejecutarFallbackMesVencido()
   const liquidaciones = await getLiquidaciones(periodoMes, periodoAnio)
+  const empleadosActivos = await getEmpleadosActivosParaRecalculo()
 
   const totalAprobadas = liquidaciones.filter((l) => l.estado === 'aprobada').length
   const totalPendientes = liquidaciones.filter(
@@ -123,6 +157,11 @@ export default async function LiquidacionesPage({
               Calcular Liquidaciones
             </Link>
           </Button>
+          <RecalcularLiquidacionesButton
+            empleados={empleadosActivos}
+            defaultMes={periodoMes || new Date().getMonth() + 1}
+            defaultAnio={periodoAnio || new Date().getFullYear()}
+          />
           <Button variant="outline" asChild>
             <Link href="/rrhh/liquidaciones/configuracion">
               <Settings className="w-4 h-4 mr-2" />

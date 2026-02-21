@@ -1212,6 +1212,159 @@ export async function recalcularLiquidacionAction(
   }
 }
 
+export async function recalcularLiquidacionesPeriodoAction(input: {
+  mes: number
+  anio: number
+  alcance: 'todos' | 'empleado'
+  empleadoId?: string
+}): Promise<
+  ApiResponse<{
+    procesados: number
+    actualizados: number
+    omitidos_sin_horas: number
+    errores: number
+  }>
+> {
+  try {
+    const adminUserId = await getAuthenticatedAdminUserId()
+    if (!adminUserId) {
+      return {
+        success: false,
+        error: 'No autorizado',
+      }
+    }
+
+    const mes = Number(input.mes)
+    const anio = Number(input.anio)
+    if (!Number.isInteger(mes) || mes < 1 || mes > 12 || !Number.isInteger(anio) || anio < 2000) {
+      return {
+        success: false,
+        error: 'Periodo invalido',
+      }
+    }
+
+    if (input.alcance === 'empleado' && !input.empleadoId) {
+      return {
+        success: false,
+        error: 'Debe seleccionar un empleado',
+      }
+    }
+
+    const supabase = createAdminClient()
+
+    let targetIds: string[] = []
+    if (input.alcance === 'empleado' && input.empleadoId) {
+      targetIds = [input.empleadoId]
+    } else {
+      const { data: activos, error: activosError } = await supabase
+        .from('rrhh_empleados')
+        .select('id')
+        .eq('activo', true)
+
+      if (activosError) {
+        devError('Error obteniendo empleados activos para recálculo:', activosError)
+        return {
+          success: false,
+          error: 'No se pudo obtener la lista de empleados activos',
+        }
+      }
+
+      targetIds = (activos || []).map((row) => String(row.id)).filter(Boolean)
+    }
+
+    if (targetIds.length === 0) {
+      return {
+        success: true,
+        data: {
+          procesados: 0,
+          actualizados: 0,
+          omitidos_sin_horas: 0,
+          errores: 0,
+        },
+        message: 'No hay empleados para recalcular',
+      }
+    }
+
+    const fromDate = `${anio}-${String(mes).padStart(2, '0')}-01`
+    const toDate = `${anio}-${String(mes).padStart(2, '0')}-${String(getDaysInMonth(mes, anio)).padStart(2, '0')}`
+
+    const { data: asistenciaConHoras, error: asistenciaError } = await supabase
+      .from('rrhh_asistencia')
+      .select('empleado_id')
+      .in('empleado_id', targetIds)
+      .gte('fecha', fromDate)
+      .lte('fecha', toDate)
+      .in('estado', ['presente', 'tarde'])
+      .gt('horas_trabajadas', 0)
+
+    if (asistenciaError) {
+      devError('Error obteniendo asistencia para recálculo:', asistenciaError)
+      return {
+        success: false,
+        error: 'No se pudo verificar la asistencia del periodo',
+      }
+    }
+
+    const idsConHoras = new Set(
+      (asistenciaConHoras || []).map((row) => String(row.empleado_id || '')).filter(Boolean),
+    )
+
+    let actualizados = 0
+    let omitidosSinHoras = 0
+    let errores = 0
+
+    for (const empleadoId of targetIds) {
+      if (!idsConHoras.has(empleadoId)) {
+        omitidosSinHoras++
+        continue
+      }
+
+      let { error } = await supabase.rpc('fn_rrhh_preparar_liquidacion_mensual', {
+        p_empleado_id: empleadoId,
+        p_mes: mes,
+        p_anio: anio,
+        p_created_by: adminUserId,
+      })
+
+      if (error && String(error.message || '').toLowerCase().includes('fn_rrhh_preparar_liquidacion_mensual')) {
+        const legacy = await supabase.rpc('fn_calcular_liquidacion_mensual', {
+          p_empleado_id: empleadoId,
+          p_mes: mes,
+          p_anio: anio,
+          p_created_by: adminUserId,
+        })
+        error = legacy.error
+      }
+
+      if (error) {
+        errores++
+        devError(`Error recalculando liquidación para empleado ${empleadoId}:`, error)
+      } else {
+        actualizados++
+      }
+    }
+
+    revalidatePath('/rrhh/liquidaciones')
+
+    return {
+      success: true,
+      data: {
+        procesados: targetIds.length,
+        actualizados,
+        omitidos_sin_horas: omitidosSinHoras,
+        errores,
+      },
+      message: 'Recálculo ejecutado',
+    }
+  } catch (error) {
+    devError('Error en recalcularLiquidacionesPeriodoAction:', error)
+    return {
+      success: false,
+      error: 'Error interno del servidor',
+    }
+  }
+}
+
 export async function upsertLiquidacionJornadaAction(
   liquidacionId: string,
   jornadaData: UpsertLiquidacionJornadaInput
