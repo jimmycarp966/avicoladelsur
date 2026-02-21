@@ -723,6 +723,14 @@ export interface LiquidacionJornada extends BaseEntity {
   empleado?: Empleado
 }
 
+// Feriados RRHH
+export interface RrhhFeriado extends BaseEntity {
+  fecha: string
+  descripcion: string
+  ambito: 'nacional' | 'provincial' | 'local'
+  activo: boolean
+}
+
 // Detalles de liquidación
 export type LiquidacionAutoRunFuente = 'cron' | 'ui_fallback' | 'manual'
 export type LiquidacionAutoRunEstado = 'success' | 'error' | 'skipped'
