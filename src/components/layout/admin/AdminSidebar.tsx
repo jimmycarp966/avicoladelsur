@@ -173,7 +173,7 @@ const navigation = [
   },
   {
     name: 'RRHH',
-    href: '/rrhh',
+    href: '/rrhh/empleados',
     icon: UserCheck,
     roles: ['admin'],
     children: [

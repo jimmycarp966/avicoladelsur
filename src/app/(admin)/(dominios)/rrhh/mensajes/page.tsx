@@ -29,7 +29,7 @@ export default async function MensajesPage() {
                 title="Mensajes Internos"
                 description="Comunicación interna entre empleados"
                 breadcrumbs={[
-                    { label: 'RRHH', href: '/rrhh' },
+                    { label: 'RRHH', href: '/rrhh/empleados' },
                     { label: 'Mensajes' },
                 ]}
             />
