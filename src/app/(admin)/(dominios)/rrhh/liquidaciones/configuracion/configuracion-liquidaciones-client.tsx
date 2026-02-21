@@ -37,6 +37,7 @@ type ReglaPuestoEditable = {
   categoria_id?: string | null
   grupo_base_dias: GrupoBaseDias
   horas_jornada: number
+  tarifa_turno_trabajado: number
   tarifa_turno_especial: number
   habilita_cajero: boolean
   tarifa_diferencia_cajero: number
@@ -80,6 +81,7 @@ function defaultReglaPuesto(): ReglaPuestoEditable {
     categoria_id: null,
     grupo_base_dias: 'galpon',
     horas_jornada: 9,
+    tarifa_turno_trabajado: 0,
     tarifa_turno_especial: 0,
     habilita_cajero: false,
     tarifa_diferencia_cajero: 0,
@@ -95,6 +97,7 @@ function mapReglaPuesto(regla: LiquidacionReglaPuesto): ReglaPuestoEditable {
     categoria_id: regla.categoria_id || null,
     grupo_base_dias: regla.grupo_base_dias,
     horas_jornada: Number(regla.horas_jornada || 0),
+    tarifa_turno_trabajado: Number((regla as unknown as { tarifa_turno_trabajado?: number }).tarifa_turno_trabajado || 0),
     tarifa_turno_especial: Number(regla.tarifa_turno_especial || 0),
     habilita_cajero: !!regla.habilita_cajero,
     tarifa_diferencia_cajero: Number(regla.tarifa_diferencia_cajero || 0),
@@ -245,6 +248,7 @@ export function ConfiguracionLiquidacionesClient() {
         categoria_id: regla.categoria_id || null,
         grupo_base_dias: regla.grupo_base_dias,
         horas_jornada: regla.horas_jornada,
+        tarifa_turno_trabajado: regla.tarifa_turno_trabajado,
         tarifa_turno_especial: regla.tarifa_turno_especial,
         habilita_cajero: regla.habilita_cajero,
         tarifa_diferencia_cajero: regla.tarifa_diferencia_cajero,
@@ -529,6 +533,7 @@ export function ConfiguracionLiquidacionesClient() {
                     <TableHead>Grupo días</TableHead>
                     <TableHead>Tipo cálculo</TableHead>
                     <TableHead className="text-right">Hs jornada</TableHead>
+                    <TableHead className="text-right">Tarifa turno comp.</TableHead>
                     <TableHead className="text-right">Tarifa especial</TableHead>
                     <TableHead>Cajero</TableHead>
                     <TableHead className="text-right">Tarifa cajero</TableHead>
@@ -604,6 +609,20 @@ export function ConfiguracionLiquidacionesClient() {
                             onChange={(e) =>
                               updateReglaPuesto(index, {
                                 horas_jornada: Math.max(0, toNumber(e.target.value)),
+                              })
+                            }
+                          />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            value={regla.tarifa_turno_trabajado}
+                            className="h-8 w-24 text-sm text-right ml-auto"
+                            onChange={(e) =>
+                              updateReglaPuesto(index, {
+                                tarifa_turno_trabajado: Math.max(0, toNumber(e.target.value)),
                               })
                             }
                           />
@@ -815,6 +834,25 @@ export function ConfiguracionLiquidacionesClient() {
                     }))
                   }
                 />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Tarifa turno trabajado (completo)</label>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={nuevaRegla.tarifa_turno_trabajado}
+                  onChange={(e) =>
+                    setNuevaRegla((prev) => ({
+                      ...prev,
+                      tarifa_turno_trabajado: Math.max(0, toNumber(e.target.value)),
+                    }))
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Si el día es medio turno (solo mañana o solo tarde), se liquida al 50%.
+                </p>
               </div>
 
               <div className="space-y-1">

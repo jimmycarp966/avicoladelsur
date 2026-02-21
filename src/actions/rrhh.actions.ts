@@ -969,6 +969,7 @@ type GuardarReglaPuestoInput = {
   categoria_id?: string | null
   grupo_base_dias: 'galpon' | 'sucursales' | 'rrhh'
   horas_jornada: number
+  tarifa_turno_trabajado: number
   tarifa_turno_especial: number
   habilita_cajero: boolean
   tarifa_diferencia_cajero: number
@@ -1634,10 +1635,21 @@ export async function guardarReglaPuestoAction(
       }
     }
 
-    if (payload.tarifa_turno_especial < 0 || payload.tarifa_diferencia_cajero < 0) {
+    if (
+      payload.tarifa_turno_trabajado < 0 ||
+      payload.tarifa_turno_especial < 0 ||
+      payload.tarifa_diferencia_cajero < 0
+    ) {
       return {
         success: false,
         error: 'Las tarifas no pueden ser negativas',
+      }
+    }
+
+    if ((payload.tipo_calculo ?? 'hora') === 'turno' && payload.tarifa_turno_trabajado <= 0) {
+      return {
+        success: false,
+        error: 'Para cálculo por turno, la tarifa de turno trabajado debe ser mayor a cero',
       }
     }
 
@@ -1647,6 +1659,7 @@ export async function guardarReglaPuestoAction(
       categoria_id: payload.categoria_id || null,
       grupo_base_dias: payload.grupo_base_dias,
       horas_jornada: payload.horas_jornada,
+      tarifa_turno_trabajado: payload.tarifa_turno_trabajado,
       tarifa_turno_especial: payload.tarifa_turno_especial,
       habilita_cajero: payload.habilita_cajero,
       tarifa_diferencia_cajero: payload.tarifa_diferencia_cajero,
