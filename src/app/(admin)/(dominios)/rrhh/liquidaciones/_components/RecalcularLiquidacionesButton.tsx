@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Loader2, RefreshCw } from 'lucide-react'
 import { recalcularLiquidacionesPeriodoAction } from '@/actions/rrhh.actions'
 import { Button } from '@/components/ui/button'
@@ -44,6 +44,7 @@ const MESES = [
 
 export function RecalcularLiquidacionesButton({ empleados, defaultMes, defaultAnio }: Props) {
   const { showToast } = useNotificationStore()
+  const [mounted, setMounted] = useState(false)
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [mes, setMes] = useState(defaultMes)
@@ -55,6 +56,19 @@ export function RecalcularLiquidacionesButton({ empleados, defaultMes, defaultAn
     const current = new Date().getFullYear()
     return [current - 2, current - 1, current, current + 1]
   }, [])
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return (
+      <Button variant="outline" disabled>
+        <RefreshCw className="w-4 h-4 mr-2" />
+        Recalcular
+      </Button>
+    )
+  }
 
   const handleRecalcular = async () => {
     if (alcance === 'empleado' && !empleadoId) {
@@ -200,4 +214,3 @@ export function RecalcularLiquidacionesButton({ empleados, defaultMes, defaultAn
     </>
   )
 }
-
