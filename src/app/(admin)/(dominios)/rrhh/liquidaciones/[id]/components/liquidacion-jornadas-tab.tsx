@@ -84,13 +84,17 @@ export function LiquidacionJornadasTab({
   const [jornadaTurnoFilter, setJornadaTurnoFilter] = useState<string>('todos')
   const [jornadaOrigenFilter, setJornadaOrigenFilter] = useState<string>('todos')
   const [soloDiferencias, setSoloDiferencias] = useState(false)
+  const defaultPuestoLabel =
+    liquidacion.puesto_override?.trim() ||
+    liquidacion.empleado?.categoria?.nombre?.trim() ||
+    'Sin puesto asignado'
 
   const editingRowBreakdown = editingRow ? getRowBreakdown(editingRow, isSucursalEmployee) : null
 
   const filteredRows = useMemo(() => {
     const term = jornadaSearch.trim().toLowerCase()
     return rows.filter((row) => {
-      const task = sanitizeTaskValue(row.tarea).toLowerCase()
+      const task = (sanitizeTaskValue(row.tarea) || defaultPuestoLabel).toLowerCase()
       const turno = normalizeTurno(row.turno)
       const origen = normalizeOrigen(row.origen)
       const hasDiferencia =
@@ -106,7 +110,7 @@ export function LiquidacionJornadasTab({
       const byFecha = row.fecha?.slice(0, 10)?.includes(term)
       return Boolean(byFecha || task.includes(term) || turno.includes(term) || origen.includes(term))
     })
-  }, [rows, jornadaSearch, jornadaTurnoFilter, jornadaOrigenFilter, soloDiferencias, liquidacion.valor_hora])
+  }, [rows, jornadaSearch, jornadaTurnoFilter, jornadaOrigenFilter, soloDiferencias, liquidacion.valor_hora, defaultPuestoLabel])
 
   const jornadasResumen = filteredRows.reduce(
     (acc, row) => {
@@ -354,7 +358,7 @@ export function LiquidacionJornadasTab({
                       </TableCell>
                       <TableCell className="text-sm">{getTurnoLabel(row.turno)}</TableCell>
                       <TableCell className="text-sm max-w-[160px] truncate">
-                        {sanitizeTaskValue(row.tarea) || 'Sin puesto cargado'}
+                        {sanitizeTaskValue(row.tarea) || defaultPuestoLabel}
                       </TableCell>
                       <TableCell className="text-right text-sm tabular-nums">
                         {row.horas_mensuales ?? 0}

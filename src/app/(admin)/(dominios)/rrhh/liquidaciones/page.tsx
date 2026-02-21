@@ -130,7 +130,7 @@ export default async function LiquidacionesPage({
             </Link>
           </Button>
           <Button variant="outline" asChild>
-            <Link href="/rrhh/liquidaciones/reportes">
+            <Link href="/rrhh/reportes">
               <FileText className="w-4 h-4 mr-2" />
               Reportes
             </Link>
