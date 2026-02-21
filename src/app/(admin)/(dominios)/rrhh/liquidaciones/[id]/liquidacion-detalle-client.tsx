@@ -11,9 +11,20 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { useNotificationStore } from '@/store/notificationStore'
 import {
   aprobarLiquidacionAction,
@@ -64,6 +75,8 @@ type NewRowDraft = {
   observaciones: string
 }
 
+type ConfirmFlowAction = 'aprobar' | 'pagar' | 'no_autorizar'
+
 function toNum(value: string): number {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : 0
@@ -74,7 +87,7 @@ function formatMoney(value?: number | null) {
 }
 
 function getOrigenBadge(origen: string | null | undefined) {
-  switch (origen) {
+  switch (normalizeOrigen(origen)) {
     case 'hik':
       return (
         <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200 text-xs">
@@ -96,6 +109,60 @@ function getOrigenBadge(origen: string | null | undefined) {
   }
 }
 
+const TURNO_OPTIONS = [
+  { value: 'general', label: 'General (jornada normal)' },
+  { value: 'manana', label: 'Manana' },
+  { value: 'tarde', label: 'Tarde' },
+  { value: 'noche', label: 'Noche' },
+  { value: 'feriado', label: 'Feriado' },
+  { value: 'domingo', label: 'Domingo' },
+] as const
+
+const TASK_TEMPLATES = ['Caja', 'Atencion al cliente', 'Reposicion', 'Reparto', 'Deposito', 'Limpieza'] as const
+
+const TURNO_VALUE_SET = new Set<string>(TURNO_OPTIONS.map((opt) => opt.value))
+
+function normalizeTurno(value?: string | null): string {
+  return (value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+}
+
+function getTurnoSelectValue(value?: string | null): string {
+  const normalized = normalizeTurno(value)
+  if (!normalized) return 'general'
+  return TURNO_VALUE_SET.has(normalized) ? normalized : 'otro'
+}
+
+function getTurnoLabel(value?: string | null): string {
+  const normalized = normalizeTurno(value)
+  if (!normalized) return 'General'
+  const option = TURNO_OPTIONS.find((opt) => opt.value === normalized)
+  if (option) {
+    return option.label.replace(' (jornada normal)', '')
+  }
+  return value?.trim() || 'General'
+}
+
+function sanitizeTaskValue(value?: string | null): string {
+  const raw = (value || '').trim()
+  if (!raw) return ''
+  const normalized = raw.toLowerCase()
+  if (normalized.includes('sincronizado desde hikconnect') || normalized.includes('sincronizado')) {
+    return ''
+  }
+  return raw
+}
+
+function normalizeOrigen(origen?: string | null): 'hik' | 'asistencia' | 'manual' {
+  const value = (origen || '').toLowerCase().trim()
+  if (value.includes('hik')) return 'hik'
+  if (value.includes('asistencia')) return 'asistencia'
+  return 'manual'
+}
+
 export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puestosDisponibles }: Props) {
   const router = useRouter()
   const { showToast } = useNotificationStore()
@@ -109,6 +176,8 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
   }, [jornadas])
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editingRow, setEditingRow] = useState<LiquidacionJornada | null>(null)
+  const [editingRowError, setEditingRowError] = useState<string | null>(null)
+  const [showEditingAdvancedTarifas, setShowEditingAdvancedTarifas] = useState(false)
 
   const [control, setControl] = useState({
     puesto_override: liquidacion.puesto_override || '',
@@ -135,6 +204,11 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
   const [showAdvancedTarifas, setShowAdvancedTarifas] = useState(false)
 
   const [motivoNoAutorizado, setMotivoNoAutorizado] = useState(liquidacion.motivo_no_autorizado || '')
+  const [confirmFlowAction, setConfirmFlowAction] = useState<ConfirmFlowAction | null>(null)
+  const [jornadaSearch, setJornadaSearch] = useState('')
+  const [jornadaTurnoFilter, setJornadaTurnoFilter] = useState<string>('todos')
+  const [jornadaOrigenFilter, setJornadaOrigenFilter] = useState<string>('todos')
+  const [soloDiferencias, setSoloDiferencias] = useState(false)
 
   const isSucursalEmployee = useMemo(() => {
     const categoriaNombre = liquidacion.empleado?.categoria?.nombre?.toLowerCase() || ''
@@ -158,6 +232,118 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
 
   const newRowBreakdown = getRowBreakdown(newRow)
   const editingRowBreakdown = editingRow ? getRowBreakdown(editingRow) : null
+  const newRowTurnoSelectValue = getTurnoSelectValue(newRow.turno)
+  const editingTurnoSelectValue = getTurnoSelectValue(editingRow?.turno)
+  const trimmedMotivoNoAutorizado = motivoNoAutorizado.trim()
+
+  const recentTaskOptions = useMemo(() => {
+    const unique = new Set<string>()
+    for (const row of rows) {
+      const task = sanitizeTaskValue(row.tarea)
+      if (!task) continue
+      unique.add(task)
+      if (unique.size >= 10) break
+    }
+    return Array.from(unique)
+  }, [rows])
+
+  const filteredRows = useMemo(() => {
+    const term = jornadaSearch.trim().toLowerCase()
+    return rows.filter((row) => {
+      const task = sanitizeTaskValue(row.tarea).toLowerCase()
+      const turno = normalizeTurno(row.turno)
+      const origen = normalizeOrigen(row.origen)
+      const hasDiferencia =
+        (row.horas_adicionales || 0) > 0 ||
+        (row.turno_especial_unidades || 0) > 0 ||
+        (row.tarifa_hora_base || 0) !== (liquidacion.valor_hora || 0)
+
+      if (soloDiferencias && !hasDiferencia) return false
+      if (jornadaTurnoFilter !== 'todos' && turno !== jornadaTurnoFilter) return false
+      if (jornadaOrigenFilter !== 'todos' && origen !== jornadaOrigenFilter) return false
+      if (!term) return true
+
+      const byFecha = row.fecha?.slice(0, 10)?.includes(term)
+      return Boolean(byFecha || task.includes(term) || turno.includes(term) || origen.includes(term))
+    })
+  }, [rows, jornadaSearch, jornadaTurnoFilter, jornadaOrigenFilter, soloDiferencias, liquidacion.valor_hora])
+
+  const jornadasResumen = filteredRows.reduce(
+    (acc, row) => {
+      acc.horasMensuales += row.horas_mensuales || 0
+      acc.horasAdicionales += row.horas_adicionales || 0
+      acc.turnosEspeciales += row.turno_especial_unidades || 0
+      const breakdown = getRowBreakdown(row)
+      acc.totalAplicado += breakdown.total
+      return acc
+    },
+    {
+      horasMensuales: 0,
+      horasAdicionales: 0,
+      turnosEspeciales: 0,
+      totalAplicado: 0,
+    },
+  )
+
+  const estadoLabel =
+    liquidacion.estado === 'borrador'
+      ? 'Borrador'
+      : liquidacion.estado === 'calculada'
+        ? 'Calculada'
+        : liquidacion.estado === 'aprobada'
+          ? 'Aprobada'
+          : 'Pagada'
+
+  const estadoBadgeClass =
+    liquidacion.estado === 'pagada'
+      ? 'bg-green-50 text-green-700 border-green-200'
+      : liquidacion.estado === 'aprobada'
+        ? 'bg-blue-50 text-blue-700 border-blue-200'
+        : liquidacion.estado === 'calculada'
+          ? 'bg-amber-50 text-amber-700 border-amber-200'
+          : 'bg-slate-50 text-slate-700 border-slate-200'
+
+  const approveBlockedReason =
+    liquidacion.estado === 'aprobada' || liquidacion.estado === 'pagada'
+      ? 'La liquidacion ya esta aprobada o pagada.'
+      : liquidacion.control_30_superado && !liquidacion.pago_autorizado
+        ? 'Supera control 30%. Primero autorice el pago.'
+        : null
+
+  const payBlockedReason =
+    liquidacion.estado !== 'aprobada'
+      ? 'Solo se puede pagar una liquidacion aprobada.'
+      : null
+
+  const nextStep =
+    liquidacion.estado === 'pagada'
+      ? 'No hay acciones pendientes.'
+      : liquidacion.estado === 'aprobada'
+        ? 'Siguiente paso: marcar como pagada.'
+        : liquidacion.control_30_superado && !liquidacion.pago_autorizado
+          ? 'Siguiente paso: autorizar pago o cargar motivo de rechazo.'
+          : 'Siguiente paso: revisar control y aprobar.'
+
+  const confirmTitle =
+    confirmFlowAction === 'aprobar'
+      ? 'Confirmar aprobacion'
+      : confirmFlowAction === 'pagar'
+        ? 'Confirmar pago'
+        : 'Confirmar no autorizacion'
+
+  const confirmDescription =
+    confirmFlowAction === 'aprobar'
+      ? 'Se marcara la liquidacion como aprobada.'
+      : confirmFlowAction === 'pagar'
+        ? 'Se marcara la liquidacion como pagada.'
+        : 'Se registrara la no autorizacion con el motivo cargado.'
+
+  const confirmActionLabel =
+    confirmFlowAction === 'aprobar'
+      ? 'Aprobar'
+      : confirmFlowAction === 'pagar'
+        ? 'Marcar pagada'
+        : 'No autorizar'
 
   const updateNewRow = (patch: Partial<NewRowDraft>) => {
     setNewRow((prev) => ({ ...prev, ...patch }))
@@ -202,6 +388,42 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
     return null
   }
 
+  const validateExistingRow = (row: LiquidacionJornada) => {
+    if (!row.fecha) return 'La fecha es obligatoria.'
+
+    const checks: Array<[string, number]> = [
+      ['hs mensuales', row.horas_mensuales || 0],
+      ['hs adicionales', row.horas_adicionales || 0],
+      ['turno especial', row.turno_especial_unidades || 0],
+      ['tarifa base', row.tarifa_hora_base || 0],
+      ['tarifa extra', row.tarifa_hora_extra || 0],
+      ['tarifa especial', row.tarifa_turno_especial || 0],
+    ]
+
+    const invalidNegative = checks.find(([, value]) => value < 0)
+    if (invalidNegative) return `El campo ${invalidNegative[0]} no puede ser negativo.`
+
+    const unidades =
+      (row.horas_mensuales || 0) + (row.horas_adicionales || 0) + (row.turno_especial_unidades || 0)
+    if (unidades <= 0) {
+      return 'Debe cargar al menos hs mensuales, hs adicionales o turno especial mayor a 0.'
+    }
+
+    if ((row.horas_mensuales || 0) > 0 && (row.tarifa_hora_base || 0) <= 0) {
+      return 'Si carga hs mensuales, la tarifa base debe ser mayor a 0.'
+    }
+
+    if (!isSucursalEmployee && (row.horas_adicionales || 0) > 0 && (row.tarifa_hora_extra || 0) <= 0) {
+      return 'Si carga hs adicionales, la tarifa extra debe ser mayor a 0.'
+    }
+
+    if ((row.turno_especial_unidades || 0) > 0 && (row.tarifa_turno_especial || 0) <= 0) {
+      return 'Si carga turno especial, la tarifa especial debe ser mayor a 0.'
+    }
+
+    return null
+  }
+
   const cuotasPeriodo = useMemo(() => {
     return cuotas.filter(
       (c) => c.periodo_mes === liquidacion.periodo_mes && c.periodo_anio === liquidacion.periodo_anio,
@@ -214,13 +436,20 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
     control30Limite > 0 ? Math.min(Math.round((control30Anticipos / control30Limite) * 100), 100) : 0
 
   const handleSaveRow = async (row: LiquidacionJornada) => {
+    const validationError = validateExistingRow(row)
+    if (validationError) {
+      setEditingRowError(validationError)
+      showToast('error', validationError, 'Validacion')
+      return
+    }
+
     setLoading(true)
     try {
       const result = await upsertLiquidacionJornadaAction(liquidacion.id, {
         id: row.id,
         fecha: row.fecha,
-        turno: row.turno,
-        tarea: row.tarea,
+        turno: row.turno?.trim() || 'general',
+        tarea: sanitizeTaskValue(row.tarea) || null,
         horas_mensuales: row.horas_mensuales,
         horas_adicionales: row.horas_adicionales,
         turno_especial_unidades: row.turno_especial_unidades,
@@ -260,7 +489,7 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
       const result = await upsertLiquidacionJornadaAction(liquidacion.id, {
         fecha: newRow.fecha,
         turno: newRow.turno.trim() || 'general',
-        tarea: newRow.tarea,
+        tarea: sanitizeTaskValue(newRow.tarea) || null,
         horas_mensuales: newRow.horas_mensuales,
         horas_adicionales: newRow.horas_adicionales,
         turno_especial_unidades: newRow.turno_especial_unidades,
@@ -338,6 +567,11 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
   }
 
   const handleAutorizar = async (autorizado: boolean) => {
+    if (!autorizado && !trimmedMotivoNoAutorizado) {
+      showToast('error', 'Ingrese un motivo para no autorizar.', 'Validacion')
+      return
+    }
+
     setLoading(true)
     try {
       const result = await autorizarPagoLiquidacionAction(
@@ -354,6 +588,46 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
     } finally {
       setLoading(false)
     }
+  }
+
+  const requestAprobar = () => {
+    if (approveBlockedReason) {
+      showToast('error', approveBlockedReason, 'Accion bloqueada')
+      return
+    }
+    setConfirmFlowAction('aprobar')
+  }
+
+  const requestPagar = () => {
+    if (payBlockedReason) {
+      showToast('error', payBlockedReason, 'Accion bloqueada')
+      return
+    }
+    setConfirmFlowAction('pagar')
+  }
+
+  const requestNoAutorizar = () => {
+    if (!trimmedMotivoNoAutorizado) {
+      showToast('error', 'Ingrese el motivo de no autorizacion antes de continuar.', 'Validacion')
+      return
+    }
+    setConfirmFlowAction('no_autorizar')
+  }
+
+  const confirmFlow = async () => {
+    const action = confirmFlowAction
+    setConfirmFlowAction(null)
+    if (!action) return
+
+    if (action === 'aprobar') {
+      await handleAprobar()
+      return
+    }
+    if (action === 'pagar') {
+      await handlePagar()
+      return
+    }
+    await handleAutorizar(false)
   }
 
   const handleAprobar = async () => {
@@ -391,12 +665,21 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
   }
 
   const openEditSheet = (row: LiquidacionJornada) => {
-    setEditingRow({ ...row })
+    setEditingRow({
+      ...row,
+      turno: row.turno?.trim() || 'general',
+      tarea: sanitizeTaskValue(row.tarea),
+    })
+    setEditingRowError(null)
+    setShowEditingAdvancedTarifas(false)
     setSheetOpen(true)
   }
 
   const updateEditingRow = (patch: Partial<LiquidacionJornada>) => {
     setEditingRow((prev) => (prev ? { ...prev, ...patch } : prev))
+    if (editingRowError) {
+      setEditingRowError(null)
+    }
   }
 
   return (
@@ -493,6 +776,36 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
 
         {/* Tab 1: Control y Autorización */}
         <TabsContent value="control" className="space-y-4">
+          <Card className="border-slate-200">
+            <CardHeader className="pb-3">
+              <CardTitle>Estado de flujo</CardTitle>
+              <CardDescription>Vista rapida del estado y la siguiente accion recomendada.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div className="rounded-md border bg-slate-50 p-3">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Estado</p>
+                  <Badge variant="outline" className={`mt-2 ${estadoBadgeClass}`}>
+                    {estadoLabel}
+                  </Badge>
+                </div>
+                <div className="rounded-md border bg-slate-50 p-3">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Pago autorizado</p>
+                  <Badge variant={liquidacion.pago_autorizado ? 'outline' : 'secondary'} className="mt-2">
+                    {liquidacion.pago_autorizado ? 'Si' : 'Pendiente'}
+                  </Badge>
+                </div>
+                <div className="rounded-md border bg-slate-50 p-3">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Control 30%</p>
+                  <p className="mt-2 font-semibold tabular-nums">{control30Pct}%</p>
+                </div>
+                <div className="rounded-md border bg-slate-50 p-3">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Siguiente paso</p>
+                  <p className="mt-2 text-sm">{nextStep}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
           <Card>
             <CardHeader>
               <CardTitle>Control de liquidación</CardTitle>
@@ -568,41 +881,13 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
               </div>
 
               {/* QW-2: Botones de edición */}
-              <div className="md:col-span-2 space-y-3">
-                <div className="flex gap-2 flex-wrap">
-                  <Button onClick={handleSaveControl} disabled={loading}>
-                    Guardar control
-                  </Button>
-                  <Button variant="outline" onClick={handleRecalcular} disabled={loading}>
-                    Recalcular
-                  </Button>
-                </div>
-
-                {/* QW-2: Separador de acciones de flujo */}
-                <Separator />
-                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                  Acciones de flujo
-                </p>
-                <div className="flex gap-2 flex-wrap">
-                  <Button
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                    onClick={handleAprobar}
-                    disabled={
-                      loading ||
-                      liquidacion.estado === 'aprobada' ||
-                      liquidacion.estado === 'pagada'
-                    }
-                  >
-                    Aprobar
-                  </Button>
-                  <Button
-                    className="bg-purple-600 hover:bg-purple-700 text-white"
-                    onClick={handlePagar}
-                    disabled={loading || liquidacion.estado !== 'aprobada'}
-                  >
-                    Marcar pagada
-                  </Button>
-                </div>
+              <div className="md:col-span-2 flex gap-2 flex-wrap pt-1">
+                <Button onClick={handleSaveControl} disabled={loading}>
+                  Guardar control
+                </Button>
+                <Button variant="outline" onClick={handleRecalcular} disabled={loading}>
+                  Recalcular
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -612,25 +897,54 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
               <CardTitle>Autorización de pago</CardTitle>
               <CardDescription>Si supera control 30%, requiere autorización manual.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center gap-2 flex-wrap">
-                <Badge variant={liquidacion.pago_autorizado ? 'outline' : 'secondary'}>
-                  {liquidacion.pago_autorizado ? 'Autorizado' : 'Pendiente'}
-                </Badge>
-                <Button size="sm" onClick={() => handleAutorizar(true)} disabled={loading}>
-                  Autorizar
+            <CardContent className="space-y-4">
+              <div className="rounded-md border bg-slate-50 p-3 space-y-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant={liquidacion.pago_autorizado ? 'outline' : 'secondary'}>
+                    {liquidacion.pago_autorizado ? 'Pago autorizado' : 'Autorizacion pendiente'}
+                  </Badge>
+                  <Button size="sm" onClick={() => handleAutorizar(true)} disabled={loading}>
+                    Autorizar
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={requestNoAutorizar} disabled={loading}>
+                    No autorizar
+                  </Button>
+                </div>
+                <div>
+                  <Label>Motivo no autorizado</Label>
+                  <Textarea
+                    value={motivoNoAutorizado}
+                    onChange={(e) => setMotivoNoAutorizado(e.target.value)}
+                    placeholder="Obligatorio para no autorizar"
+                  />
+                  {!trimmedMotivoNoAutorizado && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Si decide no autorizar, debe completar este motivo.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <Separator />
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Acciones de flujo</p>
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                  onClick={requestAprobar}
+                  disabled={loading || Boolean(approveBlockedReason)}
+                >
+                  Aprobar
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => handleAutorizar(false)} disabled={loading}>
-                  No autorizar
+                <Button
+                  className="bg-purple-600 hover:bg-purple-700 text-white"
+                  onClick={requestPagar}
+                  disabled={loading || Boolean(payBlockedReason)}
+                >
+                  Marcar pagada
                 </Button>
               </div>
-              <div>
-                <Label>Motivo no autorizado</Label>
-                <Textarea
-                  value={motivoNoAutorizado}
-                  onChange={(e) => setMotivoNoAutorizado(e.target.value)}
-                />
-              </div>
+              {approveBlockedReason && <p className="text-xs text-muted-foreground">{approveBlockedReason}</p>}
+              {payBlockedReason && <p className="text-xs text-muted-foreground">{payBlockedReason}</p>}
             </CardContent>
           </Card>
         </TabsContent>
@@ -651,9 +965,95 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
               )}
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                <div className="rounded-md border bg-slate-50 p-3">
+                  <p className="text-xs text-muted-foreground">Hs mensuales</p>
+                  <p className="font-semibold tabular-nums">{jornadasResumen.horasMensuales.toFixed(2)}</p>
+                </div>
+                <div className="rounded-md border bg-slate-50 p-3">
+                  <p className="text-xs text-muted-foreground">
+                    Hs adicionales {isSucursalEmployee ? '(informativas)' : ''}
+                  </p>
+                  <p className="font-semibold tabular-nums">{jornadasResumen.horasAdicionales.toFixed(2)}</p>
+                </div>
+                <div className="rounded-md border bg-slate-50 p-3">
+                  <p className="text-xs text-muted-foreground">Turnos especiales</p>
+                  <p className="font-semibold tabular-nums">{jornadasResumen.turnosEspeciales.toFixed(2)}</p>
+                </div>
+                <div className="rounded-md border bg-slate-50 p-3">
+                  <p className="text-xs text-muted-foreground">Total aplicado</p>
+                  <p className="font-semibold tabular-nums">{formatMoney(jornadasResumen.totalAplicado)}</p>
+                </div>
+              </div>
+
+              <div className="rounded-md border p-3 bg-white">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Buscar</Label>
+                    <Input
+                      placeholder="fecha, tarea, turno"
+                      value={jornadaSearch}
+                      onChange={(e) => setJornadaSearch(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Turno</Label>
+                    <Select value={jornadaTurnoFilter} onValueChange={setJornadaTurnoFilter}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Todos los turnos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos</SelectItem>
+                        {TURNO_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Origen</Label>
+                    <Select value={jornadaOrigenFilter} onValueChange={setJornadaOrigenFilter}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Todos los origenes" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos</SelectItem>
+                        <SelectItem value="hik">HIK</SelectItem>
+                        <SelectItem value="asistencia">Asistencia</SelectItem>
+                        <SelectItem value="manual">Manual</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-end justify-between gap-2">
+                    <label className="flex items-center gap-2 text-sm pb-2">
+                      <Checkbox
+                        checked={soloDiferencias}
+                        onCheckedChange={(checked) => setSoloDiferencias(Boolean(checked))}
+                      />
+                      Solo diferencias
+                    </label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setJornadaSearch('')
+                        setJornadaTurnoFilter('todos')
+                        setJornadaOrigenFilter('todos')
+                        setSoloDiferencias(false)
+                      }}
+                    >
+                      Limpiar
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
               <div className="rounded-md border overflow-auto">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 z-10 bg-background">
                     <TableRow>
                       <TableHead>Fecha</TableHead>
                       <TableHead>Turno</TableHead>
@@ -667,20 +1067,29 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {rows.length === 0 ? (
+                    {filteredRows.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={9} className="text-center text-muted-foreground py-6">
-                          No hay jornadas registradas
+                          No hay jornadas que coincidan con los filtros
                         </TableCell>
                       </TableRow>
                     ) : (
-                      rows.map((row) => (
-                        <TableRow key={row.id}>
+                      filteredRows.map((row) => (
+                        <TableRow
+                          key={row.id}
+                          className={
+                            (row.horas_adicionales || 0) > 0 ||
+                            (row.turno_especial_unidades || 0) > 0 ||
+                            (row.tarifa_hora_base || 0) !== (liquidacion.valor_hora || 0)
+                              ? 'bg-amber-50/30'
+                              : undefined
+                          }
+                        >
                           <TableCell className="text-sm whitespace-nowrap">
                             {row.fecha?.slice(0, 10) ?? '—'}
                           </TableCell>
-                          <TableCell className="text-sm">{row.turno || 'general'}</TableCell>
-                          <TableCell className="text-sm max-w-[120px] truncate">{row.tarea || '—'}</TableCell>
+                          <TableCell className="text-sm">{getTurnoLabel(row.turno)}</TableCell>
+                          <TableCell className="text-sm max-w-[160px] truncate">{sanitizeTaskValue(row.tarea) || 'Sin tarea cargada'}</TableCell>
                           <TableCell className="text-right text-sm tabular-nums">
                             {row.horas_mensuales ?? 0}
                           </TableCell>
@@ -744,19 +1153,63 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Turno</Label>
-                    <Input
-                      placeholder="ej: general"
-                      value={newRow.turno}
-                      onChange={(e) => updateNewRow({ turno: e.target.value })}
-                    />
+                    <Select
+                      value={newRowTurnoSelectValue}
+                      onValueChange={(value) =>
+                        updateNewRow({
+                          turno: value === 'otro' ? '' : value,
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar turno" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TURNO_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="otro">Otro (personalizado)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[11px] text-muted-foreground">General = jornada normal del dia.</p>
+                    {newRowTurnoSelectValue === 'otro' && (
+                      <Input
+                        placeholder="Escribir turno personalizado"
+                        value={newRow.turno}
+                        onChange={(e) => updateNewRow({ turno: e.target.value })}
+                      />
+                    )}
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Tarea</Label>
                     <Input
-                      placeholder="Descripcion breve"
+                      list="tareas-recientes"
+                      placeholder="Que tarea realizo"
                       value={newRow.tarea}
                       onChange={(e) => updateNewRow({ tarea: e.target.value })}
                     />
+                    <datalist id="tareas-recientes">
+                      {recentTaskOptions.map((task) => (
+                        <option key={task} value={task} />
+                      ))}
+                    </datalist>
+                    <div className="flex flex-wrap gap-1 pt-1">
+                      {TASK_TEMPLATES.map((task) => (
+                        <Button
+                          key={task}
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-6 px-2 text-[11px]"
+                          onClick={() => updateNewRow({ tarea: task })}
+                          disabled={loading}
+                        >
+                          {task}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
@@ -951,10 +1404,19 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Editar Jornada</SheetTitle>
+            <SheetDescription>
+              Turno general significa jornada normal del dia, sin clasificacion especial.
+            </SheetDescription>
           </SheetHeader>
 
           {editingRow && (
             <div className="mt-6 space-y-4">
+              {editingRowError && (
+                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                  {editingRowError}
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1 col-span-2">
                   <Label>Fecha</Label>
@@ -966,18 +1428,41 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
                 </div>
                 <div className="space-y-1">
                   <Label>Turno</Label>
-                  <Input
-                    value={editingRow.turno || ''}
-                    onChange={(e) => updateEditingRow({ turno: e.target.value })}
-                    placeholder="ej: general"
-                  />
+                  <Select
+                    value={editingTurnoSelectValue}
+                    onValueChange={(value) =>
+                      updateEditingRow({
+                        turno: value === 'otro' ? '' : value,
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar turno" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TURNO_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="otro">Otro (personalizado)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[11px] text-muted-foreground">General = jornada normal del dia.</p>
+                  {editingTurnoSelectValue === 'otro' && (
+                    <Input
+                      value={editingRow.turno || ''}
+                      onChange={(e) => updateEditingRow({ turno: e.target.value })}
+                      placeholder="Escribir turno personalizado"
+                    />
+                  )}
                 </div>
                 <div className="space-y-1">
                   <Label>Tarea</Label>
                   <Input
                     value={editingRow.tarea || ''}
                     onChange={(e) => updateEditingRow({ tarea: e.target.value })}
-                    placeholder="Descripción"
+                    placeholder="Que tarea realizo"
                   />
                 </div>
               </div>
@@ -991,6 +1476,7 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
                   <Input
                     type="number"
                     step="0.01"
+                    min="0"
                     value={editingRow.horas_mensuales ?? 0}
                     onChange={(e) => updateEditingRow({ horas_mensuales: toNum(e.target.value) })}
                   />
@@ -1000,6 +1486,7 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
                   <Input
                     type="number"
                     step="0.01"
+                    min="0"
                     value={editingRow.horas_adicionales ?? 0}
                     onChange={(e) => updateEditingRow({ horas_adicionales: toNum(e.target.value) })}
                   />
@@ -1009,6 +1496,7 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
                   <Input
                     type="number"
                     step="0.01"
+                    min="0"
                     value={editingRow.turno_especial_unidades ?? 0}
                     onChange={(e) => updateEditingRow({ turno_especial_unidades: toNum(e.target.value) })}
                   />
@@ -1016,36 +1504,50 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
               </div>
 
               <Separator />
-              <p className="text-sm font-medium">Tarifas</p>
+              <div className="space-y-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowEditingAdvancedTarifas((prev) => !prev)}
+                  disabled={loading}
+                >
+                  {showEditingAdvancedTarifas ? 'Ocultar tarifas avanzadas' : 'Mostrar tarifas avanzadas'}
+                </Button>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <Label>Tarifa hora base</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={editingRow.tarifa_hora_base ?? 0}
-                    onChange={(e) => updateEditingRow({ tarifa_hora_base: toNum(e.target.value) })}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>Tarifa hora extra</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={editingRow.tarifa_hora_extra ?? 0}
-                    onChange={(e) => updateEditingRow({ tarifa_hora_extra: toNum(e.target.value) })}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>Tarifa turno especial</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={editingRow.tarifa_turno_especial ?? 0}
-                    onChange={(e) => updateEditingRow({ tarifa_turno_especial: toNum(e.target.value) })}
-                  />
-                </div>
+                {showEditingAdvancedTarifas && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 rounded-md border bg-white p-3">
+                    <div className="space-y-1">
+                      <Label>Tarifa hora base</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={editingRow.tarifa_hora_base ?? 0}
+                        onChange={(e) => updateEditingRow({ tarifa_hora_base: toNum(e.target.value) })}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Tarifa hora extra</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={editingRow.tarifa_hora_extra ?? 0}
+                        onChange={(e) => updateEditingRow({ tarifa_hora_extra: toNum(e.target.value) })}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Tarifa turno especial</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={editingRow.tarifa_turno_especial ?? 0}
+                        onChange={(e) => updateEditingRow({ tarifa_turno_especial: toNum(e.target.value) })}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1">
@@ -1104,6 +1606,21 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
           )}
         </SheetContent>
       </Sheet>
+
+      <AlertDialog open={Boolean(confirmFlowAction)} onOpenChange={(open) => !open && setConfirmFlowAction(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmTitle}</AlertDialogTitle>
+            <AlertDialogDescription>{confirmDescription}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loading}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void confirmFlow()} disabled={loading}>
+              {confirmActionLabel}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
