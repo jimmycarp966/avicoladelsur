@@ -54,12 +54,14 @@ function getOrigenBadge(origen: string | null | undefined) {
 type LiquidacionJornadasTabProps = {
   liquidacion: Liquidacion
   jornadas: LiquidacionJornada[]
+  feriados: Array<{ fecha: string; descripcion?: string | null }>
   isSucursalEmployee: boolean
 }
 
 export function LiquidacionJornadasTab({
   liquidacion,
   jornadas,
+  feriados,
   isSucursalEmployee,
 }: LiquidacionJornadasTabProps) {
   const router = useRouter()
@@ -90,6 +92,27 @@ export function LiquidacionJornadasTab({
     'Sin puesto asignado'
 
   const editingRowBreakdown = editingRow ? getRowBreakdown(editingRow, isSucursalEmployee) : null
+  const feriadosMap = useMemo(
+    () =>
+      new Map<string, string>(
+        feriados
+          .filter((f) => Boolean(f.fecha))
+          .map((f) => [String(f.fecha).slice(0, 10), (f.descripcion || 'Feriado').trim() || 'Feriado']),
+      ),
+    [feriados],
+  )
+
+  const formatDateDMY = (value?: string | null): string => {
+    const iso = value?.slice(0, 10) || ''
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return '—'
+    const [year, month, day] = iso.split('-')
+    return `${day}-${month}-${year}`
+  }
+
+  const isSunday = (isoDate: string): boolean => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return false
+    return new Date(`${isoDate}T00:00:00`).getDay() === 0
+  }
 
   const filteredRows = useMemo(() => {
     const term = jornadaSearch.trim().toLowerCase()
@@ -97,6 +120,8 @@ export function LiquidacionJornadasTab({
       const task = (sanitizeTaskValue(row.tarea) || defaultPuestoLabel).toLowerCase()
       const turno = normalizeTurno(row.turno)
       const origen = normalizeOrigen(row.origen)
+      const fechaIso = row.fecha?.slice(0, 10) || ''
+      const fechaDmy = formatDateDMY(row.fecha).toLowerCase()
       const hasDiferencia =
         (row.horas_adicionales || 0) > 0 ||
         (row.turno_especial_unidades || 0) > 0 ||
@@ -107,7 +132,7 @@ export function LiquidacionJornadasTab({
       if (jornadaOrigenFilter !== 'todos' && origen !== jornadaOrigenFilter) return false
       if (!term) return true
 
-      const byFecha = row.fecha?.slice(0, 10)?.includes(term)
+      const byFecha = fechaIso.includes(term) || fechaDmy.includes(term)
       return Boolean(byFecha || task.includes(term) || turno.includes(term) || origen.includes(term))
     })
   }, [rows, jornadaSearch, jornadaTurnoFilter, jornadaOrigenFilter, soloDiferencias, liquidacion.valor_hora, defaultPuestoLabel])
@@ -342,19 +367,40 @@ export function LiquidacionJornadasTab({
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredRows.map((row) => (
+                  filteredRows.map((row) => {
+                    const fechaIso = row.fecha?.slice(0, 10) || ''
+                    const feriadoLabel = feriadosMap.get(fechaIso)
+                    const esFeriado = Boolean(feriadoLabel)
+                    const esDomingo = isSunday(fechaIso)
+                    const hasDiferencia =
+                      (row.horas_adicionales || 0) > 0 ||
+                      (row.turno_especial_unidades || 0) > 0 ||
+                      (row.tarifa_hora_base || 0) !== (liquidacion.valor_hora || 0)
+                    const rowClass = esFeriado || esDomingo
+                      ? 'bg-rose-50/60'
+                      : hasDiferencia
+                        ? 'bg-amber-50/30'
+                        : undefined
+
+                    return (
                     <TableRow
                       key={row.id}
-                      className={
-                        (row.horas_adicionales || 0) > 0 ||
-                        (row.turno_especial_unidades || 0) > 0 ||
-                        (row.tarifa_hora_base || 0) !== (liquidacion.valor_hora || 0)
-                          ? 'bg-amber-50/30'
-                          : undefined
-                      }
+                      className={rowClass}
                     >
                       <TableCell className="text-sm whitespace-nowrap">
-                        {row.fecha?.slice(0, 10) ?? '—'}
+                        <div className="flex items-center gap-2">
+                          <span>{formatDateDMY(row.fecha)}</span>
+                          {esDomingo && (
+                            <Badge variant="outline" className="bg-rose-50 text-rose-700 border-rose-200 text-[10px]">
+                              Domingo
+                            </Badge>
+                          )}
+                          {esFeriado && (
+                            <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 text-[10px]">
+                              {feriadoLabel}
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-sm">{getTurnoLabel(row.turno)}</TableCell>
                       <TableCell className="text-sm max-w-[160px] truncate">
@@ -384,7 +430,8 @@ export function LiquidacionJornadasTab({
                         </Button>
                       </TableCell>
                     </TableRow>
-                  ))
+                    )
+                  })
                 )}
               </TableBody>
               {filteredRows.length > 0 && (
@@ -446,3 +493,4 @@ export function LiquidacionJornadasTab({
     </>
   )
 }
+

@@ -24,10 +24,17 @@ type Props = {
   liquidacion: Liquidacion
   jornadas: LiquidacionJornada[]
   cuotas: CuotaWithPlan[]
+  feriados: Array<{ fecha: string; descripcion?: string | null }>
   puestosDisponibles: Pick<LiquidacionReglaPuesto, 'puesto_codigo'>[]
 }
 
-export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puestosDisponibles }: Props) {
+export function LiquidacionDetalleClient({
+  liquidacion,
+  jornadas,
+  cuotas,
+  feriados,
+  puestosDisponibles,
+}: Props) {
   const router = useRouter()
 
   const isSucursalEmployee = useMemo(() => {
@@ -81,6 +88,7 @@ export function LiquidacionDetalleClient({ liquidacion, jornadas, cuotas, puesto
           <LiquidacionJornadasTab
             liquidacion={liquidacion}
             jornadas={jornadas}
+            feriados={feriados}
             isSucursalEmployee={isSucursalEmployee}
           />
         </TabsContent>

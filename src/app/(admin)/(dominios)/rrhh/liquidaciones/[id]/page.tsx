@@ -61,6 +61,20 @@ async function getLiquidacionDetalle(liquidacionId: string) {
     .order('periodo_anio', { ascending: false })
     .order('periodo_mes', { ascending: false })
 
+  const periodoMes = Number(liquidacion.periodo_mes)
+  const periodoAnio = Number(liquidacion.periodo_anio)
+  const fromDate = `${periodoAnio}-${String(periodoMes).padStart(2, '0')}-01`
+  const monthLastDay = new Date(periodoAnio, periodoMes, 0).getDate()
+  const toDate = `${periodoAnio}-${String(periodoMes).padStart(2, '0')}-${String(monthLastDay).padStart(2, '0')}`
+
+  const { data: feriados } = await db
+    .from('rrhh_feriados')
+    .select('fecha, descripcion')
+    .eq('activo', true)
+    .gte('fecha', fromDate)
+    .lte('fecha', toDate)
+    .order('fecha', { ascending: true })
+
   const { data: puestos } = await adminSupabase
     .from('rrhh_liquidacion_reglas_puesto')
     .select('puesto_codigo')
@@ -71,6 +85,7 @@ async function getLiquidacionDetalle(liquidacionId: string) {
     liquidacion: liquidacion as Liquidacion,
     jornadas: (jornadas || []) as LiquidacionJornada[],
     cuotas: (cuotas || []) as AdelantoCuota[],
+    feriados: (feriados || []) as Array<{ fecha: string; descripcion?: string | null }>,
     puestosDisponibles: (puestos || []) as Pick<LiquidacionReglaPuesto, 'puesto_codigo'>[],
   }
 }
@@ -182,6 +197,7 @@ export default async function LiquidacionDetallePage({
         liquidacion={data.liquidacion}
         jornadas={data.jornadas}
         cuotas={data.cuotas}
+        feriados={data.feriados}
         puestosDisponibles={data.puestosDisponibles}
       />
     </div>
