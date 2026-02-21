@@ -2,6 +2,10 @@ import type { HorarioEventoNormalizado } from '@/types/domain.types'
 
 const BUSINESS_TIMEZONE = 'America/Argentina/Buenos_Aires'
 const NON_ATTENDANCE_EVENT_TYPES = new Set(['110517'])
+const HIK_ATTENDANCE_DEBOUNCE_MINUTES = Math.max(
+  0,
+  Number(process.env.HIK_ATTENDANCE_DEBOUNCE_MINUTES || '1'),
+)
 
 function normalizeIdentity(value: string): string {
   return value.replace(/[^0-9A-Za-z]+/g, '').toUpperCase()
@@ -152,6 +156,58 @@ function inferEmployeeNo(record: Record<string, unknown>): string | null {
   ])
 }
 
+function parseTimestampMs(value: string): number | null {
+  const parsed = new Date(normalizeTimestampValue(value))
+  const ms = parsed.getTime()
+  return Number.isNaN(ms) ? null : ms
+}
+
+function dedupeRapidEvents(events: HorarioEventoNormalizado[]): {
+  deduped: HorarioEventoNormalizado[]
+  removedCount: number
+} {
+  if (HIK_ATTENDANCE_DEBOUNCE_MINUTES <= 0 || events.length <= 1) {
+    return { deduped: events, removedCount: 0 }
+  }
+
+  const debounceMs = HIK_ATTENDANCE_DEBOUNCE_MINUTES * 60 * 1000
+  const lastAcceptedByEmployee = new Map<string, number>()
+  const deduped: HorarioEventoNormalizado[] = []
+  let removedCount = 0
+
+  const sorted = [...events].sort((a, b) => {
+    if (a.employee_no !== b.employee_no) {
+      return a.employee_no.localeCompare(b.employee_no)
+    }
+    const aTs = parseTimestampMs(a.timestamp) ?? 0
+    const bTs = parseTimestampMs(b.timestamp) ?? 0
+    return aTs - bTs
+  })
+
+  for (const event of sorted) {
+    const currentMs = parseTimestampMs(event.timestamp)
+    if (currentMs == null) {
+      deduped.push(event)
+      continue
+    }
+
+    const previousMs = lastAcceptedByEmployee.get(event.employee_no)
+    if (
+      typeof previousMs === 'number' &&
+      currentMs >= previousMs &&
+      currentMs - previousMs <= debounceMs
+    ) {
+      removedCount++
+      continue
+    }
+
+    lastAcceptedByEmployee.set(event.employee_no, currentMs)
+    deduped.push(event)
+  }
+
+  return { deduped, removedCount }
+}
+
 export function getArgentinaDateRange(baseDate = new Date()): { date: string; start: string; end: string } {
   const date = new Intl.DateTimeFormat('en-CA', {
     timeZone: BUSINESS_TIMEZONE,
@@ -171,7 +227,7 @@ export function normalizeHikAttendanceEvents(events: Record<string, unknown>[]):
   normalized: HorarioEventoNormalizado[]
   warnings: string[]
 } {
-  const normalized: HorarioEventoNormalizado[] = []
+  const normalizedRaw: HorarioEventoNormalizado[] = []
   const warnings: string[] = []
   let omittedCount = 0
   let skippedNonAttendance = 0
@@ -197,7 +253,7 @@ export function normalizeHikAttendanceEvents(events: Record<string, unknown>[]):
       return
     }
 
-    normalized.push({
+    normalizedRaw.push({
       employee_no: employeeNo,
       timestamp,
       type,
@@ -214,7 +270,14 @@ export function normalizeHikAttendanceEvents(events: Record<string, unknown>[]):
     warnings.push(`Se ignoraron ${skippedNonAttendance} eventos tecnicos no asociados a asistencia RRHH.`)
   }
 
-  return { normalized, warnings }
+  const { deduped, removedCount } = dedupeRapidEvents(normalizedRaw)
+  if (removedCount > 0) {
+    warnings.push(
+      `Se ignoraron ${removedCount} marcaciones repetidas dentro de ${HIK_ATTENDANCE_DEBOUNCE_MINUTES} minuto(s).`,
+    )
+  }
+
+  return { normalized: deduped, warnings }
 }
 
 export function timestampToLocalHour(input: string): string {
