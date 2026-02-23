@@ -11,6 +11,7 @@ type BreakdownItem = {
 
 const TIPO_CONFIG: Record<string, { label: string; color: string; tipo: 'ingreso' | 'descuento' }> = {
   sueldo_basico: { label: 'Sueldo basico', color: 'bg-blue-500', tipo: 'ingreso' },
+  presentismo: { label: 'Presentismo', color: 'bg-emerald-500', tipo: 'ingreso' },
   horas_mensuales: { label: 'Horas mensuales', color: 'bg-blue-400', tipo: 'ingreso' },
   horas_extras: { label: 'Horas extras', color: 'bg-indigo-500', tipo: 'ingreso' },
   turnos_especiales: { label: 'Turnos especiales', color: 'bg-violet-500', tipo: 'ingreso' },

@@ -555,7 +555,7 @@ export interface Asistencia extends BaseEntity {
 // Licencias y descansos
 export interface Licencia extends BaseEntity {
   empleado_id: string
-  tipo: 'vacaciones' | 'enfermedad' | 'maternidad' | 'estudio' | 'otro'
+  tipo: 'vacaciones' | 'enfermedad' | 'maternidad' | 'estudio' | 'otro' | 'descanso_programado'
   fecha_inicio: string
   fecha_fin: string
   fecha_sintomas?: string
@@ -666,6 +666,12 @@ export interface Liquidacion extends BaseEntity {
   adelanto_mercaderia_total?: number
   adelanto_efectivo_total?: number
   descuento_presentismo?: number
+  presentismo_teorico?: number
+  presentismo_perdido?: number
+  presentismo_pagado?: number
+  grupo_base_snapshot?: 'galpon' | 'sucursales' | 'rrhh' | string
+  sucursal_snapshot_id?: string | null
+  sucursal_snapshot_nombre?: string | null
   control_30_limite?: number
   control_30_anticipos?: number
   control_30_superado?: boolean
@@ -726,7 +732,7 @@ export interface LiquidacionJornada extends BaseEntity {
   monto_mensual?: number
   monto_extra?: number
   monto_turno_especial?: number
-  origen: 'auto_hik' | 'auto_asistencia' | 'manual'
+  origen: 'auto_hik' | 'auto_asistencia' | 'auto_licencia_descanso' | 'manual'
   observaciones?: string
   liquidacion?: Liquidacion
   empleado?: Empleado

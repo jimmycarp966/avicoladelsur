@@ -390,8 +390,8 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
                   <p className="font-semibold">Descuentos automáticos</p>
                   <ul className="list-disc list-inside text-blue-800/80 space-y-1">
                     <li>
-                      <strong>Presentismo:</strong> si existe alguna falta sin aviso en el mes, se
-                      descuenta 1 jornal completo
+                      <strong>Presentismo:</strong> si existe al menos una falta sin aviso o una
+                      tardanza mayor a 15 minutos en el mes, se descuenta 1 jornal completo
                     </li>
                     <li>
                       <strong>Adelantos:</strong> cuotas pendientes del período (dinero y mercadería)

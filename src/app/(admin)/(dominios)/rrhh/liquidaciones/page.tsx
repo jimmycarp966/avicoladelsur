@@ -14,7 +14,31 @@ import { LiquidacionesTableWrapper } from './_components/LiquidacionesTableWrapp
 import { PeriodFilterBar } from './_components/PeriodFilterBar'
 import { RecalcularLiquidacionesButton } from './_components/RecalcularLiquidacionesButton'
 
-async function getLiquidaciones(periodoMes?: number, periodoAnio?: number) {
+type AmbitoFilter = 'todos' | 'sucursal' | 'galpon'
+
+type SucursalOption = {
+  id: string
+  nombre: string
+}
+
+function resolveAmbitoLiquidacion(liquidacion: Liquidacion): 'sucursal' | 'galpon' | 'rrhh' {
+  const snapshot = (liquidacion.grupo_base_snapshot || '').toLowerCase().trim()
+  if (snapshot === 'sucursales') return 'sucursal'
+  if (snapshot === 'rrhh') return 'rrhh'
+  if (snapshot === 'galpon') return 'galpon'
+
+  const categoriaNombre = liquidacion.empleado?.categoria?.nombre?.toLowerCase() || ''
+  if (categoriaNombre.includes('sucursal') || categoriaNombre.includes('encargad')) return 'sucursal'
+
+  return 'galpon'
+}
+
+async function getLiquidaciones(
+  periodoMes?: number,
+  periodoAnio?: number,
+  ambito: AmbitoFilter = 'todos',
+  sucursalId?: string,
+) {
   const supabase = await createClient()
   const adminSupabase = createAdminClient()
 
@@ -36,9 +60,12 @@ async function getLiquidaciones(periodoMes?: number, periodoAnio?: number) {
       *,
       empleado:rrhh_empleados(
         id,
+        sucursal_id,
         legajo,
         nombre,
         apellido,
+        sucursal:sucursales(id, nombre),
+        categoria:rrhh_categorias(id, nombre),
         usuario:usuarios(nombre, apellido, email)
       )
     `)
@@ -60,7 +87,53 @@ async function getLiquidaciones(periodoMes?: number, periodoAnio?: number) {
     return []
   }
 
-  return data as Liquidacion[]
+  const base = (data || []) as Liquidacion[]
+  const filtered = base.filter((liquidacion) => {
+    const ambitoItem = resolveAmbitoLiquidacion(liquidacion)
+
+    if (ambito === 'galpon' && ambitoItem !== 'galpon') return false
+    if (ambito === 'sucursal' && ambitoItem !== 'sucursal') return false
+
+    if (ambito === 'sucursal' && sucursalId) {
+      const snapshotSucursal = liquidacion.sucursal_snapshot_id || ''
+      const empleadoSucursal = liquidacion.empleado?.sucursal_id || ''
+      if (snapshotSucursal !== sucursalId && empleadoSucursal !== sucursalId) return false
+    }
+
+    return true
+  })
+
+  return filtered
+}
+
+async function getSucursalesOptions(): Promise<SucursalOption[]> {
+  const supabase = await createClient()
+  const adminSupabase = createAdminClient()
+
+  const { data: authResult, error: authError } = await supabase.auth.getUser()
+  if (authError || !authResult.user) return []
+
+  const { data: userData } = await supabase
+    .from('usuarios')
+    .select('rol, activo')
+    .eq('id', authResult.user.id)
+    .maybeSingle()
+
+  const isAdmin = !!userData?.activo && userData.rol === 'admin'
+  const db = isAdmin ? adminSupabase : supabase
+
+  const { data, error } = await db
+    .from('sucursales')
+    .select('id, nombre')
+    .eq('activo', true)
+    .order('nombre', { ascending: true })
+
+  if (error) {
+    console.error('Error fetching sucursales for liquidaciones:', error)
+    return []
+  }
+
+  return (data || []) as SucursalOption[]
 }
 
 async function getEmpleadosActivosParaRecalculo() {
@@ -124,14 +197,17 @@ export const dynamic = 'force-dynamic'
 export default async function LiquidacionesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mes?: string; anio?: string }>
+  searchParams: Promise<{ mes?: string; anio?: string; ambito?: string; sucursal?: string }>
 }) {
   const params = await searchParams
   const periodoMes = params.mes ? Number(params.mes) : undefined
   const periodoAnio = params.anio ? Number(params.anio) : new Date().getFullYear()
+  const ambito = (params.ambito || 'todos') as AmbitoFilter
+  const sucursalId = params.sucursal || undefined
 
   await ejecutarFallbackMesVencido()
-  const liquidaciones = await getLiquidaciones(periodoMes, periodoAnio)
+  const liquidaciones = await getLiquidaciones(periodoMes, periodoAnio, ambito, sucursalId)
+  const sucursales = await getSucursalesOptions()
   const empleadosActivos = await getEmpleadosActivosParaRecalculo()
 
   const totalAprobadas = liquidaciones.filter((l) => l.estado === 'aprobada').length
@@ -205,7 +281,13 @@ export default async function LiquidacionesPage({
 
       {/* Tabla de liquidaciones con filtros y bulk actions */}
       <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
-        <PeriodFilterBar periodoMes={periodoMes} periodoAnio={periodoAnio} />
+        <PeriodFilterBar
+          periodoMes={periodoMes}
+          periodoAnio={periodoAnio}
+          ambito={ambito}
+          sucursalId={sucursalId}
+          sucursales={sucursales}
+        />
         <LiquidacionesTableWrapper liquidaciones={liquidaciones} />
       </div>
     </div>

@@ -2087,6 +2087,7 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
       | 'maternidad'
       | 'estudio'
       | 'otro'
+      | 'descanso_programado'
     const fecha_inicio = String(formData.get('fecha_inicio') || '')
     const fecha_fin = String(formData.get('fecha_fin') || '')
     const fecha_sintomas = String(formData.get('fecha_sintomas') || '')
@@ -2273,6 +2274,149 @@ export async function aprobarLicenciaAction(licenciaId: string): Promise<ApiResp
     }
   } catch (error) {
     devError('Error en aprobarLicencia:', error)
+    return {
+      success: false,
+      error: 'Error interno del servidor',
+    }
+  }
+}
+
+export async function obtenerDescansosProgramadosAction(
+  empleadoId: string,
+): Promise<
+  ApiResponse<
+    Array<{
+      id: string
+      dia_semana: number
+      vigente_desde: string
+      vigente_hasta?: string | null
+      observaciones?: string | null
+      activo: boolean
+    }>
+  >
+> {
+  try {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+      .from('rrhh_descansos_programados')
+      .select('id, dia_semana, vigente_desde, vigente_hasta, observaciones, activo')
+      .eq('empleado_id', empleadoId)
+      .eq('activo', true)
+      .order('dia_semana', { ascending: true })
+      .order('vigente_desde', { ascending: false })
+
+    if (error) {
+      devError('Error al obtener descansos programados:', error)
+      return {
+        success: false,
+        error: 'No se pudieron obtener los descansos programados',
+      }
+    }
+
+    return {
+      success: true,
+      data: (data || []) as Array<{
+        id: string
+        dia_semana: number
+        vigente_desde: string
+        vigente_hasta?: string | null
+        observaciones?: string | null
+        activo: boolean
+      }>,
+    }
+  } catch (error) {
+    devError('Error en obtenerDescansosProgramadosAction:', error)
+    return {
+      success: false,
+      error: 'Error interno del servidor',
+    }
+  }
+}
+
+export async function guardarDescansosProgramadosAction(input: {
+  empleado_id: string
+  dias_semana: number[]
+  vigente_desde: string
+  vigente_hasta?: string
+  observaciones?: string
+}): Promise<ApiResponse<{ registros: number }>> {
+  try {
+    const supabase = await createClient()
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser()
+    if (userError || !user) {
+      return {
+        success: false,
+        error: 'Usuario no autenticado',
+      }
+    }
+
+    const diasSemana = Array.from(new Set(input.dias_semana.map((d) => Number(d))))
+      .filter((d) => Number.isInteger(d) && d >= 0 && d <= 6)
+      .sort((a, b) => a - b)
+
+    if (!input.empleado_id || !input.vigente_desde || diasSemana.length === 0) {
+      return {
+        success: false,
+        error: 'Debe indicar empleado, fecha de vigencia y al menos un dia de descanso',
+      }
+    }
+
+    const { error: deactivateError } = await supabase
+      .from('rrhh_descansos_programados')
+      .update({
+        activo: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('empleado_id', input.empleado_id)
+      .eq('activo', true)
+
+    if (deactivateError) {
+      devError('Error desactivando descansos anteriores:', deactivateError)
+      return {
+        success: false,
+        error: 'No se pudieron reemplazar los descansos previos',
+      }
+    }
+
+    const payload = diasSemana.map((diaSemana) => ({
+      empleado_id: input.empleado_id,
+      dia_semana: diaSemana,
+      vigente_desde: input.vigente_desde,
+      vigente_hasta: input.vigente_hasta || null,
+      observaciones: input.observaciones || null,
+      activo: true,
+      created_by: user.id,
+    }))
+
+    const { data, error } = await supabase
+      .from('rrhh_descansos_programados')
+      .insert(payload)
+      .select('id')
+
+    if (error) {
+      devError('Error guardando descansos programados:', error)
+      return {
+        success: false,
+        error: 'No se pudieron guardar los descansos programados',
+      }
+    }
+
+    revalidatePath('/rrhh/licencias')
+    revalidatePath('/rrhh/liquidaciones')
+    revalidatePath('/rrhh/liquidaciones/calcular')
+
+    return {
+      success: true,
+      data: { registros: (data || []).length },
+      message: 'Descansos programados guardados y notificados',
+    }
+  } catch (error) {
+    devError('Error en guardarDescansosProgramadosAction:', error)
     return {
       success: false,
       error: 'Error interno del servidor',

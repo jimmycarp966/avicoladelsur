@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -19,6 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Printer } from 'lucide-react'
 import { useNotificationStore } from '@/store/notificationStore'
 import {
   aprobarLiquidacionAction,
@@ -352,6 +354,12 @@ export function LiquidacionControlTab({
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex gap-2 flex-wrap">
+              <Button variant="outline" asChild>
+                <Link href={`/rrhh/liquidaciones/${liquidacion.id}/recibo`}>
+                  <Printer className="w-4 h-4 mr-2" />
+                  Imprimir recibo
+                </Link>
+              </Button>
               <Button
                 className="bg-green-600 hover:bg-green-700 text-white"
                 onClick={requestAprobar}

@@ -6,7 +6,7 @@ import { DataTable, SortableHeader, StatusBadge } from '@/components/ui/data-tab
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Edit, Eye, CheckCircle, DollarSign, MoreHorizontal, FileSpreadsheet } from 'lucide-react'
+import { Edit, Eye, CheckCircle, DollarSign, MoreHorizontal, FileSpreadsheet, Printer } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -242,6 +242,12 @@ export function LiquidacionesTable({ liquidaciones, onView, onEdit, onApprove, o
                   <Link href={`/rrhh/liquidaciones/${liquidacion.id}`}>
                     <FileSpreadsheet className="mr-2 h-4 w-4" />
                     Ver planilla
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href={`/rrhh/liquidaciones/${liquidacion.id}/recibo`}>
+                    <Printer className="mr-2 h-4 w-4" />
+                    Imprimir recibo
                   </Link>
                 </DropdownMenuItem>
               </DropdownMenuGroup>

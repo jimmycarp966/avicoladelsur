@@ -62,7 +62,7 @@ export function sanitizeTaskValue(value?: string | null): string {
 export function normalizeOrigen(origen?: string | null): 'hik' | 'asistencia' | 'manual' {
   const value = (origen || '').toLowerCase().trim()
   if (value.includes('hik')) return 'hik'
-  if (value.includes('asistencia')) return 'asistencia'
+  if (value.includes('asistencia') || value.includes('licencia') || value.includes('descanso')) return 'asistencia'
   return 'manual'
 }
 

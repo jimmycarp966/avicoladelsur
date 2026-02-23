@@ -23,8 +23,10 @@ export function LiquidacionResumenTab({ liquidacion }: LiquidacionResumenTabProp
           <CardTitle className="text-base">Datos base de calculo</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
             <InfoItem label="Sueldo basico" value={formatMoney(liquidacion.sueldo_basico)} />
+            <InfoItem label="Presentismo teorico" value={formatMoney(liquidacion.presentismo_teorico)} />
+            <InfoItem label="Presentismo pagado" value={formatMoney(liquidacion.presentismo_pagado)} />
             <InfoItem label="Valor jornal" value={formatMoney(liquidacion.valor_jornal)} />
             <InfoItem label="Valor hora" value={formatMoney(liquidacion.valor_hora)} />
             <InfoItem label="Dias base" value={String(liquidacion.dias_base ?? '-')} />
