@@ -222,15 +222,18 @@ interface NavigationItemProps {
 }
 
 function NavigationItem({ item, pathname, user, onClose, badges }: NavigationItemProps) {
-  const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+  const hasChildren = item.children && item.children.length > 0
+  const hasActiveChild = Boolean(
+    item.children?.some((child) => pathname === child.href || pathname.startsWith(child.href + '/'))
+  )
+  const isActive = pathname === item.href || pathname.startsWith(item.href + '/') || hasActiveChild
   const canAccess = hasAccess(user, item.roles)
   const badgeCount = item.badge ? badges[item.badge] || 0 : 0
-  const hasChildren = item.children && item.children.length > 0
 
   if (!canAccess) return null
 
   // Solo cerrar menú si NO tiene hijos (es enlace final)
-  const handleMainClick = (e: React.MouseEvent) => {
+  const handleMainClick = () => {
     if (hasChildren) {
       // Si tiene hijos, solo navegar pero no cerrar el menú móvil
       // El submenú se mostrará automáticamente por isActive
@@ -270,7 +273,7 @@ function NavigationItem({ item, pathname, user, onClose, badges }: NavigationIte
       {hasChildren && isActive && (
         <div className="pl-10 pr-3 py-1 space-y-1 animate-in slide-in-from-top-2 duration-200">
           {item.children!.map((child) => {
-            const isChildActive = pathname === child.href
+            const isChildActive = pathname === child.href || pathname.startsWith(child.href + '/')
             return (
               <Link
                 key={child.name}

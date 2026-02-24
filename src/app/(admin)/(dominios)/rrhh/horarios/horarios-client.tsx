@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/ui/page-header'
 import { StatCard } from '@/components/ui/stat-card'
 import { useNotificationStore } from '@/store/notificationStore'
 import { obtenerHorariosHoyDesdeHikAction, sincronizarMesDesdeHikAction } from '@/actions/rrhh-horarios.actions'
+import { getTodayArgentina } from '@/lib/utils'
 import type { HorariosHoyData } from '@/types/domain.types'
 
 export function HorariosClient() {
@@ -17,11 +18,10 @@ export function HorariosClient() {
   const [isSyncingMes, setIsSyncingMes] = useState(false)
   const [data, setData] = useState<HorariosHoyData | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [fecha, setFecha] = useState(() => new Date().toISOString().split('T')[0])
-
-  const now = new Date()
-  const [syncMes, setSyncMes] = useState(now.getMonth() + 1)
-  const [syncAnio, setSyncAnio] = useState(now.getFullYear())
+  const fechaArgentinaHoy = getTodayArgentina()
+  const [fecha, setFecha] = useState(() => fechaArgentinaHoy)
+  const [syncMes, setSyncMes] = useState(() => Number(fechaArgentinaHoy.slice(5, 7)))
+  const [syncAnio, setSyncAnio] = useState(() => Number(fechaArgentinaHoy.slice(0, 4)))
 
   const loadData = useCallback((targetDate?: string) => {
     const dateToQuery = targetDate || fecha
@@ -83,7 +83,7 @@ export function HorariosClient() {
   }, [data])
 
   const mesesNombres = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
-  const aniosDisponibles = [now.getFullYear() - 1, now.getFullYear()]
+  const aniosDisponibles = [syncAnio - 1, syncAnio]
 
   return (
     <div className="space-y-8">

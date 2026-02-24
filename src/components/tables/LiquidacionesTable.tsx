@@ -102,6 +102,7 @@ export function LiquidacionesTable({ liquidaciones, onView, onEdit, onApprove, o
         const apellido = empleado?.usuario?.apellido || empleado?.apellido || ''
         const email = empleado?.usuario?.email || ''
         const legajo = empleado?.legajo || ''
+        const puesto = row.original.puesto_override?.trim() || empleado?.categoria?.nombre?.trim() || 'Sin puesto'
         const nombreCompleto = `${nombre} ${apellido}`.trim()
         const etiquetaEmpleado = nombreCompleto || email || 'Sin nombre'
 
@@ -109,6 +110,7 @@ export function LiquidacionesTable({ liquidaciones, onView, onEdit, onApprove, o
           <div>
             <div className="font-semibold text-foreground text-base">{etiquetaEmpleado}</div>
             {legajo && <div className="text-sm text-muted-foreground">Legajo: {legajo}</div>}
+            <div className="text-sm text-muted-foreground">Puesto: {puesto}</div>
           </div>
         )
       },
@@ -310,6 +312,7 @@ export function LiquidacionesTable({ liquidaciones, onView, onEdit, onApprove, o
         data={liquidacionesFiltradas}
         searchKey="empleado.usuario.nombre"
         searchPlaceholder="Buscar por empleado..."
+        enablePagination={false}
       />
     </div>
   )

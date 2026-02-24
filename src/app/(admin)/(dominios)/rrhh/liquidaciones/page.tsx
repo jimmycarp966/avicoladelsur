@@ -27,6 +27,8 @@ function resolveAmbitoLiquidacion(liquidacion: Liquidacion): 'sucursal' | 'galpo
   if (snapshot === 'rrhh') return 'rrhh'
   if (snapshot === 'galpon') return 'galpon'
 
+  if (liquidacion.sucursal_snapshot_id || liquidacion.empleado?.sucursal_id) return 'sucursal'
+
   const categoriaNombre = liquidacion.empleado?.categoria?.nombre?.toLowerCase() || ''
   if (categoriaNombre.includes('sucursal') || categoriaNombre.includes('encargad')) return 'sucursal'
 

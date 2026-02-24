@@ -113,30 +113,31 @@ export function PeriodFilterBar({
         </SelectContent>
       </Select>
 
-      <Select
-        value={sucursalId ?? 'todas'}
-        disabled={ambito !== 'sucursal'}
-        onValueChange={(value) =>
-          navigate(
-            periodoMes?.toString() ?? 'todos',
-            periodoAnio.toString(),
-            ambito,
-            value === 'todas' ? undefined : value,
-          )
-        }
-      >
-        <SelectTrigger className="w-[210px]">
-          <SelectValue placeholder="Todas las sucursales" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="todas">Todas las sucursales</SelectItem>
-          {sucursales.map((sucursal) => (
-            <SelectItem key={sucursal.id} value={sucursal.id}>
-              {sucursal.nombre}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {ambito === 'sucursal' && (
+        <Select
+          value={sucursalId ?? 'todas'}
+          onValueChange={(value) =>
+            navigate(
+              periodoMes?.toString() ?? 'todos',
+              periodoAnio.toString(),
+              ambito,
+              value === 'todas' ? undefined : value,
+            )
+          }
+        >
+          <SelectTrigger className="w-[210px]">
+            <SelectValue placeholder="Todas las sucursales" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todas">Todas las sucursales</SelectItem>
+            {sucursales.map((sucursal) => (
+              <SelectItem key={sucursal.id} value={sucursal.id}>
+                {sucursal.nombre}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
     </div>
   )
 }
