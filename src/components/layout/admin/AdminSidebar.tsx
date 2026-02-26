@@ -85,7 +85,7 @@ const navigation = [
   },
   {
     name: 'Almacén',
-    href: '/almacen',
+    href: '/almacen/presupuestos-dia',
     icon: Package,
     roles: ['admin', 'almacenista'],
     children: [
@@ -103,7 +103,7 @@ const navigation = [
   },
   {
     name: 'Ventas',
-    href: '/ventas',
+    href: '/ventas/presupuestos',
     icon: ShoppingCart,
     roles: ['admin', 'vendedor'],
     children: [
@@ -117,7 +117,7 @@ const navigation = [
   },
   {
     name: 'Reparto',
-    href: '/reparto',
+    href: '/reparto/rutas',
     icon: Truck,
     roles: ['admin', 'vendedor', 'almacenista'],
     children: [
