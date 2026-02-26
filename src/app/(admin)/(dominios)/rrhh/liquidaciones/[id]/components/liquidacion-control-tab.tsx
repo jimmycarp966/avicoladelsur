@@ -28,6 +28,7 @@ import {
   actualizarLiquidacionControlAction,
   marcarLiquidacionPagadaAction,
   recalcularLiquidacionAction,
+  autoAsignarDescansosAction,
 } from '@/actions/rrhh.actions'
 import { FieldWithTooltip } from './field-with-tooltip'
 import type { Liquidacion, LiquidacionReglaPuesto } from '@/types/domain.types'
@@ -491,6 +492,30 @@ export function LiquidacionControlTab({
                       </Button>
                       <Button variant="outline" onClick={handleRecalcular} disabled={loading}>
                         Recalcular
+                      </Button>
+                      <Button
+                        variant="outline"
+                        disabled={loading}
+                        onClick={async () => {
+                          setLoading(true)
+                          try {
+                            const result = await autoAsignarDescansosAction(liquidacion.id)
+                            if (!result.success) {
+                              showToast('error', result.error || 'No se pudo asignar descansos', 'Error')
+                            } else {
+                              showToast(
+                                'success',
+                                result.data?.mensaje || 'Descansos asignados',
+                                'Descansos',
+                              )
+                              onRefresh()
+                            }
+                          } finally {
+                            setLoading(false)
+                          }
+                        }}
+                      >
+                        Auto-descansos
                       </Button>
                     </div>
                   </div>

@@ -100,7 +100,10 @@ export default async function ReciboLiquidacionPage({
 
   return (
     <div className="max-w-4xl mx-auto py-6 space-y-4">
-      <PrintActions backHref={`/rrhh/liquidaciones/${liquidacion.id}`} />
+      <PrintActions
+        backHref={`/rrhh/liquidaciones/${liquidacion.id}`}
+        simpleHref={`/rrhh/liquidaciones/${liquidacion.id}/recibo/simple`}
+      />
 
       <Card className="print:shadow-none print:border-0">
         <CardContent className="p-8 print:p-2">

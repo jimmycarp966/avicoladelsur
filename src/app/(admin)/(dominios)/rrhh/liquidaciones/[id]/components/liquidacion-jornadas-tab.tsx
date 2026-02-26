@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Pencil, Plus } from 'lucide-react'
+import { CalendarDays, Pencil, Plus, Table2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -11,10 +11,12 @@ import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useNotificationStore } from '@/store/notificationStore'
 import { upsertLiquidacionJornadaAction } from '@/actions/rrhh.actions'
 import { JornadaEditSheet } from './jornada-edit-sheet'
 import { JornadaAddSheet } from './jornada-add-sheet'
+import { JornadasCalendario } from './jornadas-calendario'
 import type { Liquidacion, LiquidacionJornada } from '@/types/domain.types'
 import {
   TURNO_OPTIONS,
@@ -69,6 +71,7 @@ export function LiquidacionJornadasTab({
 
   const [rows, setRows] = useState<LiquidacionJornada[]>(jornadas)
   const [loading, setLoading] = useState(false)
+  const [vistaCalendario, setVistaCalendario] = useState(false)
 
   useEffect(() => {
     setRows(jornadas)
@@ -248,10 +251,32 @@ export function LiquidacionJornadasTab({
                 </p>
               )}
             </div>
-            <Button size="sm" onClick={() => setAddSheetOpen(true)} disabled={loading}>
-              <Plus className="h-4 w-4 mr-1" />
-              Agregar jornada
-            </Button>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center rounded-md border bg-muted/30 p-0.5">
+                <Button
+                  size="sm"
+                  variant={vistaCalendario ? 'ghost' : 'secondary'}
+                  className="h-7 px-2 gap-1"
+                  onClick={() => setVistaCalendario(false)}
+                >
+                  <Table2 className="h-3.5 w-3.5" />
+                  <span className="text-xs">Tabla</span>
+                </Button>
+                <Button
+                  size="sm"
+                  variant={vistaCalendario ? 'secondary' : 'ghost'}
+                  className="h-7 px-2 gap-1"
+                  onClick={() => setVistaCalendario(true)}
+                >
+                  <CalendarDays className="h-3.5 w-3.5" />
+                  <span className="text-xs">Calendario</span>
+                </Button>
+              </div>
+              <Button size="sm" onClick={() => setAddSheetOpen(true)} disabled={loading}>
+                <Plus className="h-4 w-4 mr-1" />
+                Agregar jornada
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -277,8 +302,8 @@ export function LiquidacionJornadasTab({
             </div>
           </div>
 
-          {/* Filtros */}
-          <div className="rounded-md border p-3 bg-white">
+          {/* Filtros (solo en vista tabla) */}
+          {!vistaCalendario && <div className="rounded-md border p-3 bg-white">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
               <div className="space-y-1">
                 <Label className="text-xs">Buscar</Label>
@@ -341,10 +366,20 @@ export function LiquidacionJornadasTab({
                 </Button>
               </div>
             </div>
-          </div>
+          </div>}
+
+          {/* Vista calendario */}
+          {vistaCalendario && (
+            <JornadasCalendario
+              jornadas={rows}
+              feriados={feriados}
+              periodoMes={liquidacion.periodo_mes}
+              periodoAnio={liquidacion.periodo_anio}
+            />
+          )}
 
           {/* Tabla */}
-          <div className="rounded-md border overflow-auto">
+          {!vistaCalendario && <div className="rounded-md border overflow-auto">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-background">
                 <TableRow>
@@ -402,7 +437,33 @@ export function LiquidacionJornadasTab({
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="text-sm">{getTurnoLabel(row.turno)}</TableCell>
+                      <TableCell className="text-sm">
+                        {(() => {
+                          const horasInsuf =
+                            (row.horas_mensuales ?? 0) > 0 &&
+                            (row.horas_mensuales ?? 0) < 4 &&
+                            row.origen !== 'auto_licencia_descanso'
+                          return horasInsuf ? (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="flex items-center gap-1.5 cursor-help">
+                                    <span className="text-red-600 font-medium">{getTurnoLabel(row.turno)}</span>
+                                    <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200 text-[10px] leading-tight py-0">
+                                      Faltan hs
+                                    </Badge>
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  Solo {row.horas_mensuales}hs registradas, se esperan ≥4hs del HIK
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          ) : (
+                            getTurnoLabel(row.turno)
+                          )
+                        })()}
+                      </TableCell>
                       <TableCell className="text-sm max-w-[160px] truncate">
                         {sanitizeTaskValue(row.tarea) || defaultPuestoLabel}
                       </TableCell>
@@ -457,7 +518,7 @@ export function LiquidacionJornadasTab({
                 </TableFooter>
               )}
             </Table>
-          </div>
+          </div>}
         </CardContent>
       </Card>
 

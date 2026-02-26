@@ -1,14 +1,15 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowLeft, Printer } from 'lucide-react'
+import { ArrowLeft, FileText, Printer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 type PrintActionsProps = {
   backHref: string
+  simpleHref?: string
 }
 
-export function PrintActions({ backHref }: PrintActionsProps) {
+export function PrintActions({ backHref, simpleHref }: PrintActionsProps) {
   return (
     <div className="flex items-center justify-between gap-3 print:hidden">
       <Button variant="outline" asChild>
@@ -17,11 +18,20 @@ export function PrintActions({ backHref }: PrintActionsProps) {
           Volver
         </Link>
       </Button>
-      <Button onClick={() => window.print()}>
-        <Printer className="w-4 h-4 mr-2" />
-        Imprimir
-      </Button>
+      <div className="flex items-center gap-2">
+        {simpleHref && (
+          <Button variant="outline" asChild>
+            <Link href={simpleHref}>
+              <FileText className="w-4 h-4 mr-2" />
+              Recibí (comprobante)
+            </Link>
+          </Button>
+        )}
+        <Button onClick={() => window.print()}>
+          <Printer className="w-4 h-4 mr-2" />
+          Imprimir
+        </Button>
+      </div>
     </div>
   )
 }
-

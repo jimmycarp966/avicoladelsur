@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -34,6 +34,17 @@ export function JornadaEditSheet({
 }: JornadaEditSheetProps) {
   const [showAdvancedTarifas, setShowAdvancedTarifas] = useState(false)
   const editingTurnoSelectValue = getTurnoSelectValue(editingRow?.turno)
+
+  // Estados locales string para inputs numéricos — evita que el campo se fuerce a "0" al borrar
+  const [hsInput, setHsInput] = useState(String(editingRow?.horas_mensuales ?? ''))
+  const [hsAdicInput, setHsAdicInput] = useState(String(editingRow?.horas_adicionales ?? ''))
+  const [turnoEspInput, setTurnoEspInput] = useState(String(editingRow?.turno_especial_unidades ?? ''))
+
+  useEffect(() => {
+    setHsInput(String(editingRow?.horas_mensuales ?? ''))
+    setHsAdicInput(String(editingRow?.horas_adicionales ?? ''))
+    setTurnoEspInput(String(editingRow?.turno_especial_unidades ?? ''))
+  }, [editingRow?.id])
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -106,8 +117,9 @@ export function JornadaEditSheet({
                   type="number"
                   step="0.01"
                   min="0"
-                  value={editingRow.horas_mensuales ?? 0}
-                  onChange={(e) => onUpdateRow({ horas_mensuales: toNum(e.target.value) })}
+                  value={hsInput}
+                  onChange={(e) => setHsInput(e.target.value)}
+                  onBlur={(e) => onUpdateRow({ horas_mensuales: toNum(e.target.value) })}
                 />
               </div>
               <div className="space-y-1">
@@ -116,8 +128,9 @@ export function JornadaEditSheet({
                   type="number"
                   step="0.01"
                   min="0"
-                  value={editingRow.horas_adicionales ?? 0}
-                  onChange={(e) => onUpdateRow({ horas_adicionales: toNum(e.target.value) })}
+                  value={hsAdicInput}
+                  onChange={(e) => setHsAdicInput(e.target.value)}
+                  onBlur={(e) => onUpdateRow({ horas_adicionales: toNum(e.target.value) })}
                 />
               </div>
               <div className="space-y-1">
@@ -126,8 +139,9 @@ export function JornadaEditSheet({
                   type="number"
                   step="0.01"
                   min="0"
-                  value={editingRow.turno_especial_unidades ?? 0}
-                  onChange={(e) => onUpdateRow({ turno_especial_unidades: toNum(e.target.value) })}
+                  value={turnoEspInput}
+                  onChange={(e) => setTurnoEspInput(e.target.value)}
+                  onBlur={(e) => onUpdateRow({ turno_especial_unidades: toNum(e.target.value) })}
                 />
               </div>
             </div>

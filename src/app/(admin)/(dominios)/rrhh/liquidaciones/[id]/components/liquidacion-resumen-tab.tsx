@@ -1,6 +1,7 @@
 'use client'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import type { Liquidacion, LiquidacionDetalle } from '@/types/domain.types'
 import { SalaryBreakdownChart } from './salary-breakdown-chart'
 
@@ -22,16 +23,17 @@ export function LiquidacionResumenTab({ liquidacion }: LiquidacionResumenTabProp
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Datos base de calculo</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <InfoItem label="Sueldo basico" value={formatMoney(liquidacion.sueldo_basico)} />
-            <InfoItem label="Presentismo teorico" value={formatMoney(liquidacion.presentismo_teorico)} />
-            <InfoItem label="Presentismo pagado" value={formatMoney(liquidacion.presentismo_pagado)} />
             <InfoItem label="Valor jornal" value={formatMoney(liquidacion.valor_jornal)} />
             <InfoItem label="Valor hora" value={formatMoney(liquidacion.valor_hora)} />
             <InfoItem label="Dias base" value={String(liquidacion.dias_base ?? '-')} />
             <InfoItem label="Horas jornada" value={String(liquidacion.horas_jornada ?? '-')} />
           </div>
+
+          {/* Card de presentismo fijo */}
+          <PresentismoCard liquidacion={liquidacion} />
         </CardContent>
       </Card>
 
@@ -68,6 +70,54 @@ function InfoItem({ label, value }: { label: string; value: string }) {
     <div className="rounded-md border bg-slate-50 p-3">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="font-semibold tabular-nums mt-1">{value}</p>
+    </div>
+  )
+}
+
+function PresentismoCard({ liquidacion }: { liquidacion: Liquidacion }) {
+  const presentismoTeorico = liquidacion.presentismo_teorico ?? 0
+  const presentismoPagado = liquidacion.presentismo_pagado ?? 0
+  const descuento = liquidacion.descuento_presentismo ?? 0
+
+  const estaGanado = presentismoPagado > 0 && descuento === 0
+  const estaDescontado = descuento > 0
+
+  return (
+    <div className={`rounded-md border p-4 ${estaGanado ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Presentismo</p>
+          <p className="text-lg font-bold tabular-nums mt-0.5">{formatMoney(presentismoTeorico)}</p>
+        </div>
+        <div className="text-right space-y-1">
+          {estaGanado && (
+            <>
+              <Badge className="bg-green-100 text-green-700 border-green-300 hover:bg-green-100">
+                Ganado
+              </Badge>
+              <p className="text-xs text-green-600">Mes completo sin infracciones</p>
+            </>
+          )}
+          {estaDescontado && (
+            <>
+              <Badge className="bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-100">
+                Descuento pendiente
+              </Badge>
+              <p className="text-xs text-amber-600">
+                {liquidacion.periodo_mes === new Date().getMonth() + 1 &&
+                liquidacion.periodo_anio === new Date().getFullYear()
+                  ? 'Mes en curso'
+                  : 'Infracciones detectadas'}
+              </p>
+            </>
+          )}
+          {!estaGanado && !estaDescontado && (
+            <Badge variant="outline" className="text-muted-foreground">
+              Sin datos
+            </Badge>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

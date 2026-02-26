@@ -940,7 +940,7 @@ type UpsertLiquidacionJornadaInput = {
   tarifa_hora_base?: number
   tarifa_hora_extra?: number
   tarifa_turno_especial?: number
-  origen?: 'auto_hik' | 'auto_asistencia' | 'manual'
+  origen?: 'auto_hik' | 'auto_asistencia' | 'auto_licencia_descanso' | 'manual'
   observaciones?: string
 }
 
@@ -3008,5 +3008,179 @@ export async function obtenerSucursalesActivasAction(): Promise<ApiResponse<Arra
       success: false,
       error: 'Error interno del servidor',
     }
+  }
+}
+
+// ========== AUTO-DESCANSOS ==========
+
+/**
+ * Asigna automáticamente 2 descansos mensuales para puestos que lo requieren:
+ * - Encargado de sucursal / Asistente sucursal (no medio día)
+ * - Tesorería en galpón (solo Lun-Vie)
+ *
+ * Idempotente: si ya existen 2 jornadas con origen='auto_licencia_descanso', no inserta más.
+ */
+export async function autoAsignarDescansosAction(
+  liquidacionId: string,
+): Promise<ApiResponse<{ insertados: number; mensaje: string }>> {
+  try {
+    const adminUserId = await getAuthenticatedAdminUserId()
+    if (!adminUserId) {
+      return { success: false, error: 'No autorizado' }
+    }
+
+    const supabase = createAdminClient()
+
+    // Obtener datos de la liquidación
+    const { data: liquidacion, error: liqError } = await supabase
+      .from('rrhh_liquidaciones')
+      .select('id, empleado_id, periodo_mes, periodo_anio, puesto_override, grupo_base_snapshot')
+      .eq('id', liquidacionId)
+      .maybeSingle()
+
+    if (liqError || !liquidacion) {
+      return { success: false, error: 'Liquidación no encontrada' }
+    }
+
+    // Obtener puesto del empleado
+    const { data: empleado } = await supabase
+      .from('rrhh_empleados')
+      .select('categoria:rrhh_categorias(nombre)')
+      .eq('id', liquidacion.empleado_id)
+      .maybeSingle()
+
+    const puestoNombre: string =
+      liquidacion.puesto_override?.trim() ||
+      (empleado?.categoria as { nombre?: string } | null)?.nombre?.trim() ||
+      ''
+
+    const esEncargadoSucursal = /encargado.+sucursal/i.test(puestoNombre)
+    const esAsistenteSucursal =
+      /asistente.+sucursal/i.test(puestoNombre) && !/medio.+d[ií]a/i.test(puestoNombre)
+    const esTesoreriaGalpon =
+      /tesorer[oía]/i.test(puestoNombre) && liquidacion.grupo_base_snapshot === 'galpon'
+
+    if (!esEncargadoSucursal && !esAsistenteSucursal && !esTesoreriaGalpon) {
+      return {
+        success: true,
+        data: { insertados: 0, mensaje: `El puesto "${puestoNombre}" no requiere descansos automáticos` },
+      }
+    }
+
+    // Verificar cuántos descansos ya existen
+    const { data: descansosExistentes } = await supabase
+      .from('rrhh_liquidacion_jornadas')
+      .select('id, fecha')
+      .eq('liquidacion_id', liquidacionId)
+      .eq('origen', 'auto_licencia_descanso')
+
+    if ((descansosExistentes?.length ?? 0) >= 2) {
+      return {
+        success: true,
+        data: {
+          insertados: 0,
+          mensaje: `Ya existen ${descansosExistentes!.length} descanso(s) registrado(s). No se insertaron más.`,
+        },
+      }
+    }
+
+    const cantidadFaltante = 2 - (descansosExistentes?.length ?? 0)
+
+    // Obtener jornadas existentes del mes para no repetir fechas
+    const { data: jornadasExistentes } = await supabase
+      .from('rrhh_liquidacion_jornadas')
+      .select('fecha')
+      .eq('liquidacion_id', liquidacionId)
+
+    const fechasOcupadas = new Set<string>(
+      (jornadasExistentes || []).map((j) => String(j.fecha).slice(0, 10)),
+    )
+
+    // Generar días hábiles candidatos del mes
+    const { periodo_mes: mes, periodo_anio: anio } = liquidacion
+    const ultimoDia = new Date(anio, mes, 0).getDate()
+    const candidatos: string[] = []
+
+    for (let d = 1; d <= ultimoDia; d++) {
+      const fechaStr = `${anio}-${String(mes).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+      if (fechasOcupadas.has(fechaStr)) continue
+
+      const dow = new Date(`${fechaStr}T12:00:00`).getDay() // 0=Dom, 6=Sáb
+      const esFinde = dow === 0 || dow === 6
+
+      if (esTesoreriaGalpon && esFinde) continue
+      if (!esTesoreriaGalpon && esFinde) continue // encargados y asistentes también solo días hábiles
+
+      candidatos.push(fechaStr)
+    }
+
+    if (candidatos.length < cantidadFaltante) {
+      return {
+        success: false,
+        error: `No hay suficientes días hábiles libres en el mes para asignar ${cantidadFaltante} descanso(s)`,
+      }
+    }
+
+    // Seleccionar aleatoriamente (distribuidos: 1 en primera mitad, 1 en segunda mitad si es posible)
+    const mitad = Math.floor(candidatos.length / 2)
+    const primeraMitad = candidatos.slice(0, mitad)
+    const segundaMitad = candidatos.slice(mitad)
+
+    const elegidos: string[] = []
+    if (cantidadFaltante >= 1 && primeraMitad.length > 0) {
+      elegidos.push(primeraMitad[Math.floor(Math.random() * primeraMitad.length)])
+    }
+    if (cantidadFaltante >= 2 && segundaMitad.length > 0) {
+      elegidos.push(segundaMitad[Math.floor(Math.random() * segundaMitad.length)])
+    }
+
+    // Completar si alguna mitad estaba vacía
+    while (elegidos.length < cantidadFaltante) {
+      const remaining = candidatos.filter((c) => !elegidos.includes(c))
+      if (remaining.length === 0) break
+      elegidos.push(remaining[Math.floor(Math.random() * remaining.length)])
+    }
+
+    // Insertar jornadas de descanso
+    const inserts = elegidos.map((fecha) => ({
+      liquidacion_id: liquidacionId,
+      empleado_id: liquidacion.empleado_id,
+      fecha,
+      turno: 'medio_turno_tarde',
+      horas_mensuales: 0.5,
+      horas_adicionales: 0,
+      turno_especial_unidades: 0,
+      tarifa_hora_base: 0,
+      tarifa_hora_extra: 0,
+      tarifa_turno_especial: 0,
+      origen: 'auto_licencia_descanso' as const,
+      observaciones: 'Descanso mensual asignado automáticamente',
+    }))
+
+    const { error: insertError } = await supabase
+      .from('rrhh_liquidacion_jornadas')
+      .insert(inserts)
+
+    if (insertError) {
+      devError('Error al insertar descansos automáticos:', insertError)
+      return { success: false, error: 'Error al guardar los descansos: ' + insertError.message }
+    }
+
+    // Recalcular liquidación
+    await supabase.rpc('fn_rrhh_recalcular_liquidacion', {
+      p_liquidacion_id: liquidacionId,
+      p_actor: adminUserId,
+    })
+
+    return {
+      success: true,
+      data: {
+        insertados: elegidos.length,
+        mensaje: `Se asignaron ${elegidos.length} descanso(s) en: ${elegidos.join(', ')}`,
+      },
+    }
+  } catch (error) {
+    devError('Error en autoAsignarDescansosAction:', error)
+    return { success: false, error: 'Error interno del servidor' }
   }
 }
