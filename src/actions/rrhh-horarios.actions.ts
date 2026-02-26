@@ -15,6 +15,10 @@ import {
   normalizeHikAttendanceEvents,
   timestampToLocalHour,
 } from '@/lib/services/rrhh-horarios.service'
+import {
+  applyConfiguredHikMappings,
+  loadHikPersonMapConfig,
+} from '@/lib/services/hik-mapping.service'
 
 interface EmpleadoLookup {
   id: string
@@ -135,23 +139,6 @@ function extractHikPersonName(raw: Record<string, unknown>): string | undefined 
   const last = readString(base, 'lastName')
   const composed = `${first} ${last}`.trim()
   return composed || undefined
-}
-
-function parseManualHikMap(): Map<string, string> {
-  const raw = (process.env.HIK_CONNECT_PERSON_MAP || '').trim()
-  const map = new Map<string, string>()
-  if (!raw) return map
-
-  const entries = raw.split(',').map((item) => item.trim()).filter(Boolean)
-  for (const entry of entries) {
-    const separator = entry.includes('=') ? '=' : entry.includes(':') ? ':' : ''
-    if (!separator) continue
-    const [left, right] = entry.split(separator).map((part) => part.trim())
-    if (!left || !right) continue
-    map.set(normalizeIdentity(left), right)
-  }
-
-  return map
 }
 
 async function checkAdmin(supabase: SupabaseClient): Promise<boolean> {
@@ -554,36 +541,29 @@ export async function obtenerHorariosHoyDesdeHikAction(fecha?: string): Promise<
       }
     }
 
-    const manualMap = parseManualHikMap()
-    let appliedManualMapCount = 0
-    for (const [hikCode, employeeRef] of manualMap.entries()) {
-      const refKey = normalizeIdentity(employeeRef)
-      const refDigits = digitsOnly(employeeRef)
-      const resolved =
-        employeeById.get(employeeRef) ||
-        employeeMap.get(refKey) ||
-        (refDigits ? employeeMap.get(refDigits) : undefined)
-
-      if (resolved) {
-        employeeMap.set(hikCode, resolved)
-        const hikDigits = digitsOnly(hikCode)
-        if (hikDigits) {
-          employeeMap.set(hikDigits, resolved)
-        }
-        appliedManualMapCount++
-      }
-    }
+    const hikMapConfig = await loadHikPersonMapConfig({
+      adminSupabase: createAdminClient(),
+    })
+    const { appliedCount: appliedHikMapCount, unresolvedCount: unresolvedHikMapCount } =
+      applyConfiguredHikMappings({
+        configuredMap: hikMapConfig.map,
+        employeeMap,
+        employeeById,
+      })
+    warnings.push(...hikMapConfig.warnings)
 
     const registros = buildDailyRows(normalizedToday, employeeMap, employeeByName)
     const mappedCount = registros.filter((row) => row.mapeado).length
 
-    if (manualMap.size > 0 && appliedManualMapCount < manualMap.size) {
-      warnings.push(`Se aplicaron ${appliedManualMapCount}/${manualMap.size} mapeos manuales de HIK_CONNECT_PERSON_MAP.`)
+    if (hikMapConfig.map.size > 0 && unresolvedHikMapCount > 0) {
+      warnings.push(
+        `Se aplicaron ${appliedHikMapCount}/${hikMapConfig.map.size} mapeos configurados (rrhh_hik_person_map/HIK_CONNECT_PERSON_MAP).`,
+      )
     }
 
     if (registros.length > 0 && mappedCount === 0) {
       warnings.push(
-        'No se pudo mapear ninguna marcacion a RRHH. Revise DNI/CUIL/legajo o configure HIK_CONNECT_PERSON_MAP.',
+        'No se pudo mapear ninguna marcacion a RRHH. Revise DNI/CUIL/legajo o configure rrhh_hik_person_map/HIK_CONNECT_PERSON_MAP.',
       )
     }
 
@@ -667,19 +647,18 @@ export async function sincronizarMesDesdeHikAction(
       }
     }
 
-    // Aplicar mapeo manual si existe
-    const manualMap = parseManualHikMap()
-    for (const [hikCode, employeeRef] of manualMap.entries()) {
-      const refKey = normalizeIdentity(employeeRef)
-      const refDigits = digitsOnly(employeeRef)
-      const resolved = employeeById.get(employeeRef)
-        || employeeMap.get(refKey)
-        || (refDigits ? employeeMap.get(refDigits) : undefined)
-      if (resolved) {
-        employeeMap.set(hikCode, resolved)
-        const hikDigits = digitsOnly(hikCode)
-        if (hikDigits) employeeMap.set(hikDigits, resolved)
-      }
+    const hikMapConfig = await loadHikPersonMapConfig({
+      adminSupabase: createAdminClient(),
+    })
+    const { unresolvedCount: unresolvedHikMapCount } = applyConfiguredHikMappings({
+      configuredMap: hikMapConfig.map,
+      employeeMap,
+      employeeById,
+    })
+    if (unresolvedHikMapCount > 0) {
+      devError(
+        `[RRHH Horarios] Mapeos Hik sin resolver en sync mensual: ${unresolvedHikMapCount}/${hikMapConfig.map.size}`,
+      )
     }
 
     const lastDay = new Date(anio, mes, 0).getDate()

@@ -9,6 +9,10 @@ import {
   normalizeHikAttendanceEvents,
   timestampToLocalHour,
 } from '@/lib/services/rrhh-horarios.service'
+import {
+  applyConfiguredHikMappings,
+  loadHikPersonMapConfig,
+} from '@/lib/services/hik-mapping.service'
 
 const ARG_TZ = 'America/Argentina/Buenos_Aires'
 const MIDDAY_HORA_ARG = Number(process.env.HIK_SPLIT_TURNO_HORA || '14')
@@ -256,27 +260,6 @@ function splitTurnos(sortedTimes: Date[]): { manana: Date[]; tarde: Date[] } {
   return { manana, tarde }
 }
 
-function parseManualHikMap(): Map<string, string> {
-  const raw = (process.env.HIK_CONNECT_PERSON_MAP || '').trim()
-  const map = new Map<string, string>()
-  if (!raw) return map
-
-  const entries = raw
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
-
-  for (const entry of entries) {
-    const separator = entry.includes('=') ? '=' : entry.includes(':') ? ':' : ''
-    if (!separator) continue
-    const [left, right] = entry.split(separator).map((part) => part.trim())
-    if (!left || !right) continue
-    map.set(normalizeIdentity(left), right)
-  }
-
-  return map
-}
-
 function findEmployeeByPartialName(
   hikNameKey: string,
   employeeByName: Map<string, EmpleadoLookup>,
@@ -413,19 +396,22 @@ async function getEmployeeMaps(adminSupabase: ReturnType<typeof createAdminClien
     }
   }
 
-  const manualMap = parseManualHikMap()
-  for (const [hikCode, employeeRef] of manualMap.entries()) {
-    const refKey = normalizeIdentity(employeeRef)
-    const refDigits = digitsOnly(employeeRef)
-    const resolved =
-      employeeById.get(employeeRef) ||
-      employeeMap.get(refKey) ||
-      (refDigits ? employeeMap.get(refDigits) : undefined)
-    if (!resolved) continue
+  const hikMapConfig = await loadHikPersonMapConfig({ adminSupabase })
+  const { unresolvedCount } = applyConfiguredHikMappings({
+    configuredMap: hikMapConfig.map,
+    employeeMap,
+    employeeById,
+  })
 
-    employeeMap.set(hikCode, resolved)
-    const hikDigits = digitsOnly(hikCode)
-    if (hikDigits) employeeMap.set(hikDigits, resolved)
+  if (hikMapConfig.warnings.length > 0) {
+    for (const warning of hikMapConfig.warnings) {
+      devError('[RRHH AUTO LIQ][HIK MAP]', warning)
+    }
+  }
+  if (unresolvedCount > 0) {
+    devError(
+      `[RRHH AUTO LIQ][HIK MAP] Quedaron ${unresolvedCount}/${hikMapConfig.map.size} codigos sin resolver.`,
+    )
   }
 
   return { employeeMap, employeeById, employeeByName }

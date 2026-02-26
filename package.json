@@ -20,7 +20,8 @@
     "test:webmcp:presupuesto-flow": "node scripts/test-webmcp-presupuesto-flow.cjs",
     "test:webmcp:sucursales-transferencias": "node scripts/test-webmcp-sucursales-transferencias.cjs",
     "test:webmcp:reparto-pedidos": "node scripts/test-webmcp-reparto-pedidos.cjs",
-    "test:webmcp:rrhh-flow": "node scripts/test-webmcp-rrhh-flow.cjs"
+    "test:webmcp:rrhh-flow": "node scripts/test-webmcp-rrhh-flow.cjs",
+    "rrhh:hik:backfill": "node scripts/rrhh-hik-backfill.js"
   },
   "dependencies": {
     "@fontsource/outfit": "^5.2.8",

@@ -40,8 +40,35 @@ Orden de mapeo activo:
 
 1. `personCode/employeeNo` contra `dni/cuil/legajo`.
 2. Fallback por nombre (`firstName + lastName` de Hik vs `nombre + apellido` en RRHH, normalizado).
-3. Mapeo manual opcional por variable de entorno:
+3. Mapeo persistente en BD (`public.rrhh_hik_person_map`).
+4. Fallback por variable de entorno:
    - `HIK_CONNECT_PERSON_MAP=personCode=LEG001,otroCodigo=UUID_o_DNI_o_CUIL`
+
+## Actualizacion operativa (2026-02-26)
+
+- Se agrego `public.rrhh_hik_person_map` para guardar vinculaciones Hik -> `rrhh_empleados` de forma estable.
+- Se unifico el uso del mapeo en:
+  - `RRHH > Horarios` (sync diario y mensual)
+  - proceso automatico de liquidaciones RRHH
+- Si la tabla no existe aun, el sistema sigue funcionando con fallback a `HIK_CONNECT_PERSON_MAP`.
+
+### Backfill y autovinculacion masiva
+
+Se agrego script operativo:
+
+- `npm run rrhh:hik:backfill -- --from=YYYY-MM-DD --to=YYYY-MM-DD --apply`
+
+Comportamiento:
+
+1. Lee eventos Hik por dia y normaliza marcaciones.
+2. Intenta mapear por `rrhh_hik_person_map`, env map, DNI/CUIL/legajo y UUID.
+3. Si un codigo Hik no tiene match y se usa `--apply`, crea empleado placeholder y lo vincula.
+4. Sincroniza `rrhh_asistencia` respetando cargas manuales existentes.
+
+Opciones utiles:
+
+- `--apply`: aplica cambios reales (sin esto corre en dry-run).
+- `--no-create-placeholders`: no crea empleados nuevos para codigos sin match.
 
 ### Nota sobre IDs con ceros (liquidacion externa)
 
