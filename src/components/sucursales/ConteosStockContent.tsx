@@ -261,45 +261,42 @@ export function ConteosStockContent({ data }: { data: ConteosData }) {
 
   // Manejar escaneo de código de barras en conteo
   const handleScanConteo = useCallback(async (code: string) => {
-    if (!conteoActivo) return
+    if (!conteoActivo) return false
 
     const parsed = parseBarcodeEAN13(code)
-    console.log('[ConteosStock] Código escaneado:', code, parsed)
+    console.log('[ConteosStock] Codigo escaneado:', code, parsed)
 
-    if (!parsed.plu) {
-      toast.error('Código no válido')
-      return
+    if (!parsed.isValid || !parsed.plu) {
+      toast.error(parsed.error || 'Codigo no valido')
+      return false
     }
 
-    // Buscar producto por PLU
-    const result = await buscarProductoPorCodigoBarrasAction(parsed.plu)
+    const result = await buscarProductoPorCodigoBarrasAction(parsed.rawCode)
 
     if (!result.success || !result.data) {
       toast.error(result.error || 'Producto no encontrado')
-      return
+      return false
     }
 
-    // Buscar el item en el conteo activo
     const itemConteo = conteoActivo.items.find(
       item => item.productoId === result.data!.producto.id
     )
 
     if (!itemConteo) {
-      toast.error('Este producto no está en el conteo actual')
-      return
+      toast.error('Este producto no esta en el conteo actual')
+      return false
     }
 
-    // Si el código tiene peso embebido, actualizar cantidad contada
     if (parsed.isWeightCode && parsed.weight) {
       await handleActualizarCantidad(itemConteo.productoId, parsed.weight)
       toast.success(`${result.data.producto.nombre}: ${parsed.weight.toFixed(3)} kg registrado`)
-    } else {
-      // Mostrar mensaje para ingresar cantidad manualmente
-      toast.info(`Producto: ${result.data.producto.nombre}. Ingresa la cantidad manualmente.`)
-      // Hacer scroll al item
-      const rowElement = document.getElementById(`conteo-item-${itemConteo.productoId}`)
-      rowElement?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      return true
     }
+
+    toast.info(`Producto: ${result.data.producto.nombre}. Ingresa la cantidad manualmente.`)
+    const rowElement = document.getElementById(`conteo-item-${itemConteo.productoId}`)
+    rowElement?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    return true
   }, [conteoActivo, handleActualizarCantidad])
 
   return (
@@ -672,4 +669,5 @@ export function ConteosStockContent({ data }: { data: ConteosData }) {
     </div>
   )
 }
+
 

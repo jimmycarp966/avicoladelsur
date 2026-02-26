@@ -390,23 +390,25 @@ export function PesajeItemCard({
   const handleScan = useCallback((code: string) => {
     const parsed = parseBarcodeEAN13(code)
 
-    // Validar que el código PLU coincida con el producto del item actual
+    if (!parsed.isValid || !parsed.plu) {
+      toast.error('Codigo no valido: ' + (parsed.error || 'formato desconocido'))
+      return false
+    }
+
     const codigoProducto = item.producto?.codigo
-    if (parsed.plu && codigoProducto) {
-      // Normalizar códigos para comparación rápida (quitar ceros iniciales)
+    if (codigoProducto) {
       const pluNormalizado = parsed.plu.replace(/^0+/, '') || '0'
       const codigoNormalizado = codigoProducto.replace(/^0+/, '') || '0'
 
       if (!pluNormalizado.includes(codigoNormalizado) && !codigoNormalizado.includes(pluNormalizado)) {
         toast.error(
-          `El código escaneado (${parsed.plu}) NO corresponde al producto "${item.producto?.nombre}" (código: ${codigoProducto}). Escanea la etiqueta correcta.`,
+          `El codigo escaneado (${parsed.plu}) NO corresponde al producto "${item.producto?.nombre}" (codigo: ${codigoProducto}). Escanea la etiqueta correcta.`,
           { duration: 5000 }
         )
-        return
+        return false
       }
     }
 
-    // ACUMULATIVO: Agregar peso a la lista de bolsas escaneadas
     if (parsed.isWeightCode && parsed.weight) {
       const nuevaBolsa: ScanEntry = {
         id: crypto.randomUUID(),
@@ -419,14 +421,14 @@ export function PesajeItemCard({
       const bolsasCount = scanEntries.length + 1
 
       toast.success(
-        `Bolsa ${bolsasCount}: ${parsed.weight.toFixed(3)} kg → Total: ${nuevoTotal.toFixed(3)} kg`,
+        `Bolsa ${bolsasCount}: ${parsed.weight.toFixed(3)} kg -> Total: ${nuevoTotal.toFixed(3)} kg`,
         { duration: 3000 }
       )
-    } else if (parsed.plu) {
-      toast.info(`Código PLU: ${parsed.plu} (sin peso embebido)`)
-    } else {
-      toast.error('Código no válido: ' + (parsed.error || 'formato desconocido'))
+      return true
     }
+
+    toast.info(`Codigo PLU: ${parsed.plu} (sin peso embebido)`)
+    return false
   }, [item.producto?.codigo, item.producto?.nombre, pesoTotalAcumulado, scanEntries.length])
 
   // Eliminar una bolsa individual del listado
@@ -811,4 +813,5 @@ export function PesajeItemCard({
     </>
   )
 }
+
 

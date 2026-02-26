@@ -1,14 +1,5 @@
 /**
- * Utilidades para parsear códigos de barras EAN-13 con peso embebido
- * 
- * Formato de la balanza SDP BBC-4030:
- * 2 0 P P P P P W W W W W C
- * │ │ └─────┘   └─────┘   │
- * │ │    │         │      └── Dígito verificador
- * │ │    │         └── Peso (5 dígitos, ej: 10170 = 10.170 kg)
- * │ │    └── PLU/Código producto (5 dígitos)
- * │ └── Indicador tipo (0 = precio variable, 1 = peso variable)
- * └── Prefijo nacional peso variable
+ * Utilities to parse EAN-13 barcodes, including variable-weight labels.
  */
 
 export interface BarcodeResult {
@@ -18,11 +9,12 @@ export interface BarcodeResult {
   pluExtended?: string | null
   weight: number | null
   rawCode: string
+  checksumValid?: boolean
   error?: string
 }
 
 /**
- * Calcula el dígito verificador EAN-13
+ * Calculates EAN-13 check digit for a 12-digit base.
  */
 function calculateEAN13CheckDigit(code: string): number {
   if (code.length !== 12) return -1
@@ -37,7 +29,7 @@ function calculateEAN13CheckDigit(code: string): number {
 }
 
 /**
- * Valida un código EAN-13
+ * Validates a full EAN-13 code.
  */
 export function validateEAN13(code: string): boolean {
   if (!/^\d{13}$/.test(code)) return false
@@ -49,26 +41,11 @@ export function validateEAN13(code: string): boolean {
 }
 
 /**
- * Parsea un código de barras EAN-13 con peso embebido
- * 
- * Formato de balanza SDP BBC-4030 (Avícola del Sur):
- * 2 0 P P P P F W W W W W C
- * │ │ └─────┘ │ └───────┘ │
- * │ │    │    │     │     └── Dígito verificador
- * │ │    │    │     └── Peso (5 dígitos en gramos, ej: 11650 = 11.650 kg)
- * │ │    │    └── Flag (0=normal, 1=unidad mayor, etc.)
- * │ │    └── PLU/Código producto (4 dígitos con ceros a la izquierda)
- * │ └── Indicador tipo
- * └── Prefijo nacional peso variable
- * 
- * Ejemplos:
- * - 2001480116503 → PLU: 148, Peso: 11.650 kg
- * - 2001481010704 → PLU: 148, Peso: 10.170 kg (flag 1 = unidad mayor)
+ * Parses EAN-13 barcode and extracts variable-weight payload when prefix is 20/21/22.
  */
 export function parseBarcodeEAN13(code: string): BarcodeResult {
   const rawCode = code.trim()
 
-  // Validar formato básico
   if (!/^\d{13}$/.test(rawCode)) {
     return {
       isValid: false,
@@ -76,48 +53,57 @@ export function parseBarcodeEAN13(code: string): BarcodeResult {
       plu: null,
       weight: null,
       rawCode,
-      error: 'Código debe tener 13 dígitos'
+      checksumValid: false,
+      error: 'Codigo debe tener 13 digitos'
     }
   }
 
-  // Verificar prefijo de peso variable (20, 21, 22, etc.)
+  const checksumValid = validateEAN13(rawCode)
+
+  // Variable weight prefixes used by scales.
   const prefix = rawCode.substring(0, 2)
   const isWeightCode = prefix === '20' || prefix === '21' || prefix === '22'
 
   if (!isWeightCode) {
-    // Es un código EAN-13 estándar (sin peso embebido)
     return {
-      isValid: validateEAN13(rawCode),
+      isValid: checksumValid,
       isWeightCode: false,
-      plu: rawCode, // El código completo es el identificador
+      plu: rawCode,
       weight: null,
-      rawCode
+      rawCode,
+      checksumValid,
+      error: checksumValid ? undefined : 'Checksum EAN-13 invalido'
     }
   }
 
-  // Formato SDP: 20 + PLU(4) + FLAG(1) + PESO(5) + CHECK(1)
-  // O Alternativa 5 dígitos PLU: 20 + PLU(5) + PESO(5) + CHECK(1)
-  // Como no podemos estar seguros, extraemos estándar pero permitimos variantes
-  const pluRaw = rawCode.substring(2, 6)   // 4 dígitos de PLU (posición 2-5)
-  const flag = rawCode.substring(6, 7)      // 1 dígito flag (posición 6)
-  const weightRaw = rawCode.substring(7, 12)  // 5 dígitos de peso (posición 7-11)
+  if (!checksumValid) {
+    return {
+      isValid: false,
+      isWeightCode: true,
+      plu: null,
+      pluExtended: null,
+      weight: null,
+      rawCode,
+      checksumValid,
+      error: 'Checksum EAN-13 invalido'
+    }
+  }
 
-  // Variante 5 dígitos (si el formato es PPPPP sin flag)
-  // Esto es útil si el PLU real es de 5 dígitos (ej: 00055)
+  // Format: 20 + PLU(4) + FLAG(1) + WEIGHT(5) + CHECK(1)
+  // Alternate format also exists with PLU(5).
+  const pluRaw = rawCode.substring(2, 6)
+  const flag = rawCode.substring(6, 7)
+  const weightRaw = rawCode.substring(7, 12)
   const pluRawExtended = rawCode.substring(2, 7)
 
-  // Limpiar PLU: remover ceros a la izquierda
-  // Devolvemos el PLU estándar, pero getPLUVariants debería considerar pluRawExtended si es necesario
   const plu = pluRaw.replace(/^0+/, '') || '0'
   const pluExtended = pluRawExtended.replace(/^0+/, '') || '0'
 
-  // Convertir peso: los 5 dígitos representan gramos (ej: 11650 = 11.650 kg)
   const weightGrams = parseInt(weightRaw, 10)
-  const weight = weightGrams / 1000  // Convertir a kg
+  const weight = weightGrams / 1000
 
-  // Log solo en desarrollo para debugging
   if (process.env.NODE_ENV === 'development') {
-    console.log('[barcode-parser] Código parseado:', {
+    console.log('[barcode-parser] Parsed code:', {
       rawCode,
       pluRaw,
       plu,
@@ -133,23 +119,21 @@ export function parseBarcodeEAN13(code: string): BarcodeResult {
     plu,
     pluExtended,
     weight,
-    rawCode
+    rawCode,
+    checksumValid
   }
 }
 
 /**
- * Parsea códigos alternativos (Code128, etc.)
- * Útil cuando el código no es EAN-13
+ * Parses non-EAN formats (Code128, etc.).
  */
 export function parseGenericBarcode(code: string): BarcodeResult {
   const rawCode = code.trim()
 
-  // Si es EAN-13, usar el parser específico
   if (/^\d{13}$/.test(rawCode)) {
     return parseBarcodeEAN13(rawCode)
   }
 
-  // Para otros formatos, simplemente retornar el código como PLU
   return {
     isValid: true,
     isWeightCode: false,
@@ -161,7 +145,7 @@ export function parseGenericBarcode(code: string): BarcodeResult {
 }
 
 /**
- * Formatea el peso para mostrar (ej: 10.170 kg)
+ * Formats weight with 3 decimals.
  */
 export function formatWeight(weight: number | null): string {
   if (weight === null) return '-'
@@ -169,22 +153,19 @@ export function formatWeight(weight: number | null): string {
 }
 
 /**
- * Formatea el PLU para búsqueda en BD
- * Genera variantes posibles del código
+ * Produces PLU variants used in DB lookup.
  */
 export function getPLUVariants(plu: string): string[] {
   const variants: string[] = [plu]
 
-  // Agregar con ceros a la izquierda (4 dígitos)
   if (plu.length < 4) {
     variants.push(plu.padStart(4, '0'))
   }
 
-  // Agregar sin ceros a la izquierda
   const withoutLeadingZeros = plu.replace(/^0+/, '')
   if (withoutLeadingZeros !== plu && withoutLeadingZeros.length > 0) {
     variants.push(withoutLeadingZeros)
   }
 
-  return [...new Set(variants)] // Eliminar duplicados
+  return [...new Set(variants)]
 }

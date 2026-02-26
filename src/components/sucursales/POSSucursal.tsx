@@ -210,53 +210,47 @@ export function POSSucursal({
   // Manejar escaneo de código de barras
   const handleScan = useCallback(async (code: string) => {
     const parsed = parseBarcodeEAN13(code)
-    console.log('[POS Sucursal] Código escaneado:', code, parsed)
+    console.log('[POS Sucursal] Codigo escaneado:', code, parsed)
 
-    if (!parsed.plu) {
-      toast.error('Código no válido')
-      return
+    if (!parsed.isValid || !parsed.plu) {
+      toast.error(parsed.error || 'Codigo no valido')
+      return false
     }
 
-    // Buscar producto por PLU
-    const result = await buscarProductoPorCodigoBarrasAction(parsed.plu)
+    const result = await buscarProductoPorCodigoBarrasAction(parsed.rawCode)
 
     if (!result.success || !result.data) {
       toast.error(result.error || 'Producto no encontrado')
-      return
+      return false
     }
 
     const productoEncontrado = result.data.producto
-
-    // Buscar en la lista local de productos
     const productoLocal = productos.find(p => p.id === productoEncontrado.id)
 
     if (!productoLocal) {
       toast.error('Producto no disponible en esta sucursal')
-      return
+      return false
     }
 
-    // Si el código tiene peso embebido, usar ese peso como cantidad
     if (parsed.isWeightCode && parsed.weight) {
       setCantidadInput({ ...cantidadInput, [productoLocal.id]: parsed.weight.toFixed(3) })
     } else {
       setCantidadInput({ ...cantidadInput, [productoLocal.id]: '1' })
     }
 
-    // Agregar al carrito automáticamente
     const cantidad = parsed.isWeightCode && parsed.weight ? parsed.weight : 1
 
     if (cantidad > productoLocal.stockDisponible) {
       toast.error(`Stock insuficiente. Disponible: ${productoLocal.stockDisponible} ${productoLocal.unidadMedida}`)
-      return
+      return false
     }
 
-    // Verificar si ya existe en el carrito
     const existente = carrito.find((item) => item.productoId === productoLocal.id)
     const cantidadTotal = existente ? existente.cantidad + cantidad : cantidad
 
     if (cantidadTotal > productoLocal.stockDisponible) {
       toast.error(`Stock insuficiente. Disponible: ${productoLocal.stockDisponible} ${productoLocal.unidadMedida}`)
-      return
+      return false
     }
 
     const precioUnitario = productoLocal.precioVenta
@@ -287,6 +281,7 @@ export function POSSucursal({
     }
 
     toast.success(`${productoLocal.nombre} - ${cantidad.toFixed(3)} kg agregado`)
+    return true
   }, [productos, carrito, cantidadInput])
 
   // Actualizar precio cuando cambia la lista de un item específico
@@ -874,4 +869,5 @@ export function POSSucursal({
     </div>
   )
 }
+
 

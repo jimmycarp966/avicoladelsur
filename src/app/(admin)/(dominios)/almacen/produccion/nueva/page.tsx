@@ -284,18 +284,18 @@ export default function NuevaOrdenProduccionPage() {
     // Manejar escaneo de código de barras para salidas (productos que salen)
     const handleScanSalida = useCallback(async (code: string) => {
         const parsed = parseBarcodeEAN13(code)
-        console.log('[Producción] Código escaneado (salida):', code, parsed)
+        console.log('[Produccion] Codigo escaneado (salida):', code, parsed)
 
-        if (!parsed.plu) {
-            toast.error('Código no válido')
-            return
+        if (!parsed.isValid || !parsed.plu) {
+            toast.error(parsed.error || 'Codigo no valido')
+            return false
         }
 
-        const result = await buscarProductoPorCodigoBarrasAction(parsed.plu)
+        const result = await buscarProductoPorCodigoBarrasAction(parsed.rawCode)
 
         if (!result.success || !result.data) {
             toast.error(result.error || 'Producto no encontrado')
-            return
+            return false
         }
 
         const producto = result.data.producto
@@ -308,23 +308,25 @@ export default function NuevaOrdenProduccionPage() {
         } else {
             toast.success(`Producto: ${producto.nombre}`)
         }
+
+        return true
     }, [])
 
     // Manejar escaneo de código de barras para entradas (productos que entran)
     const handleScanEntrada = useCallback(async (code: string) => {
         const parsed = parseBarcodeEAN13(code)
-        console.log('[Producción] Código escaneado (entrada):', code, parsed)
+        console.log('[Produccion] Codigo escaneado (entrada):', code, parsed)
 
-        if (!parsed.plu) {
-            toast.error('Código no válido')
-            return
+        if (!parsed.isValid || !parsed.plu) {
+            toast.error(parsed.error || 'Codigo no valido')
+            return false
         }
 
-        const result = await buscarProductoPorCodigoBarrasAction(parsed.plu)
+        const result = await buscarProductoPorCodigoBarrasAction(parsed.rawCode)
 
         if (!result.success || !result.data) {
             toast.error(result.error || 'Producto no encontrado')
-            return
+            return false
         }
 
         const producto = result.data.producto
@@ -337,6 +339,8 @@ export default function NuevaOrdenProduccionPage() {
         } else {
             toast.success(`Producto: ${producto.nombre}`)
         }
+
+        return true
     }, [])
 
     // Calcular totales
@@ -1266,3 +1270,4 @@ export default function NuevaOrdenProduccionPage() {
         </div>
     )
 }
+

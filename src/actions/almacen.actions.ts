@@ -5,6 +5,7 @@ import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { useNotificationStore } from '@/store/notificationStore'
 import { getNowArgentina } from '@/lib/utils'
 import { devError } from '@/lib/utils/logger'
+import { buildBarcodeLookupCandidates } from '@/lib/barcode-lookup'
 import type {
   IngresarMercaderiaParams,
   MovimientoStockParams,
@@ -1140,8 +1141,8 @@ export async function actualizarCategoriaProductosAction(
   }
 }
 
-// Buscar producto por código de barras o PLU
-// Soporta códigos EAN-13 con peso embebido de balanza SDP
+// Buscar producto por codigo de barras o PLU.
+// Soporta codigos EAN-13 con peso embebido de balanza SDP.
 export async function buscarProductoPorCodigoBarrasAction(
   codigo: string
 ): Promise<ApiResponse<{
@@ -1150,43 +1151,44 @@ export async function buscarProductoPorCodigoBarrasAction(
 }>> {
   try {
     const supabase = await createClient()
-
-    // Limpiar código
     const codigoLimpio = codigo.trim()
 
-    // Generar variantes del código para búsqueda
-    const variantes: string[] = [codigoLimpio]
-
-    // Agregar versión sin ceros a la izquierda
-    const sinCeros = codigoLimpio.replace(/^0+/, '')
-    if (sinCeros && sinCeros !== codigoLimpio) {
-      variantes.push(sinCeros)
+    if (!codigoLimpio) {
+      return {
+        success: false,
+        error: 'Codigo vacio',
+      }
     }
 
-    // Agregar versión con ceros a la izquierda (4 dígitos)
-    if (codigoLimpio.length < 4) {
-      variantes.push(codigoLimpio.padStart(4, '0'))
-    }
+    const {
+      barcodeCandidates,
+      productCodeCandidates,
+    } = buildBarcodeLookupCandidates(codigoLimpio)
 
-    // Buscar por codigo_barras primero
     let producto = null
 
-    const { data: porBarras } = await supabase
-      .from('productos')
-      .select('*')
-      .eq('codigo_barras', codigoLimpio)
-      .eq('activo', true)
-      .single()
+    // 1) Buscar por codigo_barras exacto (prioridad maxima).
+    for (const barcodeCandidate of barcodeCandidates) {
+      const { data } = await supabase
+        .from('productos')
+        .select('*')
+        .eq('codigo_barras', barcodeCandidate)
+        .eq('activo', true)
+        .single()
 
-    if (porBarras) {
-      producto = porBarras
-    } else {
-      // Buscar por código (PLU) - probar variantes
-      for (const variante of variantes) {
+      if (data) {
+        producto = data
+        break
+      }
+    }
+
+    // 2) Buscar por codigo interno / PLU con variantes.
+    if (!producto) {
+      for (const codeCandidate of productCodeCandidates) {
         const { data } = await supabase
           .from('productos')
           .select('*')
-          .eq('codigo', variante)
+          .eq('codigo', codeCandidate)
           .eq('activo', true)
           .single()
 
@@ -1200,11 +1202,10 @@ export async function buscarProductoPorCodigoBarrasAction(
     if (!producto) {
       return {
         success: false,
-        error: `Producto no encontrado para código: ${codigoLimpio}`,
+        error: `Producto no encontrado para codigo: ${codigoLimpio}`,
       }
     }
 
-    // Obtener stock disponible
     const { data: lotes } = await supabase
       .from('lotes')
       .select('cantidad_disponible')
@@ -1225,10 +1226,11 @@ export async function buscarProductoPorCodigoBarrasAction(
       },
     }
   } catch (error: any) {
-    devError('Error al buscar producto por código de barras:', error)
+    devError('Error al buscar producto por codigo de barras:', error)
     return {
       success: false,
       error: error.message || 'Error al buscar producto',
     }
   }
 }
+

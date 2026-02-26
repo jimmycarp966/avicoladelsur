@@ -15,7 +15,7 @@ import { X, Scan, Flashlight, FlashlightOff } from 'lucide-react'
 import { useSoundAlert } from '@/components/ui/sound-alert'
 
 interface BarcodeScannerProps {
-    onScan: (code: string) => void
+    onScan: (code: string) => void | boolean | Promise<void | boolean>
     onClose: () => void
     title?: string
     description?: string
@@ -36,7 +36,9 @@ export function BarcodeScanner({
     const streamRef = useRef<MediaStream | null>(null)
     const scanIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
     const canvasRef = useRef<HTMLCanvasElement | null>(null)
+    const workCanvasRef = useRef<HTMLCanvasElement | null>(null)
     const readerRef = useRef<MultiFormatReader | null>(null)
+    const processingScanRef = useRef(false)
 
     // Hook de sonido para el beep de escáner
     const { playScannerBeep } = useSoundAlert(true)
@@ -95,16 +97,98 @@ export function BarcodeScanner({
 
         // Crear canvas offscreen
         canvasRef.current = document.createElement('canvas')
+        workCanvasRef.current = document.createElement('canvas')
     }, [])
 
     // Función para detener todo (declarada ANTES de startCamera para evitar TDZ)
     const stopAll = useCallback(() => {
-        if (scanIntervalRef.current) clearInterval(scanIntervalRef.current)
+        if (scanIntervalRef.current) {
+            clearInterval(scanIntervalRef.current)
+            scanIntervalRef.current = null
+        }
         streamRef.current?.getTracks().forEach(t => t.stop())
+        streamRef.current = null
+        processingScanRef.current = false
+        setIsScanning(false)
         readerRef.current?.reset()
     }, [])
 
-    // Función para iniciar cámara (User Gesture Triggered)
+    const decodeImageData = useCallback((imageData: ImageData, threshold?: number): string | null => {
+        if (!readerRef.current) return null
+
+        const { width, height, data } = imageData
+        const luminances = new Uint8ClampedArray(data.length / 4)
+
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i]
+            const g = data[i + 1]
+            const b = data[i + 2]
+            const grayscale = ((r * 2 + g * 5 + b) >> 3) & 0xFF
+            luminances[i / 4] = typeof threshold === 'number'
+                ? (grayscale >= threshold ? 255 : 0)
+                : grayscale
+        }
+
+        try {
+            const source = new RGBLuminanceSource(luminances, width, height)
+            const binaryBitmap = new BinaryBitmap(new HybridBinarizer(source))
+            return readerRef.current.decode(binaryBitmap).getText()
+        } catch {
+            return null
+        }
+    }, [])
+
+    const tryDecodeFrame = useCallback((): string | null => {
+        if (!videoRef.current || !canvasRef.current || !workCanvasRef.current) return null
+        if (videoRef.current.readyState !== videoRef.current.HAVE_ENOUGH_DATA) return null
+
+        const video = videoRef.current
+        const fullCanvas = canvasRef.current
+        const workCanvas = workCanvasRef.current
+        const fullCtx = fullCanvas.getContext('2d')
+        const workCtx = workCanvas.getContext('2d')
+        if (!fullCtx || !workCtx) return null
+
+        // Attempt 1: full frame, grayscale.
+        fullCtx.drawImage(video, 0, 0, fullCanvas.width, fullCanvas.height)
+        const fullImage = fullCtx.getImageData(0, 0, fullCanvas.width, fullCanvas.height)
+        const fullDecoded = decodeImageData(fullImage)
+        if (fullDecoded) return fullDecoded
+
+        // Attempt 2: central crop (barcode guide area), upscaled.
+        const cropWidth = Math.floor(fullCanvas.width * 0.75)
+        const cropHeight = Math.floor(fullCanvas.height * 0.36)
+        const cropX = Math.floor((fullCanvas.width - cropWidth) / 2)
+        const cropY = Math.floor((fullCanvas.height - cropHeight) / 2)
+
+        workCanvas.width = cropWidth * 2
+        workCanvas.height = cropHeight * 2
+        workCtx.drawImage(
+            video,
+            cropX,
+            cropY,
+            cropWidth,
+            cropHeight,
+            0,
+            0,
+            workCanvas.width,
+            workCanvas.height
+        )
+        const croppedImage = workCtx.getImageData(0, 0, workCanvas.width, workCanvas.height)
+        const croppedDecoded = decodeImageData(croppedImage)
+        if (croppedDecoded) return croppedDecoded
+
+        // Attempt 3: threshold variants on cropped image.
+        const thresholds = [100, 140]
+        for (const threshold of thresholds) {
+            const thresholdDecoded = decodeImageData(croppedImage, threshold)
+            if (thresholdDecoded) return thresholdDecoded
+        }
+
+        return null
+    }, [decodeImageData])
+
+    // Funcion para iniciar camara (User Gesture Triggered)
     const startCamera = useCallback(async () => {
         if (!videoRef.current) return
 
@@ -113,7 +197,6 @@ export function BarcodeScanner({
         try {
             addDebugLog('Solicitando permisos...')
 
-            // Obtener stream
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: {
                     facingMode: 'environment',
@@ -124,20 +207,17 @@ export function BarcodeScanner({
 
             addDebugLog('Stream obtenido')
 
-            // Asignar stream al video
             videoRef.current.srcObject = stream
             streamRef.current = stream
 
-            // Esperar metadata y reproducir
             videoRef.current.onloadedmetadata = () => {
                 if (videoRef.current) {
                     setVideoSize({
                         width: videoRef.current.videoWidth,
                         height: videoRef.current.videoHeight
                     })
-                    addDebugLog(`📷 Video metadata: ${videoRef.current.videoWidth}x${videoRef.current.videoHeight}`)
+                    addDebugLog(`Video metadata: ${videoRef.current.videoWidth}x${videoRef.current.videoHeight}`)
 
-                    // Ajustar canvas al tamaño del video
                     if (canvasRef.current) {
                         canvasRef.current.width = videoRef.current.videoWidth
                         canvasRef.current.height = videoRef.current.videoHeight
@@ -148,95 +228,74 @@ export function BarcodeScanner({
             await videoRef.current.play()
             addDebugLog('Video reproduciendo')
 
-            // Verificar antorcha
             const track = stream.getVideoTracks()[0]
             const caps = track.getCapabilities?.()
-            // @ts-expect-error - torch es una capacidad no estándar
+            // @ts-expect-error - torch es una capacidad no estandar
             if (caps?.torch) {
                 setTorchSupported(true)
-                addDebugLog('💡 Antorcha disponible')
+                addDebugLog('Antorcha disponible')
             }
 
             setIsScanning(true)
             setError(null)
-            addDebugLog('🔍 Escaneando (Canvas Mode)...')
+            addDebugLog('Escaneando (modo robusto)...')
 
-            // Loop de escaneo MANUAL (sin tocar el video)
             let frameCount = 0
             scanIntervalRef.current = setInterval(() => {
-                if (!readerRef.current || !videoRef.current || !canvasRef.current) return
-                if (videoRef.current.readyState !== videoRef.current.HAVE_ENOUGH_DATA) return
+                if (processingScanRef.current) return
 
                 frameCount++
                 if (frameCount % 200 === 0) {
-                    addDebugLog(`🔍 Frame ${frameCount} (Canvas)`)
+                    addDebugLog(`Frame ${frameCount}`)
                 }
 
-                try {
-                    // 1. Dibujar frame en canvas
-                    const ctx = canvasRef.current.getContext('2d')
-                    if (!ctx) return
+                const code = tryDecodeFrame()
+                if (!code) return
 
-                    ctx.drawImage(videoRef.current, 0, 0)
+                const now = Date.now()
+                if (
+                    lastScannedRef.current &&
+                    lastScannedRef.current.code === code &&
+                    now - lastScannedRef.current.time < DEBOUNCE_MS
+                ) {
+                    return
+                }
 
-                    // 2. Obtener datos de imagen
-                    const { width, height } = canvasRef.current
-                    const imageData = ctx.getImageData(0, 0, width, height)
+                lastScannedRef.current = { code, time: now }
+                processingScanRef.current = true
 
-                    // 3. Crear LuminanceSource desde los pixels
-                    const len = imageData.data.length
-                    const luminances = new Uint8ClampedArray(len / 4)
+                addDebugLog(`CODIGO detectado: ${code}`)
+                logToServer('info', 'Codigo detectado', { code })
 
-                    // Convertir a Grayscale manualmente para evitar deps
-                    for (let i = 0; i < len; i += 4) {
-                        const r = imageData.data[i]
-                        const g = imageData.data[i + 1]
-                        const b = imageData.data[i + 2]
-                        // Promedio ponderado o simple
-                        luminances[i / 4] = ((r * 2 + g * 5 + b * 1) >> 3) & 0xFF
-                    }
-
-                    const source = new RGBLuminanceSource(luminances, width, height)
-
-                    // 4. Decodificar
-                    const binaryBitmap = new BinaryBitmap(new HybridBinarizer(source))
-                    const result = readerRef.current.decode(binaryBitmap)
-
-                    if (result) {
-                        const code = result.getText()
-                        const now = Date.now()
-
-                        // Debounce
-                        if (lastScannedRef.current &&
-                            lastScannedRef.current.code === code &&
-                            now - lastScannedRef.current.time < DEBOUNCE_MS) {
+                Promise.resolve(onScan(code))
+                    .then((scanResult) => {
+                        if (scanResult === false) {
+                            addDebugLog(`Lectura rechazada, continuando: ${code}`)
+                            logToServer('warn', 'Lectura rechazada por flujo', { code })
                             return
                         }
 
-                        lastScannedRef.current = { code, time: now }
-
-                        addDebugLog(`✅ CÓDIGO: ${code}`)
-                        logToServer('info', 'Código escaneado', { code })
-
                         vibrate()
-                        playScannerBeep()  // Beep típico de escáner
-
-                        // Detener
+                        playScannerBeep()
                         stopAll()
-                        onScan(code)
-                    }
-                } catch (e) {
-                    // NotFoundException es normal
-                }
+                        onClose()
+                    })
+                    .catch((scanError: unknown) => {
+                        const message = scanError instanceof Error ? scanError.message : 'Error desconocido'
+                        addDebugLog(`Error procesando codigo: ${message}`, true)
+                        logToServer('error', 'Error procesando codigo detectado', { code, message })
+                    })
+                    .finally(() => {
+                        processingScanRef.current = false
+                    })
             }, 100)
-
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : 'Error desconocido'
-            addDebugLog(`❌ Error: ${message}`, true)
-            setError('No se pudo acceder a la cámara: ' + message)
+            addDebugLog(`Error: ${message}`, true)
+            setError('No se pudo acceder a la camara: ' + message)
             setCameraStarted(false)
         }
-    }, [addDebugLog, logToServer, onScan, vibrate, playScannerBeep, stopAll])
+    }, [addDebugLog, logToServer, onClose, onScan, playScannerBeep, stopAll, tryDecodeFrame, vibrate])
 
     // Auto-start cámara si autoStart es true
     useEffect(() => {
@@ -295,7 +354,10 @@ export function BarcodeScanner({
                             <Button
                                 variant="outline"
                                 className="mt-2 w-full"
-                                onClick={() => window.location.reload()}
+                                onClick={() => {
+                                    setError(null)
+                                    void startCamera()
+                                }}
                             >
                                 Reintentar
                             </Button>
@@ -399,7 +461,7 @@ export function BarcodeScanner({
 
 // Componente auxiliar
 interface ScanButtonProps {
-    onScan: (code: string) => void
+    onScan: (code: string) => void | boolean | Promise<void | boolean>
     className?: string
     variant?: 'default' | 'outline' | 'secondary' | 'ghost' | 'link' | 'destructive'
     size?: 'default' | 'sm' | 'lg' | 'icon'
@@ -419,10 +481,9 @@ export function ScanButton({
 }: ScanButtonProps) {
     const [isOpen, setIsOpen] = useState(false)
 
-    const handleScan = (code: string) => {
-        setIsOpen(false)
-        onScan(code)
-    }
+    const handleScan = useCallback((code: string) => {
+        return onScan(code)
+    }, [onScan])
 
     return (
         <>
@@ -449,3 +510,5 @@ export function ScanButton({
         </>
     )
 }
+
+
