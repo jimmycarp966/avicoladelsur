@@ -397,10 +397,14 @@ export function PesajeItemCard({
 
     const codigoProducto = item.producto?.codigo
     if (codigoProducto) {
-      const pluNormalizado = parsed.plu.replace(/^0+/, '') || '0'
-      const codigoNormalizado = codigoProducto.replace(/^0+/, '') || '0'
+      const normalizarCodigo = (value: string) => value.replace(/^0+/, '') || '0'
+      const codigoNormalizado = normalizarCodigo(codigoProducto)
+      const candidatosEscaneados = [parsed.plu, parsed.pluExtended]
+        .filter((candidate): candidate is string => Boolean(candidate))
+        .map(normalizarCodigo)
+      const coincideCodigo = candidatosEscaneados.some(candidate => candidate === codigoNormalizado)
 
-      if (!pluNormalizado.includes(codigoNormalizado) && !codigoNormalizado.includes(pluNormalizado)) {
+      if (!coincideCodigo) {
         toast.error(
           `El codigo escaneado (${parsed.plu}) NO corresponde al producto "${item.producto?.nombre}" (codigo: ${codigoProducto}). Escanea la etiqueta correcta.`,
           { duration: 5000 }
