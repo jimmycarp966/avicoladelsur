@@ -24,6 +24,8 @@ interface BarcodeScannerProps {
 
 // Tiempo mínimo entre escaneos del mismo código (debounce)
 const DEBOUNCE_MS = 2000
+const REQUIRED_CONFIRMATIONS = 2
+const CONFIRMATION_WINDOW_MS = 1200
 
 export function BarcodeScanner({
     onScan,
@@ -55,6 +57,7 @@ export function BarcodeScanner({
 
     // Debounce
     const lastScannedRef = useRef<{ code: string; time: number } | null>(null)
+    const candidateScanRef = useRef<{ code: string; count: number; lastSeen: number } | null>(null)
 
     // Logging
     const logToServer = useCallback(async (level: 'info' | 'error' | 'warn', msg: string, details?: any) => {
@@ -91,6 +94,7 @@ export function BarcodeScanner({
             BarcodeFormat.EAN_8,
         ])
         hints.set(DecodeHintType.TRY_HARDER, true)
+        hints.set(DecodeHintType.ALSO_INVERTED, true)
 
         readerRef.current = new MultiFormatReader()
         readerRef.current.setHints(hints)
@@ -109,24 +113,52 @@ export function BarcodeScanner({
         streamRef.current?.getTracks().forEach(t => t.stop())
         streamRef.current = null
         processingScanRef.current = false
+        candidateScanRef.current = null
         setIsScanning(false)
         readerRef.current?.reset()
     }, [])
 
-    const decodeImageData = useCallback((imageData: ImageData, threshold?: number): string | null => {
+    const decodeImageData = useCallback((
+        imageData: ImageData,
+        options?: { threshold?: number; autoContrast?: boolean; invert?: boolean }
+    ): string | null => {
         if (!readerRef.current) return null
 
         const { width, height, data } = imageData
         const luminances = new Uint8ClampedArray(data.length / 4)
+        let min = 255
+        let max = 0
 
         for (let i = 0; i < data.length; i += 4) {
             const r = data[i]
             const g = data[i + 1]
             const b = data[i + 2]
             const grayscale = ((r * 2 + g * 5 + b) >> 3) & 0xFF
-            luminances[i / 4] = typeof threshold === 'number'
-                ? (grayscale >= threshold ? 255 : 0)
-                : grayscale
+            const index = i / 4
+            luminances[index] = grayscale
+
+            if (options?.autoContrast) {
+                if (grayscale < min) min = grayscale
+                if (grayscale > max) max = grayscale
+            }
+        }
+
+        if (options?.autoContrast && max > min) {
+            const scale = 255 / (max - min)
+            for (let i = 0; i < luminances.length; i++) {
+                luminances[i] = Math.max(0, Math.min(255, Math.round((luminances[i] - min) * scale)))
+            }
+        }
+
+        for (let i = 0; i < luminances.length; i++) {
+            let value = luminances[i]
+            if (options?.invert) {
+                value = 255 - value
+            }
+            if (typeof options?.threshold === 'number') {
+                value = value >= options.threshold ? 255 : 0
+            }
+            luminances[i] = value
         }
 
         try {
@@ -149,13 +181,17 @@ export function BarcodeScanner({
         const workCtx = workCanvas.getContext('2d')
         if (!fullCtx || !workCtx) return null
 
-        // Attempt 1: full frame, grayscale.
+        // Attempt 1: full frame grayscale.
         fullCtx.drawImage(video, 0, 0, fullCanvas.width, fullCanvas.height)
         const fullImage = fullCtx.getImageData(0, 0, fullCanvas.width, fullCanvas.height)
         const fullDecoded = decodeImageData(fullImage)
         if (fullDecoded) return fullDecoded
 
-        // Attempt 2: central crop (barcode guide area), upscaled.
+        // Attempt 2: full frame with auto-contrast.
+        const fullContrastDecoded = decodeImageData(fullImage, { autoContrast: true })
+        if (fullContrastDecoded) return fullContrastDecoded
+
+        // Attempt 3: central crop (barcode guide area), upscaled.
         const cropWidth = Math.floor(fullCanvas.width * 0.75)
         const cropHeight = Math.floor(fullCanvas.height * 0.36)
         const cropX = Math.floor((fullCanvas.width - cropWidth) / 2)
@@ -175,15 +211,23 @@ export function BarcodeScanner({
             workCanvas.height
         )
         const croppedImage = workCtx.getImageData(0, 0, workCanvas.width, workCanvas.height)
-        const croppedDecoded = decodeImageData(croppedImage)
+        const croppedDecoded = decodeImageData(croppedImage, { autoContrast: true })
         if (croppedDecoded) return croppedDecoded
 
-        // Attempt 3: threshold variants on cropped image.
-        const thresholds = [100, 140]
+        // Attempt 4: threshold variants.
+        const thresholds = [95, 125, 155]
         for (const threshold of thresholds) {
-            const thresholdDecoded = decodeImageData(croppedImage, threshold)
+            const thresholdDecoded = decodeImageData(croppedImage, { autoContrast: true, threshold })
             if (thresholdDecoded) return thresholdDecoded
         }
+
+        // Attempt 5: inverted threshold for glare/reflections.
+        const invertedDecoded = decodeImageData(croppedImage, {
+            autoContrast: true,
+            threshold: 125,
+            invert: true,
+        })
+        if (invertedDecoded) return invertedDecoded
 
         return null
     }, [decodeImageData])
@@ -253,6 +297,23 @@ export function BarcodeScanner({
                 if (!code) return
 
                 const now = Date.now()
+                const lastCandidate = candidateScanRef.current
+                if (
+                    !lastCandidate ||
+                    lastCandidate.code !== code ||
+                    now - lastCandidate.lastSeen > CONFIRMATION_WINDOW_MS
+                ) {
+                    candidateScanRef.current = { code, count: 1, lastSeen: now }
+                    return
+                }
+
+                const nextCount = lastCandidate.count + 1
+                candidateScanRef.current = { code, count: nextCount, lastSeen: now }
+                if (nextCount < REQUIRED_CONFIRMATIONS) {
+                    return
+                }
+                candidateScanRef.current = null
+
                 if (
                     lastScannedRef.current &&
                     lastScannedRef.current.code === code &&
@@ -261,7 +322,6 @@ export function BarcodeScanner({
                     return
                 }
 
-                lastScannedRef.current = { code, time: now }
                 processingScanRef.current = true
 
                 addDebugLog(`CODIGO detectado: ${code}`)
@@ -275,6 +335,7 @@ export function BarcodeScanner({
                             return
                         }
 
+                        lastScannedRef.current = { code, time: Date.now() }
                         vibrate()
                         playScannerBeep()
                         stopAll()
