@@ -844,26 +844,29 @@ export async function aprobarAdelantoAction(
   try {
     const supabase = createAdminClient()
 
-    const { data, error } = await supabase
-      .from('rrhh_adelantos')
-      .update({
-        aprobado: true,
-        aprobado_por: aprobadoPor,
-        fecha_aprobacion: new Date().toISOString(),
-      })
-      .eq('id', adelantoId)
-      .select('id')
-      .maybeSingle()
+    const { data, error } = await supabase.rpc('fn_rrhh_aprobar_adelanto_atomico', {
+      p_adelanto_id: adelantoId,
+      p_aprobado_por: aprobadoPor,
+      p_cantidad_cuotas: 1,
+      p_fecha_inicio: null,
+      p_recalcular: true,
+    })
 
-    if (error || !data?.id) {
+    const resultRow = Array.isArray(data) ? data[0] : data
+
+    if (error || !resultRow?.adelanto_id) {
       devError('Error al aprobar adelanto:', error)
       return {
         success: false,
-        error: 'Error al aprobar adelanto: ' + (error?.message || 'Adelanto no encontrado'),
+        error: 'Error al aprobar adelanto: ' + (error?.message || 'No se pudo mapear el adelanto en planes/cuotas'),
       }
     }
 
     revalidatePath('/rrhh/adelantos')
+    revalidatePath('/rrhh/liquidaciones')
+    if (resultRow.liquidacion_recalculada_id) {
+      revalidatePath(`/rrhh/liquidaciones/${resultRow.liquidacion_recalculada_id}`)
+    }
 
     return {
       success: true,
@@ -882,16 +885,26 @@ export async function rechazarAdelantoAction(adelantoId: string): Promise<ApiRes
   try {
     const supabase = createAdminClient()
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('rrhh_adelantos')
       .delete()
+      .eq('aprobado', false)
+      .is('plan_id', null)
       .eq('id', adelantoId)
+      .select('id')
+      .maybeSingle()
 
     if (error) {
       devError('Error al rechazar adelanto:', error)
       return {
         success: false,
         error: 'Error al rechazar adelanto: ' + error.message,
+      }
+    }
+    if (!data?.id) {
+      return {
+        success: false,
+        error: 'Solo se pueden rechazar adelantos pendientes y aun no mapeados en liquidaciones',
       }
     }
 

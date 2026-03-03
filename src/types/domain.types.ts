@@ -597,6 +597,7 @@ export interface Adelanto extends BaseEntity {
   producto_id?: string
   cantidad?: number
   precio_unitario?: number
+  plan_id?: string
   fecha_solicitud: string
   aprobado: boolean
   aprobado_por?: string
