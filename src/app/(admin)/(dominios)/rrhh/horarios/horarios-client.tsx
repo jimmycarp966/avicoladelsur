@@ -12,6 +12,8 @@ import { obtenerHorariosHoyDesdeHikAction, sincronizarMesDesdeHikAction } from '
 import { getTodayArgentina } from '@/lib/utils'
 import type { HorariosHoyData } from '@/types/domain.types'
 
+const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/
+
 export function HorariosClient() {
   const { showToast } = useNotificationStore()
   const [isPending, startTransition] = useTransition()
@@ -23,10 +25,16 @@ export function HorariosClient() {
   const [syncMes, setSyncMes] = useState(() => Number(fechaArgentinaHoy.slice(5, 7)))
   const [syncAnio, setSyncAnio] = useState(() => Number(fechaArgentinaHoy.slice(0, 4)))
 
-  const loadData = useCallback((targetDate?: string) => {
-    const dateToQuery = targetDate || fecha
+  const loadData = useCallback((targetDate: string) => {
+    if (!ISO_DATE_REGEX.test(targetDate)) {
+      const message = 'Fecha invalida. Selecciona una fecha completa.'
+      setError(message)
+      showToast('error', message, 'Hik-Connect')
+      return
+    }
+
     startTransition(async () => {
-      const result = await obtenerHorariosHoyDesdeHikAction(dateToQuery)
+      const result = await obtenerHorariosHoyDesdeHikAction(targetDate)
       if (!result.success || !result.data) {
         const message = result.error || 'No se pudieron cargar horarios.'
         setError(message)
@@ -42,11 +50,13 @@ export function HorariosClient() {
         showToast('warning', `Carga con advertencias (${result.data.warnings.length}).`, 'Hik-Connect')
       }
     })
-  }, [showToast, fecha])
+  }, [showToast])
 
   useEffect(() => {
-    loadData()
-  }, [loadData])
+    if (ISO_DATE_REGEX.test(fecha)) {
+      loadData(fecha)
+    }
+  }, [fecha, loadData])
 
   const handleSincronizarMes = useCallback(async () => {
     setIsSyncingMes(true)
@@ -84,6 +94,7 @@ export function HorariosClient() {
 
   const mesesNombres = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
   const aniosDisponibles = [syncAnio - 1, syncAnio]
+  const fechaValida = ISO_DATE_REGEX.test(fecha)
 
   return (
     <div className="space-y-8">
@@ -99,7 +110,7 @@ export function HorariosClient() {
               onChange={(e) => setFecha(e.target.value)}
               className="h-9 rounded-md border px-3 text-sm"
             />
-            <Button onClick={() => loadData(fecha)} disabled={isPending}>
+            <Button onClick={() => loadData(fecha)} disabled={isPending || !fechaValida}>
               <RefreshCw className={`w-4 h-4 mr-2 ${isPending ? 'animate-spin' : ''}`} />
               Ver día
             </Button>

@@ -458,8 +458,9 @@ export async function obtenerHorariosHoyDesdeHikAction(fecha?: string): Promise<
     }
 
     let baseDate = new Date()
-    if (fecha) {
-      const safe = /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? `${fecha}T12:00:00-03:00` : ''
+    if (typeof fecha === 'string') {
+      const normalizedDate = fecha.trim()
+      const safe = /^\d{4}-\d{2}-\d{2}$/.test(normalizedDate) ? `${normalizedDate}T12:00:00-03:00` : ''
       if (!safe) {
         return {
           success: false,
@@ -476,7 +477,7 @@ export async function obtenerHorariosHoyDesdeHikAction(fecha?: string): Promise<
     }
 
     const range = getArgentinaDateRange(baseDate)
-    const hikResponse = await fetchHikConnectEvents({
+    let hikResponse = await fetchHikConnectEvents({
       startTime: range.start,
       endTime: range.end,
       date: range.date,
@@ -484,13 +485,58 @@ export async function obtenerHorariosHoyDesdeHikAction(fecha?: string): Promise<
       pageSize: 200,
     })
 
-    const rawEventsForDate = hikResponse.events.filter((event) => {
+    const filterRawEventsForDate = (events: Record<string, unknown>[]) => events.filter((event) => {
       if (!event || typeof event !== 'object') return false
       const raw = event as Record<string, unknown>
       const timestamp = extractRawEventTimestamp(raw)
       if (!timestamp) return false
       return isTimestampOnBusinessDate(timestamp, range.date)
     })
+
+    let rawEventsForDate = filterRawEventsForDate(hikResponse.events)
+    const todayArgentina = getArgentinaDateRange(new Date()).date
+    const isHistoricalDate = range.date < todayArgentina
+    const paginationWasTrimmed = hikResponse.warnings.some((warning) => warning.includes('puede haber mas eventos pendientes'))
+    const defaultMaxPagesRaw = Number(process.env.HIK_CONNECT_MAX_PAGES || '10')
+    const defaultMaxPages = Number.isFinite(defaultMaxPagesRaw)
+      ? Math.max(1, Math.min(defaultMaxPagesRaw, 50))
+      : 10
+    const fallbackMaxPagesRaw = Number(process.env.HIK_CONNECT_MAX_PAGES_HISTORICAL || '50')
+    const fallbackMaxPages = Number.isFinite(fallbackMaxPagesRaw)
+      ? Math.max(1, Math.min(fallbackMaxPagesRaw, 50))
+      : 50
+
+    if (isHistoricalDate && rawEventsForDate.length === 0 && paginationWasTrimmed && fallbackMaxPages > defaultMaxPages) {
+      const retryResponse = await fetchHikConnectEvents({
+        startTime: range.start,
+        endTime: range.end,
+        date: range.date,
+        pageNo: 1,
+        pageSize: 200,
+        maxPages: fallbackMaxPages,
+      })
+      const retryRawEventsForDate = filterRawEventsForDate(retryResponse.events)
+      if (retryRawEventsForDate.length > 0) {
+        rawEventsForDate = retryRawEventsForDate
+        hikResponse = {
+          ...retryResponse,
+          warnings: [
+            ...hikResponse.warnings,
+            `Reintento para fecha historica con ${fallbackMaxPages} paginas: se recuperaron marcaciones.`,
+            ...retryResponse.warnings,
+          ],
+        }
+      } else {
+        hikResponse = {
+          ...retryResponse,
+          warnings: [
+            ...hikResponse.warnings,
+            `Reintento para fecha historica con ${fallbackMaxPages} paginas sin resultados para ${range.date}.`,
+            ...retryResponse.warnings,
+          ],
+        }
+      }
+    }
 
     const { normalized: normalizedToday, warnings } = normalizeHikAttendanceEvents(rawEventsForDate)
 

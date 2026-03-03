@@ -21,6 +21,7 @@ export interface HikConnectEventsRequest {
   date?: string
   pageNo?: number
   pageSize?: number
+  maxPages?: number
 }
 
 export interface HikConnectEventsResponse {
@@ -202,7 +203,8 @@ export async function fetchHikConnectEvents(params: HikConnectEventsRequest): Pr
 
   const defaultPageSize = Math.min(params.pageSize || 200, 200)
   const maxPagesFromEnv = Number(process.env.HIK_CONNECT_MAX_PAGES || '10')
-  const maxPages = Number.isFinite(maxPagesFromEnv) ? Math.max(1, Math.min(maxPagesFromEnv, 50)) : 10
+  const maxPagesFromParams = typeof params.maxPages === 'number' ? params.maxPages : maxPagesFromEnv
+  const maxPages = Number.isFinite(maxPagesFromParams) ? Math.max(1, Math.min(maxPagesFromParams, 50)) : 10
 
   const fetchPage = async (pageNo: number): Promise<HikPageResult> => {
     let response: Response
