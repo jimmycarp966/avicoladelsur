@@ -193,7 +193,7 @@ export function VehiculosTable({ data, onView, onEdit, onDelete, onMaintenance, 
       enableRowSelection={true}
       enableColumnVisibility={true}
       enablePagination={true}
-      pageSize={15}
+      pageSize={50}
     />
   )
 }

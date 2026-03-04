@@ -220,7 +220,7 @@ export function LotesTable({ data, onView, onEdit, onDelete, onAdjust }: LotesTa
       enableRowSelection={true}
       enableColumnVisibility={true}
       enablePagination={true}
-      pageSize={15}
+      pageSize={50}
     />
   )
 }

@@ -51,7 +51,7 @@ export function NuevaLicenciaForm() {
 
   const fechaInicio = watch('fecha_inicio')
   const fechaFin = watch('fecha_fin')
-  const fechaSintomas = watch('fecha_sintomas')
+  const fechaPresentacion = watch('fecha_presentacion')
   const excepcionPlazo = watch('excepcion_plazo')
 
   useEffect(() => {
@@ -81,8 +81,9 @@ export function NuevaLicenciaForm() {
   const empleadoSeleccionado = empleados.find((e) => e.id === watch('empleado_id'))
 
   const estadoPlazo = useMemo(() => {
-    if (!fechaSintomas) return null
-    const inicio = new Date(fechaSintomas)
+    const fechaControl = fechaPresentacion || fechaInicio
+    if (!fechaControl) return null
+    const inicio = fechaPresentacion ? new Date(fechaPresentacion) : new Date(`${fechaInicio}T00:00:00`)
     if (Number.isNaN(inicio.getTime())) return null
     const limite = new Date(inicio.getTime() + 24 * 60 * 60 * 1000)
     const ahora = new Date()
@@ -92,7 +93,7 @@ export function NuevaLicenciaForm() {
       enTermino: restanteMs >= 0,
       horasRestantes: Math.round(restanteMs / (1000 * 60 * 60)),
     }
-  }, [fechaSintomas])
+  }, [fechaPresentacion, fechaInicio])
 
   const onSubmit = async (data: LicenciaFormData) => {
     try {
@@ -107,7 +108,9 @@ export function NuevaLicenciaForm() {
       payload.append('tipo', data.tipo)
       payload.append('fecha_inicio', data.fecha_inicio)
       payload.append('fecha_fin', data.fecha_fin)
-      payload.append('fecha_sintomas', data.fecha_sintomas)
+      if (data.fecha_presentacion) {
+        payload.append('fecha_presentacion', data.fecha_presentacion)
+      }
       payload.append('observaciones', data.observaciones || '')
       payload.append('diagnostico_reportado', data.diagnostico_reportado || '')
       payload.append('excepcion_plazo', data.excepcion_plazo ? 'true' : 'false')
@@ -226,7 +229,8 @@ export function NuevaLicenciaForm() {
               Fechas, Diagnostico y Plazo 24h
             </CardTitle>
             <CardDescription>
-              El certificado debe presentarse dentro de 24 horas desde el inicio informado (salvo excepcion)
+              El certificado debe presentarse dentro de 24 horas desde la fecha de presentacion declarada.
+              Si no se informa, se usa la fecha de inicio.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -244,11 +248,20 @@ export function NuevaLicenciaForm() {
               </div>
             </div>
 
+            {watch('tipo') === 'vacaciones' && (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
+                Vacaciones: se cargan solo de fecha a fecha y se consideran dias corridos.
+                Para sucursales, domingos y feriados se liquidan como dia completo (regla vigente).
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="fecha_sintomas">Inicio del hecho (control 24h) *</Label>
-                <Input id="fecha_sintomas" type="datetime-local" {...register('fecha_sintomas')} />
-                {errors.fecha_sintomas && <p className="text-sm text-red-600">{errors.fecha_sintomas.message}</p>}
+                <Label htmlFor="fecha_presentacion">Fecha de presentacion del certificado (control 24h)</Label>
+                <Input id="fecha_presentacion" type="datetime-local" {...register('fecha_presentacion')} />
+                {errors.fecha_presentacion && (
+                  <p className="text-sm text-red-600">{errors.fecha_presentacion.message}</p>
+                )}
               </div>
 
               <div className="space-y-2">

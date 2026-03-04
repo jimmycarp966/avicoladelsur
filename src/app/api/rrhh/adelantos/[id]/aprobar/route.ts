@@ -7,13 +7,19 @@ const paramsSchema = z.object({
   id: z.string().uuid(),
 });
 
+const aprobarBodySchema = z.object({
+  cantidad_cuotas: z.number().int().min(1).max(24).optional(),
+});
+
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
   try {
     const params = await context.params;
     const { id } = paramsSchema.parse(params);
+    const body = await request.json().catch(() => ({}));
+    const payload = aprobarBodySchema.parse(body);
 
     const supabase = await createClient();
     const {
@@ -31,7 +37,7 @@ export async function POST(
       );
     }
 
-    const result = await aprobarAdelantoAction(id, user.id);
+    const result = await aprobarAdelantoAction(id, user.id, payload.cantidad_cuotas ?? 1);
     if (!result.success) {
       return NextResponse.json(
         {
@@ -69,4 +75,3 @@ export async function POST(
     );
   }
 }
-

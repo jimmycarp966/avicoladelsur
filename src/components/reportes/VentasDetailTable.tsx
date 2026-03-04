@@ -123,7 +123,7 @@ export function VentasDetailTable({ data, isLoading }: VentasDetailTableProps) {
           searchKey="numero_pedido"
           searchPlaceholder="Buscar por número de pedido, cliente..."
           enablePagination={true}
-          pageSize={20}
+          pageSize={50}
         />
       </CardContent>
     </Card>

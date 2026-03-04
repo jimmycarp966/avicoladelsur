@@ -20,7 +20,8 @@ async function getLicencias() {
       ),
       aprobado_por:usuarios(id, nombre, apellido)
     `)
-    .order('fecha_inicio', { ascending: false })
+    .order('fecha_presentacion_certificado', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false })
     .limit(50)
 
   if (error) {

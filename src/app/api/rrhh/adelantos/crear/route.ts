@@ -10,6 +10,7 @@ const crearAdelantoSchema = z
     producto_id: z.string().uuid().optional(),
     cantidad: z.number().positive().optional(),
     precio_unitario: z.number().positive().optional(),
+    cantidad_cuotas: z.number().int().min(1).max(24).optional(),
     fecha_solicitud: z.string().optional(),
     observaciones: z.string().optional(),
   })
@@ -59,6 +60,7 @@ export async function POST(request: NextRequest) {
       producto_id: payload.producto_id,
       cantidad: payload.cantidad,
       precio_unitario: payload.precio_unitario,
+      cantidad_cuotas: payload.cantidad_cuotas,
       fecha_solicitud: payload.fecha_solicitud,
       observaciones: payload.observaciones,
     });
@@ -101,4 +103,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

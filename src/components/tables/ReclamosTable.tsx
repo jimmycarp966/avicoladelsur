@@ -195,7 +195,7 @@ export function ReclamosTable({ data, onView, onUpdateStatus }: ReclamosTablePro
       enableRowSelection={true}
       enableColumnVisibility={true}
       enablePagination={true}
-      pageSize={15}
+      pageSize={50}
     />
   )
 }

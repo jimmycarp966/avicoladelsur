@@ -121,7 +121,7 @@ export function PresupuestoResumenPanel({
           </div>
           <div className="flex justify-between">
             <span><kbd className="px-1 bg-background rounded border">A</kbd> Agregar</span>
-            <span><kbd className="px-1 bg-background rounded border">Ctrl+Enter</kbd> Guardar</span>
+            <span><kbd className="px-1 bg-background rounded border">F12</kbd> Guardar</span>
           </div>
         </CardContent>
       </Card>

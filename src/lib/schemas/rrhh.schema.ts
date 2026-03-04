@@ -298,8 +298,16 @@ export const licenciaSchema = z.object({
 
   fecha_sintomas: z
     .string()
-    .refine((val) => !isNaN(Date.parse(val)), {
+    .optional()
+    .refine((val) => !val || !isNaN(Date.parse(val)), {
       message: 'Fecha/hora de inicio invalida',
+    }),
+
+  fecha_presentacion: z
+    .string()
+    .optional()
+    .refine((val) => !val || !isNaN(Date.parse(val)), {
+      message: 'Fecha de presentacion invalida',
     }),
 
   diagnostico_reportado: z
@@ -369,6 +377,13 @@ export const adelantoSchema = z.object({
     .refine((val) => !isNaN(Date.parse(val)), {
       message: 'Fecha de solicitud inválida',
     }),
+
+  cantidad_cuotas: z
+    .number()
+    .int('La cantidad de cuotas debe ser un número entero')
+    .min(1, 'La cantidad de cuotas mínima es 1')
+    .max(24, 'La cantidad máxima de cuotas es 24')
+    .default(1),
 
   observaciones: z
     .string()

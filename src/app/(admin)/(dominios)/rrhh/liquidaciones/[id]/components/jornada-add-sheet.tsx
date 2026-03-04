@@ -29,18 +29,11 @@ type JornadaAddSheetProps = {
   valorHora: number
   rows: LiquidacionJornada[]
   onAdd: (draft: NewRowDraft) => Promise<void>
+  initialDraft?: Partial<NewRowDraft>
 }
 
-export function JornadaAddSheet({
-  open,
-  onOpenChange,
-  isSucursalEmployee,
-  loading,
-  valorHora,
-  rows,
-  onAdd,
-}: JornadaAddSheetProps) {
-  const [newRow, setNewRow] = useState<NewRowDraft>({
+function buildDefaultDraft(valorHora: number): NewRowDraft {
+  return {
     fecha: new Date().toISOString().slice(0, 10),
     turno: 'general',
     tarea: '',
@@ -51,6 +44,29 @@ export function JornadaAddSheet({
     tarifa_hora_extra: valorHora,
     tarifa_turno_especial: 0,
     observaciones: '',
+  }
+}
+
+export function JornadaAddSheet({
+  open,
+  onOpenChange,
+  isSucursalEmployee,
+  loading,
+  valorHora,
+  rows,
+  onAdd,
+  initialDraft,
+}: JornadaAddSheetProps) {
+  const [newRow, setNewRow] = useState<NewRowDraft>(() => {
+    const baseDraft = buildDefaultDraft(valorHora)
+    return {
+      ...baseDraft,
+      ...initialDraft,
+      fecha: initialDraft?.fecha || baseDraft.fecha,
+      turno: initialDraft?.turno || 'general',
+      tarea: initialDraft?.tarea || '',
+      observaciones: initialDraft?.observaciones || '',
+    }
   })
   const [error, setError] = useState<string | null>(null)
   const [showAdvancedTarifas, setShowAdvancedTarifas] = useState(false)

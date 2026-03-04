@@ -60,6 +60,10 @@ type LiquidacionJornadasTabProps = {
   isSucursalEmployee: boolean
 }
 
+type JornadaRowView = LiquidacionJornada & {
+  __placeholder?: boolean
+}
+
 export function LiquidacionJornadasTab({
   liquidacion,
   jornadas,
@@ -83,6 +87,8 @@ export function LiquidacionJornadasTab({
 
   // Add sheet state
   const [addSheetOpen, setAddSheetOpen] = useState(false)
+  const [addSheetInitialDraft, setAddSheetInitialDraft] = useState<Partial<NewRowDraft> | undefined>(undefined)
+  const [addSheetSession, setAddSheetSession] = useState(0)
 
   // Filters
   const [jornadaSearch, setJornadaSearch] = useState('')
@@ -118,8 +124,51 @@ export function LiquidacionJornadasTab({
   }
 
   const filteredRows = useMemo(() => {
+    const rowsConTodosLosDias: JornadaRowView[] = (() => {
+      const diasDelMes = new Date(liquidacion.periodo_anio, liquidacion.periodo_mes, 0).getDate()
+      const fechasConCarga = new Set(
+        rows
+          .filter((row) => Boolean(row.fecha))
+          .map((row) => String(row.fecha).slice(0, 10)),
+      )
+
+      const faltantes: JornadaRowView[] = []
+      for (let dia = 1; dia <= diasDelMes; dia++) {
+        const fecha = `${liquidacion.periodo_anio}-${String(liquidacion.periodo_mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
+        if (!fechasConCarga.has(fecha)) {
+          faltantes.push({
+            id: `placeholder-${fecha}`,
+            liquidacion_id: liquidacion.id,
+            empleado_id: liquidacion.empleado_id,
+            created_at: `${fecha}T00:00:00.000Z`,
+            fecha,
+            turno: 'general',
+            tarea: '',
+            horas_mensuales: 0,
+            horas_adicionales: 0,
+            turno_especial_unidades: 0,
+            tarifa_hora_base: liquidacion.valor_hora || 0,
+            tarifa_hora_extra: 0,
+            tarifa_turno_especial: 0,
+            origen: 'manual',
+            observaciones: 'Sin carga',
+            __placeholder: true,
+          })
+        }
+      }
+
+      return [...rows, ...faltantes].sort((a, b) => {
+        const dateDiff = String(a.fecha || '').localeCompare(String(b.fecha || ''))
+        if (dateDiff !== 0) return dateDiff
+        if (a.__placeholder && !b.__placeholder) return 1
+        if (!a.__placeholder && b.__placeholder) return -1
+        return String(a.created_at || '').localeCompare(String(b.created_at || ''))
+      })
+    })()
+
     const term = jornadaSearch.trim().toLowerCase()
-    return rows.filter((row) => {
+    return rowsConTodosLosDias.filter((row) => {
+      const esPlaceholder = Boolean(row.__placeholder)
       const task = (sanitizeTaskValue(row.tarea) || defaultPuestoLabel).toLowerCase()
       const turno = normalizeTurno(row.turno)
       const origen = normalizeOrigen(row.origen)
@@ -132,13 +181,26 @@ export function LiquidacionJornadasTab({
 
       if (soloDiferencias && !hasDiferencia) return false
       if (jornadaTurnoFilter !== 'todos' && turno !== jornadaTurnoFilter) return false
+      if (esPlaceholder && jornadaOrigenFilter !== 'todos') return false
       if (jornadaOrigenFilter !== 'todos' && origen !== jornadaOrigenFilter) return false
       if (!term) return true
 
       const byFecha = fechaIso.includes(term) || fechaDmy.includes(term)
       return Boolean(byFecha || task.includes(term) || turno.includes(term) || origen.includes(term))
     })
-  }, [rows, jornadaSearch, jornadaTurnoFilter, jornadaOrigenFilter, soloDiferencias, liquidacion.valor_hora, defaultPuestoLabel])
+  }, [
+    rows,
+    jornadaSearch,
+    jornadaTurnoFilter,
+    jornadaOrigenFilter,
+    soloDiferencias,
+    liquidacion.id,
+    liquidacion.empleado_id,
+    liquidacion.periodo_mes,
+    liquidacion.periodo_anio,
+    liquidacion.valor_hora,
+    defaultPuestoLabel,
+  ])
 
   const jornadasResumen = filteredRows.reduce(
     (acc, row) => {
@@ -171,7 +233,7 @@ export function LiquidacionJornadasTab({
     setLoading(true)
     try {
       const result = await upsertLiquidacionJornadaAction(liquidacion.id, {
-        id: row.id,
+        id: row.id?.startsWith('placeholder-') ? undefined : row.id,
         fecha: row.fecha,
         turno: row.turno?.trim() || 'general',
         tarea: sanitizeTaskValue(row.tarea) || null,
@@ -225,6 +287,7 @@ export function LiquidacionJornadasTab({
 
       showToast('success', 'Fila agregada correctamente', 'Guardado')
       setAddSheetOpen(false)
+      setAddSheetInitialDraft(undefined)
       router.refresh()
     } catch {
       showToast('error', 'Error inesperado al agregar fila', 'Error')
@@ -234,6 +297,17 @@ export function LiquidacionJornadasTab({
   }
 
   const rowTotal = (row: LiquidacionJornada) => getRowBreakdown(row, isSucursalEmployee).total
+
+  const handleAusenteCalendarioClick = (fecha: string) => {
+    setAddSheetInitialDraft({
+      fecha,
+      turno: 'general',
+      tarea: '',
+      observaciones: '',
+    })
+    setAddSheetSession((prev) => prev + 1)
+    setAddSheetOpen(true)
+  }
 
   return (
     <>
@@ -272,7 +346,15 @@ export function LiquidacionJornadasTab({
                   <span className="text-xs">Calendario</span>
                 </Button>
               </div>
-              <Button size="sm" onClick={() => setAddSheetOpen(true)} disabled={loading}>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setAddSheetInitialDraft(undefined)
+                  setAddSheetSession((prev) => prev + 1)
+                  setAddSheetOpen(true)
+                }}
+                disabled={loading}
+              >
                 <Plus className="h-4 w-4 mr-1" />
                 Agregar jornada
               </Button>
@@ -375,6 +457,10 @@ export function LiquidacionJornadasTab({
               feriados={feriados}
               periodoMes={liquidacion.periodo_mes}
               periodoAnio={liquidacion.periodo_anio}
+              onDiaClick={(dia) => {
+                if (dia.tipo !== 'ausente') return
+                handleAusenteCalendarioClick(dia.fecha)
+              }}
             />
           )}
 
@@ -403,15 +489,19 @@ export function LiquidacionJornadasTab({
                   </TableRow>
                 ) : (
                   filteredRows.map((row) => {
+                    const isPlaceholder = (row as JornadaRowView).__placeholder === true
                     const fechaIso = row.fecha?.slice(0, 10) || ''
                     const feriadoLabel = feriadosMap.get(fechaIso)
                     const esFeriado = Boolean(feriadoLabel)
                     const esDomingo = isSunday(fechaIso)
+                    const esDescanso = row.origen === 'auto_licencia_descanso'
                     const hasDiferencia =
                       (row.horas_adicionales || 0) > 0 ||
                       (row.turno_especial_unidades || 0) > 0 ||
                       (row.tarifa_hora_base || 0) !== (liquidacion.valor_hora || 0)
-                    const rowClass = esFeriado || esDomingo
+                    const rowClass = isPlaceholder
+                      ? 'bg-slate-50/90'
+                      : esFeriado || esDomingo
                       ? 'bg-rose-50/60'
                       : hasDiferencia
                         ? 'bg-amber-50/30'
@@ -435,10 +525,22 @@ export function LiquidacionJornadasTab({
                               {feriadoLabel}
                             </Badge>
                           )}
+                          {esDescanso && (
+                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px]">
+                              Descanso
+                            </Badge>
+                          )}
+                          {isPlaceholder && (
+                            <Badge variant="outline" className="bg-gray-50 text-gray-500 border-gray-200 text-[10px]">
+                              Sin carga
+                            </Badge>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell className="text-sm">
-                        {(() => {
+                        {isPlaceholder ? (
+                          <span className="text-muted-foreground">Sin carga</span>
+                        ) : (() => {
                           const horasInsuf =
                             (row.horas_mensuales ?? 0) > 0 &&
                             (row.horas_mensuales ?? 0) < 4 &&
@@ -465,7 +567,11 @@ export function LiquidacionJornadasTab({
                         })()}
                       </TableCell>
                       <TableCell className="text-sm max-w-[160px] truncate">
-                        {sanitizeTaskValue(row.tarea) || defaultPuestoLabel}
+                        {isPlaceholder ? (
+                          <span className="text-muted-foreground">Sin puesto cargado</span>
+                        ) : (
+                          sanitizeTaskValue(row.tarea) || defaultPuestoLabel
+                        )}
                       </TableCell>
                       <TableCell className="text-right text-sm tabular-nums">
                         {row.horas_mensuales ?? 0}
@@ -543,13 +649,20 @@ export function LiquidacionJornadasTab({
       />
 
       <JornadaAddSheet
+        key={`jornada-add-sheet-${addSheetSession}-${addSheetInitialDraft?.fecha || 'default'}`}
         open={addSheetOpen}
-        onOpenChange={setAddSheetOpen}
+        onOpenChange={(open) => {
+          setAddSheetOpen(open)
+          if (!open) {
+            setAddSheetInitialDraft(undefined)
+          }
+        }}
         isSucursalEmployee={isSucursalEmployee}
         loading={loading}
         valorHora={liquidacion.valor_hora || 0}
         rows={rows}
         onAdd={handleAddRow}
+        initialDraft={addSheetInitialDraft}
       />
     </>
   )

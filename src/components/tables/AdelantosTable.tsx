@@ -24,6 +24,15 @@ interface AdelantosTableProps {
 }
 
 export function AdelantosTable({ adelantos, onView, onApprove, onReject }: AdelantosTableProps) {
+  const getCuotas = (adelanto: Adelanto): number => {
+    const planCuotas = Number((adelanto as any)?.plan?.cantidad_cuotas || 0)
+    if (planCuotas > 0) return planCuotas
+
+    const observaciones = String(adelanto.observaciones || '')
+    const match = observaciones.match(/cuotas solicitadas:\s*(\d+)/i)
+    return match?.[1] ? Number(match[1]) : 1
+  }
+
   const getTipoBadge = (tipo: string) => {
     switch (tipo) {
       case 'dinero':
@@ -146,6 +155,14 @@ export function AdelantosTable({ adelantos, onView, onApprove, onReject }: Adela
           )
         }
         return <span className="text-muted-foreground">-</span>
+      },
+    },
+    {
+      id: 'cuotas',
+      header: 'Cuotas',
+      cell: ({ row }) => {
+        const cuotas = getCuotas(row.original)
+        return <span className="text-sm">{cuotas}</span>
       },
     },
     {

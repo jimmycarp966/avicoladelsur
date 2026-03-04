@@ -3,7 +3,7 @@
 **Versión:** Febrero 2026 (v2.4.1)  
 **Estado:** ✅ PRODUCCIÓN  
 **Docs relacionadas:** [Architecture Summary](./ARCHITECTURE_SUMMARY.md) · [Architecture Deep-Dive](./ARCHITECTURE.md) · [Supabase Setup](./SUPABASE_SETUP.md) · [INIT Context](./INIT.md)  
-**Última actualización:** 18 de Febrero 2026 (22:00)
+**Última actualización:** 28 de Febrero 2026 (20:30)
 
 **Plataforma unificada** de gestión avícola que integra WMS (Almacén), TMS (Reparto), CRM (Ventas), Carrito Web Público y ERP (Finanzas/RRHH). Potenciada por **Google Gemini AI** para decisiones inteligentes en tiempo real dentro de una arquitectura **server-authoritative** sobre Supabase.
 
@@ -16,11 +16,23 @@
 | Sección | Contenido |
 | --- | --- |
 | [Pilares del Sistema](#-pilares-del-sistema-auditoria-enero-2026) | Diferenciales funcionales e IA |
+| [Novedades 2026-02-26](#-novedades-2026-02-26) | RRHH Hikvision: mapeo estable y backfill |
 | [Novedades 2026-02-18](#-novedades-2026-02-18) | Tesoreria por sucursal, reparto y combustible |
 | [Inicio Rápido](#-inicio-rápido) | Onboarding completo (prerrequisitos + setup + scripts) |
 | [Arquitectura](#-arquitectura-del-sistema) | Stack, módulos y dominios |
 | [Características del Sistema](#-características-del-sistema---completo) | Roadmap de features clave |
 | [Troubleshooting](#-troubleshooting-rápido) | Errores comunes y soluciones |
+
+## 🆕 Novedades 2026-02-26
+
+- **RRHH / Hikvision**:
+  - Se unifica el mapeo de personas Hik -> RRHH con soporte persistente en `rrhh_hik_person_map`.
+  - La sincronizacion de horarios y la liquidacion automatica comparten la misma capa de mapeo.
+  - Se agrega script operativo de backfill para reprocesar asistencia historica:
+    - `npm run rrhh:hik:backfill -- --from=YYYY-MM-DD --to=YYYY-MM-DD --apply`
+- **Migraciones SQL aplicadas**:
+  - `supabase/migrations/20260226_rrhh_fix_origen_auto_licencia_descanso.sql`
+  - `supabase/migrations/20260228_rrhh_hik_person_map.sql`
 
 ## 🆕 Novedades 2026-02-18
 

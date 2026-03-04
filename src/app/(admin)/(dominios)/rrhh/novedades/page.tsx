@@ -32,7 +32,7 @@ export const dynamic = 'force-dynamic'
 export default async function NovedadesPage() {
   const novedades = await getNovedades()
 
-  // Calcular estadísticas
+  // Calcular estadisticas
   const activas = novedades.filter(n => n.activo).length
   const generales = novedades.filter(n => n.tipo === 'general').length
   const porSucursal = novedades.filter(n => n.tipo === 'sucursal').length
@@ -53,7 +53,7 @@ export default async function NovedadesPage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Novedades RRHH</h1>
           <p className="text-gray-600 mt-1">
-            Comunicación interna y anuncios para el personal
+            Comunicacion interna y anuncios para el personal
           </p>
         </div>
         <Button asChild>
@@ -64,7 +64,7 @@ export default async function NovedadesPage() {
         </Button>
       </div>
 
-      {/* Estadísticas rápidas */}
+      {/* Estadisticas rapidas */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white p-6 rounded-lg border border-gray-200">
           <div className="flex items-center">
@@ -96,7 +96,7 @@ export default async function NovedadesPage() {
               <Info className="w-6 h-6 text-purple-600" />
             </div>
             <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Generales</p>
+              <p className="text-sm font-medium text-gray-600">Categoría General</p>
               <p className="text-2xl font-bold text-gray-900">{generales}</p>
             </div>
           </div>
@@ -115,13 +115,13 @@ export default async function NovedadesPage() {
         </div>
       </div>
 
-      {/* Distribución por tipo */}
+      {/* Distribucion por categoria */}
       <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold mb-4">Distribución por Tipo</h3>
+        <h3 className="text-lg font-semibold mb-4">Distribucion por Categoria</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="text-center p-4 bg-blue-50 rounded-lg">
             <div className="text-2xl font-bold text-blue-600">{generales}</div>
-            <div className="text-sm text-blue-700">Generales</div>
+            <div className="text-sm text-blue-700">Categoría General</div>
           </div>
           <div className="text-center p-4 bg-green-50 rounded-lg">
             <div className="text-2xl font-bold text-green-600">{porSucursal}</div>
@@ -129,21 +129,21 @@ export default async function NovedadesPage() {
           </div>
           <div className="text-center p-4 bg-purple-50 rounded-lg">
             <div className="text-2xl font-bold text-purple-600">{porCategoria}</div>
-            <div className="text-sm text-purple-700">Por Categoría</div>
+            <div className="text-sm text-purple-700">Por Categoria</div>
           </div>
         </div>
       </div>
 
-      {/* Información importante */}
+      {/* Informacion importante */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <div className="flex items-start gap-3">
           <div className="p-1 bg-blue-100 rounded-lg">
             <Megaphone className="w-5 h-5 text-blue-600" />
           </div>
           <div>
-            <h3 className="font-semibold text-blue-900">Sistema de Comunicación Interna</h3>
+            <h3 className="font-semibold text-blue-900">Sistema de Comunicacion Interna</h3>
             <p className="text-blue-700 text-sm mt-1">
-              Las novedades se muestran automáticamente a los empleados según su sucursal y categoría.
+              Las novedades se muestran automaticamente a los empleados segun su sucursal y categoria.
               Las novedades generales son visibles para todo el personal activo.
             </p>
           </div>
@@ -161,3 +161,4 @@ export default async function NovedadesPage() {
     </div>
   )
 }
+

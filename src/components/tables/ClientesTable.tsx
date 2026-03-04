@@ -218,13 +218,13 @@ export function ClientesTable({
     <DataTable
       columns={columns}
       data={data}
-      searchKey={serverPagination ? undefined : "nombre"} // Deshabilitar búsqueda del lado cliente cuando hay server-side
+      searchKey="nombre"
       searchPlaceholder="Buscar por código, nombre, teléfono, WhatsApp, email..."
       actions={actions}
       enableRowSelection={true}
       enableColumnVisibility={true}
       enablePagination={true}
-      pageSize={15}
+      pageSize={50}
       onPaginationChange={onPaginationChange}
       onSearchChange={onSearchChange}
       serverPagination={serverPagination}

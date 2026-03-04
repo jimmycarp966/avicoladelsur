@@ -28,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -47,6 +48,7 @@ interface DataTableProps<TData, TValue> {
   enableColumnVisibility?: boolean
   enablePagination?: boolean
   pageSize?: number
+  pageSizeOptions?: number[]
   actions?: (row: TData) => React.ReactNode
   // Server-side pagination callbacks
   onPaginationChange?: (pagination: { pageIndex: number; pageSize: number }) => void
@@ -59,6 +61,14 @@ interface DataTableProps<TData, TValue> {
   }
 }
 
+const MIN_PAGE_SIZE = 50
+
+function normalizePageSize(value: number | undefined, fallback = MIN_PAGE_SIZE): number {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback
+  return Math.max(MIN_PAGE_SIZE, Math.trunc(parsed))
+}
+
 export function DataTable<TData, TValue>({
   columns,
   data,
@@ -68,12 +78,24 @@ export function DataTable<TData, TValue>({
   enableRowSelection = false,
   enableColumnVisibility = true,
   enablePagination = true,
-  pageSize = 10,
+  pageSize = 50,
+  pageSizeOptions = [50, 100, 200],
   actions,
   onPaginationChange,
   onSearchChange,
   serverPagination,
 }: DataTableProps<TData, TValue>) {
+  const normalizedInitialPageSize = React.useMemo(
+    () => normalizePageSize(serverPagination?.pageSize ?? pageSize),
+    [serverPagination?.pageSize, pageSize],
+  )
+  const normalizedPageSizeOptions = React.useMemo(() => {
+    const sizes = pageSizeOptions
+      .map((size) => normalizePageSize(size))
+      .concat([MIN_PAGE_SIZE, normalizedInitialPageSize])
+    return Array.from(new Set(sizes)).sort((a, b) => a - b)
+  }, [pageSizeOptions, normalizedInitialPageSize])
+
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
@@ -81,7 +103,7 @@ export function DataTable<TData, TValue>({
   const [globalFilter, setGlobalFilter] = React.useState('')
   const [pagination, setPagination] = React.useState({
     pageIndex: serverPagination?.pageIndex ?? 0,
-    pageSize: serverPagination?.pageSize ?? pageSize,
+    pageSize: normalizedInitialPageSize,
   })
 
   // Update pagination when serverPagination changes
@@ -89,7 +111,7 @@ export function DataTable<TData, TValue>({
     if (serverPagination) {
       const newPagination = {
         pageIndex: serverPagination.pageIndex,
-        pageSize: serverPagination.pageSize,
+        pageSize: normalizePageSize(serverPagination.pageSize, normalizedInitialPageSize),
       }
       // Only update if different to avoid unnecessary re-renders
       setPagination(prev => {
@@ -99,7 +121,7 @@ export function DataTable<TData, TValue>({
         return prev
       })
     }
-  }, [serverPagination?.pageIndex, serverPagination?.pageSize])
+  }, [serverPagination?.pageIndex, serverPagination?.pageSize, normalizedInitialPageSize])
 
   // Add row selection column if enabled
   const tableColumns = React.useMemo(() => {
@@ -212,8 +234,12 @@ export function DataTable<TData, TValue>({
     } : setGlobalFilter,
     onPaginationChange: enablePagination ? (updater) => {
       const newPagination = typeof updater === 'function' ? updater(pagination) : updater
-      setPagination(newPagination)
-      onPaginationChange?.(newPagination)
+      const normalizedPagination = {
+        pageIndex: newPagination.pageIndex,
+        pageSize: normalizePageSize(newPagination.pageSize, normalizedInitialPageSize),
+      }
+      setPagination(normalizedPagination)
+      onPaginationChange?.(normalizedPagination)
     } : undefined,
     globalFilterFn: 'includesString',
     // Server-side pagination configuration
@@ -240,7 +266,7 @@ export function DataTable<TData, TValue>({
               <Input
                 placeholder={searchPlaceholder}
                 value={globalFilter ?? ''}
-                onChange={(event) => setGlobalFilter(event.target.value)}
+                onChange={(event) => table.setGlobalFilter(event.target.value)}
                 className="pl-8 w-full sm:max-w-sm"
               />
             </div>
@@ -414,10 +440,36 @@ export function DataTable<TData, TValue>({
       {enablePagination && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-4">
           <div className="text-sm text-muted-foreground order-2 sm:order-1">
-            {table.getFilteredSelectedRowModel().rows.length} de{' '}
-            {table.getFilteredRowModel().rows.length} fila(s) seleccionada(s).
+            {(() => {
+              const totalRows = serverPagination?.totalCount ?? table.getFilteredRowModel().rows.length
+              const pageIndex = pagination.pageIndex
+              const pageSizeValue = pagination.pageSize
+              const start = totalRows === 0 ? 0 : pageIndex * pageSizeValue + 1
+              const end = Math.min((pageIndex + 1) * pageSizeValue, totalRows)
+              const selectedRows = table.getFilteredSelectedRowModel().rows.length
+              const selectedText = selectedRows > 0 ? ` • ${selectedRows} seleccionada(s)` : ''
+              return `Mostrando ${start}-${end} de ${totalRows}${selectedText}`
+            })()}
           </div>
-          <div className="flex items-center justify-center space-x-2 order-1 sm:order-2">
+          <div className="flex items-center justify-center gap-2 order-1 sm:order-2">
+            <Select
+              value={String(pagination.pageSize)}
+              onValueChange={(value) => table.setPageSize(Number(value))}
+            >
+              <SelectTrigger className="h-8 w-[100px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {normalizedPageSizeOptions.map((size) => (
+                  <SelectItem key={size} value={String(size)}>
+                    {size}/pag
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span className="text-xs text-muted-foreground min-w-[80px] text-center">
+              Pag {pagination.pageIndex + 1}
+            </span>
             <Button
               variant="outline"
               size="sm"

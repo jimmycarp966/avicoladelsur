@@ -155,7 +155,7 @@ export function EmpleadosTable({ empleados, onView, onEdit, onDelete, onCall, on
               {onView && (
                 <DropdownMenuItem onClick={() => onView(empleado)}>
                   <Eye className="mr-2 h-4 w-4" />
-                  Ver detalles
+                  Legajo
                 </DropdownMenuItem>
               )}
               {onEdit && (

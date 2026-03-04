@@ -36,6 +36,7 @@ export function NuevoAdelantoForm() {
     defaultValues: {
       tipo: 'dinero',
       fecha_solicitud: new Date().toISOString().split('T')[0],
+      cantidad_cuotas: 1,
     },
   })
 
@@ -91,16 +92,16 @@ export function NuevoAdelantoForm() {
     try {
       setIsLoading(true)
 
-      // Validar que los campos requeridos estén presentes según el tipo
+      // Validar que los campos requeridos estan presentes segun el tipo
       if (data.tipo === 'dinero' && !data.monto) {
-        showToast('error', 'El monto es requerido para adelantos en dinero', 'Error de validación')
+        showToast('error', 'El monto es requerido para adelantos en dinero', 'Error de validacion')
         setIsLoading(false)
         return
       }
 
       if (data.tipo === 'producto') {
         if (!data.producto_id || !data.cantidad || !data.precio_unitario) {
-          showToast('error', 'Producto, cantidad y precio unitario son requeridos para adelantos en productos', 'Error de validación')
+          showToast('error', 'Producto, cantidad y precio unitario son requeridos para adelantos en productos', 'Error de validacion')
           setIsLoading(false)
           return
         }
@@ -136,7 +137,7 @@ export function NuevoAdelantoForm() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      {/* Botón volver */}
+      {/* Boton volver */}
       <div className="mb-6">
         <Button variant="ghost" asChild className="mb-4">
           <Link href="/rrhh/adelantos">
@@ -147,12 +148,12 @@ export function NuevoAdelantoForm() {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        {/* Información básica */}
+        {/* Informacion basica */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              Información Básica
+              Informacion Basica
             </CardTitle>
             <CardDescription>
               Seleccione el empleado y el tipo de adelanto
@@ -234,7 +235,7 @@ export function NuevoAdelantoForm() {
           </CardContent>
         </Card>
 
-        {/* Detalles según tipo */}
+        {/* Detalles segun tipo */}
         {tipoSeleccionado === 'dinero' ? (
           <Card>
             <CardHeader>
@@ -243,7 +244,7 @@ export function NuevoAdelantoForm() {
                 Detalles del Adelanto en Dinero
               </CardTitle>
               <CardDescription>
-                Ingrese el monto del adelanto (máximo 30% del sueldo básico)
+                Ingrese el monto del adelanto (maximo 30% del sueldo basico)
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -262,7 +263,25 @@ export function NuevoAdelantoForm() {
                     <p className="text-sm text-red-600">{errors.monto.message}</p>
                   )}
                   <p className="text-xs text-muted-foreground">
-                    El sistema validará automáticamente que no supere el 30% del sueldo básico
+                    El sistema validar? automaticamente que no supere el 30% del sueldo basico
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="cantidad_cuotas">Cantidad de Cuotas</Label>
+                  <Input
+                    id="cantidad_cuotas"
+                    type="number"
+                    min={1}
+                    max={24}
+                    step={1}
+                    {...register('cantidad_cuotas', { valueAsNumber: true })}
+                  />
+                  {errors.cantidad_cuotas && (
+                    <p className="text-sm text-red-600">{errors.cantidad_cuotas.message}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Se descontara en esta cantidad de liquidaciones luego de aprobarlo.
                   </p>
                 </div>
               </div>
@@ -346,7 +365,7 @@ export function NuevoAdelantoForm() {
               Observaciones
             </CardTitle>
             <CardDescription>
-              Información adicional sobre el adelanto (opcional)
+              Informacion adicional sobre el adelanto (opcional)
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -365,7 +384,7 @@ export function NuevoAdelantoForm() {
           </CardContent>
         </Card>
 
-        {/* Botones de acción */}
+        {/* Botones de accion */}
         <div className="flex justify-end gap-4">
           <Button
             type="button"
@@ -393,4 +412,5 @@ export function NuevoAdelantoForm() {
     </div>
   )
 }
+
 

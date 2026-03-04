@@ -20,6 +20,13 @@ export function AdelantosTableWrapper({ adelantos }: AdelantosTableWrapperProps)
   const handleApprove = async (adelanto: Adelanto) => {
     try {
       setLoadingId(adelanto.id)
+
+      const cuotasInput = window.prompt('Cantidad de cuotas para descontar este adelanto (1 a 24):', '1')
+      if (cuotasInput === null) {
+        setLoadingId(null)
+        return
+      }
+      const cuotas = Math.max(1, Math.min(24, Number.parseInt(cuotasInput, 10) || 1))
       
       const user = await getCurrentUser()
       if (!user) {
@@ -27,7 +34,7 @@ export function AdelantosTableWrapper({ adelantos }: AdelantosTableWrapperProps)
         return
       }
 
-      const result = await aprobarAdelantoAction(adelanto.id, user.id)
+      const result = await aprobarAdelantoAction(adelanto.id, user.id, cuotas)
 
       if (result.success) {
         showToast('success', result.message || 'Adelanto aprobado exitosamente', 'Adelanto aprobado')

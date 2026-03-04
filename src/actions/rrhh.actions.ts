@@ -12,6 +12,41 @@ import type { Empleado, LiquidacionReglaPeriodo, LiquidacionReglaPuesto } from '
 // RRHH - ACCIONES DEL SERVIDOR
 // ===========================================
 
+type LegajoEventoInput = {
+  empleadoId: string
+  tipo: string
+  categoria: string
+  titulo: string
+  descripcion?: string
+  metadata?: Record<string, unknown>
+  createdBy?: string | null
+  fechaEvento?: string
+}
+
+async function registrarEventoLegajo(db: any, input: LegajoEventoInput): Promise<void> {
+  try {
+    const { error } = await db
+      .from('rrhh_legajo_eventos')
+      .insert({
+        empleado_id: input.empleadoId,
+        tipo: input.tipo,
+        categoria: input.categoria,
+        titulo: input.titulo,
+        descripcion: input.descripcion || null,
+        metadata: input.metadata || {},
+        created_by: input.createdBy || null,
+        fecha_evento: input.fechaEvento || new Date().toISOString(),
+      })
+
+    // 42P01 = relation does not exist (migracion aun no aplicada)
+    if (error && error.code !== '42P01') {
+      devError('Error registrando evento en legajo:', error)
+    }
+  } catch (error) {
+    devError('Error inesperado registrando evento en legajo:', error)
+  }
+}
+
 // ========== EMPLEADOS ==========
 
 export async function crearEmpleadoAction(
@@ -51,7 +86,7 @@ export async function crearEmpleadoAction(
       if (existingEmpleado) {
         return {
           success: false,
-          error: 'El legajo ya está en uso por otro empleado',
+          error: 'El legajo ya est? en uso por otro empleado',
         }
       }
     }
@@ -67,7 +102,7 @@ export async function crearEmpleadoAction(
       if (existingEmpleado) {
         return {
           success: false,
-          error: 'El DNI ya está en uso por otro empleado',
+          error: 'El DNI ya est? en uso por otro empleado',
         }
       }
     }
@@ -83,12 +118,12 @@ export async function crearEmpleadoAction(
       if (existingEmpleado) {
         return {
           success: false,
-          error: 'El CUIL ya está en uso por otro empleado',
+          error: 'El CUIL ya est? en uso por otro empleado',
         }
       }
     }
 
-    // Validar que el usuario_id tenga cuenta de autenticación si se proporciona
+    // Validar que el usuario_id tenga cuenta de autenticacion si se proporciona
     if (empleadoData.usuario_id) {
       // Verificar que el usuario existe en la tabla usuarios
       const { data: usuarioData, error: usuarioError } = await supabase
@@ -107,11 +142,11 @@ export async function crearEmpleadoAction(
       if (!usuarioData.activo) {
         return {
           success: false,
-          error: 'El usuario seleccionado está inactivo',
+          error: 'El usuario seleccionado est? inactivo',
         }
       }
 
-      // Verificar que el usuario no esté ya asignado a otro empleado
+      // Verificar que el usuario no est? ya asignado a otro empleado
       const { data: empleadoExistente, error: empleadoError } = await supabase
         .from('rrhh_empleados')
         .select('id')
@@ -122,16 +157,16 @@ export async function crearEmpleadoAction(
       if (empleadoExistente) {
         return {
           success: false,
-          error: 'Este usuario ya está asignado a otro empleado activo',
+          error: 'Este usuario ya est? asignado a otro empleado activo',
         }
       }
 
-      // Nota: La verificación de que existe en auth.users se hace automáticamente
-      // mediante el trigger sync_user_from_auth() o se puede verificar con una función RPC
-      // Por ahora, asumimos que si está en la tabla usuarios y está activo, tiene cuenta de auth
+      // Nota: La verificacion de que existe en auth.users se hace automaticamente
+      // mediante el trigger sync_user_from_auth() o se puede verificar con una funcion RPC
+      // Por ahora, asumimos que si est? en la tabla usuarios y est? activo, tiene cuenta de auth
     }
 
-    // Limpiar campos de fecha vacíos (convertir "" a null/undefined)
+    // Limpiar campos de fecha vacios (convertir "" a null/undefined)
     const cleanedData: any = {
       ...empleadoData,
       activo: empleadoData.activo ?? true,
@@ -143,7 +178,7 @@ export async function crearEmpleadoAction(
     delete cleanedData.nombre
     delete cleanedData.apellido
     
-    // Validar que fecha_ingreso no esté vacío (es requerido)
+    // Validar que fecha_ingreso no est? vacio (es requerido)
     if (!cleanedData.fecha_ingreso || cleanedData.fecha_ingreso === '' || cleanedData.fecha_ingreso === null) {
       return {
         success: false,
@@ -151,12 +186,12 @@ export async function crearEmpleadoAction(
       }
     }
     
-    // Convertir fecha_nacimiento vacía a undefined
+    // Convertir fecha_nacimiento vacia a undefined
     if (cleanedData.fecha_nacimiento === '' || cleanedData.fecha_nacimiento === null || cleanedData.fecha_nacimiento === undefined) {
       delete cleanedData.fecha_nacimiento
     }
     
-    // Limpiar otros campos opcionales vacíos
+    // Limpiar otros campos opcionales vacios
     const optionalFields = ['legajo', 'dni', 'cuil', 'domicilio', 'telefono_personal', 
                             'contacto_emergencia', 'telefono_emergencia', 'obra_social', 
                             'numero_afiliado', 'banco', 'cbu', 'numero_cuenta', 'usuario_id',
@@ -243,7 +278,7 @@ export async function actualizarEmpleadoAction(
       if (existingEmpleado) {
         return {
           success: false,
-          error: 'El legajo ya está en uso por otro empleado',
+          error: 'El legajo ya est? en uso por otro empleado',
         }
       }
     }
@@ -260,7 +295,7 @@ export async function actualizarEmpleadoAction(
       if (existingEmpleado) {
         return {
           success: false,
-          error: 'El DNI ya está en uso por otro empleado',
+          error: 'El DNI ya est? en uso por otro empleado',
         }
       }
     }
@@ -277,31 +312,31 @@ export async function actualizarEmpleadoAction(
       if (existingEmpleado) {
         return {
           success: false,
-          error: 'El CUIL ya está en uso por otro empleado',
+          error: 'El CUIL ya est? en uso por otro empleado',
         }
       }
     }
 
-    // Limpiar campos de fecha vacíos (convertir "" a null/undefined)
+    // Limpiar campos de fecha vacios (convertir "" a null/undefined)
     const cleanedData: any = { ...empleadoData }
     
     // IMPORTANTE: Manejar nombre y apellido correctamente
     // El nombre y apellido del empleado vienen del usuario vinculado (usuario_id)
     // Solo se usan si el empleado NO tiene usuario_id asignado
     
-    // Si se está asignando un usuario_id, limpiar nombre y apellido del empleado
+    // Si se est? asignando un usuario_id, limpiar nombre y apellido del empleado
     // porque el nombre debe venir del usuario vinculado, no de campos directos
     if (cleanedData.usuario_id) {
       cleanedData.nombre = null
       cleanedData.apellido = null
     } else {
-      // Si no se está asignando usuario_id, eliminar estos campos para que no se actualicen
+      // Si no se est? asignando usuario_id, eliminar estos campos para que no se actualicen
       delete cleanedData.nombre
       delete cleanedData.apellido
     }
     
-    // Convertir fechas vacías a undefined (no se actualizan si están vacías)
-    // fecha_ingreso puede ser opcional en actualización, pero si viene vacío no se actualiza
+    // Convertir fechas vacias a undefined (no se actualizan si estan vacias)
+    // fecha_ingreso puede ser opcional en actualizacion, pero si viene vacio no se actualiza
     if (cleanedData.fecha_ingreso === '' || cleanedData.fecha_ingreso === null || cleanedData.fecha_ingreso === undefined) {
       delete cleanedData.fecha_ingreso
     }
@@ -310,7 +345,7 @@ export async function actualizarEmpleadoAction(
       delete cleanedData.fecha_nacimiento
     }
     
-    // Limpiar otros campos opcionales vacíos
+    // Limpiar otros campos opcionales vacios
     const optionalFields = ['legajo', 'dni', 'cuil', 'domicilio', 'telefono_personal', 
                             'contacto_emergencia', 'telefono_emergencia', 'obra_social', 
                             'numero_afiliado', 'banco', 'cbu', 'numero_cuenta', 'usuario_id',
@@ -762,6 +797,7 @@ export async function crearAdelantoAction(
     producto_id?: string
     cantidad?: number
     precio_unitario?: number
+    cantidad_cuotas?: number
     fecha_solicitud?: string
     observaciones?: string
   }
@@ -803,10 +839,18 @@ export async function crearAdelantoAction(
       }
     }
 
+    const cantidadCuotas = Math.max(1, Math.min(24, Math.trunc(Number(adelantoData.cantidad_cuotas || 1)) || 1))
+    const { cantidad_cuotas: _cantidadCuotasIgnorada, ...adelantoPayload } = adelantoData
+    const observacionesLimpias = (adelantoData.observaciones || '').trim()
+    const observacionesConCuotas = cantidadCuotas > 1
+      ? [observacionesLimpias, `Cuotas solicitadas: ${cantidadCuotas}`].filter(Boolean).join(' | ')
+      : observacionesLimpias
+
     const { data, error } = await adminSupabase
       .from('rrhh_adelantos')
       .insert({
-        ...adelantoData,
+        ...adelantoPayload,
+        observaciones: observacionesConCuotas || null,
         fecha_solicitud: adelantoData.fecha_solicitud || new Date().toISOString().split('T')[0],
         aprobado: false,
       })
@@ -821,12 +865,36 @@ export async function crearAdelantoAction(
       }
     }
 
+    await registrarEventoLegajo(adminSupabase, {
+      empleadoId: adelantoData.empleado_id,
+      tipo: 'adelanto_solicitado',
+      categoria: 'adelantos',
+      titulo: 'Solicitud de adelanto',
+      descripcion:
+        adelantoData.tipo === 'dinero'
+          ? `Adelanto en dinero solicitado por ${Number(adelantoData.monto || 0).toLocaleString('es-AR')}`
+          : `Adelanto en producto solicitado (${Number(adelantoData.cantidad || 0)} unidad/es)`,
+      metadata: {
+        adelanto_id: data.id,
+        tipo: adelantoData.tipo,
+        monto: adelantoData.monto || null,
+        producto_id: adelantoData.producto_id || null,
+        cantidad: adelantoData.cantidad || null,
+        precio_unitario: adelantoData.precio_unitario || null,
+        cantidad_cuotas_solicitadas: cantidadCuotas,
+      },
+      createdBy: user.id,
+    })
+
     revalidatePath('/rrhh/adelantos')
 
     return {
       success: true,
       data: { adelantoId: data.id },
-      message: 'Adelanto creado exitosamente, pendiente de aprobación',
+      message:
+        cantidadCuotas > 1
+          ? `Adelanto creado exitosamente, pendiente de aprobación (${cantidadCuotas} cuotas solicitadas).`
+          : 'Adelanto creado exitosamente, pendiente de aprobación',
     }
   } catch (error) {
     devError('Error en crearAdelanto:', error)
@@ -839,15 +907,23 @@ export async function crearAdelantoAction(
 
 export async function aprobarAdelantoAction(
   adelantoId: string,
-  aprobadoPor: string
+  aprobadoPor: string,
+  cantidadCuotas = 1,
 ): Promise<ApiResponse<void>> {
   try {
     const supabase = createAdminClient()
+    const cuotasNormalizadas = Math.max(1, Math.min(24, Math.trunc(Number(cantidadCuotas)) || 1))
+
+    const { data: adelantoSnapshot } = await supabase
+      .from('rrhh_adelantos')
+      .select('id, empleado_id, tipo, monto, cantidad, precio_unitario, observaciones')
+      .eq('id', adelantoId)
+      .maybeSingle()
 
     const { data, error } = await supabase.rpc('fn_rrhh_aprobar_adelanto_atomico', {
       p_adelanto_id: adelantoId,
       p_aprobado_por: aprobadoPor,
-      p_cantidad_cuotas: 1,
+      p_cantidad_cuotas: cuotasNormalizadas,
       p_fecha_inicio: null,
       p_recalcular: true,
     })
@@ -862,6 +938,26 @@ export async function aprobarAdelantoAction(
       }
     }
 
+    if (adelantoSnapshot?.empleado_id) {
+      await registrarEventoLegajo(supabase, {
+        empleadoId: adelantoSnapshot.empleado_id,
+        tipo: 'adelanto_aprobado',
+        categoria: 'adelantos',
+        titulo: 'Adelanto aprobado',
+        descripcion:
+          adelantoSnapshot.tipo === 'dinero'
+            ? `Adelanto en dinero aprobado por ${Number(adelantoSnapshot.monto || 0).toLocaleString('es-AR')}`
+            : 'Adelanto en producto aprobado',
+        metadata: {
+          adelanto_id: adelantoId,
+          plan_id: resultRow.plan_id || null,
+          cantidad_cuotas: cuotasNormalizadas,
+          liquidacion_recalculada_id: resultRow.liquidacion_recalculada_id || null,
+        },
+        createdBy: aprobadoPor,
+      })
+    }
+
     revalidatePath('/rrhh/adelantos')
     revalidatePath('/rrhh/liquidaciones')
     if (resultRow.liquidacion_recalculada_id) {
@@ -870,7 +966,10 @@ export async function aprobarAdelantoAction(
 
     return {
       success: true,
-      message: 'Adelanto aprobado exitosamente',
+      message:
+        cuotasNormalizadas > 1
+          ? `Adelanto aprobado exitosamente en ${cuotasNormalizadas} cuotas.`
+          : 'Adelanto aprobado exitosamente',
     }
   } catch (error) {
     devError('Error en aprobarAdelanto:', error)
@@ -884,6 +983,11 @@ export async function aprobarAdelantoAction(
 export async function rechazarAdelantoAction(adelantoId: string): Promise<ApiResponse<void>> {
   try {
     const supabase = createAdminClient()
+    const { data: snapshot } = await supabase
+      .from('rrhh_adelantos')
+      .select('id, empleado_id, tipo, monto, cantidad, precio_unitario')
+      .eq('id', adelantoId)
+      .maybeSingle()
 
     const { data, error } = await supabase
       .from('rrhh_adelantos')
@@ -906,6 +1010,26 @@ export async function rechazarAdelantoAction(adelantoId: string): Promise<ApiRes
         success: false,
         error: 'Solo se pueden rechazar adelantos pendientes y aun no mapeados en liquidaciones',
       }
+    }
+
+    if (snapshot?.empleado_id) {
+      await registrarEventoLegajo(supabase, {
+        empleadoId: snapshot.empleado_id,
+        tipo: 'adelanto_rechazado',
+        categoria: 'adelantos',
+        titulo: 'Adelanto rechazado',
+        descripcion:
+          snapshot.tipo === 'dinero'
+            ? `Se rechazó un adelanto en dinero de ${Number(snapshot.monto || 0).toLocaleString('es-AR')}`
+            : 'Se rechazó un adelanto en producto',
+        metadata: {
+          adelanto_id: adelantoId,
+          tipo: snapshot.tipo,
+          monto: snapshot.monto || null,
+          cantidad: snapshot.cantidad || null,
+          precio_unitario: snapshot.precio_unitario || null,
+        },
+      })
     }
 
     revalidatePath('/rrhh/adelantos')
@@ -976,6 +1100,95 @@ function getDaysInMonth(periodoMes: number, periodoAnio: number): number {
   return new Date(periodoAnio, periodoMes, 0).getDate()
 }
 
+function normalizeText(value?: string | null): string {
+  return (value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+}
+
+function priorizarSucursalesHorqueta<T extends { nombre?: string }>(sucursales: T[]): T[] {
+  const list = Array.isArray(sucursales) ? [...sucursales] : []
+  const hasHorqueta = list.some((s) => normalizeText(s.nombre).includes('horqueta'))
+  const withoutColon = hasHorqueta
+    ? list.filter((s) => !normalizeText(s.nombre).includes('colon'))
+    : list
+
+  return withoutColon.sort((a, b) => {
+    const aNorm = normalizeText(a.nombre)
+    const bNorm = normalizeText(b.nombre)
+    const aHorqueta = aNorm.includes('horqueta')
+    const bHorqueta = bNorm.includes('horqueta')
+    if (aHorqueta && !bHorqueta) return -1
+    if (!aHorqueta && bHorqueta) return 1
+    return aNorm.localeCompare(bNorm, 'es')
+  })
+}
+
+type DescansosMensualesSyncResult = {
+  generados: number
+  sincronizados: number
+  soportado: boolean
+}
+
+async function sincronizarDescansosMensualesSucursal(
+  db: any,
+  input: {
+    anio: number
+    mes: number
+    empleadoId?: string
+    seed?: string
+  }
+): Promise<DescansosMensualesSyncResult> {
+  try {
+    let generados = 0
+    let sincronizados = 0
+
+    const { data: generadosData, error: generadosError } = await db.rpc('fn_rrhh_generar_descansos_mensuales', {
+      p_anio: input.anio,
+      p_mes: input.mes,
+      p_empleado_id: input.empleadoId || null,
+      p_seed: input.seed || null,
+    })
+
+    if (generadosError) {
+      const message = String(generadosError.message || '').toLowerCase()
+      if (message.includes('fn_rrhh_generar_descansos_mensuales')) {
+        return { generados: 0, sincronizados: 0, soportado: false }
+      }
+      throw generadosError
+    }
+
+    if (Array.isArray(generadosData)) {
+      generados = generadosData.reduce(
+        (acc: number, row: any) => acc + Number(row?.generados || 0),
+        0
+      )
+    }
+
+    const { data: sincronizadosData, error: syncError } = await db.rpc('fn_rrhh_sync_descansos_mensuales_asistencia', {
+      p_anio: input.anio,
+      p_mes: input.mes,
+      p_empleado_id: input.empleadoId || null,
+    })
+
+    if (syncError) {
+      const message = String(syncError.message || '').toLowerCase()
+      if (message.includes('fn_rrhh_sync_descansos_mensuales_asistencia')) {
+        return { generados, sincronizados: 0, soportado: false }
+      }
+      throw syncError
+    }
+
+    sincronizados = Number(sincronizadosData || 0)
+    return { generados, sincronizados, soportado: true }
+  } catch (error) {
+    devError('Error sincronizando descansos mensuales de sucursal:', error)
+    return { generados: 0, sincronizados: 0, soportado: false }
+  }
+}
+
 type GuardarReglaPuestoInput = {
   id?: string
   puesto_codigo: string
@@ -1008,6 +1221,13 @@ export async function prepararLiquidacionMensualAction(
 
     let data: string | null = null
     let error: any = null
+
+    await sincronizarDescansosMensualesSucursal(supabase, {
+      anio,
+      mes,
+      empleadoId,
+      seed: `${empleadoId}-${anio}-${mes}`,
+    })
 
     const v2Result = await supabase.rpc('fn_rrhh_preparar_liquidacion_mensual', {
       p_empleado_id: empleadoId,
@@ -1276,7 +1496,7 @@ export async function recalcularLiquidacionesPeriodoAction(input: {
         .eq('activo', true)
 
       if (activosError) {
-        devError('Error obteniendo empleados activos para recálculo:', activosError)
+        devError('Error obteniendo empleados activos para recalculo:', activosError)
         return {
           success: false,
           error: 'No se pudo obtener la lista de empleados activos',
@@ -1312,7 +1532,7 @@ export async function recalcularLiquidacionesPeriodoAction(input: {
       .gt('horas_trabajadas', 0)
 
     if (asistenciaError) {
-      devError('Error obteniendo asistencia para recálculo:', asistenciaError)
+      devError('Error obteniendo asistencia para recalculo:', asistenciaError)
       return {
         success: false,
         error: 'No se pudo verificar la asistencia del periodo',
@@ -1352,7 +1572,7 @@ export async function recalcularLiquidacionesPeriodoAction(input: {
 
       if (error) {
         errores++
-        devError(`Error recalculando liquidación para empleado ${empleadoId}:`, error)
+        devError(`Error recalculando liquidacion para empleado ${empleadoId}:`, error)
       } else {
         actualizados++
       }
@@ -1368,7 +1588,7 @@ export async function recalcularLiquidacionesPeriodoAction(input: {
         omitidos_sin_horas: omitidosSinHoras,
         errores,
       },
-      message: 'Recálculo ejecutado',
+      message: 'Recalculo ejecutado',
     }
   } catch (error) {
     devError('Error en recalcularLiquidacionesPeriodoAction:', error)
@@ -1396,7 +1616,7 @@ export async function upsertLiquidacionJornadaAction(
 
     const { data: liquidacion, error: liqError } = await supabase
       .from('rrhh_liquidaciones')
-      .select('id, empleado_id')
+      .select('id, empleado_id, periodo_mes, periodo_anio')
       .eq('id', liquidacionId)
       .maybeSingle()
 
@@ -1424,6 +1644,18 @@ export async function upsertLiquidacionJornadaAction(
     }
 
     let jornadaId = jornadaData.id
+    let jornadaOriginal: { fecha?: string | null; origen?: string | null; empleado_id?: string | null } | null = null
+
+    if (jornadaData.id) {
+      const { data: currentRow } = await supabase
+        .from('rrhh_liquidacion_jornadas')
+        .select('fecha, origen, empleado_id')
+        .eq('id', jornadaData.id)
+        .eq('liquidacion_id', liquidacionId)
+        .maybeSingle()
+
+      jornadaOriginal = (currentRow as any) || null
+    }
 
     if (jornadaData.id) {
       const { data, error } = await supabase
@@ -1459,6 +1691,30 @@ export async function upsertLiquidacionJornadaAction(
       }
 
       jornadaId = data.id
+    }
+
+    const fechaAnterior = jornadaOriginal?.fecha?.slice(0, 10)
+    const fechaNueva = payload.fecha?.slice(0, 10)
+    const esDescansoAutoOriginal = jornadaOriginal?.origen === 'auto_licencia_descanso'
+    if (esDescansoAutoOriginal && fechaAnterior && fechaNueva && fechaAnterior !== fechaNueva) {
+      const { error: descansoError } = await supabase
+        .from('rrhh_descansos_mensuales')
+        .update({
+          fecha: fechaNueva,
+          estado: 'editado',
+          origen: 'manual',
+          observaciones: `Descanso movido manualmente de ${fechaAnterior} a ${fechaNueva}`,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('empleado_id', liquidacion.empleado_id)
+        .eq('periodo_mes', Number(liquidacion.periodo_mes))
+        .eq('periodo_anio', Number(liquidacion.periodo_anio))
+        .eq('fecha', fechaAnterior)
+        .neq('estado', 'cancelado')
+
+      if (descansoError && descansoError.code !== '42P01') {
+        devError('No se pudo actualizar rrhh_descansos_mensuales al mover descanso:', descansoError)
+      }
     }
 
     const recalcResult = await recalcularLiquidacionAction(liquidacionId)
@@ -1566,14 +1822,14 @@ export async function guardarReglaPeriodoAction(
     if (payload.periodo_mes < 1 || payload.periodo_mes > 12 || payload.periodo_anio < 2000) {
       return {
         success: false,
-        error: 'Periodo inválido',
+        error: 'Periodo invalido',
       }
     }
 
     if (payload.dias_base_galpon <= 0 || payload.dias_base_rrhh <= 0) {
       return {
         success: false,
-        error: 'Los días base deben ser mayores a cero',
+        error: 'Los dias base deben ser mayores a cero',
       }
     }
 
@@ -1637,7 +1893,7 @@ export async function guardarReglaPuestoAction(
     if (!puestoCodigo) {
       return {
         success: false,
-        error: 'El código de puesto es obligatorio',
+        error: 'El codigo de puesto es obligatorio',
       }
     }
 
@@ -1662,7 +1918,7 @@ export async function guardarReglaPuestoAction(
     if ((payload.tipo_calculo ?? 'hora') === 'turno' && payload.tarifa_turno_trabajado <= 0) {
       return {
         success: false,
-        error: 'Para cálculo por turno, la tarifa de turno trabajado debe ser mayor a cero',
+        error: 'Para calculo por turno, la tarifa de turno trabajado debe ser mayor a cero',
       }
     }
 
@@ -1876,10 +2132,10 @@ export async function aprobarLiquidacionAction(liquidacionId: string): Promise<A
       .maybeSingle()
 
     if (error || !data?.id) {
-      devError('Error al aprobar liquidación:', error)
+      devError('Error al aprobar liquidacion:', error)
       return {
         success: false,
-        error: 'Error al aprobar liquidación: ' + (error?.message || 'Liquidación no encontrada'),
+        error: 'Error al aprobar liquidacion: ' + (error?.message || 'Liquidacion no encontrada'),
       }
     }
 
@@ -1887,7 +2143,7 @@ export async function aprobarLiquidacionAction(liquidacionId: string): Promise<A
 
     return {
       success: true,
-      message: 'Liquidación aprobada exitosamente',
+      message: 'Liquidacion aprobada exitosamente',
     }
   } catch (error) {
     devError('Error en aprobarLiquidacion:', error)
@@ -1943,10 +2199,10 @@ export async function marcarLiquidacionPagadaAction(liquidacionId: string): Prom
       .maybeSingle()
 
     if (error || !data?.id) {
-      devError('Error al marcar liquidación como pagada:', error)
+      devError('Error al marcar liquidacion como pagada:', error)
       return {
         success: false,
-        error: 'Error al marcar liquidación como pagada: ' + (error?.message || 'Liquidación no encontrada'),
+        error: 'Error al marcar liquidacion como pagada: ' + (error?.message || 'Liquidacion no encontrada'),
       }
     }
 
@@ -1955,7 +2211,7 @@ export async function marcarLiquidacionPagadaAction(liquidacionId: string): Prom
 
     return {
       success: true,
-      message: 'Liquidación marcada como pagada exitosamente',
+      message: 'Liquidacion marcada como pagada exitosamente',
     }
   } catch (error) {
     devError('Error en marcarLiquidacionPagada:', error)
@@ -2093,6 +2349,9 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
   try {
     const supabase = await createClient()
 
+    const { data: { user } } = await supabase.auth.getUser()
+    const actorId = user?.id || null
+
     const empleado_id = String(formData.get('empleado_id') || '')
     const tipo = String(formData.get('tipo') || '') as
       | 'vacaciones'
@@ -2103,14 +2362,16 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
       | 'descanso_programado'
     const fecha_inicio = String(formData.get('fecha_inicio') || '')
     const fecha_fin = String(formData.get('fecha_fin') || '')
-    const fecha_sintomas = String(formData.get('fecha_sintomas') || '')
+    const fecha_presentacion_raw = String(
+      formData.get('fecha_presentacion') || formData.get('fecha_sintomas') || ''
+    )
     const diagnostico_reportado = String(formData.get('diagnostico_reportado') || '').trim() || undefined
     const excepcion_plazo = String(formData.get('excepcion_plazo') || 'false') === 'true'
     const motivo_excepcion = String(formData.get('motivo_excepcion') || '').trim() || undefined
     const observaciones = String(formData.get('observaciones') || '').trim() || undefined
     const certificado = formData.get('certificado') as File | null
 
-    if (!empleado_id || !tipo || !fecha_inicio || !fecha_fin || !fecha_sintomas) {
+    if (!empleado_id || !tipo || !fecha_inicio || !fecha_fin) {
       return { success: false, error: 'Faltan campos obligatorios de la licencia' }
     }
 
@@ -2124,10 +2385,16 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
 
     const fechaInicio = new Date(fecha_inicio)
     const fechaFin = new Date(fecha_fin)
-    const fechaSintomas = new Date(fecha_sintomas)
+    const fechaControlPresentacion = fecha_presentacion_raw
+      ? new Date(fecha_presentacion_raw)
+      : new Date(`${fecha_inicio}T00:00:00`)
     const ahora = new Date()
 
-    if (Number.isNaN(fechaInicio.getTime()) || Number.isNaN(fechaFin.getTime()) || Number.isNaN(fechaSintomas.getTime())) {
+    if (
+      Number.isNaN(fechaInicio.getTime()) ||
+      Number.isNaN(fechaFin.getTime()) ||
+      Number.isNaN(fechaControlPresentacion.getTime())
+    ) {
       return { success: false, error: 'Las fechas informadas no son validas' }
     }
 
@@ -2135,13 +2402,33 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
       return { success: false, error: 'La fecha de fin no puede ser anterior a la fecha de inicio' }
     }
 
-    const fechaLimitePresentacion = new Date(fechaSintomas.getTime() + 24 * 60 * 60 * 1000)
+    const fechaLimitePresentacion = new Date(fechaControlPresentacion.getTime() + 24 * 60 * 60 * 1000)
     const presentadoEnTermino = ahora <= fechaLimitePresentacion
+    const fechaPresentacionIso = fechaControlPresentacion.toISOString()
+    const fechaCargaIso = ahora.toISOString()
 
     if (!presentadoEnTermino && !excepcion_plazo) {
+      await registrarEventoLegajo(supabase, {
+        empleadoId: empleado_id,
+        tipo: 'certificado_fuera_termino',
+        categoria: 'licencias',
+        titulo: 'Intento de certificado fuera de termino',
+        descripcion: 'Se intento cargar un certificado despues de las 24 horas permitidas.',
+        metadata: {
+          tipo_licencia: tipo,
+          fecha_inicio,
+          fecha_fin,
+          fecha_presentacion: fechaPresentacionIso,
+          fecha_registro_sistema: fechaCargaIso,
+          fecha_limite_presentacion: fechaLimitePresentacion.toISOString(),
+          excepcion_plazo: false,
+        },
+        createdBy: actorId,
+      })
+
       return {
         success: false,
-        error: 'El certificado debe presentarse dentro de las 24 horas desde el inicio. Marque excepcion si corresponde.',
+        error: 'El certificado debe presentarse dentro de las 24 horas. Marque excepcion si corresponde.',
       }
     }
 
@@ -2193,11 +2480,11 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
         tipo,
         fecha_inicio,
         fecha_fin,
-        fecha_sintomas: fechaSintomas.toISOString(),
+        fecha_sintomas: fechaControlPresentacion.toISOString(),
         diagnostico_reportado,
         excepcion_plazo,
         motivo_excepcion,
-        fecha_presentacion_certificado: ahora.toISOString(),
+        fecha_presentacion_certificado: fechaPresentacionIso,
         fecha_limite_presentacion: fechaLimitePresentacion.toISOString(),
         presentado_en_termino: presentadoEnTermino,
         certificado_url: urlData.publicUrl,
@@ -2226,6 +2513,26 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
         error: 'Error al crear licencia: ' + error.message,
       }
     }
+
+    await registrarEventoLegajo(supabase, {
+      empleadoId: empleado_id,
+      tipo: 'licencia_solicitada',
+      categoria: 'licencias',
+      titulo: 'Nueva licencia solicitada',
+      descripcion: `${tipo} del ${fecha_inicio} al ${fecha_fin}`,
+      metadata: {
+        licencia_id: data.id,
+        tipo,
+        fecha_inicio,
+        fecha_fin,
+        dias_total: diasTotal,
+        fecha_presentacion_certificado: fechaPresentacionIso,
+        fecha_registro_sistema: fechaCargaIso,
+        presentado_en_termino: presentadoEnTermino,
+        excepcion_plazo,
+      },
+      createdBy: actorId,
+    })
 
     revalidatePath('/rrhh/licencias')
 
@@ -2256,6 +2563,12 @@ export async function aprobarLicenciaAction(licenciaId: string): Promise<ApiResp
       }
     }
 
+    const { data: licenciaSnapshot } = await supabase
+      .from('rrhh_licencias')
+      .select('id, empleado_id, tipo, fecha_inicio, fecha_fin, dias_total')
+      .eq('id', licenciaId)
+      .maybeSingle()
+
     const { data, error } = await supabase
       .from('rrhh_licencias')
       .update({
@@ -2277,6 +2590,24 @@ export async function aprobarLicenciaAction(licenciaId: string): Promise<ApiResp
         success: false,
         error: 'Error al aprobar licencia: ' + error.message,
       }
+    }
+
+    if (licenciaSnapshot?.empleado_id) {
+      await registrarEventoLegajo(supabase, {
+        empleadoId: licenciaSnapshot.empleado_id,
+        tipo: 'licencia_aprobada',
+        categoria: 'licencias',
+        titulo: 'Licencia aprobada',
+        descripcion: `${licenciaSnapshot.tipo} del ${licenciaSnapshot.fecha_inicio} al ${licenciaSnapshot.fecha_fin}`,
+        metadata: {
+          licencia_id: licenciaId,
+          tipo: licenciaSnapshot.tipo,
+          fecha_inicio: licenciaSnapshot.fecha_inicio,
+          fecha_fin: licenciaSnapshot.fecha_fin,
+          dias_total: licenciaSnapshot.dias_total,
+        },
+        createdBy: user.id,
+      })
     }
 
     revalidatePath('/rrhh/licencias')
@@ -2484,7 +2815,7 @@ export async function crearDescuentoAction(
     return {
       success: true,
       data: { descuentoId: data.id },
-      message: 'Descuento creado exitosamente, pendiente de aprobación',
+      message: 'Descuento creado exitosamente, pendiente de aprobacion',
     }
   } catch (error) {
     devError('Error en crearDescuento:', error)
@@ -2575,7 +2906,7 @@ export async function crearEvaluacionAction(
       }
     }
 
-    // Verificar si ya existe una evaluación para el mismo período
+    // Verificar si ya existe una evaluacion para el mismo periodo
     const { data: existingEvaluacion, error: checkError } = await supabase
       .from('rrhh_evaluaciones')
       .select('id')
@@ -2587,7 +2918,7 @@ export async function crearEvaluacionAction(
     if (existingEvaluacion) {
       return {
         success: false,
-        error: 'Ya existe una evaluación para este empleado en el período seleccionado',
+        error: 'Ya existe una evaluacion para este empleado en el periodo seleccionado',
       }
     }
 
@@ -2603,19 +2934,34 @@ export async function crearEvaluacionAction(
       .single()
 
     if (error) {
-      devError('Error al crear evaluación:', error)
+      devError('Error al crear evaluacion:', error)
       return {
         success: false,
-        error: 'Error al crear evaluación: ' + error.message,
+        error: 'Error al crear evaluacion: ' + error.message,
       }
     }
+
+    await registrarEventoLegajo(supabase, {
+      empleadoId: evaluacionData.empleado_id,
+      tipo: 'evaluacion_creada',
+      categoria: 'evaluaciones',
+      titulo: 'Nueva evaluacion de desempeno',
+      descripcion: `Periodo ${evaluacionData.periodo_mes}/${evaluacionData.periodo_anio}`,
+      metadata: {
+        evaluacion_id: data.id,
+        periodo_mes: evaluacionData.periodo_mes,
+        periodo_anio: evaluacionData.periodo_anio,
+        sucursal_id: evaluacionData.sucursal_id,
+      },
+      createdBy: user.id,
+    })
 
     revalidatePath('/rrhh/evaluaciones')
 
     return {
       success: true,
       data: { evaluacionId: data.id },
-      message: 'Evaluación creada exitosamente',
+      message: 'Evaluacion creada exitosamente',
     }
   } catch (error) {
     devError('Error en crearEvaluacion:', error)
@@ -2652,10 +2998,10 @@ export async function actualizarEvaluacionAction(
       .single()
 
     if (error) {
-      devError('Error al actualizar evaluación:', error)
+      devError('Error al actualizar evaluacion:', error)
       return {
         success: false,
-        error: 'Error al actualizar evaluación: ' + error.message,
+        error: 'Error al actualizar evaluacion: ' + error.message,
       }
     }
 
@@ -2665,7 +3011,7 @@ export async function actualizarEvaluacionAction(
     return {
       success: true,
       data: { evaluacionId: data.id },
-      message: 'Evaluación actualizada exitosamente',
+      message: 'Evaluacion actualizada exitosamente',
     }
   } catch (error) {
     devError('Error en actualizarEvaluacion:', error)
@@ -2693,10 +3039,10 @@ export async function enviarEvaluacionAction(evaluacionId: string): Promise<ApiR
       .single()
 
     if (error) {
-      devError('Error al enviar evaluación:', error)
+      devError('Error al enviar evaluacion:', error)
       return {
         success: false,
-        error: 'Error al enviar evaluación: ' + error.message,
+        error: 'Error al enviar evaluacion: ' + error.message,
       }
     }
 
@@ -2704,7 +3050,7 @@ export async function enviarEvaluacionAction(evaluacionId: string): Promise<ApiR
 
     return {
       success: true,
-      message: 'Evaluación enviada exitosamente',
+      message: 'Evaluacion enviada exitosamente',
     }
   } catch (error) {
     devError('Error en enviarEvaluacion:', error)
@@ -2807,7 +3153,7 @@ export async function actualizarSucursalAction(
   }
 }
 
-// ========== CATEGORÍAS ==========
+// ========== CATEGORIAS ==========
 
 export async function crearCategoriaEmpleadoAction(
   categoriaData: {
@@ -2834,10 +3180,10 @@ export async function crearCategoriaEmpleadoAction(
       .single()
 
     if (error) {
-      devError('Error al crear categoría:', error)
+      devError('Error al crear categoria:', error)
       return {
         success: false,
-        error: 'Error al crear categoría: ' + error.message,
+        error: 'Error al crear categoria: ' + error.message,
       }
     }
 
@@ -2846,7 +3192,7 @@ export async function crearCategoriaEmpleadoAction(
     return {
       success: true,
       data: { categoriaId: data.id },
-      message: 'Categoría creada exitosamente',
+      message: 'Categoria creada exitosamente',
     }
   } catch (error) {
     devError('Error en crearCategoriaEmpleado:', error)
@@ -2879,10 +3225,10 @@ export async function actualizarCategoriaEmpleadoAction(
       .single()
 
     if (error) {
-      devError('Error al actualizar categoría:', error)
+      devError('Error al actualizar categoria:', error)
       return {
         success: false,
-        error: 'Error al actualizar categoría: ' + error.message,
+        error: 'Error al actualizar categoria: ' + error.message,
       }
     }
 
@@ -2892,7 +3238,7 @@ export async function actualizarCategoriaEmpleadoAction(
     return {
       success: true,
       data: { categoriaId: data.id },
-      message: 'Categoría actualizada exitosamente',
+      message: 'Categoria actualizada exitosamente',
     }
   } catch (error) {
     devError('Error en actualizarCategoriaEmpleado:', error)
@@ -2903,7 +3249,7 @@ export async function actualizarCategoriaEmpleadoAction(
   }
 }
 
-// Obtener usuarios activos con cuenta de autenticación (para formularios)
+// Obtener usuarios activos con cuenta de autenticacion (para formularios)
 export async function obtenerUsuariosConAuthAction(): Promise<ApiResponse<Array<{
   id: string
   email: string
@@ -2930,11 +3276,11 @@ export async function obtenerUsuariosConAuthAction(): Promise<ApiResponse<Array<
       }
     }
 
-    // Verificar cuáles tienen cuenta de autenticación usando función RPC
+    // Verificar cuales tienen cuenta de autenticacion usando funcion RPC
     // Nota: No podemos consultar auth.users directamente, pero podemos usar
-    // la función usuario_tiene_auth() si está disponible, o asumir que todos
+    // la funcion usuario_tiene_auth() si est? disponible, o asumir que todos
     // los usuarios activos en la tabla usuarios tienen cuenta de auth
-    // (ya que el trigger sync_user_from_auth() los sincroniza automáticamente)
+    // (ya que el trigger sync_user_from_auth() los sincroniza automaticamente)
 
     return {
       success: true,
@@ -3011,9 +3357,17 @@ export async function obtenerSucursalesActivasAction(): Promise<ApiResponse<Arra
       }
     }
 
+    const sucursalesPriorizadas = priorizarSucursalesHorqueta((sucursales || []) as any[])
+
     return {
       success: true,
-      data: sucursales || [],
+      data: sucursalesPriorizadas as Array<{
+        id: string
+        nombre: string
+        direccion?: string
+        telefono?: string
+        activo: boolean
+      }>,
     }
   } catch (error) {
     devError('Error en obtenerSucursalesActivasAction:', error)
@@ -3027,11 +3381,10 @@ export async function obtenerSucursalesActivasAction(): Promise<ApiResponse<Arra
 // ========== AUTO-DESCANSOS ==========
 
 /**
- * Asigna automáticamente 2 descansos mensuales para puestos que lo requieren:
- * - Encargado de sucursal / Asistente sucursal (no medio día)
- * - Tesorería en galpón (solo Lun-Vie)
- *
- * Idempotente: si ya existen 2 jornadas con origen='auto_licencia_descanso', no inserta más.
+ * Regla vigente RRHH sucursales:
+ * - Cada empleado de sucursal tiene 2 descansos mensuales de medio turno tarde.
+ * - Se generan de forma aleatoria al inicio de mes y pueden re-sincronizarse bajo demanda.
+ * - Esos descansos impactan en liquidacion como jornada paga completa (segun regla vigente).
  */
 export async function autoAsignarDescansosAction(
   liquidacionId: string,
@@ -3044,152 +3397,54 @@ export async function autoAsignarDescansosAction(
 
     const supabase = createAdminClient()
 
-    // Obtener datos de la liquidación
+    // Obtener datos de la liquidacion objetivo
     const { data: liquidacion, error: liqError } = await supabase
       .from('rrhh_liquidaciones')
-      .select('id, empleado_id, periodo_mes, periodo_anio, puesto_override, grupo_base_snapshot')
+      .select('id, empleado_id, periodo_mes, periodo_anio')
       .eq('id', liquidacionId)
       .maybeSingle()
 
     if (liqError || !liquidacion) {
-      return { success: false, error: 'Liquidación no encontrada' }
+      return { success: false, error: 'Liquidacion no encontrada' }
     }
 
-    // Obtener puesto del empleado
-    const { data: empleado } = await supabase
-      .from('rrhh_empleados')
-      .select('categoria:rrhh_categorias(nombre)')
-      .eq('id', liquidacion.empleado_id)
-      .maybeSingle()
-
-    const puestoNombre: string =
-      liquidacion.puesto_override?.trim() ||
-      (empleado?.categoria as { nombre?: string } | null)?.nombre?.trim() ||
-      ''
-
-    const esEncargadoSucursal = /encargado.+sucursal/i.test(puestoNombre)
-    const esAsistenteSucursal =
-      /asistente.+sucursal/i.test(puestoNombre) && !/medio.+d[ií]a/i.test(puestoNombre)
-    const esTesoreriaGalpon =
-      /tesorer[oía]/i.test(puestoNombre) && liquidacion.grupo_base_snapshot === 'galpon'
-
-    if (!esEncargadoSucursal && !esAsistenteSucursal && !esTesoreriaGalpon) {
-      return {
-        success: true,
-        data: { insertados: 0, mensaje: `El puesto "${puestoNombre}" no requiere descansos automáticos` },
-      }
-    }
-
-    // Verificar cuántos descansos ya existen
-    const { data: descansosExistentes } = await supabase
-      .from('rrhh_liquidacion_jornadas')
-      .select('id, fecha')
-      .eq('liquidacion_id', liquidacionId)
-      .eq('origen', 'auto_licencia_descanso')
-
-    if ((descansosExistentes?.length ?? 0) >= 2) {
-      return {
-        success: true,
-        data: {
-          insertados: 0,
-          mensaje: `Ya existen ${descansosExistentes!.length} descanso(s) registrado(s). No se insertaron más.`,
-        },
-      }
-    }
-
-    const cantidadFaltante = 2 - (descansosExistentes?.length ?? 0)
-
-    // Obtener jornadas existentes del mes para no repetir fechas
-    const { data: jornadasExistentes } = await supabase
-      .from('rrhh_liquidacion_jornadas')
-      .select('fecha')
-      .eq('liquidacion_id', liquidacionId)
-
-    const fechasOcupadas = new Set<string>(
-      (jornadasExistentes || []).map((j) => String(j.fecha).slice(0, 10)),
-    )
-
-    // Generar días hábiles candidatos del mes
-    const { periodo_mes: mes, periodo_anio: anio } = liquidacion
-    const ultimoDia = new Date(anio, mes, 0).getDate()
-    const candidatos: string[] = []
-
-    for (let d = 1; d <= ultimoDia; d++) {
-      const fechaStr = `${anio}-${String(mes).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-      if (fechasOcupadas.has(fechaStr)) continue
-
-      const dow = new Date(`${fechaStr}T12:00:00`).getDay() // 0=Dom, 6=Sáb
-      const esFinde = dow === 0 || dow === 6
-
-      if (esTesoreriaGalpon && esFinde) continue
-      if (!esTesoreriaGalpon && esFinde) continue // encargados y asistentes también solo días hábiles
-
-      candidatos.push(fechaStr)
-    }
-
-    if (candidatos.length < cantidadFaltante) {
-      return {
-        success: false,
-        error: `No hay suficientes días hábiles libres en el mes para asignar ${cantidadFaltante} descanso(s)`,
-      }
-    }
-
-    // Seleccionar aleatoriamente (distribuidos: 1 en primera mitad, 1 en segunda mitad si es posible)
-    const mitad = Math.floor(candidatos.length / 2)
-    const primeraMitad = candidatos.slice(0, mitad)
-    const segundaMitad = candidatos.slice(mitad)
-
-    const elegidos: string[] = []
-    if (cantidadFaltante >= 1 && primeraMitad.length > 0) {
-      elegidos.push(primeraMitad[Math.floor(Math.random() * primeraMitad.length)])
-    }
-    if (cantidadFaltante >= 2 && segundaMitad.length > 0) {
-      elegidos.push(segundaMitad[Math.floor(Math.random() * segundaMitad.length)])
-    }
-
-    // Completar si alguna mitad estaba vacía
-    while (elegidos.length < cantidadFaltante) {
-      const remaining = candidatos.filter((c) => !elegidos.includes(c))
-      if (remaining.length === 0) break
-      elegidos.push(remaining[Math.floor(Math.random() * remaining.length)])
-    }
-
-    // Insertar jornadas de descanso
-    const inserts = elegidos.map((fecha) => ({
-      liquidacion_id: liquidacionId,
-      empleado_id: liquidacion.empleado_id,
-      fecha,
-      turno: 'medio_turno_tarde',
-      horas_mensuales: 0.5,
-      horas_adicionales: 0,
-      turno_especial_unidades: 0,
-      tarifa_hora_base: 0,
-      tarifa_hora_extra: 0,
-      tarifa_turno_especial: 0,
-      origen: 'auto_licencia_descanso' as const,
-      observaciones: 'Descanso mensual asignado automáticamente',
-    }))
-
-    const { error: insertError } = await supabase
-      .from('rrhh_liquidacion_jornadas')
-      .insert(inserts)
-
-    if (insertError) {
-      devError('Error al insertar descansos automáticos:', insertError)
-      return { success: false, error: 'Error al guardar los descansos: ' + insertError.message }
-    }
-
-    // Recalcular liquidación
-    await supabase.rpc('fn_rrhh_recalcular_liquidacion', {
-      p_liquidacion_id: liquidacionId,
-      p_actor: adminUserId,
+    const syncResult = await sincronizarDescansosMensualesSucursal(supabase, {
+      anio: Number(liquidacion.periodo_anio),
+      mes: Number(liquidacion.periodo_mes),
+      empleadoId: liquidacion.empleado_id,
+      seed: `liq-${liquidacionId}`,
     })
+
+    if (syncResult.soportado) {
+      const { error: prepararError } = await supabase.rpc('fn_rrhh_preparar_liquidacion_mensual', {
+        p_empleado_id: liquidacion.empleado_id,
+        p_mes: Number(liquidacion.periodo_mes),
+        p_anio: Number(liquidacion.periodo_anio),
+        p_created_by: adminUserId,
+      })
+
+      if (prepararError) {
+        devError('Error refrescando liquidacion luego de sincronizar descansos:', prepararError)
+      }
+    } else {
+      const { error: recalcError } = await supabase.rpc('fn_rrhh_recalcular_liquidacion', {
+        p_liquidacion_id: liquidacionId,
+        p_actor: adminUserId,
+      })
+      if (recalcError) {
+        devError('Error recalculando liquidacion (fallback descansos):', recalcError)
+      }
+    }
+
+    revalidatePath(`/rrhh/liquidaciones/${liquidacionId}`)
 
     return {
       success: true,
       data: {
-        insertados: elegidos.length,
-        mensaje: `Se asignaron ${elegidos.length} descanso(s) en: ${elegidos.join(', ')}`,
+        insertados: syncResult.generados,
+        mensaje: syncResult.soportado
+          ? `Descansos mensuales sincronizados (generados: ${syncResult.generados}, asistencias actualizadas: ${syncResult.sincronizados}).`
+          : 'Se recalculo la liquidacion. La sincronizacion de descansos requiere migracion actualizada.',
       },
     }
   } catch (error) {
@@ -3197,3 +3452,4 @@ export async function autoAsignarDescansosAction(
     return { success: false, error: 'Error interno del servidor' }
   }
 }
+

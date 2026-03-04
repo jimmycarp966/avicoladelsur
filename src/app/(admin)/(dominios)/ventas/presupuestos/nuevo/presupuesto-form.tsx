@@ -34,6 +34,7 @@ const crearPresupuestoSchema = z.object({
   observaciones: z.string().optional(),
   lista_precio_id: z.string().uuid().optional(), // Lista global (por defecto para todos los productos)
   tipo_venta: z.enum(['reparto', 'retira_casa_central']).optional(),
+  turno: z.enum(['mañana', 'tarde']).optional(),
   items: z.array(z.object({
     producto_id: z.string().uuid('Debes seleccionar un producto'),
     cantidad_solicitada: z.number().positive('La cantidad debe ser mayor a 0'),
@@ -71,6 +72,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
   const { showToast } = useNotificationStore()
   const [isLoading, setIsLoading] = useState(false)
   const [clienteSearch, setClienteSearch] = useState('')
+  const [clienteCodigoDirecto, setClienteCodigoDirecto] = useState('')
   const [clienteDropdownOpen, setClienteDropdownOpen] = useState(false)
   const [todasListas, setTodasListas] = useState<Array<{ id: string; codigo: string; nombre: string; tipo: string; margen_ganancia: number | null }>>([])
   const [cargandoListas, setCargandoListas] = useState(true) // Iniciar en true para mostrar loading inicial
@@ -80,7 +82,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
   // Estado para listas por producto (index -> lista_id)
   const [listasPorProducto, setListasPorProducto] = useState<Record<number, string>>({})
 
-  // Estado para rastrear qué precios fueron modificados manualmente por el usuario
+  // Estado para rastrear qu? precios fueron modificados manualmente por el usuario
   // Para no sobrescribirlos al agregar nuevos productos
   const preciosModificadosManualmenteRef = useRef<Set<number>>(new Set())
 
@@ -98,10 +100,11 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
     resolver: zodResolver(crearPresupuestoSchema),
     mode: 'onChange', // Actualizar en tiempo real cuando cambian los valores
     defaultValues: {
-      zona_id: '', // Inicializar como string vacío para evitar warning uncontrolled/controlled
+      zona_id: '', // Inicializar como string vacio para evitar warning uncontrolled/controlled
       fecha_entrega_estimada: new Date().toISOString().split('T')[0], // Fecha de hoy por defecto
       observaciones: '',
       tipo_venta: tipoVentaInicial || 'reparto',
+      turno: 'mañana',
       items: [{ producto_id: '', cantidad_solicitada: 1, precio_unit_est: 0, lista_precio_id: undefined }],
     },
   })
@@ -115,13 +118,13 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
   const watchedItems = useWatch({ control, name: 'items' })
   const watchedCliente = useWatch({ control, name: 'cliente_id' })
 
-  // Estado para forzar actualización del total cuando cambia precio
+  // Estado para forzar actualizacion del total cuando cambia precio
   const [totalUpdateKey, setTotalUpdateKey] = useState(0)
 
   // Suscribirse a cambios en items usando watch con callback para detectar cambios profundos
   useEffect(() => {
     const subscription = watch((value, { name, type }) => {
-      // Si cambió algún precio o cantidad, forzar actualización del total
+      // Si cambi? algun precio o cantidad, forzar actualizacion del total
       if (name && (name.includes('precio_unit_est') || name.includes('cantidad_solicitada'))) {
         setTotalUpdateKey(prev => prev + 1)
       }
@@ -133,21 +136,21 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
   // Ref para rastrear la cantidad de items y detectar cuando se agregan nuevos
   const cantidadItemsRef = useRef(watchedItems?.length || 0)
 
-  // Ref para forzar actualización cuando se agregan productos nuevos
+  // Ref para forzar actualizacion cuando se agregan productos nuevos
   const [triggerActualizacion, setTriggerActualizacion] = useState(0)
 
   // Efecto separado para detectar cuando se agregan productos nuevos
   useEffect(() => {
     const cantidadActual = watchedItems?.length || 0
     if (cantidadActual > cantidadItemsRef.current) {
-      // Se agregaron nuevos productos, limpiar cache y forzar actualización
+      // Se agregaron nuevos productos, limpiar cache y forzar actualizacion
       productosProcesadosRef.current.clear()
       cantidadItemsRef.current = cantidadActual
       setTriggerActualizacion(prev => prev + 1)
     }
   }, [watchedItems?.length])
 
-  // Debouncing para búsquedas (solo para cliente, productos se manejan individualmente)
+  // Debouncing para busquedas (solo para cliente, productos se manejan individualmente)
   // Reducido a 150ms para mejor respuesta sin sacrificar rendimiento
   const debouncedClienteSearch = useDebounce(clienteSearch, 150)
 
@@ -155,7 +158,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
   // Usar watch('items') directamente para obtener valores actuales en cada render
   const itemsParaTotal = watch('items')
 
-  // Crear una clave única basada en los valores de los items para detectar cambios profundos
+  // Crear una clave ?nica basada en los valores de los items para detectar cambios profundos
   const itemsKey = useMemo(() => {
     if (!itemsParaTotal || itemsParaTotal.length === 0) return 'empty'
     return JSON.stringify(itemsParaTotal.map(item => ({
@@ -190,6 +193,14 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
     return clientes.find(c => c.id === watchedCliente)
   }, [clientes, watchedCliente])
 
+  useEffect(() => {
+    if (!watchedCliente) return
+    const cliente = clientes.find((c) => c.id === watchedCliente)
+    if (cliente?.codigo) {
+      setClienteCodigoDirecto(cliente.codigo)
+    }
+  }, [clientes, watchedCliente])
+
   // Atajos contextuales para el formulario
   useFormContextShortcuts({
     shortcuts: [
@@ -206,7 +217,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
           const firstProductSelect = document.getElementById('producto_0')
           if (firstProductSelect) {
             firstProductSelect.click()
-            // El hook mejorado manejará el focus del input de búsqueda
+            // El hook mejorado manejar? el focus del input de busqueda
           }
         },
       },
@@ -228,9 +239,9 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
         description: 'Enfocar Fecha de Entrega',
       },
       {
-        key: 'z',
-        fieldId: 'zona_id',
-        description: 'Enfocar Zona de Entrega',
+        key: 't',
+        fieldId: 'turno_entrega',
+        description: 'Enfocar Turno de Entrega',
       },
       {
         key: 'o',
@@ -261,7 +272,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
           }
         },
       },
-      // Atajos numéricos para enfocar productos por índice (Ctrl+1-9)
+      // Atajos numericos para enfocar productos por ?ndice (Ctrl+1-9)
       ...Array.from({ length: 9 }, (_, i) => ({
         key: String(i + 1),
         ctrlKey: true,
@@ -280,7 +291,6 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
   // Cargar todas las listas activas disponibles
   useEffect(() => {
     let isMounted = true
-    let timeoutId: NodeJS.Timeout | null = null
 
     const cargarListas = async () => {
       try {
@@ -322,9 +332,6 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
           console.log('[PRESUPUESTO FORM] Finalizando carga de listas')
           setCargandoListas(false)
         }
-        if (timeoutId) {
-          clearTimeout(timeoutId)
-        }
       }
     }
 
@@ -333,31 +340,28 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
     return () => {
       console.log('[PRESUPUESTO FORM] Limpiando efecto de carga de listas')
       isMounted = false
-      if (timeoutId) {
-        clearTimeout(timeoutId)
-      }
     }
   }, [])
 
-  // Efecto para enfocar y abrir automáticamente el selector de cliente al montar
+  // Efecto para enfocar y abrir automaticamente el selector de cliente al montar
   useEffect(() => {
     const focusClienteSelect = () => {
       const clienteTrigger = document.getElementById('cliente_id') as HTMLButtonElement
       if (clienteTrigger) {
         clienteTrigger.focus()
-        // Abrir el dropdown automáticamente
+        // Abrir el dropdown automaticamente
         setTimeout(() => {
           setClienteDropdownOpen(true)
         }, 100)
       }
     }
 
-    // Esperar a que el componente esté montado
+    // Esperar a que el componente est? montado
     const timeoutId = setTimeout(focusClienteSelect, 150)
     return () => clearTimeout(timeoutId)
   }, [])
 
-  // Efecto para cargar y aplicar automáticamente zona y lista de precios del cliente
+  // Efecto para cargar y aplicar automaticamente zona y lista de precios del cliente
   useEffect(() => {
     if (!watchedCliente) return
 
@@ -398,7 +402,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
   // Actualizar precios cuando cambia la lista global o lista por producto
   const watchedListaPrecioGlobal = useWatch({ control, name: 'lista_precio_id' })
 
-  // Ref para rastrear las últimas listas usadas y evitar loops infinitos
+  // Ref para rastrear las ?ltimas listas usadas y evitar loops infinitos
   const ultimasListasRef = useRef<Record<number, string>>({})
   const ultimaListaGlobalRef = useRef<string | undefined>(undefined)
   const productosProcesadosRef = useRef<Set<string>>(new Set())
@@ -412,11 +416,11 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
 
       console.log('[PRESUPUESTO FORM] actualizarPrecios llamado - items:', itemsActuales.length, 'precios modificados:', Array.from(preciosModificadosManualmenteRef.current))
 
-      // Verificar si realmente cambió la lista global
+      // Verificar si realmente cambi? la lista global
       const listaGlobalCambio = ultimaListaGlobalRef.current !== watchedListaPrecioGlobal
 
-      // Si cambió la lista global, limpiar el cache de productos procesados
-      // Y también limpiar los precios modificados manualmente (para actualizar todos)
+      // Si cambi? la lista global, limpiar el cache de productos procesados
+      // Y tambien limpiar los precios modificados manualmente (para actualizar todos)
       if (listaGlobalCambio) {
         productosProcesadosRef.current.clear()
         preciosModificadosManualmenteRef.current.clear()
@@ -430,39 +434,39 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
         const listaId = listasPorProducto[i] || watchedListaPrecioGlobal
         if (!listaId) continue
 
-        // Crear una clave única para este producto+lista
+        // Crear una clave ?nica para este producto+lista
         const clave = `${item.producto_id}-${listaId}`
 
-        // Verificar si la lista para este producto cambió
+        // Verificar si la lista para este producto cambi?
         const listaAnterior = ultimasListasRef.current[i]
         const listaCambio = listaAnterior !== listaId || listaGlobalCambio
 
-        console.log('[PRESUPUESTO FORM] Procesando índice', i, '- listaCambio:', listaCambio, 'precioModificado:', preciosModificadosManualmenteRef.current.has(i), 'listaAnterior:', listaAnterior, 'listaId:', listaId)
+        console.log('[PRESUPUESTO FORM] Procesando ?ndice', i, '- listaCambio:', listaCambio, 'precioModificado:', preciosModificadosManualmenteRef.current.has(i), 'listaAnterior:', listaAnterior, 'listaId:', listaId)
 
         // IMPORTANTE: PRIMERO verificar si el precio fue modificado manualmente
-        // Esta verificación tiene prioridad sobre listaCambio
-        // Solo debemos saltar la actualización si NO cambió explícitamente la lista global
+        // Esta verificacion tiene prioridad sobre listaCambio
+        // Solo debemos saltar la actualizacion si NO cambi? explicitamente la lista global
         // (listaGlobalCambio se maneja aparte - limpia todos los precios modificados)
         if (preciosModificadosManualmenteRef.current.has(i) && !listaGlobalCambio) {
-          console.log('[PRESUPUESTO FORM] Saltando actualización de precio para índice', i, '- fue modificado manualmente')
+          console.log('[PRESUPUESTO FORM] Saltando actualizacion de precio para ?ndice', i, '- fue modificado manualmente')
           // Marcar como procesado para no volver a intentar en futuras iteraciones
           productosProcesadosRef.current.add(clave)
           ultimasListasRef.current[i] = listaId
           continue
         }
 
-        // Si la lista no cambió y ya procesamos este producto con esta lista, saltar
+        // Si la lista no cambi? y ya procesamos este producto con esta lista, saltar
         if (!listaCambio && productosProcesadosRef.current.has(clave)) {
           continue
         }
 
         const precioResult = await obtenerPrecioProductoAction(listaId, item.producto_id)
         if (precioResult.success && precioResult.data) {
-          // Obtener información de la lista seleccionada
+          // Obtener informacion de la lista seleccionada
           const listaSeleccionada = todasListas.find(l => l.id === listaId)
           const esListaMayorista = listaSeleccionada?.tipo === 'mayorista'
 
-          // Obtener información del producto
+          // Obtener informacion del producto
           const producto = productos.find(p => p.id === item.producto_id)
           const ventaMayorHabilitada = producto?.venta_mayor_habilitada || false
           const kgPorUnidadMayor = producto?.kg_por_unidad_mayor
@@ -483,7 +487,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
             })
           }
 
-          // Actualizar también la lista_precio_id del item si se calculó desde lista global
+          // Actualizar tambien la lista_precio_id del item si se calcul? desde lista global
           if (!listasPorProducto[i] && watchedListaPrecioGlobal) {
             setValue(`items.${i}.lista_precio_id`, watchedListaPrecioGlobal, { shouldDirty: false })
           }
@@ -512,7 +516,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
     const listaId = listasPorProducto[index] || watchedListaPrecioGlobal
 
     if (listaId) {
-      // Obtener información de la lista seleccionada
+      // Obtener informacion de la lista seleccionada
       const listaSeleccionada = todasListas.find(l => l.id === listaId)
       const esListaMayorista = listaSeleccionada?.tipo === 'mayorista'
       const ventaMayorHabilitada = producto.venta_mayor_habilitada || false
@@ -546,11 +550,11 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
     })
   }, [productos, setValue, watchedListaPrecioGlobal, listasPorProducto, todasListas])
 
-  // Memoizar función para filtrar productos con límite de resultados
+  // Memoizar funcion para filtrar productos con limite de resultados
   const getFilteredProductos = useCallback((index: number, searchTerm: string) => {
     const term = searchTerm.toLowerCase().trim()
     if (!term) {
-      // Si no hay búsqueda, devolver solo los primeros MAX_RESULTS
+      // Si no hay busqueda, devolver solo los primeros MAX_RESULTS
       return productos.slice(0, MAX_RESULTS)
     }
 
@@ -561,13 +565,13 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
     for (const producto of productos) {
       if (results.length >= MAX_RESULTS) break
 
-      // Coincidencia exacta en código (prioridad alta)
+      // Coincidencia exacta en codigo (prioridad alta)
       if (producto.codigo.toLowerCase() === termLower) {
         results.unshift(producto) // Al inicio
         continue
       }
 
-      // Coincidencia que empieza con el término (prioridad media)
+      // Coincidencia que empieza con el termino (prioridad media)
       if (
         producto.codigo.toLowerCase().startsWith(termLower) ||
         producto.nombre.toLowerCase().startsWith(termLower)
@@ -588,16 +592,16 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
     return results
   }, [productos])
 
-  // Memoizar función para filtrar clientes con límite de resultados
+  // Memoizar funcion para filtrar clientes con limite de resultados
   const MAX_RESULTS = 50 // Limitar resultados para mejor rendimiento
   const getFilteredClientes = useCallback((searchTerm: string) => {
     const term = searchTerm.toLowerCase().trim()
     if (!term) {
-      // Si no hay búsqueda, devolver solo los primeros MAX_RESULTS
+      // Si no hay busqueda, devolver solo los primeros MAX_RESULTS
       return clientes.slice(0, MAX_RESULTS)
     }
 
-    // Asegurar que el cliente seleccionado siempre esté en la lista si existe
+    // Asegurar que el cliente seleccionado siempre est? en la lista si existe
     const clienteSeleccionado = watchedCliente
       ? clientes.find(c => c.id === watchedCliente)
       : null
@@ -615,12 +619,12 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
       const codigoLower = cliente.codigo?.toLowerCase() || ''
       const telefono = cliente.telefono || ''
 
-      // Si es el cliente seleccionado, incluirlo siempre (se agregará al inicio después)
+      // Si es el cliente seleccionado, incluirlo siempre (se agregar? al inicio despues)
       if (cliente.id === watchedCliente) {
         continue // Se maneja separadamente al final
       }
 
-      // Prioridad 1: Código exacto
+      // Prioridad 1: Codigo exacto
       if (codigoLower === term) {
         codigoExacto.push(cliente)
         continue
@@ -632,7 +636,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
         continue
       }
 
-      // Prioridad 3: Nombre empieza con término y es palabra completa
+      // Prioridad 3: Nombre empieza con termino y es palabra completa
       if (nombreLower.startsWith(term)) {
         const charDespues = nombreLower[term.length]
         if (charDespues === ' ' || charDespues === undefined) {
@@ -643,25 +647,25 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
         continue
       }
 
-      // Prioridad 4: Teléfono empieza con el término
+      // Prioridad 4: Telefono empieza con el termino
       if (telefono.startsWith(term)) {
         codigoEmpiezaCon.push(cliente)
         continue
       }
 
-      // Prioridad 5: Código empieza con el término
+      // Prioridad 5: Codigo empieza con el termino
       if (codigoLower.startsWith(term)) {
         codigoEmpiezaCon.push(cliente)
         continue
       }
 
-      // Prioridad 6: Contiene el término
+      // Prioridad 6: Contiene el termino
       if (nombreLower.includes(term) || codigoLower.includes(term) || telefono.includes(term)) {
         contiene.push(cliente)
       }
     }
 
-    // Ordenar por longitud de nombre (más corto primero)
+    // Ordenar por longitud de nombre (mas corto primero)
     nombrePalabraCompleta.sort((a, b) => a.nombre.length - b.nombre.length)
     nombreEmpiezaCon.sort((a, b) => a.nombre.length - b.nombre.length)
 
@@ -678,7 +682,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
     // Limitar a MAX_RESULTS
     results = results.slice(0, MAX_RESULTS)
 
-    // Si hay un cliente seleccionado y no está en los resultados, agregarlo al inicio
+    // Si hay un cliente seleccionado y no est? en los resultados, agregarlo al inicio
     if (clienteSeleccionado && !results.find(c => c.id === clienteSeleccionado.id)) {
       results.unshift(clienteSeleccionado)
     }
@@ -686,14 +690,37 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
     return results
   }, [clientes, watchedCliente])
 
-  // Función para marcar que el precio fue modificado manualmente
+  const seleccionarClientePorCodigo = useCallback((rawCodigo: string): boolean => {
+    const codigo = rawCodigo.trim().toLowerCase()
+    if (!codigo) return false
+
+    const cliente = clientes.find((c) => (c.codigo || '').trim().toLowerCase() === codigo)
+    if (!cliente) {
+      showToast('error', `No existe un cliente con codigo "${rawCodigo.trim()}"`)
+      return false
+    }
+
+    setValue('cliente_id', cliente.id, { shouldValidate: true, shouldDirty: true })
+    setClienteSearch('')
+    setClienteDropdownOpen(false)
+    setClienteCodigoDirecto(cliente.codigo || '')
+
+    setTimeout(() => {
+      const fechaInput = document.getElementById('fecha_entrega_estimada')
+      if (fechaInput) fechaInput.focus()
+    }, 100)
+
+    return true
+  }, [clientes, setValue, showToast])
+
+  // Funcion para marcar que el precio fue modificado manualmente
   const handlePrecioModificadoManualmente = useCallback((index: number) => {
-    console.log('[PRESUPUESTO FORM] Precio modificado manualmente para índice:', index)
+    console.log('[PRESUPUESTO FORM] Precio modificado manualmente para ?ndice:', index)
     preciosModificadosManualmenteRef.current.add(index)
     console.log('[PRESUPUESTO FORM] Precios modificados:', Array.from(preciosModificadosManualmenteRef.current))
   }, [])
 
-  // Función para cambiar lista de un producto específico
+  // Funcion para cambiar lista de un producto especifico
   const handleListaProductoChange = useCallback(async (index: number, listaId: string) => {
     const nuevaListasPorProducto = { ...listasPorProducto }
     if (listaId) {
@@ -710,21 +737,21 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
     }
     setListasPorProducto(nuevaListasPorProducto)
 
-    // Limpiar el marcador de precio modificado manualmente para permitir la actualización
+    // Limpiar el marcador de precio modificado manualmente para permitir la actualizacion
     preciosModificadosManualmenteRef.current.delete(index)
 
     // Actualizar precio del producto con la nueva lista
     const item = watchedItems?.[index]
     if (item?.producto_id) {
-      // Determinar qué lista usar: individual si existe, sino lista global
+      // Determinar qu? lista usar: individual si existe, sino lista global
       const listaAUsar = listaId || watchedListaPrecioGlobal
 
       if (listaAUsar) {
-        // Obtener información de la lista seleccionada
+        // Obtener informacion de la lista seleccionada
         const listaSeleccionada = todasListas.find(l => l.id === listaAUsar)
         const esListaMayorista = listaSeleccionada?.tipo === 'mayorista'
 
-        // Obtener información del producto
+        // Obtener informacion del producto
         const productoSeleccionado = productos.find(p => p.id === item.producto_id)
         const ventaMayorHabilitada = productoSeleccionado?.venta_mayor_habilitada || false
         const kgPorUnidadMayor = productoSeleccionado?.kg_por_unidad_mayor
@@ -737,15 +764,15 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
             precioFinal = precioResult.data.precio * kgPorUnidadMayor
           }
 
-          // Actualizar precio con todas las opciones para forzar actualización
+          // Actualizar precio con todas las opciones para forzar actualizacion
           setValue(`items.${index}.precio_unit_est`, precioFinal, {
             shouldValidate: true,
             shouldDirty: true,
             shouldTouch: true
           })
-          // Forzar actualización del formulario y validación
+          // Forzar actualizacion del formulario y validacion
           await trigger(`items.${index}.precio_unit_est`)
-          // Forzar actualización del total estimado - usar setTimeout para asegurar que React procese el cambio
+          // Forzar actualizacion del total estimado - usar setTimeout para asegurar que React procese el cambio
           setTimeout(() => {
             setTotalUpdateKey(prev => prev + 1)
           }, 0)
@@ -764,10 +791,10 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
       setValue(`items.${newIndex}.lista_precio_id`, watchedListaPrecioGlobal, { shouldDirty: false })
     }
 
-    // Enfocar el select del producto recién agregado después de que React lo renderice
-    // Usar múltiples intentos para asegurar que funcione
+    // Enfocar el select del producto recien agregado despues de que React lo renderice
+    // Usar multiples intentos para asegurar que funcione
     const focusProductSelect = (attempts = 0) => {
-      if (attempts > 20) return // Máximo 20 intentos
+      if (attempts > 20) return // Maximo 20 intentos
 
       const nuevoProductoSelect = document.getElementById(`producto_${newIndex}`) as HTMLElement
       if (nuevoProductoSelect) {
@@ -780,12 +807,12 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
         // Hacer click para abrir el dropdown
         nuevoProductoSelect.click()
 
-        // Esperar a que se abra el dropdown y luego enfocar el input de búsqueda
+        // Esperar a que se abra el dropdown y luego enfocar el input de busqueda
         // Buscar el input dentro del SelectContent que se acaba de abrir
         const focusSearchInput = (searchAttempts = 0) => {
-          if (searchAttempts > 30) return // Máximo 30 intentos para encontrar el input
+          if (searchAttempts > 30) return // Maximo 30 intentos para encontrar el input
 
-          // Buscar el input de búsqueda usando el atributo data-product-search
+          // Buscar el input de busqueda usando el atributo data-product-search
           const searchInput = document.querySelector(`input[data-product-search="${newIndex}"]`) as HTMLInputElement
           if (searchInput) {
             // Enfocar y seleccionar el texto
@@ -807,19 +834,19 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
             }
           }
 
-          // Si no se encuentra, intentar de nuevo después de un breve delay
+          // Si no se encuentra, intentar de nuevo despues de un breve delay
           setTimeout(() => focusSearchInput(searchAttempts + 1), 50)
         }
 
-        // Iniciar la búsqueda del input después de un pequeño delay para que el dropdown se abra
+        // Iniciar la busqueda del input despues de un pequeno delay para que el dropdown se abra
         setTimeout(() => focusSearchInput(), 100)
       } else {
-        // Si no se encuentra el select, intentar de nuevo después de un breve delay
+        // Si no se encuentra el select, intentar de nuevo despues de un breve delay
         setTimeout(() => focusProductSelect(attempts + 1), 50)
       }
     }
 
-    // Iniciar el proceso después de que React renderice
+    // Iniciar el proceso despues de que React renderice
     requestAnimationFrame(() => {
       setTimeout(() => focusProductSelect(), 100)
     })
@@ -834,7 +861,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
       // Limpiar lista individual si existe
       const nuevaListasPorProducto = { ...listasPorProducto }
       delete nuevaListasPorProducto[index]
-      // Reindexar las listas (después de eliminar, los índices cambian)
+      // Reindexar las listas (despues de eliminar, los ?ndices cambian)
       const reindexed: Record<number, string> = {}
       Object.keys(nuevaListasPorProducto).forEach(key => {
         const oldIndex = parseInt(key)
@@ -851,15 +878,15 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
     }
   }, [fields.length, remove, listasPorProducto])
 
-  // Función para verificar si se puede eliminar un item
+  // Funcion para verificar si se puede eliminar un item
   const canRemoveItem = useCallback((index: number) => {
     return fields.length > 1
   }, [fields.length])
 
   // Combinar fields (con IDs) y watchedItems (con valores) para la tabla
-  // IMPORTANTE: Usar fields.length como dependencia para forzar recálculo cuando se agrega/elimina
+  // IMPORTANTE: Usar fields.length como dependencia para forzar recalculo cuando se agrega/elimina
   const itemsWithIds = useMemo(() => {
-    // Si watchedItems tiene más elementos que fields, ocurrió una eliminación
+    // Si watchedItems tiene mas elementos que fields, ocurri? una eliminacion
     // y necesitamos sincronizar
     const itemsToUse = (watchedItems?.length || 0) > fields.length
       ? watchedItems?.slice(0, fields.length)
@@ -895,7 +922,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
     }
   }, [watchedItems, append, fields.length, listasPorProducto])
 
-  const onSubmit = async (data: CrearPresupuestoFormData) => {
+  const submitPresupuesto = useCallback(async (data: CrearPresupuestoFormData) => {
     try {
       setIsLoading(true)
 
@@ -914,6 +941,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
         formData.append('lista_precio_id', data.lista_precio_id)
       }
       formData.append('tipo_venta', data.tipo_venta || 'reparto')
+      formData.append('turno', data.turno || 'mañana')
       formData.append('items', JSON.stringify(data.items))
 
       const result = await crearPresupuestoAction(formData)
@@ -929,7 +957,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
         const presupuestoId = result.data?.presupuesto_id
         const presupuestoCodigo = result.data?.codigo || presupuestoId
 
-        // Mostrar toast de éxito
+        // Mostrar toast de ?xito
         showToast('success', `Presupuesto ${presupuestoCodigo} creado! Listo para crear otro.`)
 
         // Reiniciar formulario para nuevo presupuesto
@@ -939,10 +967,12 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
           fecha_entrega_estimada: new Date().toISOString().split('T')[0],
           observaciones: '',
           tipo_venta: 'reparto',
+          turno: 'mañana',
           lista_precio_id: undefined,
           items: [{ producto_id: '', cantidad_solicitada: 1, precio_unit_est: 0, lista_precio_id: undefined }],
         })
         setClienteSearch('')
+        setClienteCodigoDirecto('')
         setListasPorProducto({})
         preciosModificadosManualmenteRef.current.clear()
         setTotalUpdateKey(prev => prev + 1)
@@ -965,10 +995,56 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
     } finally {
       setIsLoading(false)
     }
+  }, [reset, showToast])
+
+  const onSubmit = async (data: CrearPresupuestoFormData) => {
+    await submitPresupuesto(data)
   }
 
-  // Atajos globales (Ctrl+Enter para guardar, Ctrl+N para agregar producto)
-  // Debe estar después de la definición de onSubmit
+  const handleF12Submit = useCallback(async () => {
+    if (isLoading) return
+
+    const rawData = getValues()
+    const clienteValido = z.string().uuid().safeParse(rawData.cliente_id).success
+    if (!clienteValido) {
+      showToast('error', 'Debes seleccionar un cliente valido para finalizar')
+      return
+    }
+
+    const items = Array.isArray(rawData.items) ? rawData.items : []
+    const itemsValidos = items
+      .filter((item) => {
+        const productoValido = z.string().uuid().safeParse(item?.producto_id).success
+        const cantidadValida = Number(item?.cantidad_solicitada || 0) > 0
+        const precioValido = Number(item?.precio_unit_est || 0) > 0
+        return productoValido && cantidadValida && precioValido
+      })
+      .map((item) => ({
+        producto_id: item.producto_id,
+        cantidad_solicitada: Number(item.cantidad_solicitada),
+        precio_unit_est: Number(item.precio_unit_est),
+        lista_precio_id: item.lista_precio_id || undefined,
+      }))
+
+    if (itemsValidos.length === 0) {
+      showToast('error', 'No se puede finalizar sin al menos un producto valido')
+      return
+    }
+
+    await submitPresupuesto({
+      cliente_id: rawData.cliente_id,
+      zona_id: rawData.zona_id || undefined,
+      fecha_entrega_estimada: rawData.fecha_entrega_estimada || undefined,
+      observaciones: rawData.observaciones || undefined,
+      lista_precio_id: rawData.lista_precio_id || undefined,
+      tipo_venta: rawData.tipo_venta || 'reparto',
+      turno: rawData.turno || 'mañana',
+      items: itemsValidos,
+    })
+  }, [getValues, isLoading, showToast, submitPresupuesto])
+
+  // Atajos globales (F12 para guardar, Ctrl+N para agregar producto)
+  // Debe estar despues de la definicion de onSubmit
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       // Solo procesar si no estamos escribiendo en un input/textarea
@@ -976,20 +1052,18 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
       const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA'
       const isContentEditable = target.isContentEditable
 
-      // Si estamos en un input de búsqueda dentro de un Select, permitir que funcione normalmente
+      // Si estamos en un input de busqueda dentro de un Select, permitir que funcione normalmente
       const isSearchInput = isInput && target.closest('[role="listbox"]')
 
-      if (isSearchInput) {
-        return // Permitir que el input de búsqueda maneje sus propios eventos
+      // F12: Finalizar venta (funciona desde cualquier lugar)
+      if (e.key === 'F12') {
+        e.preventDefault()
+        void handleF12Submit()
+        return
       }
 
-      // Ctrl+Enter o Ctrl+S: Guardar presupuesto
-      if ((e.key === 'Enter' || e.key === 's') && e.ctrlKey && !isInput && !isContentEditable) {
-        e.preventDefault()
-        if (!isLoading) {
-          handleSubmit(onSubmit)()
-        }
-        return
+      if (isSearchInput) {
+        return // Permitir que el input de busqueda maneje sus propios eventos
       }
 
       // Ctrl+N: Agregar nuevo producto
@@ -998,37 +1072,56 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
         addItem()
         return
       }
-
-      // F12: Finalizar venta (funciona desde cualquier lugar)
-      if (e.key === 'F12') {
-        e.preventDefault()
-        if (!isLoading) {
-          handleSubmit(onSubmit)()
-        }
-        return
-      }
     }
 
     window.addEventListener('keydown', handleGlobalKeyDown)
     return () => {
       window.removeEventListener('keydown', handleGlobalKeyDown)
     }
-  }, [isLoading, handleSubmit, onSubmit, addItem])
+  }, [addItem, handleF12Submit])
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div className="grid gap-4 xl:grid-cols-[1fr,340px]">
         {/* Columna izquierda: Contenido del formulario */}
         <div className="space-y-6">
-          {/* Información del Cliente */}
+          {/* Informacion del Cliente */}
           <Card className="border-l-[3px] border-l-primary">
             <CardHeader>
-              <CardTitle className="text-primary">Información del Cliente</CardTitle>
+              <CardTitle className="text-primary">Informacion del Cliente</CardTitle>
               <CardDescription>
                 Selecciona el cliente para el presupuesto
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="cliente_codigo_directo">Codigo de cliente (directo)</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="cliente_codigo_directo"
+                    placeholder="Ej: 1024"
+                    value={clienteCodigoDirecto}
+                    onChange={(e) => setClienteCodigoDirecto(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        seleccionarClientePorCodigo(clienteCodigoDirecto)
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => seleccionarClientePorCodigo(clienteCodigoDirecto)}
+                  >
+                    Cargar
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Permite cargar el cliente directamente por su codigo.
+                </p>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="cliente_id" className="flex items-center gap-2">
                   Cliente *
@@ -1039,25 +1132,21 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                   onValueChange={(value) => {
                     // Establecer el valor primero
                     setValue('cliente_id', value, { shouldValidate: true, shouldDirty: true })
-                    // Limpiar la búsqueda después de un pequeño delay para asegurar que el valor se estableció
+                    const cliente = clientes.find((c) => c.id === value)
+                    setClienteCodigoDirecto(cliente?.codigo || '')
+                    // Limpiar la busqueda despues de un pequeno delay para asegurar que el valor se estableci?
                     setTimeout(() => {
                       setClienteSearch('')
-                      // Avanzar al siguiente campo (zona o fecha)
-                      const zonaInput = document.getElementById('zona_id')
-                      if (zonaInput) {
-                        zonaInput.focus()
-                      } else {
-                        const fechaInput = document.getElementById('fecha_entrega_estimada')
-                        if (fechaInput) {
-                          fechaInput.focus()
-                        }
+                      const fechaInput = document.getElementById('fecha_entrega_estimada')
+                      if (fechaInput) {
+                        fechaInput.focus()
                       }
                     }, 100)
                   }}
                   onOpenChange={(open) => {
                     setClienteDropdownOpen(open)
                     if (open) {
-                      // Cuando se abre, enfocar el input de búsqueda automáticamente
+                      // Cuando se abre, enfocar el input de busqueda automaticamente
                       setTimeout(() => {
                         const searchInput = document.querySelector('#cliente_id ~ [role="listbox"] input, [data-radix-popper-content-wrapper] input[placeholder*="Buscar"]') as HTMLInputElement
                         if (searchInput) {
@@ -1065,20 +1154,20 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                         }
                       }, 50)
                     } else {
-                      // Limpiar la búsqueda cuando se cierra el dropdown
+                      // Limpiar la busqueda cuando se cierra el dropdown
                       setClienteSearch('')
                     }
                   }}
                 >
                   <SelectTrigger id="cliente_id" autoFocus className={errors.cliente_id ? 'border-red-500' : ''}>
-                    <SelectValue placeholder="Buscar por código, nombre, teléfono o zona..." />
+                    <SelectValue placeholder="Buscar por codigo, nombre, telefono o zona..." />
                   </SelectTrigger>
                   <SelectContent className="max-h-[300px]">
                     <div className="sticky top-0 bg-background p-2 border-b">
                       <div className="relative">
                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
-                          placeholder="Buscar por código, nombre..."
+                          placeholder="Buscar por codigo, nombre..."
                           value={clienteSearch}
                           onChange={(e) => {
                             setClienteSearch(e.target.value)
@@ -1101,18 +1190,13 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                               // Seleccionar el primer resultado
                               const primerCliente = listaFinal[0]
                               setValue('cliente_id', primerCliente.id, { shouldValidate: true, shouldDirty: true })
+                              setClienteCodigoDirecto(primerCliente.codigo || '')
                               setClienteSearch('')
                               setClienteDropdownOpen(false)
-                              // Avanzar al siguiente campo (zona o fecha)
                               setTimeout(() => {
-                                const zonaInput = document.getElementById('zona_id')
-                                if (zonaInput) {
-                                  zonaInput.focus()
-                                } else {
-                                  const fechaInput = document.getElementById('fecha_entrega_estimada')
-                                  if (fechaInput) {
-                                    fechaInput.focus()
-                                  }
+                                const fechaInput = document.getElementById('fecha_entrega_estimada')
+                                if (fechaInput) {
+                                  fechaInput.focus()
                                 }
                               }, 100)
                             } else if (e.key === 'Tab' && !e.shiftKey) {
@@ -1154,12 +1238,12 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                         const totalClientes = clientes.length
                         const showingAll = filtered.length >= totalClientes || filtered.length < MAX_RESULTS
 
-                        // Asegurar que el cliente seleccionado siempre esté en la lista si existe
+                        // Asegurar que el cliente seleccionado siempre est? en la lista si existe
                         const clienteSeleccionadoEnLista = watchedCliente
                           ? clientes.find(c => c.id === watchedCliente)
                           : null
 
-                        // Si hay un cliente seleccionado y no está en los resultados filtrados, agregarlo
+                        // Si hay un cliente seleccionado y no est? en los resultados filtrados, agregarlo
                         const listaFinal = [...filtered]
                         if (clienteSeleccionadoEnLista && !listaFinal.find(c => c.id === clienteSeleccionadoEnLista.id)) {
                           listaFinal.unshift(clienteSeleccionadoEnLista)
@@ -1194,39 +1278,18 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                 )}
               </div>
 
-              {/* Zona y Fecha - Visible después de seleccionar cliente */}
+              {/* Zona y Fecha - Visible despues de seleccionar cliente */}
               {clienteSeleccionado && (
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 md:grid-cols-3">
+                  <input type="hidden" {...register('zona_id')} />
+
                   <div className="space-y-2">
-                    <Label htmlFor="zona_id" className="flex items-center gap-2">
-                      Zona de Entrega
-                      <KeyboardHintCompact shortcut="Z" />
-                    </Label>
-                    <Select
-                      key={watchedCliente} // Forzar re-render al cambiar cliente
-                      value={watch('zona_id') || ''}
-                      onValueChange={(value) => {
-                        setValue('zona_id', value, { shouldValidate: true, shouldDirty: true })
-                        // Avanzar a fecha después de seleccionar zona
-                        setTimeout(() => {
-                          const fechaInput = document.getElementById('fecha_entrega_estimada')
-                          if (fechaInput) {
-                            fechaInput.focus()
-                          }
-                        }, 100)
-                      }}
-                    >
-                      <SelectTrigger id="zona_id">
-                        <SelectValue placeholder="Selecciona una zona" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {zonas.map((zona) => (
-                          <SelectItem key={zona.id} value={zona.id}>
-                            {zona.nombre}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="zona_id">Zona de Entrega (bloqueada)</Label>
+                    <Input
+                      id="zona_id"
+                      value={zonas.find((z) => z.id === watch('zona_id'))?.nombre || clienteSeleccionado.zona_entrega || 'Sin zona'}
+                      disabled
+                    />
                   </div>
 
                   <div className="space-y-2">
@@ -1240,6 +1303,22 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                       onChange={(value) => setValue('fecha_entrega_estimada', value)}
                       placeholder="DD/MM/YYYY"
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="turno_entrega">Turno de Entrega</Label>
+                    <Select
+                      value={watch('turno') || 'mañana'}
+                      onValueChange={(value) => setValue('turno', value as 'mañana' | 'tarde')}
+                    >
+                      <SelectTrigger id="turno_entrega">
+                        <SelectValue placeholder="Selecciona un turno" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="mañana">Mañana</SelectItem>
+                        <SelectItem value="tarde">Tarde</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               )}
@@ -1259,7 +1338,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                         setValue(`items.${index}.lista_precio_id`, value, { shouldDirty: false })
                       }
                     })
-                    // Avanzar al primer producto después de seleccionar lista
+                    // Avanzar al primer producto despues de seleccionar lista
                     setTimeout(() => {
                       const firstProductSelect = document.getElementById('producto_0')
                       if (firstProductSelect) {
@@ -1301,7 +1380,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                 </Select>
                 {errorListas && (
                   <p className="text-sm text-destructive">
-                    Error al cargar listas. Intenta recargar la página.
+                    Error al cargar listas. Intenta recargar la pagina.
                   </p>
                 )}
                 {watch('lista_precio_id') && (
@@ -1318,7 +1397,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
             <CardHeader className="pb-3">
               <CardTitle className="text-accent">Productos</CardTitle>
               <CardDescription>
-                Escribí el código o nombre y presioná Enter para agregar rápidamente
+                Escrib? el codigo o nombre y presion? Enter para agregar rapidamente
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1383,4 +1462,5 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
     </form>
   )
 }
+
 

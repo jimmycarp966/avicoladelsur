@@ -78,7 +78,7 @@ export function NovedadesTable({ novedades, onView, onEdit, onDelete }: Novedade
     {
       accessorKey: 'tipo',
       header: ({ column }) => (
-        <SortableHeader column={column}>Tipo</SortableHeader>
+        <SortableHeader column={column}>Categoria</SortableHeader>
       ),
       cell: ({ row }) => {
         const tipo = row.getValue('tipo') as string

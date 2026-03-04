@@ -1,10 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { ColumnDef, Row, flexRender, getCoreRowModel, getExpandedRowModel, getPaginationRowModel, getSortedRowModel, useReactTable, SortingState } from '@tanstack/react-table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Edit, Trash2, Eye, Truck, FileText, Route, ChevronDown, ChevronRight, Scale, Package } from 'lucide-react'
 import { formatDate, formatCurrency, cn } from '@/lib/utils'
@@ -109,6 +111,8 @@ function calcularResumenProductos(entregas: Entrega[] | undefined) {
 export function PedidosTable({ data, onView, onEdit, onDelete, onDeliver, onPrint, onRoute }: PedidosTableProps) {
   const [sorting, setSorting] = useState<SortingState>([])
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+  const [searchTerm, setSearchTerm] = useState('')
+  const [estadoFilter, setEstadoFilter] = useState<string>('todos')
 
   const columns: ColumnDef<PedidoConEntregas>[] = [
     // Columna de expansión
@@ -264,8 +268,34 @@ export function PedidosTable({ data, onView, onEdit, onDelete, onDeliver, onPrin
     },
   ]
 
+  const filteredData = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase()
+    return data.filter((pedido) => {
+      if (estadoFilter !== 'todos' && pedido.estado !== estadoFilter) {
+        return false
+      }
+
+      if (!term) return true
+
+      const numeroPedido = String(pedido.numero_pedido || '').toLowerCase()
+      const cliente = String((pedido as any).cliente?.nombre || '').toLowerCase()
+      const fecha = String(pedido.fecha_pedido || '').slice(0, 10).toLowerCase()
+      const entregasTexto = (pedido.entregas || [])
+        .map((entrega) => `${entrega.cliente?.nombre || ''} ${entrega.presupuesto?.numero_presupuesto || ''}`)
+        .join(' ')
+        .toLowerCase()
+
+      return (
+        numeroPedido.includes(term) ||
+        cliente.includes(term) ||
+        fecha.includes(term) ||
+        entregasTexto.includes(term)
+      )
+    })
+  }, [data, estadoFilter, searchTerm])
+
   const table = useReactTable({
-    data,
+    data: filteredData,
     columns,
     state: { sorting, expanded },
     onSortingChange: setSorting,
@@ -276,7 +306,7 @@ export function PedidosTable({ data, onView, onEdit, onDelete, onDeliver, onPrin
     getPaginationRowModel: getPaginationRowModel(),
     getRowCanExpand: (row) => (row.original.entregas?.length || 0) > 0,
     initialState: {
-      pagination: { pageSize: 15 },
+      pagination: { pageSize: 50 },
     },
   })
 
@@ -370,6 +400,38 @@ export function PedidosTable({ data, onView, onEdit, onDelete, onDeliver, onPrin
 
   return (
     <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-[1fr,220px,auto] gap-2">
+        <Input
+          value={searchTerm}
+          onChange={(event) => setSearchTerm(event.target.value)}
+          placeholder="Buscar por número, cliente o fecha..."
+        />
+        <Select value={estadoFilter} onValueChange={setEstadoFilter}>
+          <SelectTrigger>
+            <SelectValue placeholder="Estado" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos los estados</SelectItem>
+            <SelectItem value="pendiente">Pendiente</SelectItem>
+            <SelectItem value="confirmado">Confirmado</SelectItem>
+            <SelectItem value="preparando">Preparando</SelectItem>
+            <SelectItem value="enviado">Enviado</SelectItem>
+            <SelectItem value="entregado">Entregado</SelectItem>
+            <SelectItem value="cancelado">Cancelado</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => {
+            setSearchTerm('')
+            setEstadoFilter('todos')
+          }}
+        >
+          Limpiar
+        </Button>
+      </div>
+
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -388,9 +450,8 @@ export function PedidosTable({ data, onView, onEdit, onDelete, onDeliver, onPrin
           <TableBody>
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-                <>
+                <Fragment key={row.id}>
                   <TableRow
-                    key={row.id}
                     data-state={row.getIsSelected() && "selected"}
                     className={cn(row.getIsExpanded() && "bg-muted/50")}
                   >
@@ -401,7 +462,7 @@ export function PedidosTable({ data, onView, onEdit, onDelete, onDeliver, onPrin
                     ))}
                   </TableRow>
                   {row.getIsExpanded() && renderExpandedRow(row)}
-                </>
+                </Fragment>
               ))
             ) : (
               <TableRow>
@@ -417,7 +478,7 @@ export function PedidosTable({ data, onView, onEdit, onDelete, onDeliver, onPrin
       {/* Paginación */}
       <div className="flex items-center justify-between">
         <div className="text-sm text-muted-foreground">
-          Mostrando {table.getRowModel().rows.length} de {data.length} pedidos
+          Mostrando {table.getRowModel().rows.length} de {filteredData.length} pedidos
         </div>
         <div className="flex gap-2">
           <Button

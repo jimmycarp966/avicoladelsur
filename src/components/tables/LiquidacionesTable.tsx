@@ -312,7 +312,8 @@ export function LiquidacionesTable({ liquidaciones, onView, onEdit, onApprove, o
         data={liquidacionesFiltradas}
         searchKey="empleado.usuario.nombre"
         searchPlaceholder="Buscar por empleado..."
-        enablePagination={false}
+        enablePagination={true}
+        pageSize={50}
       />
     </div>
   )

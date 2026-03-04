@@ -110,13 +110,22 @@ export function LicenciasTable({ licencias, onView, onApprove, onReject }: Licen
       cell: ({ row }) => getTipoBadge(row.getValue('tipo') as string),
     },
     {
+      accessorKey: 'fecha_presentacion_certificado',
+      header: ({ column }) => <SortableHeader column={column}>Presentacion</SortableHeader>,
+      cell: ({ row }) => {
+        const licencia = row.original
+        const fechaPresentacion = licencia.fecha_presentacion_certificado || licencia.created_at
+        return <div className="text-sm text-muted-foreground">{fechaPresentacion ? formatDate(fechaPresentacion) : '-'}</div>
+      },
+    },
+    {
       accessorKey: 'fecha_inicio',
-      header: ({ column }) => <SortableHeader column={column}>Fecha Inicio</SortableHeader>,
+      header: ({ column }) => <SortableHeader column={column}>Desde</SortableHeader>,
       cell: ({ row }) => <div className="text-sm text-muted-foreground">{formatDate(row.getValue('fecha_inicio'))}</div>,
     },
     {
       accessorKey: 'fecha_fin',
-      header: ({ column }) => <SortableHeader column={column}>Fecha Fin</SortableHeader>,
+      header: ({ column }) => <SortableHeader column={column}>Hasta</SortableHeader>,
       cell: ({ row }) => <div className="text-sm text-muted-foreground">{formatDate(row.getValue('fecha_fin'))}</div>,
     },
     {

@@ -192,7 +192,7 @@ export function CuentasCorrientesTable({ clientes }: CuentasTableProps) {
             enableRowSelection={false}
             enableColumnVisibility={true}
             enablePagination={true}
-            pageSize={20}
+            pageSize={50}
         />
     )
 }

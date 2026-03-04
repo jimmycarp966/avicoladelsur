@@ -183,7 +183,7 @@ export function NuevaNovedadForm() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="tipo">Tipo de Novedad *</Label>
+                <Label htmlFor="tipo">Categoria *</Label>
                 <Select
                   value={watch('tipo') || 'general'}
                   onValueChange={(value) => setValue('tipo', value as any)}

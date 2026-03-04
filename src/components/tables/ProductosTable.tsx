@@ -135,7 +135,7 @@ export function ProductosTable({ data, onView, onEdit, onDelete }: ProductosTabl
       enableRowSelection={true}
       enableColumnVisibility={true}
       enablePagination={true}
-      pageSize={10}
+      pageSize={50}
     />
   )
 }

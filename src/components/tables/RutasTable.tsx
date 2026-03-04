@@ -249,7 +249,7 @@ export function RutasTable({ data, onView, onEdit, onDelete, onStart, onComplete
       enableRowSelection={true}
       enableColumnVisibility={true}
       enablePagination={true}
-      pageSize={15}
+      pageSize={50}
     />
   )
 }

@@ -19,10 +19,11 @@ async function getAdelantos() {
         usuario:usuarios(id, nombre, apellido, email)
       ),
       producto:productos(id, codigo, nombre),
-      aprobador:usuarios(id, nombre, apellido)
+      aprobador:usuarios(id, nombre, apellido),
+      plan:rrhh_adelanto_planes(id, cantidad_cuotas, estado)
     `)
     .order('fecha_solicitud', { ascending: false })
-    .limit(100)
+    .limit(50)
 
   if (error) {
     console.error('Error fetching adelantos:', error)

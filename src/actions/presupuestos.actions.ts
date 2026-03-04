@@ -18,12 +18,13 @@ const crearPresupuestoSchema = z.object({
   observaciones: z.string().optional(),
   lista_precio_id: z.string().uuid().optional(), // Lista global (por defecto)
   tipo_venta: z.enum(['reparto', 'retira_casa_central']).default('reparto'),
+  turno: z.enum(['mañana', 'tarde']).optional(),
   items: z.array(z.object({
     producto_id: z.string().uuid(),
     cantidad_solicitada: z.number().positive(),
     precio_unit_est: z.number().positive(),
     lista_precio_id: z.string().uuid().optional(), // Lista individual por producto
-  })),
+  })).min(1),
 })
 
 const reservarStockSchema = z.object({
@@ -71,6 +72,7 @@ export async function crearPresupuestoAction(formData: FormData) {
       observaciones: rawData.observaciones || undefined,
       lista_precio_id: rawData.lista_precio_id || undefined,
       tipo_venta: rawData.tipo_venta || 'reparto',
+      turno: rawData.turno || undefined,
       items: JSON.parse(rawData.items as string),
     })
 
@@ -112,7 +114,7 @@ export async function crearPresupuestoAction(formData: FormData) {
     })
 
     // Asignar usuario vendedor, lista de precios, y tipo de venta
-    const updateData: { usuario_vendedor: string; lista_precio_id?: string; tipo_venta?: string } = {
+    const updateData: { usuario_vendedor: string; lista_precio_id?: string; tipo_venta?: string; turno?: 'mañana' | 'tarde' } = {
       usuario_vendedor: user.id,
     }
     if (data.lista_precio_id) {
@@ -120,6 +122,9 @@ export async function crearPresupuestoAction(formData: FormData) {
     }
     if (data.tipo_venta) {
       updateData.tipo_venta = data.tipo_venta
+    }
+    if (data.turno) {
+      updateData.turno = data.turno
     }
     await supabase
       .from('presupuestos')
@@ -912,9 +917,21 @@ export async function actualizarPresupuestoAction(formData: FormData) {
     const presupuestoId = formData.get('presupuesto_id') as string
     const observaciones = formData.get('observaciones') as string
     const fecha_entrega_estimada = formData.get('fecha_entrega_estimada') as string
+    const turnoRaw = formData.get('turno') as string
 
     if (!presupuestoId) {
       return { success: false, error: 'ID de presupuesto requerido' }
+    }
+
+    const turnoNormalizado =
+      turnoRaw === 'manana'
+        ? 'mañana'
+        : turnoRaw === 'mañana' || turnoRaw === 'tarde'
+          ? turnoRaw
+          : ''
+
+    if (turnoRaw && !turnoNormalizado) {
+      return { success: false, error: 'Turno inválido. Debe ser mañana o tarde.' }
     }
 
     // Verificar que el presupuesto existe y está en estado pendiente
@@ -943,6 +960,10 @@ export async function actualizarPresupuestoAction(formData: FormData) {
 
     if (fecha_entrega_estimada) {
       updateData.fecha_entrega_estimada = fecha_entrega_estimada
+    }
+
+    if (turnoNormalizado) {
+      updateData.turno = turnoNormalizado
     }
 
     const { error: updateError } = await supabase

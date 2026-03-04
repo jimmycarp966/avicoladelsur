@@ -247,8 +247,7 @@ export function FacturasTable({ onView, onPrint, clienteId }: FacturasTableProps
       enableRowSelection={false}
       enableColumnVisibility
       enablePagination
-      pageSize={15}
+      pageSize={50}
     />
   )
 }
-

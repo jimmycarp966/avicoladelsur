@@ -9,6 +9,7 @@ type JornadasCalendarioProps = {
   feriados: Array<{ fecha: string; descripcion?: string | null }>
   periodoMes: number
   periodoAnio: number
+  onDiaClick?: (dia: DiaCalendario) => void
 }
 
 type DiaCalendario = {
@@ -96,6 +97,7 @@ export function JornadasCalendario({
   feriados,
   periodoMes,
   periodoAnio,
+  onDiaClick,
 }: JornadasCalendarioProps) {
   const today = getTodayArgentina()
 
@@ -208,11 +210,26 @@ export function JornadasCalendario({
           {dias.map((dia) => {
             const cfg = TIPO_CONFIG[dia.tipo]
             const esHoy = dia.fecha === today
+            const esClicable = dia.tipo === 'ausente'
 
             return (
               <div
                 key={dia.fecha}
-                className={`min-h-[60px] border-r border-b p-1 relative ${cfg.bg} ${esHoy ? 'ring-2 ring-inset ring-blue-400' : ''}`}
+                className={`min-h-[60px] border-r border-b p-1 relative ${cfg.bg} ${esHoy ? 'ring-2 ring-inset ring-blue-400' : ''} ${esClicable ? 'cursor-pointer hover:ring-2 hover:ring-inset hover:ring-red-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400' : ''}`}
+                onClick={() => {
+                  if (!esClicable) return
+                  onDiaClick?.(dia)
+                }}
+                onKeyDown={(event) => {
+                  if (!esClicable) return
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    onDiaClick?.(dia)
+                  }
+                }}
+                role={esClicable ? 'button' : undefined}
+                tabIndex={esClicable ? 0 : -1}
+                aria-label={esClicable ? `Cargar jornada para el dia ${dia.fecha}` : undefined}
               >
                 <div className="flex items-start justify-between">
                   <span
