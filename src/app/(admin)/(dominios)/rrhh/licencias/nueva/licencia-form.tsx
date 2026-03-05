@@ -27,6 +27,7 @@ import { licenciaSchema, type LicenciaFormData } from '@/lib/schemas/rrhh.schema
 import { crearLicenciaAction, obtenerEmpleadosActivosAction } from '@/actions/rrhh.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 import type { Empleado } from '@/types/domain.types'
+import { getEmpleadoNombre } from '@/lib/utils/empleado-display'
 
 export function NuevaLicenciaForm() {
   const router = useRouter()
@@ -174,11 +175,12 @@ export function NuevaLicenciaForm() {
                 </SelectTrigger>
                 <SelectContent>
                   {empleados.map((empleado) => {
-                    const nombre = empleado.usuario?.nombre || ''
-                    const apellido = empleado.usuario?.apellido || ''
+                    const nombreCompleto = getEmpleadoNombre(empleado)
                     return (
                       <SelectItem key={empleado.id} value={empleado.id}>
-                        {`${nombre} ${apellido}`.trim()} - {empleado.legajo || 'Sin legajo'} ({empleado.sucursal?.nombre})
+                        {nombreCompleto}
+                        {empleado.legajo ? ` - Legajo ${empleado.legajo}` : ''}
+                        {empleado.sucursal?.nombre ? ` (${empleado.sucursal.nombre})` : ''}
                       </SelectItem>
                     )
                   })}
@@ -212,7 +214,7 @@ export function NuevaLicenciaForm() {
                 <div className="font-medium text-blue-900 mb-2">Empleado Seleccionado</div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
-                    Nombre: {empleadoSeleccionado.usuario?.nombre} {empleadoSeleccionado.usuario?.apellido}
+                    Nombre: {getEmpleadoNombre(empleadoSeleccionado)}
                   </div>
                   <div>Legajo: {empleadoSeleccionado.legajo || 'Sin asignar'}</div>
                   <div>Sucursal: {empleadoSeleccionado.sucursal?.nombre || 'Sin asignar'}</div>
@@ -410,3 +412,4 @@ export function NuevaLicenciaForm() {
     </div>
   )
 }
+

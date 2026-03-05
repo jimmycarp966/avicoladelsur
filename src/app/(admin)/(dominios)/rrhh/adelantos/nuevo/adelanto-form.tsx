@@ -17,6 +17,7 @@ import { crearAdelantoAction, obtenerEmpleadosActivosAction } from '@/actions/rr
 import { useNotificationStore } from '@/store/notificationStore'
 import { createClient } from '@/lib/supabase/client'
 import type { Empleado, Producto } from '@/types/domain.types'
+import { getEmpleadoNombre } from '@/lib/utils/empleado-display'
 
 export function NuevoAdelantoForm() {
   const router = useRouter()
@@ -173,12 +174,11 @@ export function NuevoAdelantoForm() {
                   </SelectTrigger>
                   <SelectContent>
                     {empleados.map((empleado) => {
-                      const nombre = empleado.usuario?.nombre || ''
-                      const apellido = empleado.usuario?.apellido || ''
-                      const nombreCompleto = `${nombre} ${apellido}`.trim()
+                      const nombreCompleto = getEmpleadoNombre(empleado)
                       return (
                         <SelectItem key={empleado.id} value={empleado.id}>
-                          {nombreCompleto || 'Sin nombre'} {empleado.legajo && `- ${empleado.legajo}`}
+                          {nombreCompleto}
+                          {empleado.legajo ? ` - Legajo ${empleado.legajo}` : ''}
                         </SelectItem>
                       )
                     })}
@@ -412,5 +412,4 @@ export function NuevoAdelantoForm() {
     </div>
   )
 }
-
 

@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { useNotificationStore } from '@/store/notificationStore'
 import type { Empleado } from '@/types/domain.types'
+import { getEmpleadoNombre } from '@/lib/utils/empleado-display'
 
 interface EmpleadoSeleccionado extends Empleado {
   selected: boolean
@@ -108,14 +109,7 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
   }
 
   const getNombreEmpleado = (empleado: EmpleadoSeleccionado) => {
-    const nombreUsuario = `${empleado.usuario?.nombre || ''} ${empleado.usuario?.apellido || ''}`.trim()
-    const nombreEmpleado = `${empleado.nombre || ''} ${empleado.apellido || ''}`.trim()
-    return (
-      nombreUsuario ||
-      nombreEmpleado ||
-      empleado.usuario?.email ||
-      (empleado.legajo ? `Empleado ${empleado.legajo}` : 'Sin nombre')
-    )
+    return getEmpleadoNombre(empleado)
   }
 
   const handleCalcular = async () => {
@@ -551,3 +545,4 @@ export function CalcularLiquidacionesForm({ initialEmpleados }: CalcularLiquidac
     </div>
   )
 }
+

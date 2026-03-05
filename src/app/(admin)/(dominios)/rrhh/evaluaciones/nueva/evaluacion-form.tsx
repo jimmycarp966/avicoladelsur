@@ -23,6 +23,7 @@ import {
 import { MetricasSoportePanel } from '@/components/rrhh/MetricasSoportePanel'
 import { useNotificationStore } from '@/store/notificationStore'
 import type { Empleado, Sucursal } from '@/types/domain.types'
+import { getEmpleadoNombre } from '@/lib/utils/empleado-display'
 
 interface EvaluacionCriteria {
   name: keyof Pick<EvaluacionFormData, 'puntualidad' | 'rendimiento' | 'actitud' | 'responsabilidad' | 'trabajo_equipo'>
@@ -206,12 +207,12 @@ export function NuevaEvaluacionForm() {
                   </SelectTrigger>
                   <SelectContent>
                     {empleados.map((empleado) => {
-                      const nombre = empleado.usuario?.nombre || empleado.nombre || ''
-                      const apellido = empleado.usuario?.apellido || empleado.apellido || ''
-                      const nombreCompleto = `${apellido} ${nombre}`.trim() || 'Sin nombre'
+                      const nombreCompleto = getEmpleadoNombre(empleado)
                       return (
                         <SelectItem key={empleado.id} value={empleado.id}>
-                          {nombreCompleto} - {empleado.legajo || 'Sin legajo'} ({empleado.sucursal?.nombre})
+                          {nombreCompleto}
+                          {empleado.legajo ? ` - Legajo ${empleado.legajo}` : ''}
+                          {empleado.sucursal?.nombre ? ` (${empleado.sucursal.nombre})` : ''}
                         </SelectItem>
                       )
                     })}
@@ -314,7 +315,7 @@ export function NuevaEvaluacionForm() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                   <div>
-                    <span className="font-medium">Nombre:</span> {empleadoSeleccionado.usuario?.nombre} {empleadoSeleccionado.usuario?.apellido}
+                    <span className="font-medium">Nombre:</span> {getEmpleadoNombre(empleadoSeleccionado)}
                   </div>
                   <div>
                     <span className="font-medium">Legajo:</span> {empleadoSeleccionado.legajo || 'Sin asignar'}
@@ -505,3 +506,4 @@ export function NuevaEvaluacionForm() {
     </div>
   )
 }
+
