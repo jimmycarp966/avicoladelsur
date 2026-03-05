@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Bell, Check, Filter, RefreshCw, Settings, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -25,7 +25,7 @@ type Notification = {
   tipo: 'info' | 'success' | 'warning' | 'error'
   categoria: string | null
   leida: boolean
-  metadata: any
+  metadata: Record<string, unknown> | null
   created_at: string
 }
 
@@ -40,27 +40,56 @@ const AREAS: Array<{ value: string; label: string }> = [
   { value: 'ia', label: 'IA' },
 ]
 
+const REQUEST_TIMEOUT_MS = 12000
+
+async function withTimeout<T>(operation: () => Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  return await new Promise<T>((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error(`Timeout al cargar ${label}`))
+    }, timeoutMs)
+
+    operation().then(
+      (result) => {
+        clearTimeout(timeoutId)
+        resolve(result)
+      },
+      (error) => {
+        clearTimeout(timeoutId)
+        reject(error)
+      }
+    )
+  })
+}
+
 export default function NotificacionesPage() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [filtroTipo, setFiltroTipo] = useState<string>('todos')
   const [filtroLeida, setFiltroLeida] = useState<string>('todos')
   const [filtroArea, setFiltroArea] = useState<string>('todos')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
-  useEffect(() => {
-    void loadNotifications()
-  }, [filtroTipo, filtroLeida, filtroArea])
 
-  async function loadNotifications() {
+  const loadNotifications = useCallback(async () => {
     try {
       setLoading(true)
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      setLoadError(null)
 
-      if (!user) {
+      const {
+        data: { session },
+      } = await withTimeout(() => supabase.auth.getSession(), REQUEST_TIMEOUT_MS, 'la sesion')
+
+      let userId = session?.user?.id || null
+      if (!userId) {
+        const {
+          data: { user },
+        } = await withTimeout(() => supabase.auth.getUser(), REQUEST_TIMEOUT_MS, 'el usuario')
+        userId = user?.id || null
+      }
+
+      if (!userId) {
         setNotifications([])
         return
       }
@@ -68,7 +97,7 @@ export default function NotificacionesPage() {
       let query = supabase
         .from('notificaciones')
         .select('*')
-        .or(`usuario_id.eq.${user.id},usuario_id.is.null`)
+        .or(`usuario_id.eq.${userId},usuario_id.is.null`)
         .order('created_at', { ascending: false })
         .limit(100)
 
@@ -90,17 +119,22 @@ export default function NotificacionesPage() {
         }
       }
 
-      const { data, error } = await query
+      const { data, error } = await withTimeout(async () => await query, REQUEST_TIMEOUT_MS, 'las notificaciones')
       if (error) throw error
 
       setNotifications(data || [])
     } catch (error) {
       console.error('Error cargando notificaciones:', error)
       setNotifications([])
+      setLoadError('No se pudieron cargar las notificaciones. Intenta nuevamente.')
     } finally {
       setLoading(false)
     }
-  }
+  }, [filtroArea, filtroLeida, filtroTipo, supabase])
+
+  useEffect(() => {
+    void loadNotifications()
+  }, [loadNotifications])
 
   async function markAsRead(notificationIds: string[]) {
     try {
@@ -291,6 +325,15 @@ export default function NotificacionesPage() {
       <div className="space-y-3">
         {loading ? (
           <div className="text-center py-12 text-muted-foreground">Cargando notificaciones...</div>
+        ) : loadError ? (
+          <Card>
+            <CardContent className="py-12 text-center space-y-3">
+              <p className="text-sm text-muted-foreground">{loadError}</p>
+              <Button variant="outline" size="sm" onClick={loadNotifications}>
+                Reintentar
+              </Button>
+            </CardContent>
+          </Card>
         ) : notifications.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
@@ -360,4 +403,5 @@ export default function NotificacionesPage() {
     </div>
   )
 }
+
 
