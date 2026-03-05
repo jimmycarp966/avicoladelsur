@@ -3453,3 +3453,70 @@ export async function autoAsignarDescansosAction(
   }
 }
 
+
+function getPeriodoActualArgentina(): { mes: number; anio: number } {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric',
+    month: '2-digit',
+  })
+
+  const parts = formatter.formatToParts(new Date())
+  const anio = Number(parts.find((part) => part.type === 'year')?.value || new Date().getFullYear())
+  const mes = Number(parts.find((part) => part.type === 'month')?.value || new Date().getMonth() + 1)
+
+  return { mes, anio }
+}
+
+export async function asignarDescansosAleatoriosMesActualAction(): Promise<ApiResponse<{
+  mes: number
+  anio: number
+  generados: number
+  sincronizados: number
+  mensaje: string
+}>> {
+  try {
+    const adminUserId = await getAuthenticatedAdminUserId()
+    if (!adminUserId) {
+      return { success: false, error: 'No autorizado' }
+    }
+
+    const { mes, anio } = getPeriodoActualArgentina()
+    const supabase = createAdminClient()
+
+    const syncResult = await sincronizarDescansosMensualesSucursal(supabase, {
+      anio,
+      mes,
+      seed: `manual-${anio}-${mes}`,
+    })
+
+    if (!syncResult.soportado) {
+      return {
+        success: false,
+        error: 'La sincronizacion de descansos no esta disponible en esta base. Revisa migraciones RRHH.',
+      }
+    }
+
+    revalidatePath('/rrhh/empleados')
+    revalidatePath('/rrhh/horarios')
+    revalidatePath('/rrhh/liquidaciones')
+
+    const mensaje = `Descansos mensuales sincronizados para ${mes}/${anio} (generados: ${syncResult.generados}, asistencias actualizadas: ${syncResult.sincronizados}).`
+
+    return {
+      success: true,
+      data: {
+        mes,
+        anio,
+        generados: syncResult.generados,
+        sincronizados: syncResult.sincronizados,
+        mensaje,
+      },
+      message: mensaje,
+    }
+  } catch (error) {
+    devError('Error en asignarDescansosAleatoriosMesActualAction:', error)
+    return { success: false, error: 'Error interno del servidor' }
+  }
+}
+

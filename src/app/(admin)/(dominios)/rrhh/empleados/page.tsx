@@ -4,9 +4,13 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { EmpleadosTable } from '@/components/tables/EmpleadosTable'
 import { Button } from '@/components/ui/button'
-import { Plus, Users, UserCheck, TrendingUp, Building2 } from 'lucide-react'
+import { Plus, Users, UserCheck, TrendingUp, Building2, Shuffle } from 'lucide-react'
 import Link from 'next/link'
-import { eliminarEmpleadoAction, obtenerEmpleadosActivosAction } from '@/actions/rrhh.actions'
+import {
+  asignarDescansosAleatoriosMesActualAction,
+  eliminarEmpleadoAction,
+  obtenerEmpleadosActivosAction,
+} from '@/actions/rrhh.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatCard } from '@/components/ui/stat-card'
@@ -30,6 +34,7 @@ export default function EmpleadosPage() {
   const [loading, setLoading] = useState(true)
   const [empleadoToDelete, setEmpleadoToDelete] = useState<Empleado | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isAssigningDescansos, setIsAssigningDescansos] = useState(false)
 
   useEffect(() => {
     let mounted = true
@@ -101,6 +106,30 @@ export default function EmpleadosPage() {
     }
   }
 
+  const handleAsignarDescansosMesActual = async () => {
+    setIsAssigningDescansos(true)
+
+    try {
+      const result = await asignarDescansosAleatoriosMesActualAction()
+
+      if (!result.success) {
+        showToast('error', result.error || 'No se pudieron asignar descansos', 'RRHH')
+        return
+      }
+
+      showToast(
+        'success',
+        result.data?.mensaje || result.message || 'Descansos mensuales sincronizados',
+        'RRHH'
+      )
+    } catch (error) {
+      console.error('Error asignando descansos mensuales:', error)
+      showToast('error', 'Error al asignar descansos mensuales', 'RRHH')
+    } finally {
+      setIsAssigningDescansos(false)
+    }
+  }
+
   const handleCall = (empleado: Empleado) => {
     if (empleado.telefono_personal) {
       window.location.href = `tel:${empleado.telefono_personal}`
@@ -132,12 +161,24 @@ export default function EmpleadosPage() {
         title="Empleados"
         description="Gestión completa del personal de la empresa"
         actions={
-          <Button asChild className="bg-primary hover:bg-primary/90 shadow-sm md:h-10 md:px-6 w-fit">
-            <Link href="/rrhh/empleados/nuevo">
-              <Plus className="w-4 h-4 mr-2" />
-              Nuevo Empleado
-            </Link>
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={handleAsignarDescansosMesActual}
+              disabled={isAssigningDescansos}
+              className="md:h-10"
+            >
+              <Shuffle className={`w-4 h-4 mr-2 ${isAssigningDescansos ? 'animate-spin' : ''}`} />
+              {isAssigningDescansos ? 'Asignando descansos...' : 'Asignar descansos del mes'}
+            </Button>
+
+            <Button asChild className="bg-primary hover:bg-primary/90 shadow-sm md:h-10 md:px-6 w-fit">
+              <Link href="/rrhh/empleados/nuevo">
+                <Plus className="w-4 h-4 mr-2" />
+                Nuevo Empleado
+              </Link>
+            </Button>
+          </div>
         }
       />
 
