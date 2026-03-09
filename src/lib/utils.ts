@@ -14,6 +14,17 @@ export function cn(...inputs: ClassValue[]) {
 
 const TIMEZONE_ARGENTINA = 'America/Argentina/Buenos_Aires'
 
+function parseArgentinaDateValue(value: string | Date): Date {
+  if (value instanceof Date) return value
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split('-').map(Number)
+    return new Date(year, month - 1, day, 12, 0, 0, 0)
+  }
+
+  return parseISO(value)
+}
+
 /**
  * Obtiene la fecha/hora actual en timezone de Argentina (GMT-3)
  * @returns Date con la fecha/hora actual en Argentina
@@ -49,7 +60,7 @@ export function formatDate(date: string | Date | null | undefined, formatString:
   }
   
   try {
-    const dateObj = typeof date === 'string' ? parseISO(date) : date
+    const dateObj = parseArgentinaDateValue(date)
     if (!dateObj || isNaN(dateObj.getTime())) {
       return '-'
     }
@@ -109,7 +120,7 @@ export function formatRelativeDate(date: string | Date | null | undefined) {
   }
   
   try {
-    const dateObj = typeof date === 'string' ? parseISO(date) : date
+    const dateObj = parseArgentinaDateValue(date)
     if (!dateObj || isNaN(dateObj.getTime())) {
       return '-'
     }

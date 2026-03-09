@@ -13,6 +13,7 @@ import { ejecutarLiquidacionAutomatica } from '@/lib/services/rrhh-liquidaciones
 import { LiquidacionesTableWrapper } from './_components/LiquidacionesTableWrapper'
 import { PeriodFilterBar } from './_components/PeriodFilterBar'
 import { RecalcularLiquidacionesButton } from './_components/RecalcularLiquidacionesButton'
+import { formatCurrency } from '@/lib/utils'
 
 type AmbitoFilter = 'todos' | 'sucursal' | 'galpon'
 
@@ -275,7 +276,7 @@ export default async function LiquidacionesPage({
         />
         <StatCardPrimary
           title="Total Pagado"
-          value={`$${totalPagado.toLocaleString()}`}
+          value={formatCurrency(totalPagado)}
           subtitle="Liquidaciones pagadas"
           icon={FileText}
         />
