@@ -16,7 +16,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate } from '@/lib/utils'
 import type { Liquidacion } from '@/types/domain.types'
 import Link from 'next/link'
 
@@ -133,7 +133,7 @@ export function LiquidacionesTable({ liquidaciones, onView, onEdit, onApprove, o
       header: ({ column }) => <SortableHeader column={column}>Total Bruto</SortableHeader>,
       cell: ({ row }) => {
         const total = row.getValue('total_bruto') as number
-        return <div className="font-medium text-green-600">${total.toLocaleString()}</div>
+        return <div className="font-medium text-green-600">{formatCurrency(total)}</div>
       },
     },
     {
@@ -141,7 +141,7 @@ export function LiquidacionesTable({ liquidaciones, onView, onEdit, onApprove, o
       header: ({ column }) => <SortableHeader column={column}>Total Neto</SortableHeader>,
       cell: ({ row }) => {
         const total = row.getValue('total_neto') as number
-        return <div className="font-semibold text-blue-600">${total.toLocaleString()}</div>
+        return <div className="font-semibold text-blue-600">{formatCurrency(total)}</div>
       },
     },
     {
@@ -156,7 +156,7 @@ export function LiquidacionesTable({ liquidaciones, onView, onEdit, onApprove, o
         return (
           <div className="space-y-1.5 min-w-[100px]">
             <div className="flex justify-between text-xs">
-              <span className="text-muted-foreground">${anticipos.toLocaleString()}</span>
+              <span className="text-muted-foreground">{formatCurrency(anticipos)}</span>
               <span
                 className={`font-semibold ${
                   pct >= 100 ? 'text-red-600' : pct >= 70 ? 'text-amber-600' : 'text-green-600'

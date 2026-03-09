@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { formatDate } from '@/lib/utils'
+import { formatDate, formatFixed } from '@/lib/utils'
 import type { Evaluacion } from '@/types/domain.types'
 
 interface EvaluacionesTableProps {
@@ -125,7 +125,7 @@ export function EvaluacionesTable({ evaluaciones, onView, onEdit, onSend }: Eval
           <div className="flex items-center gap-2">
             {renderStars(promedio)}
             {promedio && (
-              <span className="font-medium text-lg">{promedio.toFixed(1)}</span>
+              <span className="font-medium text-lg">{formatFixed(promedio, 1, '0.0')}</span>
             )}
           </div>
         )

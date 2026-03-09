@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { DollarSign, AlertTriangle, Package, Truck, Building2, ShoppingCart } from 'lucide-react'
 import Link from 'next/link'
 import { DashboardRealtime } from './DashboardRealtime'
+import { formatFixed } from '@/lib/utils'
 
 interface DashboardClientProps {
   sucursal: {
@@ -161,7 +162,7 @@ export function DashboardClient({
               {/* Caja */}
               <div className="text-center p-3 bg-blue-50 rounded-lg">
                 <DollarSign className="w-5 h-5 mx-auto text-blue-600 mb-1" />
-                <p className="text-xl font-bold text-blue-700">${caja?.saldo_actual?.toFixed(0) || '0'}</p>
+                <p className="text-xl font-bold text-blue-700">${formatFixed(caja?.saldo_actual, 0, '0')}</p>
                 <p className="text-xs text-muted-foreground">En caja</p>
               </div>
 

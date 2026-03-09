@@ -28,6 +28,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { AnimatePresence, motion } from 'framer-motion'
+import { formatFixed } from '@/lib/utils'
 
 interface Producto {
     id: string
@@ -449,6 +450,8 @@ export default function CatalogoClient({ productos, categorias, telefono, auth }
                             <Button
                                 variant="ghost"
                                 size="sm"
+                                aria-label={soloFavoritos ? 'Mostrar todos los productos' : 'Mostrar solo favoritos'}
+                                title={soloFavoritos ? 'Mostrar todos los productos' : 'Mostrar solo favoritos'}
                                 className={`relative h-9 w-9 sm:h-auto sm:w-auto sm:px-3 ${soloFavoritos ? 'bg-rose-50 text-rose-600 hover:bg-rose-100' : ''}`}
                                 onClick={() => setSoloFavoritos(!soloFavoritos)}
                             >
@@ -462,6 +465,8 @@ export default function CatalogoClient({ productos, categorias, telefono, auth }
                             <Button
                                 variant="ghost"
                                 size="sm"
+                                aria-label={carritoAbierto ? 'Cerrar carrito' : 'Abrir carrito'}
+                                title={carritoAbierto ? 'Cerrar carrito' : 'Abrir carrito'}
                                 className="relative h-9 w-9 sm:h-auto sm:w-auto sm:px-3 hover:bg-emerald-50"
                                 onClick={() => setCarritoAbierto(!carritoAbierto)}
                             >
@@ -494,6 +499,8 @@ export default function CatalogoClient({ productos, categorias, telefono, auth }
                                 <motion.button
                                     initial={{ scale: 0 }}
                                     animate={{ scale: 1 }}
+                                    aria-label="Limpiar búsqueda"
+                                    title="Limpiar búsqueda"
                                     onClick={() => setBusqueda('')}
                                     className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                                 >
@@ -1182,6 +1189,8 @@ function ProductoCard({
                     {/* Badge de favorito */}
                     <motion.button
                         whileTap={{ scale: 0.9 }}
+                        aria-label={esFavorito ? `Quitar ${producto.nombre} de favoritos` : `Agregar ${producto.nombre} a favoritos`}
+                        title={esFavorito ? `Quitar ${producto.nombre} de favoritos` : `Agregar ${producto.nombre} a favoritos`}
                         onClick={(e) => onToggleFavorito(producto.id, e)}
                         className="absolute top-3 right-3 z-10 w-9 h-9 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-sm hover:bg-white transition-colors"
                     >
@@ -1247,7 +1256,7 @@ function ProductoCard({
                                 className="text-right"
                             >
                                 <p className="text-xs text-slate-500">Subtotal</p>
-                                <p className="font-bold text-emerald-600">${subtotal.toFixed(2)}</p>
+                                <p className="font-bold text-emerald-600">${formatFixed(subtotal, 2)}</p>
                             </motion.div>
                         )}
                     </div>
@@ -1435,6 +1444,8 @@ function ProductoListItem({
 
                                 <motion.button
                                     whileTap={{ scale: 0.9 }}
+                                    aria-label={esFavorito ? `Quitar ${producto.nombre} de favoritos` : `Agregar ${producto.nombre} a favoritos`}
+                                    title={esFavorito ? `Quitar ${producto.nombre} de favoritos` : `Agregar ${producto.nombre} a favoritos`}
                                     onClick={(e) => onToggleFavorito(producto.id, e)}
                                     className="shrink-0"
                                 >

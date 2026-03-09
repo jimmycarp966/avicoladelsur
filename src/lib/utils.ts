@@ -127,19 +127,34 @@ export function formatRelativeDate(date: string | Date | null | undefined) {
 }
 
 // Utilidades de formato de moneda
-export function formatCurrency(amount: number, currency: string = 'ARS') {
+function toFiniteNumber(value: number | string | null | undefined): number | null {
+  if (value == null) return null
+  const parsed = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+export function formatCurrency(amount: number | string | null | undefined, currency: string = 'ARS') {
   return new Intl.NumberFormat('es-AR', {
     style: 'currency',
     currency,
-  }).format(amount)
+  }).format(toFiniteNumber(amount) ?? 0)
 }
 
 // Utilidades de formato de números
-export function formatNumber(num: number, decimals: number = 2) {
+export function formatNumber(num: number | string | null | undefined, decimals: number = 2) {
   return new Intl.NumberFormat('es-AR', {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
-  }).format(num)
+  }).format(toFiniteNumber(num) ?? 0)
+}
+
+export function formatFixed(
+  value: number | string | null | undefined,
+  decimals: number = 2,
+  fallback: string = '0.00'
+) {
+  const safeNumber = toFiniteNumber(value)
+  return safeNumber == null ? fallback : safeNumber.toFixed(decimals)
 }
 
 // Utilidades para arrays y objetos
@@ -340,4 +355,3 @@ export function esVentaMayorista(presupuesto: any, item: any): boolean {
   // Verificar si el producto tiene venta mayor habilitada
   return item.producto?.venta_mayor_habilitada === true
 }
-

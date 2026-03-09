@@ -77,6 +77,7 @@ export function ModernLoginForm({ onSuccess }: ModernLoginFormProps) {
                     <Input
                         id="email"
                         type="email"
+                        autoComplete="email"
                         placeholder="nombre@empresa.com"
                         {...register('email')}
                         disabled={isLoading}
@@ -98,6 +99,7 @@ export function ModernLoginForm({ onSuccess }: ModernLoginFormProps) {
                         <Input
                             id="password"
                             type={showPassword ? 'text' : 'password'}
+                            autoComplete="current-password"
                             placeholder="••••••••"
                             {...register('password')}
                             disabled={isLoading}
@@ -105,6 +107,8 @@ export function ModernLoginForm({ onSuccess }: ModernLoginFormProps) {
                         />
                         <button
                             type="button"
+                            aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                            title={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                             className="absolute right-0 top-0 h-full px-3 text-[#A1A1A1] hover:text-[#2F7058] transition-colors"
                             onClick={() => setShowPassword(!showPassword)}
                         >

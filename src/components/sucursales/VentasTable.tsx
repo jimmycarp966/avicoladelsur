@@ -8,6 +8,7 @@ import { ShoppingCart, DollarSign, User, Clock, Printer, RotateCcw, Loader2 } fr
 import { toast } from 'sonner'
 import { generarFacturaAction, generarTicketTermicoAction, obtenerProductosPedidoAction } from '@/actions/pos-sucursal.actions'
 import { DevolucionVentaDialog } from './DevolucionVentaDialog'
+import { formatFixed } from '@/lib/utils'
 
 interface Venta {
   id: string
@@ -171,7 +172,7 @@ export function VentasTable({ ventas }: VentasTableProps) {
 
                       <div className="flex items-center gap-1">
                         <DollarSign className="w-3 h-3" />
-                        ${venta.total?.toFixed(2) || '0.00'}
+                        ${formatFixed(venta.total, 2)}
                       </div>
                     </div>
                   </div>
@@ -182,7 +183,7 @@ export function VentasTable({ ventas }: VentasTableProps) {
                   <div className="flex flex-col gap-2">
                     <div className="text-right">
                       <div className="text-lg font-bold text-green-600">
-                        ${venta.total?.toFixed(2) || '0.00'}
+                        ${formatFixed(venta.total, 2)}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         Total pagado

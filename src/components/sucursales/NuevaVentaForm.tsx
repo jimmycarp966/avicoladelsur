@@ -58,6 +58,7 @@ import {
   validarLimiteCreditoAction,
 } from '@/actions/ventas-sucursal.actions'
 import { generarTicketTermicoAction } from '@/actions/pos-sucursal.actions'
+import { formatFixed } from '@/lib/utils'
 import { obtenerTodasListasActivasAction } from '@/actions/listas-precios.actions'
 import {
   MetodoPago,
@@ -484,7 +485,7 @@ export function NuevaVentaForm({
     } else {
       // Si hay lista global, usarla; sino usar precio_venta por defecto
       let precio = producto.precioVenta
-      let listaPrecioId = watchedListaGlobal
+      const listaPrecioId = watchedListaGlobal
 
       if (watchedListaGlobal) {
         // Intentar obtener precio de la lista global
@@ -546,7 +547,7 @@ export function NuevaVentaForm({
 
     // Si hay lista global, usarla; sino usar precio_venta por defecto
     let precio = producto.precioVenta
-    let listaPrecioId = watchedListaGlobal
+    const listaPrecioId = watchedListaGlobal
 
     if (watchedListaGlobal) {
       // Intentar obtener precio de la lista global
@@ -947,7 +948,7 @@ export function NuevaVentaForm({
                       <SelectContent>
                         {cajas.map((caja) => (
                           <SelectItem key={caja.id} value={caja.id}>
-                            {caja.nombre} - ${caja.saldo_actual?.toFixed(2) || '0.00'}
+                            {caja.nombre} - ${formatFixed(caja.saldo_actual, 2)}
                           </SelectItem>
                         ))}
                       </SelectContent>

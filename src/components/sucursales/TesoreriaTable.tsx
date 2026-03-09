@@ -3,6 +3,7 @@
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { ArrowUpRight, ArrowDownRight, DollarSign, FileText, Clock } from 'lucide-react'
+import { formatFixed } from '@/lib/utils'
 
 interface Movimiento {
   id: string
@@ -111,12 +112,12 @@ export function TesoreriaTable({ movimientos }: TesoreriaTableProps) {
 
                     <span className="flex items-center gap-1">
                       <span>Saldo anterior:</span>
-                      <span className="font-medium">${movimiento.saldo_anterior?.toFixed(2) || '0.00'}</span>
+                      <span className="font-medium">${formatFixed(movimiento.saldo_anterior, 2)}</span>
                     </span>
 
                     <span className="flex items-center gap-1">
                       <span>Saldo nuevo:</span>
-                      <span className="font-medium">${movimiento.saldo_nuevo?.toFixed(2) || '0.00'}</span>
+                      <span className="font-medium">${formatFixed(movimiento.saldo_nuevo, 2)}</span>
                     </span>
                   </div>
                 </div>
@@ -126,7 +127,7 @@ export function TesoreriaTable({ movimientos }: TesoreriaTableProps) {
                 <div className={`text-2xl font-bold ${
                   movimiento.tipo === 'ingreso' ? 'text-green-600' : 'text-red-600'
                 }`}>
-                  {movimiento.tipo === 'ingreso' ? '+' : '-'}${movimiento.monto?.toFixed(2) || '0.00'}
+                  {movimiento.tipo === 'ingreso' ? '+' : '-'}${formatFixed(movimiento.monto, 2)}
                 </div>
                 <div className="text-xs text-muted-foreground">
                   {movimiento.tipo === 'ingreso' ? 'Ingreso' : 'Egreso'}
