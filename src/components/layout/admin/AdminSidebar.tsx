@@ -1,34 +1,27 @@
 'use client'
 
-import { usePathname } from 'next/navigation'
-import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Logo } from '@/components/ui/logo'
-import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
-import { colors } from '@/lib/config'
+import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import type { LucideIcon } from 'lucide-react'
 import {
+  Bell,
+  Building2,
+  DollarSign,
+  FileText,
   LayoutDashboard,
   Package,
   ShoppingCart,
-  Users,
-  Truck,
-  FileText,
-  DollarSign,
-  Settings,
-  X,
-  UserCheck,
-  Tag,
-  Receipt,
-  Building2,
   Sparkles,
-  Brain,
-  FileSearch,
-  Bell,
-  MessageSquare,
+  Truck,
+  UserCheck,
+  X,
 } from 'lucide-react'
+
+import { Badge } from '@/components/ui/badge'
+import { Logo } from '@/components/ui/logo'
+import { cn } from '@/lib/utils'
 import type { Usuario } from '@/types/domain.types'
-import type { LucideIcon } from 'lucide-react'
 
 interface AdminSidebarProps {
   onClose?: () => void
@@ -50,22 +43,13 @@ interface NavigationItem {
   children?: NavigationChild[]
 }
 
-// Función para obtener badges dinámicos - versión cliente
-async function getBadges(): Promise<{ [key: string]: number }> {
-  // En producción, esto debería venir de una API route
-  // Por ahora, solo traemos mensajes de hoy del bot
-  try {
-    const { obtenerMensajesHoyAction } = await import('@/actions/bot-mensajes.actions')
-    const result = await obtenerMensajesHoyAction()
-    return {
-      bot_mensajes_hoy: result.data || 0
-    }
-  } catch {
-    return {}
-  }
+type SidebarBadges = {
+  notificaciones_unread?: number
+  sucursales_alerts?: number
+  bot_mensajes_hoy?: number
 }
 
-const navigation = [
+const navigation: NavigationItem[] = [
   {
     name: 'Dashboard',
     href: '/dashboard',
@@ -203,8 +187,9 @@ const navigation = [
       { name: 'Clientes', href: '/reportes/clientes' },
       { name: 'Empleados', href: '/reportes/empleados' },
       { name: 'Sucursales', href: '/reportes/sucursales' },
-      { name: 'Métricas Bot', href: '/reportes/bot', badge: 'bot_mensajes_hoy' },
+      { name: 'Métricas Bot', href: '/reportes/bot' },
     ],
+    badge: 'bot_mensajes_hoy',
   },
 ]
 
@@ -218,13 +203,13 @@ interface NavigationItemProps {
   pathname: string
   user: Usuario | null
   onClose?: () => void
-  badges: { [key: string]: number }
+  badges: Record<string, number>
 }
 
 function NavigationItem({ item, pathname, user, onClose, badges }: NavigationItemProps) {
   const hasChildren = item.children && item.children.length > 0
   const hasActiveChild = Boolean(
-    item.children?.some((child) => pathname === child.href || pathname.startsWith(child.href + '/'))
+    item.children?.some((child) => pathname === child.href || pathname.startsWith(child.href + '/')),
   )
   const isActive = pathname === item.href || pathname.startsWith(item.href + '/') || hasActiveChild
   const canAccess = hasAccess(user, item.roles)
@@ -232,15 +217,8 @@ function NavigationItem({ item, pathname, user, onClose, badges }: NavigationIte
 
   if (!canAccess) return null
 
-  // Solo cerrar menú si NO tiene hijos (es enlace final)
   const handleMainClick = () => {
-    if (hasChildren) {
-      // Si tiene hijos, solo navegar pero no cerrar el menú móvil
-      // El submenú se mostrará automáticamente por isActive
-      return
-    }
-    // Si no tiene hijos, cerrar el menú
-    onClose?.()
+    if (!hasChildren) onClose?.()
   }
 
   return (
@@ -249,29 +227,34 @@ function NavigationItem({ item, pathname, user, onClose, badges }: NavigationIte
         href={item.href}
         onClick={handleMainClick}
         className={cn(
-          "group relative flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
+          'group relative flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
           isActive
-            ? "bg-white/10 text-white shadow-sm ring-1 ring-white/20"
-            : "text-white/70 hover:bg-white/5 hover:text-white"
+            ? 'bg-white/10 text-white shadow-sm ring-1 ring-white/20'
+            : 'text-white/70 hover:bg-white/5 hover:text-white',
         )}
       >
         <div className="flex items-center gap-3">
-          <item.icon className={cn(
-            "h-5 w-5 shrink-0 transition-colors duration-200",
-            isActive ? "text-white" : "text-white/50 group-hover:text-white/80"
-          )} />
+          <item.icon
+            className={cn(
+              'h-5 w-5 shrink-0 transition-colors duration-200',
+              isActive ? 'text-white' : 'text-white/50 group-hover:text-white/80',
+            )}
+          />
           <span>{item.name}</span>
         </div>
 
         {badgeCount > 0 && (
-          <Badge variant="destructive" className="ml-2 h-5 flex items-center justify-center rounded-full px-1.5 text-xs font-bold animate-pulse">
+          <Badge
+            variant="destructive"
+            className="ml-2 flex h-5 items-center justify-center rounded-full px-1.5 text-xs font-bold animate-pulse"
+          >
             {badgeCount}
           </Badge>
         )}
       </Link>
 
       {hasChildren && isActive && (
-        <div className="pl-10 pr-3 py-1 space-y-1 animate-in slide-in-from-top-2 duration-200">
+        <div className="animate-in slide-in-from-top-2 space-y-1 py-1 pl-10 pr-3 duration-200">
           {item.children!.map((child) => {
             const isChildActive = pathname === child.href || pathname.startsWith(child.href + '/')
             return (
@@ -280,14 +263,14 @@ function NavigationItem({ item, pathname, user, onClose, badges }: NavigationIte
                 href={child.href}
                 onClick={() => onClose?.()}
                 className={cn(
-                  "relative flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-all duration-200",
+                  'relative flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-all duration-200',
                   isChildActive
-                    ? "text-[#FCDE8D] font-medium"
-                    : "text-white/60 hover:text-white hover:bg-white/5"
+                    ? 'font-medium text-[#FCDE8D]'
+                    : 'text-white/60 hover:bg-white/5 hover:text-white',
                 )}
               >
                 {isChildActive && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-[#FCDE8D] rounded-full -ml-6"></div>
+                  <div className="absolute left-0 top-1/2 -ml-6 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-[#FCDE8D]" />
                 )}
                 <span>{child.name}</span>
               </Link>
@@ -299,38 +282,44 @@ function NavigationItem({ item, pathname, user, onClose, badges }: NavigationIte
   )
 }
 
-
 export function AdminSidebar({ onClose, user }: AdminSidebarProps) {
   const pathname = usePathname()
-  const [badges, setBadges] = useState<{ [key: string]: number }>({})
+  const [badges, setBadges] = useState<Record<string, number>>({})
 
   useEffect(() => {
     const loadBadges = async () => {
       try {
-        const { obtenerMensajesHoyAction } = await import('@/actions/bot-mensajes.actions')
-        const result = await obtenerMensajesHoyAction()
-        const botHoy = result.data || 0
+        const response = await fetch('/api/admin/sidebar-badges', {
+          method: 'GET',
+          credentials: 'same-origin',
+          cache: 'no-store',
+        })
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`)
+        }
+
+        const result = (await response.json()) as SidebarBadges
         setBadges({
-          notificaciones_unread: 0, // En producción esto vendrá de la API
-          sucursales_alerts: 0, // En producción esto vendrá de la API
-          bot_mensajes_hoy: botHoy,
+          notificaciones_unread: result.notificaciones_unread || 0,
+          sucursales_alerts: result.sucursales_alerts || 0,
+          bot_mensajes_hoy: result.bot_mensajes_hoy || 0,
         })
       } catch (error) {
         console.error('[AdminSidebar] Error cargando badges:', error)
       }
     }
+
     loadBadges()
   }, [])
 
   return (
     <div className="relative flex h-full grow flex-col overflow-y-auto bg-gradient-sidebar">
-      {/* Logo y título - Destacado */}
-      <div className="flex h-20 shrink-0 items-center justify-between px-6 border-b border-white/10">
+      <div className="flex h-20 shrink-0 items-center justify-between border-b border-white/10 px-6">
         <div className="flex items-center gap-3">
           <Logo size="lg" variant="full" light />
         </div>
 
-        {/* Botón cerrar (móvil) */}
         {onClose && (
           <button
             type="button"
@@ -342,7 +331,6 @@ export function AdminSidebar({ onClose, user }: AdminSidebarProps) {
         )}
       </div>
 
-      {/* Navegación */}
       <nav className="flex flex-1 flex-col px-4 py-6">
         <ul role="list" className="flex flex-1 flex-col space-y-2">
           <li>
@@ -363,7 +351,6 @@ export function AdminSidebar({ onClose, user }: AdminSidebarProps) {
         </ul>
       </nav>
 
-      {/* Información del usuario */}
       {user && (
         <div className="mt-auto border-t border-white/10 px-6 py-4">
           <div className="flex items-center gap-3">
@@ -373,11 +360,11 @@ export function AdminSidebar({ onClose, user }: AdminSidebarProps) {
                 {user.apellido?.charAt(0).toUpperCase()}
               </span>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-white truncate">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-white">
                 {user.nombre} {user.apellido}
               </p>
-              <p className="text-xs text-white/60 capitalize mt-0.5">{user.rol}</p>
+              <p className="mt-0.5 text-xs capitalize text-white/60">{user.rol}</p>
             </div>
           </div>
         </div>
