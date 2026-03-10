@@ -10,7 +10,6 @@ import { Badge } from '@/components/ui/badge'
 import {
   DollarSign,
   TrendingUp,
-  TrendingDown,
   Building2,
   BarChart3,
   Download,
@@ -23,7 +22,7 @@ import {
 import { obtenerSucursalesAction } from '@/actions/sucursales.actions'
 import { obtenerRetirosEnTransitoAction } from '@/actions/tesoreria.actions'
 import { format, subDays } from 'date-fns'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatDate } from '@/lib/utils'
 import { getTodayArgentina } from '@/lib/utils'
 
 
@@ -340,7 +339,7 @@ function ReportesTesoreriaConsolidados({ data, fechaDesde, fechaHasta }: { data:
             <ArrowUpCircle className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">${totalIngresos.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-green-600">{formatCurrency(totalIngresos)}</div>
             <p className="text-xs text-muted-foreground">
               Todas las sucursales
             </p>
@@ -353,7 +352,7 @@ function ReportesTesoreriaConsolidados({ data, fechaDesde, fechaHasta }: { data:
             <ArrowDownCircle className="h-4 w-4 text-red-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">${totalEgresos.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-red-600">{formatCurrency(totalEgresos)}</div>
             <p className="text-xs text-muted-foreground">
               Todas las sucursales
             </p>
@@ -367,7 +366,7 @@ function ReportesTesoreriaConsolidados({ data, fechaDesde, fechaHasta }: { data:
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${totalSaldoNeto >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              ${totalSaldoNeto.toLocaleString()}
+              {formatCurrency(totalSaldoNeto)}
             </div>
             <p className="text-xs text-muted-foreground">
               Ingresos - Egresos
@@ -382,7 +381,7 @@ function ReportesTesoreriaConsolidados({ data, fechaDesde, fechaHasta }: { data:
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${totalSaldoCajas >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              ${totalSaldoCajas.toLocaleString()}
+              {formatCurrency(totalSaldoCajas)}
             </div>
             <p className="text-xs text-muted-foreground">
               Saldo actual total
@@ -428,16 +427,16 @@ function ReportesTesoreriaConsolidados({ data, fechaDesde, fechaHasta }: { data:
                 <div className="grid grid-cols-4 gap-6 text-right">
                   <div>
                     <p className="text-sm text-muted-foreground">Ingresos</p>
-                    <p className="font-semibold text-green-600">${sucursal.ingresos.toLocaleString()}</p>
+                    <p className="font-semibold text-green-600">{formatCurrency(sucursal.ingresos)}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Egresos</p>
-                    <p className="font-semibold text-red-600">${sucursal.egresos.toLocaleString()}</p>
+                    <p className="font-semibold text-red-600">{formatCurrency(sucursal.egresos)}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Saldo Neto</p>
                     <p className={`font-semibold ${sucursal.saldoNeto >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      ${sucursal.saldoNeto.toLocaleString()}
+                      {formatCurrency(sucursal.saldoNeto)}
                     </p>
                   </div>
                   <div>
@@ -500,7 +499,7 @@ function ReporteTesoreriaSucursalEspecifica({ data }: { data: any }) {
             <ArrowUpCircle className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">${ingresos.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-green-600">{formatCurrency(ingresos)}</div>
             <p className="text-xs text-muted-foreground">
               {movimientos.filter((m: any) => m.tipo === 'ingreso').length} movimientos
             </p>
@@ -513,7 +512,7 @@ function ReporteTesoreriaSucursalEspecifica({ data }: { data: any }) {
             <ArrowDownCircle className="h-4 w-4 text-red-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">${egresos.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-red-600">{formatCurrency(egresos)}</div>
             <p className="text-xs text-muted-foreground">
               {movimientos.filter((m: any) => m.tipo === 'egreso').length} movimientos
             </p>
@@ -527,7 +526,7 @@ function ReporteTesoreriaSucursalEspecifica({ data }: { data: any }) {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${(ingresos - egresos) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              ${(ingresos - egresos).toLocaleString()}
+              {formatCurrency(ingresos - egresos)}
             </div>
             <p className="text-xs text-muted-foreground">
               Ingresos - Egresos
@@ -542,7 +541,7 @@ function ReporteTesoreriaSucursalEspecifica({ data }: { data: any }) {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${saldoCajas >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              ${saldoCajas.toLocaleString()}
+              {formatCurrency(saldoCajas)}
             </div>
             <p className="text-xs text-muted-foreground">
               Saldo actual
@@ -565,7 +564,7 @@ function ReporteTesoreriaSucursalEspecifica({ data }: { data: any }) {
               <div key={caja.id} className="flex justify-between items-center p-3 border rounded-lg">
                 <span className="font-medium">{caja.nombre}</span>
                 <Badge variant={caja.saldo_actual >= 0 ? "default" : "destructive"}>
-                  ${caja.saldo_actual?.toLocaleString() || '0'}
+                  {formatCurrency(caja.saldo_actual)}
                 </Badge>
               </div>
             ))}
@@ -593,15 +592,15 @@ function ReporteTesoreriaSucursalEspecifica({ data }: { data: any }) {
                     </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    {mov.descripcion} • {format(new Date(mov.created_at), 'dd/MM/yyyy HH:mm')}
+                    {mov.descripcion} • {formatDate(mov.created_at, 'dd/MM/yyyy HH:mm')}
                   </p>
                 </div>
                 <div className="text-right">
                   <p className={`font-semibold ${mov.tipo === 'ingreso' ? 'text-green-600' : 'text-red-600'}`}>
-                    {mov.tipo === 'ingreso' ? '+' : '-'}${mov.monto.toLocaleString()}
+                    {mov.tipo === 'ingreso' ? '+' : '-'}{formatCurrency(mov.monto)}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Saldo: ${mov.saldo_nuevo?.toLocaleString()}
+                    Saldo: {formatCurrency(mov.saldo_nuevo)}
                   </p>
                 </div>
               </div>

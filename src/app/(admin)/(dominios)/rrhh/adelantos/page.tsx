@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Plus, DollarSign, Package, CheckCircle, Clock } from 'lucide-react'
 import Link from 'next/link'
 import type { Adelanto } from '@/types/domain.types'
+import { formatCurrency } from '@/lib/utils'
 
 async function getAdelantos() {
   const supabase = await createClient()
@@ -117,7 +118,7 @@ export default async function AdelantosPage() {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Total Aprobado</p>
               <p className="text-2xl font-bold text-gray-900">
-                ${(totalDinero + totalProductos).toLocaleString()}
+                {formatCurrency(totalDinero + totalProductos)}
               </p>
             </div>
           </div>
@@ -132,14 +133,14 @@ export default async function AdelantosPage() {
             <div className="text-2xl font-bold text-green-600">{dinero}</div>
             <div className="text-sm text-green-700">Adelantos en Dinero</div>
             <div className="text-xs text-green-600 mt-1">
-              Total: ${totalDinero.toLocaleString()}
+              Total: {formatCurrency(totalDinero)}
             </div>
           </div>
           <div className="text-center p-4 bg-blue-50 rounded-lg">
             <div className="text-2xl font-bold text-blue-600">{productos}</div>
             <div className="text-sm text-blue-700">Adelantos en Productos</div>
             <div className="text-xs text-blue-600 mt-1">
-              Total: ${totalProductos.toLocaleString()}
+              Total: {formatCurrency(totalProductos)}
             </div>
           </div>
         </div>

@@ -5,16 +5,14 @@ import {
     Upload,
     History,
     CheckCircle2,
-    XCircle,
     AlertTriangle,
     DollarSign,
     TrendingUp,
     FileText
 } from 'lucide-react'
 import { obtenerEstadisticasConciliacionAction, obtenerHistorialSesionesAction } from '@/actions/conciliacion.actions'
-import { format } from 'date-fns'
-import { es } from 'date-fns/locale'
 import { Badge } from '@/components/ui/badge'
+import { formatCurrency, formatDate } from '@/lib/utils'
 
 export const revalidate = 60 // Revalidar cada 60 segundos
 
@@ -87,10 +85,7 @@ export default async function ConciliacionDashboardPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-green-600">
-                            {new Intl.NumberFormat('es-AR', {
-                                style: 'currency',
-                                currency: 'ARS'
-                            }).format(stats.totalAcreditado)}
+                            {formatCurrency(stats.totalAcreditado)}
                         </div>
                         <p className="text-xs text-muted-foreground">
                             acumulado histórico
@@ -176,7 +171,7 @@ export default async function ConciliacionDashboardPage() {
                                                 {sesion.sabana_archivo || `Sesión ${sesion.id.slice(0, 8)}`}
                                             </p>
                                             <p className="text-sm text-muted-foreground">
-                                                {format(new Date(sesion.created_at!), "d 'de' MMMM, HH:mm", { locale: es })}
+                                                {formatDate(sesion.created_at, "d 'de' MMMM, HH:mm")}
                                             </p>
                                         </div>
                                     </div>
@@ -193,10 +188,7 @@ export default async function ConciliacionDashboardPage() {
                                                 )}
                                             </div>
                                             <p className="text-sm text-green-600 font-medium">
-                                                {new Intl.NumberFormat('es-AR', {
-                                                    style: 'currency',
-                                                    currency: 'ARS'
-                                                }).format(sesion.monto_total_acreditado)}
+                                                {formatCurrency(sesion.monto_total_acreditado)}
                                             </p>
                                         </div>
                                         <div className="flex gap-2">

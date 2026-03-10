@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate, formatFixed } from '@/lib/utils'
 import type { Adelanto } from '@/types/domain.types'
 
 interface AdelantosTableProps {
@@ -100,7 +100,7 @@ export function AdelantosTable({ adelantos, onView, onApprove, onReject }: Adela
         if (adelanto.tipo === 'dinero') {
           return (
             <div className="font-medium text-green-600">
-              ${adelanto.monto?.toLocaleString() || '0'}
+              {formatCurrency(adelanto.monto)}
             </div>
           )
         } else {
@@ -110,10 +110,10 @@ export function AdelantosTable({ adelantos, onView, onApprove, onReject }: Adela
           return (
             <div>
               <div className="font-medium text-blue-600">
-                ${total.toLocaleString()}
+                {formatCurrency(total)}
               </div>
               <div className="text-xs text-muted-foreground">
-                {cantidad} x ${precio.toLocaleString()}
+                {cantidad} x {formatCurrency(precio)}
               </div>
             </div>
           )
@@ -150,7 +150,7 @@ export function AdelantosTable({ adelantos, onView, onApprove, onReject }: Adela
         if (porcentaje) {
           return (
             <div className="text-sm">
-              {porcentaje.toFixed(2)}%
+              {formatFixed(porcentaje, 2, '0.00')}%
             </div>
           )
         }
