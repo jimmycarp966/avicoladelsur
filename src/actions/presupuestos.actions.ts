@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { revalidatePath } from 'next/cache'
 import { createNotification } from './index'
@@ -104,7 +104,7 @@ function sameCurrencyValue(
 }
 
 async function resolverPrecioUnitarioItem(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: ReturnType<typeof createAdminClient>,
   item: PresupuestoItemFinalContext,
   presupuesto: PresupuestoFinalContext
 ): Promise<number> {
@@ -139,9 +139,10 @@ async function resolverPrecioUnitarioItem(
 }
 
 async function reconciliarFinalesPresupuesto(
-  supabase: Awaited<ReturnType<typeof createClient>>,
   presupuestoId: string
 ) {
+  const supabase = createAdminClient()
+
   const { data: presupuestoData, error: presupuestoError } = await supabase
     .from('presupuestos')
     .select(`
@@ -219,6 +220,8 @@ async function reconciliarFinalesPresupuesto(
         .from('presupuesto_items')
         .update(updateData)
         .eq('id', item.id)
+        .select('id')
+        .single()
 
       if (updateItemError) {
         devError('[PRESUPUESTOS] Error reconciliando item pesado:', updateItemError)
@@ -239,6 +242,8 @@ async function reconciliarFinalesPresupuesto(
       updated_at: nowIso,
     })
     .eq('id', presupuestoId)
+    .select('id')
+    .single()
 
   if (updatePresupuestoError) {
     devError('[PRESUPUESTOS] Error actualizando total final reconciliado:', updatePresupuestoError)
@@ -488,7 +493,7 @@ export async function confirmarPresupuestoAction(formData: FormData) {
 
     devLog('🔍 DEBUG confirmarPresupuestoAction - Presupuesto:', JSON.stringify(presupuestoDebug, null, 2))
 
-    const reconcileBeforeConvert = await reconciliarFinalesPresupuesto(supabase, data.presupuesto_id)
+    const reconcileBeforeConvert = await reconciliarFinalesPresupuesto(data.presupuesto_id)
     if (!reconcileBeforeConvert.success) {
       return {
         success: false,
@@ -660,7 +665,7 @@ export async function finalizarPesajeAction(formData: FormData) {
       return { success: false, error: 'ID de presupuesto requerido' }
     }
 
-    const reconcileBeforeFinalize = await reconciliarFinalesPresupuesto(supabase, presupuestoId)
+    const reconcileBeforeFinalize = await reconciliarFinalesPresupuesto(presupuestoId)
     if (!reconcileBeforeFinalize.success) {
       return {
         success: false,
@@ -682,7 +687,7 @@ export async function finalizarPesajeAction(formData: FormData) {
       return { success: false, error: result.error || 'Error al finalizar pesaje' }
     }
 
-    const reconcileAfterFinalize = await reconciliarFinalesPresupuesto(supabase, presupuestoId)
+    const reconcileAfterFinalize = await reconciliarFinalesPresupuesto(presupuestoId)
     if (!reconcileAfterFinalize.success) {
       devError('[PRESUPUESTOS] El pesaje se finalizo pero la reconciliacion posterior fallo:', reconcileAfterFinalize.error)
     }
@@ -750,7 +755,7 @@ export async function confirmarPresupuestosAgrupadosAction(formData: FormData) {
     let ultimoResultado: any = null
 
     for (const presupuestoId of data.presupuestos_ids) {
-      const reconcileBeforeConvert = await reconciliarFinalesPresupuesto(supabase, presupuestoId)
+      const reconcileBeforeConvert = await reconciliarFinalesPresupuesto(presupuestoId)
       if (!reconcileBeforeConvert.success) {
         errores++
         erroresDetalle.push(`Presupuesto ${presupuestoId}: ${reconcileBeforeConvert.error || 'No se pudo reconciliar el presupuesto'}`)
@@ -873,7 +878,9 @@ export async function actualizarPesoItemAction(formData: FormData) {
       return { success: false, error: result.error || 'Error en la actualización del peso' }
     }
 
-    const { data: itemActualizado, error: itemActualizadoError } = await supabase
+    const adminSupabase = createAdminClient()
+
+    const { data: itemActualizado, error: itemActualizadoError } = await adminSupabase
       .from('presupuesto_items')
       .select('presupuesto_id')
       .eq('id', data.presupuesto_item_id)
@@ -884,7 +891,7 @@ export async function actualizarPesoItemAction(formData: FormData) {
       return { success: false, error: 'El peso se guardo pero no se pudo reconciliar el presupuesto' }
     }
 
-    const reconcileAfterWeight = await reconciliarFinalesPresupuesto(supabase, itemActualizado.presupuesto_id)
+    const reconcileAfterWeight = await reconciliarFinalesPresupuesto(itemActualizado.presupuesto_id)
     if (!reconcileAfterWeight.success) {
       devError('[PRESUPUESTOS] El peso se guardo pero la reconciliacion fallo:', reconcileAfterWeight.error)
       return { success: false, error: reconcileAfterWeight.error || 'No se pudo reconciliar el presupuesto despues del pesaje' }
