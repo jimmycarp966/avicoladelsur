@@ -1,30 +1,77 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { procesarNotificacionesPendientes, limpiarNotificacionesAntiguas } from '@/lib/services/notificaciones-proactivas'
+import { createAdminClient } from '@/lib/supabase/server'
+import {
+  procesarNotificacionesPendientes,
+  limpiarNotificacionesAntiguas,
+} from '@/lib/services/notificaciones-proactivas'
 
 /**
- * Endpoint para procesar notificaciones proactivas programadas
+ * Endpoint para procesar notificaciones proactivas programadas.
  *
- * Este endpoint se ejecuta periódicamente (ej: cada 5 minutos) vía cron jobs
- * para enviar notificaciones pendientes por WhatsApp (Twilio)
- *
- * Uso:
- * - GET /api/cron/notificaciones - Procesa pendientes (hasta 50)
- * - GET /api/cron/notificaciones?limit=100 - Procesa con límite específico
- * - GET /api/cron/notificaciones?cleanup=true - Limpia notificaciones antiguas (>90 días)
+ * Este endpoint ahora es disparado por un job de Supabase pg_cron
+ * que invoca la URL de producción usando un secret almacenado en la base.
  */
+
+const CRON_JOB_NAME = 'cron_notificaciones_proactivas'
+
+async function autorizarCronRequest(request: NextRequest) {
+  const authHeader = request.headers.get('authorization')
+  const envSecret = process.env.CRON_SECRET?.trim()
+
+  if (process.env.NODE_ENV !== 'production' && !authHeader && !envSecret) {
+    return { autorizado: true as const }
+  }
+
+  const token = authHeader?.startsWith('Bearer ')
+    ? authHeader.slice('Bearer '.length).trim()
+    : null
+
+  if (!token) {
+    return {
+      autorizado: false as const,
+      response: NextResponse.json(
+        { success: false, error: 'No autorizado' },
+        { status: 401 }
+      ),
+    }
+  }
+
+  if (envSecret && token === envSecret) {
+    return { autorizado: true as const }
+  }
+
+  try {
+    const supabase = createAdminClient()
+    const { data, error } = await supabase.rpc('fn_validar_cron_secret', {
+      p_job_name: CRON_JOB_NAME,
+      p_token: token,
+    })
+
+    if (error) {
+      console.error('[Cron Notificaciones] Error validando secret:', error)
+    }
+
+    if (data === true) {
+      return { autorizado: true as const }
+    }
+  } catch (error) {
+    console.error('[Cron Notificaciones] Error consultando secret en Supabase:', error)
+  }
+
+  return {
+    autorizado: false as const,
+    response: NextResponse.json(
+      { success: false, error: 'No autorizado' },
+      { status: 401 }
+    ),
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
-    // Verificar authentication para ejecutar cron jobs
-    // En producción, verificar un token secreto en headers
-    const authHeader = request.headers.get('authorization')
-    const cronSecret = process.env.CRON_SECRET || 'your-secret-token'
-
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json(
-        { success: false, error: 'No autorizado' },
-        { status: 401 }
-      )
+    const auth = await autorizarCronRequest(request)
+    if (!auth.autorizado) {
+      return auth.response
     }
 
     const searchParams = request.nextUrl.searchParams
@@ -37,19 +84,11 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString(),
     })
 
-    let resultado
+    const resultado = cleanup
+      ? await limpiarNotificacionesAntiguas(90)
+      : await procesarNotificacionesPendientes(limit)
 
-    if (cleanup) {
-      // Ejecutar limpieza de notificaciones antiguas
-      resultado = await limpiarNotificacionesAntiguas(90)
-
-      console.log('[Cron Notificaciones] Limpieza completada:', resultado)
-    } else {
-      // Procesar notificaciones pendientes
-      resultado = await procesarNotificacionesPendientes(limit)
-
-      console.log('[Cron Notificaciones] Procesamiento completado:', resultado)
-    }
+    console.log('[Cron Notificaciones] Resultado:', resultado)
 
     return NextResponse.json({
       success: true,
@@ -70,12 +109,13 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/**
- * Endpoint POST para testing manual
- * Permite probar el procesamiento de notificaciones sin esperar al cron
- */
 export async function POST(request: NextRequest) {
   try {
+    const auth = await autorizarCronRequest(request)
+    if (!auth.autorizado) {
+      return auth.response
+    }
+
     const body = await request.json()
     const limit = body.limit || 10
 
