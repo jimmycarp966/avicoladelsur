@@ -144,19 +144,38 @@ function toFiniteNumber(value: number | string | null | undefined): number | nul
   return Number.isFinite(parsed) ? parsed : null
 }
 
+function formatDecimalString(value: number, decimals: number): string {
+  const safeDecimals = Math.max(0, Math.trunc(decimals))
+  const absoluteValue = Math.abs(value)
+  const fixedValue = absoluteValue.toFixed(safeDecimals)
+  const [integerPart, decimalPart] = fixedValue.split('.')
+  const groupedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  const sign = value < 0 ? '-' : ''
+
+  if (safeDecimals === 0) {
+    return `${sign}${groupedInteger}`
+  }
+
+  return `${sign}${groupedInteger},${decimalPart}`
+}
+
 export function formatCurrency(amount: number | string | null | undefined, currency: string = 'ARS') {
-  return new Intl.NumberFormat('es-AR', {
-    style: 'currency',
-    currency,
-  }).format(toFiniteNumber(amount) ?? 0)
+  const safeAmount = toFiniteNumber(amount) ?? 0
+  const normalizedCurrency = currency.toUpperCase()
+  const decimals = normalizedCurrency === 'ARS' ? 0 : 2
+  const symbols: Record<string, string> = {
+    ARS: '$',
+    USD: 'US$',
+    EUR: 'EUR ',
+  }
+  const prefix = symbols[normalizedCurrency] ?? `${normalizedCurrency} `
+
+  return `${prefix}${formatDecimalString(safeAmount, decimals)}`
 }
 
 // Utilidades de formato de números
 export function formatNumber(num: number | string | null | undefined, decimals: number = 2) {
-  return new Intl.NumberFormat('es-AR', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(toFiniteNumber(num) ?? 0)
+  return formatDecimalString(toFiniteNumber(num) ?? 0, decimals)
 }
 
 export function formatFixed(
