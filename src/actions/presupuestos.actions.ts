@@ -6,7 +6,8 @@ import { revalidatePath } from 'next/cache'
 import { createNotification } from './index'
 import { generateRutaOptimizada } from '@/lib/services/ruta-optimizer'
 import { confirmarPresupuestosAgrupadosSchema } from '@/lib/schemas/presupuestos.schema'
-import { getNowArgentina } from '@/lib/utils'
+import { esVentaMayorista, getNowArgentina } from '@/lib/utils'
+import { esItemPesable } from '@/lib/utils/pesaje'
 import { enviarNotificacionWhatsApp } from '@/lib/services/notificaciones'
 import { devError, devLog } from '@/lib/utils/logger'
 
@@ -38,8 +39,220 @@ const confirmarPresupuestoSchema = z.object({
 
 const actualizarPesoItemSchema = z.object({
   presupuesto_item_id: z.string().uuid(),
-  peso_final: z.number().positive(),
+  peso_final: z.number().nonnegative(),
 })
+
+type PresupuestoItemFinalContext = {
+  id: string
+  presupuesto_id: string
+  producto_id: string
+  cantidad_solicitada: number | null
+  peso_final: number | null
+  pesable: boolean | null
+  precio_unit_est: number | null
+  precio_unit_final: number | null
+  subtotal_est: number | null
+  subtotal_final: number | null
+  lista_precio_id: string | null
+  lista_precio?: {
+    tipo?: string | null
+  } | null
+  producto?: {
+    nombre?: string | null
+    categoria?: string | null
+    precio_venta?: number | null
+    requiere_pesaje?: boolean | null
+    venta_mayor_habilitada?: boolean | null
+  } | null
+}
+
+type PresupuestoFinalContext = {
+  id: string
+  recargo_total: number | null
+  lista_precio_id: string | null
+  lista_precio?: {
+    tipo?: string | null
+  } | null
+  items?: PresupuestoItemFinalContext[] | null
+}
+
+function toFiniteNumber(value: number | string | null | undefined): number | null {
+  if (value == null) return null
+  const parsed = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function toPositiveNumber(value: number | string | null | undefined): number | null {
+  const parsed = toFiniteNumber(value)
+  return parsed != null && parsed > 0 ? parsed : null
+}
+
+function roundCurrency(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100
+}
+
+function sameCurrencyValue(
+  currentValue: number | string | null | undefined,
+  nextValue: number
+): boolean {
+  const currentNumber = toFiniteNumber(currentValue)
+  if (currentNumber == null) {
+    return false
+  }
+
+  return roundCurrency(currentNumber) === roundCurrency(nextValue)
+}
+
+async function resolverPrecioUnitarioItem(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  item: PresupuestoItemFinalContext,
+  presupuesto: PresupuestoFinalContext
+): Promise<number> {
+  const precioFinalActual = toPositiveNumber(item.precio_unit_final)
+  if (precioFinalActual != null) {
+    return precioFinalActual
+  }
+
+  const precioEstimado = toPositiveNumber(item.precio_unit_est)
+  if (precioEstimado != null) {
+    return precioEstimado
+  }
+
+  const listaPrecioId = item.lista_precio_id || presupuesto.lista_precio_id
+  if (listaPrecioId) {
+    const { data: precioLista, error: precioListaError } = await supabase.rpc('fn_obtener_precio_producto', {
+      p_lista_precio_id: listaPrecioId,
+      p_producto_id: item.producto_id,
+    })
+
+    if (precioListaError) {
+      devError('[PRESUPUESTOS] Error obteniendo precio desde lista para reconciliar item:', precioListaError)
+    } else {
+      const precioDesdeLista = toPositiveNumber(precioLista as number | null | undefined)
+      if (precioDesdeLista != null) {
+        return precioDesdeLista
+      }
+    }
+  }
+
+  return toPositiveNumber(item.producto?.precio_venta) ?? 0
+}
+
+async function reconciliarFinalesPresupuesto(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  presupuestoId: string
+) {
+  const { data: presupuestoData, error: presupuestoError } = await supabase
+    .from('presupuestos')
+    .select(`
+      id,
+      recargo_total,
+      lista_precio_id,
+      lista_precio:listas_precios(tipo),
+      items:presupuesto_items(
+        id,
+        presupuesto_id,
+        producto_id,
+        cantidad_solicitada,
+        peso_final,
+        pesable,
+        precio_unit_est,
+        precio_unit_final,
+        subtotal_est,
+        subtotal_final,
+        lista_precio_id,
+        lista_precio:listas_precios(tipo),
+        producto:productos(nombre, categoria, precio_venta, requiere_pesaje, venta_mayor_habilitada)
+      )
+    `)
+    .eq('id', presupuestoId)
+    .single()
+
+  if (presupuestoError || !presupuestoData) {
+    devError('[PRESUPUESTOS] No se pudo cargar el presupuesto para reconciliar finales:', presupuestoError)
+    return {
+      success: false,
+      error: presupuestoError?.message || 'Presupuesto no encontrado',
+    }
+  }
+
+  let subtotalReconciliado = 0
+  const nowIso = getNowArgentina().toISOString()
+
+  for (const item of presupuestoData.items || []) {
+    const esMayorista = esVentaMayorista(presupuestoData, item)
+    const esPesable = esItemPesable(item, esMayorista)
+    const precioUnitario = await resolverPrecioUnitarioItem(supabase, item, presupuestoData)
+    const cantidadBase = esPesable
+      ? (toFiniteNumber(item.peso_final) ?? toFiniteNumber(item.cantidad_solicitada) ?? 0)
+      : (toFiniteNumber(item.cantidad_solicitada) ?? 0)
+    const subtotalCalculado = roundCurrency(cantidadBase * precioUnitario)
+
+    const subtotalItem = esPesable
+      ? subtotalCalculado
+      : toPositiveNumber(item.subtotal_final)
+        ?? toPositiveNumber(item.subtotal_est)
+        ?? subtotalCalculado
+
+    subtotalReconciliado += subtotalItem
+
+    const updateData: Record<string, unknown> = {}
+
+    if (esPesable && item.pesable !== true) {
+      updateData.pesable = true
+    }
+
+    if (esPesable && item.peso_final != null) {
+      if (!sameCurrencyValue(item.precio_unit_final, precioUnitario)) {
+        updateData.precio_unit_final = precioUnitario
+      }
+
+      if (!sameCurrencyValue(item.subtotal_final, subtotalCalculado)) {
+        updateData.subtotal_final = subtotalCalculado
+      }
+    }
+
+    if (Object.keys(updateData).length > 0) {
+      updateData.updated_at = nowIso
+
+      const { error: updateItemError } = await supabase
+        .from('presupuesto_items')
+        .update(updateData)
+        .eq('id', item.id)
+
+      if (updateItemError) {
+        devError('[PRESUPUESTOS] Error reconciliando item pesado:', updateItemError)
+        return {
+          success: false,
+          error: updateItemError.message,
+        }
+      }
+    }
+  }
+
+  const totalFinal = roundCurrency(subtotalReconciliado + (toFiniteNumber(presupuestoData.recargo_total) ?? 0))
+
+  const { error: updatePresupuestoError } = await supabase
+    .from('presupuestos')
+    .update({
+      total_final: totalFinal,
+      updated_at: nowIso,
+    })
+    .eq('id', presupuestoId)
+
+  if (updatePresupuestoError) {
+    devError('[PRESUPUESTOS] Error actualizando total final reconciliado:', updatePresupuestoError)
+    return {
+      success: false,
+      error: updatePresupuestoError.message,
+    }
+  }
+
+  return {
+    success: true,
+    total_final: totalFinal,
+  }
+}
 
 // Acción para crear presupuesto
 export async function crearPresupuestoAction(formData: FormData) {
@@ -275,6 +488,15 @@ export async function confirmarPresupuestoAction(formData: FormData) {
 
     devLog('🔍 DEBUG confirmarPresupuestoAction - Presupuesto:', JSON.stringify(presupuestoDebug, null, 2))
 
+    const reconcileBeforeConvert = await reconciliarFinalesPresupuesto(supabase, data.presupuesto_id)
+    if (!reconcileBeforeConvert.success) {
+      return {
+        success: false,
+        message: reconcileBeforeConvert.error || 'No se pudo preparar el presupuesto antes de convertirlo',
+        debug: { presupuesto: presupuestoDebug }
+      }
+    }
+
     // Llamar RPC para convertir presupuesto a pedido
     devLog('🔍 DEBUG - Llamando fn_convertir_presupuesto_a_pedido con:', {
       p_presupuesto_id: data.presupuesto_id,
@@ -393,7 +615,10 @@ export async function confirmarPresupuestoAction(formData: FormData) {
     return {
       success: true,
       message: `Presupuesto convertido a pedido ${result.numero_pedido} exitosamente`,
-      data: result
+      data: {
+        ...result,
+        total_presupuesto_reconciliado: reconcileBeforeConvert.total_final,
+      }
     }
 
   } catch (error) {
@@ -435,6 +660,14 @@ export async function finalizarPesajeAction(formData: FormData) {
       return { success: false, error: 'ID de presupuesto requerido' }
     }
 
+    const reconcileBeforeFinalize = await reconciliarFinalesPresupuesto(supabase, presupuestoId)
+    if (!reconcileBeforeFinalize.success) {
+      return {
+        success: false,
+        error: reconcileBeforeFinalize.error || 'No se pudo preparar el presupuesto para finalizar el pesaje'
+      }
+    }
+
     // Llamar RPC para finalizar pesaje sin convertir a pedido
     const { data: result, error } = await supabase.rpc('fn_finalizar_pesaje_presupuesto', {
       p_presupuesto_id: presupuestoId,
@@ -449,13 +682,23 @@ export async function finalizarPesajeAction(formData: FormData) {
       return { success: false, error: result.error || 'Error al finalizar pesaje' }
     }
 
+    const reconcileAfterFinalize = await reconciliarFinalesPresupuesto(supabase, presupuestoId)
+    if (!reconcileAfterFinalize.success) {
+      devError('[PRESUPUESTOS] El pesaje se finalizo pero la reconciliacion posterior fallo:', reconcileAfterFinalize.error)
+    }
+
     revalidatePath('/almacen/presupuestos-dia')
     revalidatePath('/almacen/presupuesto/*')
 
     return {
       success: true,
       message: result.message || 'Pesaje finalizado correctamente. El presupuesto seguirá disponible en Presupuestos del Día.',
-      data: result
+      data: {
+        ...result,
+        total_final: reconcileAfterFinalize.success
+          ? reconcileAfterFinalize.total_final
+          : reconcileBeforeFinalize.total_final,
+      }
     }
 
   } catch (error) {
@@ -507,6 +750,13 @@ export async function confirmarPresupuestosAgrupadosAction(formData: FormData) {
     let ultimoResultado: any = null
 
     for (const presupuestoId of data.presupuestos_ids) {
+      const reconcileBeforeConvert = await reconciliarFinalesPresupuesto(supabase, presupuestoId)
+      if (!reconcileBeforeConvert.success) {
+        errores++
+        erroresDetalle.push(`Presupuesto ${presupuestoId}: ${reconcileBeforeConvert.error || 'No se pudo reconciliar el presupuesto'}`)
+        continue
+      }
+
       const { data: result, error } = await supabase.rpc('fn_convertir_presupuesto_a_pedido', {
         p_presupuesto_id: presupuestoId,
         p_user_id: user.id,
@@ -522,7 +772,10 @@ export async function confirmarPresupuestosAgrupadosAction(formData: FormData) {
       } else {
         exitosos++
         pedidosAfectados.add(result.pedido_id)
-        ultimoResultado = result
+        ultimoResultado = {
+          ...result,
+          total_presupuesto_reconciliado: reconcileBeforeConvert.total_final,
+        }
       }
     }
 
@@ -620,12 +873,33 @@ export async function actualizarPesoItemAction(formData: FormData) {
       return { success: false, error: result.error || 'Error en la actualización del peso' }
     }
 
+    const { data: itemActualizado, error: itemActualizadoError } = await supabase
+      .from('presupuesto_items')
+      .select('presupuesto_id')
+      .eq('id', data.presupuesto_item_id)
+      .single()
+
+    if (itemActualizadoError || !itemActualizado?.presupuesto_id) {
+      devError('[PRESUPUESTOS] No se pudo obtener el presupuesto del item pesado:', itemActualizadoError)
+      return { success: false, error: 'El peso se guardo pero no se pudo reconciliar el presupuesto' }
+    }
+
+    const reconcileAfterWeight = await reconciliarFinalesPresupuesto(supabase, itemActualizado.presupuesto_id)
+    if (!reconcileAfterWeight.success) {
+      devError('[PRESUPUESTOS] El peso se guardo pero la reconciliacion fallo:', reconcileAfterWeight.error)
+      return { success: false, error: reconcileAfterWeight.error || 'No se pudo reconciliar el presupuesto despues del pesaje' }
+    }
+
     revalidatePath(`/almacen/presupuesto/*`)
 
     return {
       success: true,
       message: 'Peso actualizado exitosamente',
-      data: result
+      data: {
+        ...result,
+        presupuesto_id: itemActualizado.presupuesto_id,
+        total_final: reconcileAfterWeight.total_final,
+      }
     }
 
   } catch (error) {

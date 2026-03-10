@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import RutaMap from '@/components/reparto/RutaMap'
 import { iniciarRutaAction, finalizarRutaAction } from '@/actions/reparto.actions'
 import { RutaDetalleRealtime } from '@/components/reparto/RutaDetalleRealtime'
+import { EntregaClienteForm } from '@/components/reparto/EntregaClienteForm'
 
 export const dynamic = 'force-dynamic'
 
@@ -115,11 +116,20 @@ export default async function RutaDetallePage({
           .from('entregas')
           .select(`
             id,
+            pedido_id,
             cliente_id,
+            presupuesto_id,
+            subtotal,
+            recargo,
+            total,
+            direccion,
             estado_entrega,
             estado_pago,
             monto_cobrado,
             metodo_pago,
+            referencia_pago,
+            instruccion_repartidor,
+            observaciones,
             coordenadas,
             orden_entrega,
             cliente:clientes(
@@ -160,11 +170,22 @@ export default async function RutaDetallePage({
               // Sobrescribir ID para evitar claves duplicadas en listas si se usa detalle.id
               // Usamos un ID compuesto virtual
               virtual_id: `${detalle.id}-${entrega.id}`,
+              entrega_operativa_id: entrega.id,
               // Datos específicos de esta entrega
+              pedido_id: entrega.pedido_id,
+              presupuesto_id: entrega.presupuesto_id,
+              subtotal: entrega.subtotal,
+              recargo: entrega.recargo,
+              total: entrega.total,
+              direccion: entrega.direccion,
               estado_entrega: entrega.estado_entrega,
-              pago_registrado: entrega.estado_pago === 'pagado',
+              estado_pago: entrega.estado_pago,
+              pago_registrado: ['pagado', 'parcial', 'cuenta_corriente'].includes(entrega.estado_pago),
               metodo_pago_registrado: entrega.metodo_pago,
               monto_cobrado_registrado: entrega.monto_cobrado,
+              referencia_pago: entrega.referencia_pago,
+              instruccion_repartidor: entrega.instruccion_repartidor,
+              observaciones: entrega.observaciones,
               orden_entrega: entrega.orden_entrega, // Usar orden de la entrega específica
               pedido: {
                 ...detalle.pedido,
@@ -297,6 +318,28 @@ export default async function RutaDetallePage({
   })
 
   const entregas = ruta.detalles_ruta || []
+  const entregasOperativas = entregas
+    .filter((entrega: any) => !!entrega.entrega_operativa_id)
+    .sort((a: any, b: any) => (a.orden_entrega || 0) - (b.orden_entrega || 0))
+    .map((entrega: any) => ({
+      id: entrega.entrega_operativa_id,
+      pedido_id: entrega.pedido_id,
+      cliente_id: entrega.pedido?.cliente?.id || '',
+      presupuesto_id: entrega.presupuesto_id || null,
+      subtotal: Number(entrega.subtotal || 0),
+      recargo: Number(entrega.recargo || 0),
+      total: Number(entrega.total || 0),
+      direccion: entrega.direccion || entrega.pedido?.cliente?.direccion || null,
+      orden_entrega: entrega.orden_entrega || 0,
+      estado_entrega: entrega.estado_entrega || 'pendiente',
+      estado_pago: entrega.estado_pago || 'pendiente',
+      metodo_pago: entrega.metodo_pago_registrado || null,
+      monto_cobrado: Number(entrega.monto_cobrado_registrado || 0),
+      referencia_pago: entrega.referencia_pago || null,
+      instruccion_repartidor: entrega.instruccion_repartidor || null,
+      observaciones: entrega.observaciones || null,
+      cliente: entrega.pedido?.cliente || undefined,
+    }))
   const entregasCompletadas = entregas.filter(
     (entrega: any) => entrega.estado_entrega === 'entregado',
   ).length
@@ -310,18 +353,10 @@ export default async function RutaDetallePage({
     pagosPorMetodo[metodo] = (pagosPorMetodo[metodo] || 0) + Number(detalle.monto_cobrado_registrado)
   })
 
-  const handleIniciarRuta = async () => {
-    'use server'
-    await iniciarRutaAction(ruta.id)
-  }
-
-  const handleFinalizarRuta = async () => {
-    'use server'
-    await finalizarRutaAction(ruta.id)
-  }
-
   return (
     <div className="space-y-6 p-4">
+      <RutaDetalleRealtime rutaId={ruta.id} />
+
       <div className="flex items-center justify-between">
         <Button variant="ghost" asChild>
           <Link href="/reparto/rutas">
@@ -540,6 +575,25 @@ export default async function RutaDetallePage({
         </TabsList>
 
         <TabsContent value="lista" className="space-y-4">
+          {usuarioRol.rol === 'admin' && ['en_curso', 'completada'].includes(ruta.estado) && entregasOperativas.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Gestión operativa de entregas</CardTitle>
+                <CardDescription>
+                  Registra cobros y cierra entregas individuales desde la ruta admin.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4 xl:grid-cols-2">
+                {entregasOperativas.map((entrega: any) => (
+                  <EntregaClienteForm
+                    key={entrega.id}
+                    entrega={entrega}
+                  />
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Entregas</CardTitle>

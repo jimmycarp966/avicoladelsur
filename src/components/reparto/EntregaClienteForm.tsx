@@ -66,16 +66,15 @@ interface Entrega {
 
 interface EntregaClienteFormProps {
   entrega: Entrega
-  rutaId?: string
 }
 
-export function EntregaClienteForm({ entrega, rutaId }: EntregaClienteFormProps) {
+export function EntregaClienteForm({ entrega }: EntregaClienteFormProps) {
   const router = useRouter()
   const cliente = entrega.cliente
 
   const [estadoPago, setEstadoPago] = useState<'pagado' | 'parcial' | 'fiado' | ''>(
     entrega.estado_pago === 'pagado' ? 'pagado' :
-      entrega.estado_pago === 'fiado' ? 'fiado' : ''
+      entrega.estado_pago === 'fiado' || entrega.estado_pago === 'cuenta_corriente' ? 'fiado' : ''
   )
   const [metodoPago, setMetodoPago] = useState(entrega.metodo_pago || 'efectivo')
   const [montoCobrado, setMontoCobrado] = useState(entrega.monto_cobrado || entrega.total || 0)
@@ -96,6 +95,7 @@ export function EntregaClienteForm({ entrega, rutaId }: EntregaClienteFormProps)
 
     const formData = new FormData()
     formData.append('entrega_id', entrega.id)
+    formData.append('estado_pago', estadoPago)
     formData.append('metodo_pago', metodoPago)
     formData.append('monto_cobrado', estadoPago === 'fiado' ? '0' : String(montoCobrado))
     if (numeroTransaccion) {
@@ -112,7 +112,7 @@ export function EntregaClienteForm({ entrega, rutaId }: EntregaClienteFormProps)
       toast.success(result.message || 'Cobro registrado correctamente')
       router.refresh()
     } else {
-      toast.error(result.message || 'Error al registrar el cobro')
+      toast.error(result.error || result.message || 'Error al registrar el cobro')
     }
   }
 
@@ -132,7 +132,7 @@ export function EntregaClienteForm({ entrega, rutaId }: EntregaClienteFormProps)
       toast.success(result.message || 'Entrega completada')
       router.refresh()
     } else {
-      toast.error(result.message || 'Error al completar entrega')
+      toast.error(result.error || result.message || 'Error al completar entrega')
     }
   }
 
@@ -150,7 +150,7 @@ export function EntregaClienteForm({ entrega, rutaId }: EntregaClienteFormProps)
       toast.success(result.message || 'Entrega marcada como fallida')
       router.refresh()
     } else {
-      toast.error(result.message || 'Error al marcar entrega')
+      toast.error(result.error || result.message || 'Error al marcar entrega')
     }
   }
 
@@ -159,6 +159,7 @@ export function EntregaClienteForm({ entrega, rutaId }: EntregaClienteFormProps)
     en_camino: { label: 'En camino', color: 'bg-blue-100 text-blue-800' },
     entregado: { label: 'Entregado', color: 'bg-green-100 text-green-800' },
     fallido: { label: 'Fallido', color: 'bg-red-100 text-red-800' },
+    rechazado: { label: 'Rechazado', color: 'bg-red-100 text-red-800' },
   }
 
   const estadoPagoConfig = {
@@ -166,6 +167,7 @@ export function EntregaClienteForm({ entrega, rutaId }: EntregaClienteFormProps)
     parcial: { label: 'Parcial', color: 'bg-orange-100 text-orange-800' },
     pagado: { label: 'Pagado', color: 'bg-green-100 text-green-800' },
     fiado: { label: 'Fiado', color: 'bg-purple-100 text-purple-800' },
+    cuenta_corriente: { label: 'Fiado', color: 'bg-purple-100 text-purple-800' },
   }
 
   const estadoEntrega = estadoEntregaConfig[entrega.estado_entrega as keyof typeof estadoEntregaConfig] ||
@@ -174,7 +176,7 @@ export function EntregaClienteForm({ entrega, rutaId }: EntregaClienteFormProps)
     { label: entrega.estado_pago, color: 'bg-gray-100' }
 
   const yaEntregado = entrega.estado_entrega === 'entregado'
-  const yaFallido = entrega.estado_entrega === 'fallido'
+  const yaFallido = entrega.estado_entrega === 'fallido' || entrega.estado_entrega === 'rechazado'
   const puedeEditar = !yaEntregado && !yaFallido
 
   return (
@@ -287,7 +289,7 @@ export function EntregaClienteForm({ entrega, rutaId }: EntregaClienteFormProps)
                 <select
                   className="w-full rounded-md border px-3 py-2 text-sm"
                   value={estadoPago}
-                  onChange={(e) => setEstadoPago(e.target.value as any)}
+                  onChange={(e) => setEstadoPago(e.target.value as 'pagado' | 'parcial' | 'fiado' | '')}
                   required
                 >
                   <option value="">Selecciona un estado</option>
