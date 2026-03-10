@@ -40,6 +40,12 @@ export interface NotificacionProgramada {
   programada_para: Date
 }
 
+interface NotificacionesPendientesPayload {
+  success?: boolean
+  notificaciones?: NotificacionProgramada[]
+  total?: number
+}
+
 /**
  * Envía una notificación programada individual
  *
@@ -204,7 +210,9 @@ export async function procesarNotificacionesPendientes(
       p_limit: limit,
     })
 
-    if (error || !pendientes) {
+    const payload = pendientes as NotificacionesPendientesPayload | null
+
+    if (error || !payload || payload.success === false) {
       console.error('[Notificaciones Proactivas] Error obteniendo pendientes:', error)
       return {
         procesadas: 0,
@@ -214,7 +222,7 @@ export async function procesarNotificacionesPendientes(
       }
     }
 
-    const notificaciones = pendientes as NotificacionProgramada[]
+    const notificaciones = Array.isArray(payload.notificaciones) ? payload.notificaciones : []
     console.log(`[Notificaciones Proactivas] ${notificaciones.length} pendientes encontradas`)
 
     let exitosas = 0
