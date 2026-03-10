@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/server'
 import { sendWhatsAppTwilioMessage } from '@/lib/services/whatsapp-twilio'
 import { generarMensajeOptOut } from '@/lib/vertex/tools/gestionar-notificaciones'
 
@@ -55,7 +55,7 @@ export async function enviarNotificacionProgramada(
   notificacionId: string
 ): Promise<EnvioNotificacionResult> {
   try {
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     console.log(`[Notificación Proactiva] Procesando ID: ${notificacionId}`)
 
@@ -195,7 +195,7 @@ export async function procesarNotificacionesPendientes(
   errores: string[]
 }> {
   try {
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     console.log(`[Notificaciones Proactivas] Procesando lote de hasta ${limit}...`)
 
@@ -265,7 +265,7 @@ async function marcarNotificacionEnviada(
   error?: string
 ): Promise<void> {
   try {
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     await supabase.rpc('marcar_notificacion_enviada', {
       p_notificacion_id: notificacionId,
       p_enviada: enviada,
@@ -285,7 +285,7 @@ export async function obtenerHistorialNotificaciones(
   dias: number = 30
 ) {
   try {
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     const { data, error } = await supabase.rpc('obtener_historial_notificaciones', {
       p_cliente_id: clienteId,
       p_dias: dias,
@@ -310,7 +310,7 @@ export async function obtenerHistorialNotificaciones(
  */
 export async function limpiarNotificacionesAntiguas(dias: number = 90) {
   try {
-    const supabase = await createClient()
+    const supabase = createAdminClient()
     const { data, error } = await supabase.rpc('cleanup_notificaciones_antiguas', {
       p_dias: dias,
     })
