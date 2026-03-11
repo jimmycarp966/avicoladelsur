@@ -19,13 +19,11 @@ import { obtenerClientePorIdAction } from '@/actions/ventas.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 import { formatCurrency } from '@/lib/utils'
 import { useDebounce } from '@/lib/hooks/useDebounce'
-import { useFocusField } from '@/lib/hooks/useFocusField'
 import { useFormContextShortcuts } from '@/lib/hooks/useFormContextShortcuts'
 import { KeyboardHintCompact } from '@/components/ui/keyboard-hint'
 import { PresupuestoItemsTable } from './presupuesto-items-table'
 import { useEffect, useRef } from 'react'
 import { PresupuestoResumenPanel } from '@/components/presupuestos/presupuesto-resumen-panel'
-import { Copy } from 'lucide-react'
 
 const crearPresupuestoSchema = z.object({
   cliente_id: z.string().uuid('Debes seleccionar un cliente'),
@@ -72,7 +70,6 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
   const { showToast } = useNotificationStore()
   const [isLoading, setIsLoading] = useState(false)
   const [clienteSearch, setClienteSearch] = useState('')
-  const [clienteCodigoDirecto, setClienteCodigoDirecto] = useState('')
   const [clienteDropdownOpen, setClienteDropdownOpen] = useState(false)
   const [todasListas, setTodasListas] = useState<Array<{ id: string; codigo: string; nombre: string; tipo: string; margen_ganancia: number | null }>>([])
   const [cargandoListas, setCargandoListas] = useState(true) // Iniciar en true para mostrar loading inicial
@@ -193,13 +190,41 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
     return clientes.find(c => c.id === watchedCliente)
   }, [clientes, watchedCliente])
 
-  useEffect(() => {
-    if (!watchedCliente) return
-    const cliente = clientes.find((c) => c.id === watchedCliente)
-    if (cliente?.codigo) {
-      setClienteCodigoDirecto(cliente.codigo)
+  const focusClienteSearchInput = useCallback(() => {
+    let attempts = 0
+    const maxAttempts = 12
+
+    const tryFocus = () => {
+      const searchInput = document.querySelector(
+        '[data-slot="select-content"] input[placeholder*="Buscar por codigo"], ' +
+        '[data-slot="select-content"] input[placeholder*="Buscar por código"], ' +
+        '[data-radix-popper-content-wrapper] input[placeholder*="Buscar por codigo"], ' +
+        '[data-radix-popper-content-wrapper] input[placeholder*="Buscar por código"]'
+      ) as HTMLInputElement | null
+
+      if (searchInput) {
+        searchInput.focus()
+        searchInput.select()
+        return
+      }
+
+      attempts += 1
+      if (attempts < maxAttempts) {
+        window.setTimeout(tryFocus, 50)
+      }
     }
-  }, [clientes, watchedCliente])
+
+    tryFocus()
+  }, [])
+
+  const openClienteSelector = useCallback(() => {
+    const clienteTrigger = document.getElementById('cliente_id') as HTMLButtonElement | null
+    if (clienteTrigger) {
+      clienteTrigger.focus()
+    }
+    setClienteDropdownOpen(true)
+    window.setTimeout(focusClienteSearchInput, 50)
+  }, [focusClienteSearchInput])
 
   // Atajos contextuales para el formulario
   useFormContextShortcuts({
@@ -345,21 +370,9 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
 
   // Efecto para enfocar y abrir automaticamente el selector de cliente al montar
   useEffect(() => {
-    const focusClienteSelect = () => {
-      const clienteTrigger = document.getElementById('cliente_id') as HTMLButtonElement
-      if (clienteTrigger) {
-        clienteTrigger.focus()
-        // Abrir el dropdown automaticamente
-        setTimeout(() => {
-          setClienteDropdownOpen(true)
-        }, 100)
-      }
-    }
-
-    // Esperar a que el componente est? montado
-    const timeoutId = setTimeout(focusClienteSelect, 150)
+    const timeoutId = window.setTimeout(openClienteSelector, 150)
     return () => clearTimeout(timeoutId)
-  }, [])
+  }, [openClienteSelector])
 
   // Efecto para cargar y aplicar automaticamente zona y lista de precios del cliente
   useEffect(() => {
@@ -690,29 +703,6 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
     return results
   }, [clientes, watchedCliente])
 
-  const seleccionarClientePorCodigo = useCallback((rawCodigo: string): boolean => {
-    const codigo = rawCodigo.trim().toLowerCase()
-    if (!codigo) return false
-
-    const cliente = clientes.find((c) => (c.codigo || '').trim().toLowerCase() === codigo)
-    if (!cliente) {
-      showToast('error', `No existe un cliente con codigo "${rawCodigo.trim()}"`)
-      return false
-    }
-
-    setValue('cliente_id', cliente.id, { shouldValidate: true, shouldDirty: true })
-    setClienteSearch('')
-    setClienteDropdownOpen(false)
-    setClienteCodigoDirecto(cliente.codigo || '')
-
-    setTimeout(() => {
-      const fechaInput = document.getElementById('fecha_entrega_estimada')
-      if (fechaInput) fechaInput.focus()
-    }, 100)
-
-    return true
-  }, [clientes, setValue, showToast])
-
   // Funcion para marcar que el precio fue modificado manualmente
   const handlePrecioModificadoManualmente = useCallback((index: number) => {
     console.log('[PRESUPUESTO FORM] Precio modificado manualmente para ?ndice:', index)
@@ -972,19 +962,12 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
           items: [{ producto_id: '', cantidad_solicitada: 1, precio_unit_est: 0, lista_precio_id: undefined }],
         })
         setClienteSearch('')
-        setClienteCodigoDirecto('')
         setListasPorProducto({})
         preciosModificadosManualmenteRef.current.clear()
         setTotalUpdateKey(prev => prev + 1)
 
         // Enfocar cliente nuevamente para empezar otro presupuesto
-        setTimeout(() => {
-          const clienteTrigger = document.getElementById('cliente_id') as HTMLButtonElement
-          if (clienteTrigger) {
-            clienteTrigger.focus()
-            setClienteDropdownOpen(true)
-          }
-        }, 150)
+        window.setTimeout(openClienteSelector, 150)
       } else {
         console.error('[CLIENT] Error al crear presupuesto:', result)
         showToast('error', result.error || 'Error al crear presupuesto')
@@ -995,7 +978,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
     } finally {
       setIsLoading(false)
     }
-  }, [reset, showToast])
+  }, [openClienteSelector, reset, showToast])
 
   const onSubmit = async (data: CrearPresupuestoFormData) => {
     await submitPresupuesto(data)
@@ -1095,45 +1078,16 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="cliente_codigo_directo">Codigo de cliente (directo)</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="cliente_codigo_directo"
-                    placeholder="Ej: 1024"
-                    value={clienteCodigoDirecto}
-                    onChange={(e) => setClienteCodigoDirecto(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        seleccionarClientePorCodigo(clienteCodigoDirecto)
-                      }
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => seleccionarClientePorCodigo(clienteCodigoDirecto)}
-                  >
-                    Cargar
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Permite cargar el cliente directamente por su codigo.
-                </p>
-              </div>
-
-              <div className="space-y-2">
                 <Label htmlFor="cliente_id" className="flex items-center gap-2">
                   Cliente *
                   <KeyboardHintCompact shortcut="C" />
                 </Label>
                 <Select
+                  open={clienteDropdownOpen}
                   value={watchedCliente || ''}
                   onValueChange={(value) => {
                     // Establecer el valor primero
                     setValue('cliente_id', value, { shouldValidate: true, shouldDirty: true })
-                    const cliente = clientes.find((c) => c.id === value)
-                    setClienteCodigoDirecto(cliente?.codigo || '')
                     // Limpiar la busqueda despues de un pequeno delay para asegurar que el valor se estableci?
                     setTimeout(() => {
                       setClienteSearch('')
@@ -1146,13 +1100,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                   onOpenChange={(open) => {
                     setClienteDropdownOpen(open)
                     if (open) {
-                      // Cuando se abre, enfocar el input de busqueda automaticamente
-                      setTimeout(() => {
-                        const searchInput = document.querySelector('#cliente_id ~ [role="listbox"] input, [data-radix-popper-content-wrapper] input[placeholder*="Buscar"]') as HTMLInputElement
-                        if (searchInput) {
-                          searchInput.focus()
-                        }
-                      }, 50)
+                      focusClienteSearchInput()
                     } else {
                       // Limpiar la busqueda cuando se cierra el dropdown
                       setClienteSearch('')
@@ -1190,7 +1138,6 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                               // Seleccionar el primer resultado
                               const primerCliente = listaFinal[0]
                               setValue('cliente_id', primerCliente.id, { shouldValidate: true, shouldDirty: true })
-                              setClienteCodigoDirecto(primerCliente.codigo || '')
                               setClienteSearch('')
                               setClienteDropdownOpen(false)
                               setTimeout(() => {
