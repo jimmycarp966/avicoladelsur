@@ -789,6 +789,54 @@ export async function actualizarAsistenciaAction(
 
 // ========== ADELANTOS ==========
 
+export async function obtenerProductosActivosParaAdelantosAction(): Promise<ApiResponse<Array<{
+  id: string
+  nombre: string
+  codigo: string | null
+  precio_venta: number | null
+}>>> {
+  try {
+    const adminUserId = await getAuthenticatedAdminUserId()
+    if (!adminUserId) {
+      return {
+        success: false,
+        error: 'No autorizado',
+      }
+    }
+
+    const supabase = createAdminClient()
+    const { data, error } = await supabase
+      .from('productos')
+      .select('id, nombre, codigo, precio_venta')
+      .eq('activo', true)
+      .order('nombre')
+
+    if (error) {
+      devError('Error al obtener productos activos para adelantos:', error)
+      return {
+        success: false,
+        error: 'Error al obtener productos: ' + error.message,
+      }
+    }
+
+    return {
+      success: true,
+      data: (data || []) as Array<{
+        id: string
+        nombre: string
+        codigo: string | null
+        precio_venta: number | null
+      }>,
+    }
+  } catch (error) {
+    devError('Error en obtenerProductosActivosParaAdelantosAction:', error)
+    return {
+      success: false,
+      error: 'Error interno del servidor',
+    }
+  }
+}
+
 export async function crearAdelantoAction(
   adelantoData: {
     empleado_id: string

@@ -13,18 +13,30 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowLeft, Loader2, Save, DollarSign, Package } from 'lucide-react'
 import Link from 'next/link'
 import { adelantoSchema, type AdelantoFormData } from '@/lib/schemas/rrhh.schema'
-import { crearAdelantoAction, obtenerEmpleadosActivosAction } from '@/actions/rrhh.actions'
+import {
+  crearAdelantoAction,
+  obtenerEmpleadosActivosAction,
+  obtenerProductosActivosParaAdelantosAction,
+} from '@/actions/rrhh.actions'
 import { useNotificationStore } from '@/store/notificationStore'
-import { createClient } from '@/lib/supabase/client'
-import type { Empleado, Producto } from '@/types/domain.types'
+import type { Empleado } from '@/types/domain.types'
 import { getEmpleadoNombre } from '@/lib/utils/empleado-display'
+
+type ProductoAdelantoOption = {
+  id: string
+  nombre: string
+  codigo: string | null
+  precio_venta: number | null
+}
 
 export function NuevoAdelantoForm() {
   const router = useRouter()
   const { showToast } = useNotificationStore()
   const [isLoading, setIsLoading] = useState(false)
   const [empleados, setEmpleados] = useState<Empleado[]>([])
-  const [productos, setProductos] = useState<Producto[]>([])
+  const [productos, setProductos] = useState<ProductoAdelantoOption[]>([])
+  const [isLoadingProductos, setIsLoadingProductos] = useState(false)
+  const [productosError, setProductosError] = useState<string | null>(null)
 
   const {
     register,
@@ -58,25 +70,44 @@ export function NuevoAdelantoForm() {
   }, [showToast])
 
   useEffect(() => {
+    let isActive = true
+
     const loadProductos = async () => {
       if (tipoSeleccionado !== 'producto') {
+        if (isActive) {
+          setProductos([])
+          setProductosError(null)
+          setIsLoadingProductos(false)
+        }
         return
       }
 
-      const supabase = createClient()
-      const { data: productosData } = await supabase
-        .from('productos')
-        .select('*')
-        .eq('activo', true)
-        .order('nombre')
+      setIsLoadingProductos(true)
+      setProductosError(null)
 
-      if (productosData) {
-        setProductos(productosData as Producto[])
+      const result = await obtenerProductosActivosParaAdelantosAction()
+
+      if (!isActive) {
+        return
       }
+
+      if (result.success) {
+        setProductos(result.data || [])
+      } else {
+        setProductos([])
+        setProductosError(result.error || 'No se pudieron cargar productos')
+        showToast('error', result.error || 'No se pudieron cargar productos', 'Error')
+      }
+
+      setIsLoadingProductos(false)
     }
 
     void loadProductos()
-  }, [tipoSeleccionado])
+
+    return () => {
+      isActive = false
+    }
+  }, [showToast, tipoSeleccionado])
 
   // Resetear campos cuando cambia el tipo
   useEffect(() => {
@@ -307,8 +338,14 @@ export function NuevoAdelantoForm() {
                     value={watch('producto_id') || ''}
                     onValueChange={(value) => setValue('producto_id', value)}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar producto" />
+                    <SelectTrigger disabled={isLoadingProductos || productos.length === 0}>
+                      <SelectValue
+                        placeholder={
+                          isLoadingProductos
+                            ? 'Cargando productos...'
+                            : 'Seleccionar producto'
+                        }
+                      />
                     </SelectTrigger>
                     <SelectContent>
                       {productos.map((producto) => (
@@ -320,6 +357,14 @@ export function NuevoAdelantoForm() {
                   </Select>
                   {errors.producto_id && (
                     <p className="text-sm text-red-600">{errors.producto_id.message}</p>
+                  )}
+                  {productosError && (
+                    <p className="text-sm text-red-600">{productosError}</p>
+                  )}
+                  {!isLoadingProductos && !productosError && productos.length === 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      No hay productos activos disponibles para adelantos.
+                    </p>
                   )}
                 </div>
 
