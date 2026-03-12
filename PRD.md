@@ -304,7 +304,6 @@ Solicitudes de envío de productos entre sucursales con trazabilidad completa y 
 - [ARCHITECTURE_SUMMARY.md](./ARCHITECTURE_SUMMARY.md) - Resumen ejecutivo de arquitectura
 - [ARCHITECTURE.MD](./ARCHITECTURE.MD) - Arquitectura técnica detallada
 - [README.md](./README.md) - Guía de inicio rápido
-- [TESTING.md](./TESTING.md) - Guía de pruebas
 
 ---
 

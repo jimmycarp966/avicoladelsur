@@ -30,11 +30,16 @@ function parsePeriodo(
 
 function isAuthorized(request: NextRequest): boolean {
   const authHeader = request.headers.get('authorization')
-  const cronSecret = process.env.CRON_SECRET || 'your-secret-token'
+  const cronSecret = process.env.CRON_SECRET?.trim()
+  if (!cronSecret) return false
   return authHeader === `Bearer ${cronSecret}`
 }
 
 async function runCron(request: NextRequest) {
+  if (!process.env.CRON_SECRET?.trim()) {
+    return NextResponse.json({ success: false, error: 'CRON_SECRET no configurado' }, { status: 500 })
+  }
+
   if (!isAuthorized(request)) {
     return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 })
   }

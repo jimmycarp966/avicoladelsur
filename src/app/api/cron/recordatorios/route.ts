@@ -17,7 +17,15 @@ export async function GET(request: NextRequest) {
   try {
     // Verificar authentication para ejecutar cron jobs
     const authHeader = request.headers.get('authorization')
-    const cronSecret = process.env.CRON_SECRET || 'your-secret-token'
+    const cronSecret = process.env.CRON_SECRET?.trim()
+
+    if (!cronSecret) {
+      console.error('[Cron Recordatorios] CRON_SECRET no configurado')
+      return NextResponse.json(
+        { success: false, error: 'CRON_SECRET no configurado' },
+        { status: 500 }
+      )
+    }
 
     if (authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json(

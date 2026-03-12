@@ -44,7 +44,7 @@ export function createClient() {
       `- No debe tener espacios antes o despues del =\n` +
       `- Debe estar en una sola linea\n\n` +
       `Formato correcto:\n` +
-      `NEXT_PUBLIC_SUPABASE_URL=https://tvijhnglmryjmrstfvbv.supabase.co`
+      `NEXT_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co`
     )
   }
 

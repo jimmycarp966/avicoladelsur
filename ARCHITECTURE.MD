@@ -328,7 +328,6 @@ avicola-del-sur/
 │   └── seed.sql                   # Datos iniciales
 │
 ├── scripts/                       # Scripts de automatización
-├── tests/                         # Tests E2E con Playwright
 └── docs/                          # Documentación adicional
 ```
 

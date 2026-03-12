@@ -11,7 +11,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { loginSchema, type LoginFormData } from '@/lib/schemas/auth.schema'
-import { colors } from '@/lib/config'
 
 interface LoginFormProps {
   onSuccess?: () => void
@@ -38,7 +37,7 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
       onSuccess?.()
     } catch (error: any) {
       setError('root', {
-        message: error.message || 'Error en el inicio de sesión',
+        message: error.message || 'Error en el inicio de sesion',
       })
     } finally {
       setIsLoading(false)
@@ -76,12 +75,12 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password" className="text-base font-semibold text-foreground">Contraseña</Label>
+            <Label htmlFor="password" className="text-base font-semibold text-foreground">Contrasena</Label>
             <div className="relative">
               <Input
                 id="password"
                 type={showPassword ? 'text' : 'password'}
-                placeholder="••••••••"
+                placeholder="********"
                 {...register('password')}
                 disabled={isLoading}
                 className="h-11 text-base border-2 focus:border-primary pr-10"
@@ -120,48 +119,20 @@ export function LoginForm({ onSuccess }: LoginFormProps) {
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                Iniciando sesión...
+                Iniciando sesion...
               </>
             ) : (
-              'Iniciar Sesión'
+              'Iniciar sesion'
             )}
           </Button>
         </form>
 
         <div className="pt-4 border-t border-border">
           <div className="text-center text-sm text-muted-foreground">
-            <p className="mb-2">¿Olvidaste tu contraseña?</p>
+            <p className="mb-2">Olvidaste tu contrasena?</p>
             <Button variant="link" className="p-0 h-auto font-normal text-primary hover:text-primary/80">
               Contacta al administrador del sistema
             </Button>
-          </div>
-        </div>
-
-        {/* Información de usuarios de prueba */}
-        <div className="mt-6 p-5 bg-primary/5 rounded-lg border border-primary/20">
-          <h4 className="text-sm font-semibold mb-3 text-foreground">Usuarios de Prueba:</h4>
-          <div className="text-sm space-y-2">
-            <div className="flex justify-between items-center">
-              <span className="font-medium text-foreground">Admin:</span>
-              <span className="text-muted-foreground font-mono text-xs">admin@avicoladelsur.com</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="font-medium text-foreground">Vendedor:</span>
-              <span className="text-muted-foreground font-mono text-xs">vendedor@avicoladelsur.com</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="font-medium text-foreground">Repartidor:</span>
-              <span className="text-muted-foreground font-mono text-xs">repartidor@avicoladelsur.com</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="font-medium text-foreground">Almacenista:</span>
-              <span className="text-muted-foreground font-mono text-xs">almacenista@avicoladelsur.com</span>
-            </div>
-            <div className="pt-2 mt-2 border-t border-primary/20">
-              <p className="text-xs text-muted-foreground font-medium">
-                Contraseña para todos: <span className="font-mono font-semibold text-foreground">123456</span>
-              </p>
-            </div>
           </div>
         </div>
       </CardContent>

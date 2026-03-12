@@ -21,7 +21,7 @@ import { ensureGoogleApplicationCredentials } from './ensure-google-credentials'
 // Configuración de Vertex AI
 ensureGoogleApplicationCredentials()
 const vertexAI = new VertexAI({
-  project: process.env.GOOGLE_CLOUD_PROJECT_ID || 'gen-lang-client-0184145853',
+  project: process.env.GOOGLE_CLOUD_PROJECT_ID || '',
   location: 'us-central1',
 })
 

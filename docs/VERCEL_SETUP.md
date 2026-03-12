@@ -18,7 +18,7 @@ Esta guía te explica cómo configurar las variables de entorno (incluyendo la G
 3. **Agrega la Google Maps API Key**
    - Haz clic en **"Add New"** (Agregar Nueva)
    - **Key**: `GOOGLE_MAPS_API_KEY`
-   - **Value**: `AIzaSyAfsPP-qnCmulna4zNbLEQkDk_88MB-n3o`
+   - **Value**: `your-google-maps-api-key`
    - **Environment**: Selecciona todas las opciones:
      - ✅ Production (Producción)
      - ✅ Preview (Previsualización)
@@ -46,7 +46,7 @@ vercel login
 vercel env add GOOGLE_MAPS_API_KEY
 
 # Cuando se solicite:
-# - Value: AIzaSyAfsPP-qnCmulna4zNbLEQkDk_88MB-n3o
+# - Value: your-google-maps-api-key
 # - Environment: Selecciona Production, Preview y Development
 
 # 4. Verificar que se agregó
@@ -103,17 +103,17 @@ Asegúrate de tener configuradas todas estas variables en Vercel:
 
 ```env
 # Supabase
-NEXT_PUBLIC_SUPABASE_URL=https://tvijhnglmryjmrstfvbv.supabase.co
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 # Twilio
-TWILIO_ACCOUNT_SID=ACd27123ff100aaa78a7bcadb10eac2f0a
-TWILIO_AUTH_TOKEN=daa2272544d8e082fc16776d9356744d
+TWILIO_ACCOUNT_SID=your-twilio-account-sid
+TWILIO_AUTH_TOKEN=your-twilio-auth-token
 TWILIO_WHATSAPP_NUMBER=+14155238886
 
 # Google Maps
-GOOGLE_MAPS_API_KEY=AIzaSyAfsPP-qnCmulna4zNbLEQkDk_88MB-n3o
+GOOGLE_MAPS_API_KEY=your-google-maps-api-key
 GOOGLE_MAPS_FLEET_ROUTING_API_KEY=tu-fleet-routing-api-key
 
 # Google Cloud Configuration

@@ -8,13 +8,18 @@ import type { MetaWebhookPayload, MetaIncomingMessage } from '@/types/whatsapp-m
  * POST: Recepción de mensajes entrantes y estados de mensajes
  */
 
-const VERIFY_TOKEN = process.env.WHATSAPP_META_VERIFY_TOKEN || 'avicola_del_sur_verify_token_2025'
+const VERIFY_TOKEN = process.env.WHATSAPP_META_VERIFY_TOKEN?.trim()
 
 /**
  * Maneja la verificación del webhook (GET)
  * Meta envía una petición GET con parámetros para verificar que el webhook es válido
  */
 export async function GET(request: NextRequest) {
+  if (!VERIFY_TOKEN) {
+    console.error('[WhatsApp Meta Webhook] WHATSAPP_META_VERIFY_TOKEN no configurado')
+    return new NextResponse('Webhook verify token is not configured', { status: 500 })
+  }
+
   const searchParams = request.nextUrl.searchParams
   const mode = searchParams.get('hub.mode')
   const token = searchParams.get('hub.verify_token')

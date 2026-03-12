@@ -1,10 +1,17 @@
-// Script simple para ejecutar SQL en Supabase usando la Management API
+// Script simple para ejecutar SQL en Supabase usando la Management API.
+// Requiere variables de entorno para evitar exponer tokens en el repositorio.
 const fs = require('fs');
 const https = require('https');
 
-const PROJECT_REF = 'tvijhnglmryjmrstfvbv';
-const TOKEN = 'sbp_3f640b43bed62c1338ef5f3dd93e47f2f35bfbd9';
+const PROJECT_REF = process.env.SUPABASE_PROJECT_REF;
+const TOKEN = process.env.SUPABASE_ACCESS_TOKEN;
 const SQL_FILE = process.argv[2] || 'scripts/migracion_v3.sql';
+
+if (!PROJECT_REF || !TOKEN) {
+  throw new Error(
+    'Faltan SUPABASE_PROJECT_REF o SUPABASE_ACCESS_TOKEN. Definelas en el entorno antes de ejecutar este script.'
+  );
+}
 
 let sql = fs.readFileSync(SQL_FILE, 'utf-8');
 

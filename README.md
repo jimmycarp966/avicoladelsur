@@ -163,10 +163,8 @@
 | `npm run dev` | Next.js + Server Actions |
 | `npm run build && npm start` | Build/preview producción |
 | `npm run lint` | ESLint + TS |
-| `npm run typecheck` | Revisión estricta TS |
+| `npm run type-check` | Revisión estricta TS |
 | `npm run verificar-bot` | Diagnóstico de bot WhatsApp |
-| `npm run test:sucursales` | Suite rápida de POS sucursales |
-| `npm run test:bot:webhook` | Simula mensajes Twilio hacia `/api/bot` (prueba rápida del bot) |
 | `npm run supabase:migrate` | Aplica migraciones locales |
 | `./scripts/demo-presupuestos.sh` | Flujo Presupuesto→Pedido |
 | `./scripts/demo-rutas.sh` | Demostración optimización TMS |
@@ -481,9 +479,6 @@ npm run lint
 
 # Verificar datos/configuración del bot
 npm run verificar-bot
-
-# Tests puntuales
-npm run test:sucursales
 ```
 
 ## 🎯 Flujo de Presupuestos - COMPLETO
@@ -944,17 +939,13 @@ Reserva preventiva de stock → Respuesta con número PRES-XXXXX
 
 ---
 
-## 🧪 Guía de Pruebas
+## ✅ Verificación del Sistema
 
-### 📋 Checklist Completo de Pruebas
+### 📋 Validaciones recomendadas
 
-**Ver la guía completa de pruebas en [`TESTING.md`](./TESTING.md)** que incluye:
-
-- ✅ Flujo completo Bot → Ventas → Almacén → Reparto → Tesorería
-- ✅ Pruebas de cada módulo individual
-- ✅ Endpoints de API para testing
-- ✅ Funciones RPC de Supabase
-- ✅ Validaciones de datos y consistencia
+- ✅ Ejecutar `npm run lint`
+- ✅ Ejecutar `npm run type-check`
+- ✅ Ejecutar `npm run build`
 - ✅ Problemas comunes y soluciones
 
 ### 🚀 Inicio Rápido de Pruebas
@@ -1089,7 +1080,7 @@ SELECT * FROM fn_registrar_cobro_reparto(
 - [ ] Estados se actualizan correctamente
 - [ ] Movimientos de caja se registran automáticamente
 
-**Ver la guía completa en [`TESTING.md`](./TESTING.md) para pruebas detalladas de cada módulo.**
+**Recomendación:** validar cada módulo con `npm run lint`, `npm run type-check` y `npm run build` antes de desplegar.
 
 ## 💰 Tesorería y Gastos - COMPLETO
 
@@ -1689,7 +1680,6 @@ BOTPRESS_WEBHOOK_URL=https://your-botpress-webhook
 | [📋 PRD.md](./PRD.md) | **Product Requirements Document** - Requisitos, especificaciones y criterios de validación del producto |
 | [🏗️ ARCHITECTURE_SUMMARY.md](./ARCHITECTURE_SUMMARY.md) | Resumen ejecutivo de la arquitectura del sistema |
 | [📐 ARCHITECTURE.MD](./ARCHITECTURE.MD) | Arquitectura técnica detallada con diagramas |
-| [🧪 TESTING.md](./TESTING.md) | Guía completa de pruebas del sistema |
 | [🤖 docs/IA_CAPABILITIES.md](./docs/IA_CAPABILITIES.md) | Inventario operativo de capacidades IA, estrategias y rutas canónicas |
 | [🗃️ SUPABASE_SETUP.md](./SUPABASE_SETUP.md) | Configuración de la base de datos Supabase |
 | [👔 RRHH_README.md](./RRHH_README.md) | Documentación del módulo de Recursos Humanos |

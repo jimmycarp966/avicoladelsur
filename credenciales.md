@@ -1,101 +1,26 @@
-# 🔐 Credenciales del Proyecto - Avícola del Sur ERP
+# Credenciales del Proyecto
 
-## ⚠️ IMPORTANTE
-**Este archivo contiene información sensible. NO lo subas a repositorios públicos.**
+Este archivo fue saneado para el repositorio publico.
 
----
+No se deben commitear:
 
-## 🗄️ Supabase
+- claves de Supabase
+- service role keys
+- tokens de Twilio o Meta
+- API keys de Google
+- exports de variables de entorno
 
-### Project URL
-```
-https://tvijhnglmryjmrstfvbv.supabase.co
-```
+Usa estos destinos para valores reales:
 
-### API Key (anon/public)
-```
-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR2aWpobmdsbXJ5am1yc3RmdmJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0Njg2MTYsImV4cCI6MjA3ODA0NDYxNn0.4IoAdWby0BVK90ZeZJjSz1RslmPGq2LieFD4svGEGmU
-```
+- `.env.local` para desarrollo local
+- variables de entorno del proveedor de deploy para preview/produccion
+- gestores de secretos del proveedor cloud cuando aplique
 
-### Service Role Key (privada)
-```
-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR2aWpobmdsbXJ5am1yc3RmdmJ2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MjQ2ODYxNiwiZXhwIjoyMDc4MDQ0NjE2fQ.hkmKipZklOSQuqWb9IptiSawt3TdnxqlZcilNbmB2Jc
-```
+Si en algun momento se subieron credenciales reales a Git, trata el incidente como compromiso:
 
-### Dashboard
-[Acceder al Dashboard de Supabase](https://supabase.com/dashboard/project/tvijhnglmryjmrstfvbv)
+1. Rota todas las claves afectadas.
+2. Actualiza los secretos en Vercel/Supabase/Twilio/Google.
+3. Reescribe el historial del repositorio para eliminar los valores antiguos.
+4. Invalida cualquier token de larga vida que haya quedado expuesto.
 
----
-
-## 🤖 Botpress (Pendiente)
-
-### Webhook URL
-```
-Pendiente de configuración
-```
-
-### API Key
-```
-Pendiente de configuración
-```
-
----
-
-## 📱 Twilio / WhatsApp
-
-### Account SID
-```
-ACd27123ff100aaa78a7bcadb10eac2f0a
-```
-
-### Auth Token
-```
-daa2272544d8e082fc16776d9356744d
-```
-
-### WhatsApp Number (Sandbox)
-```
-+14155238886
-```
-
-### WhatsApp Sandbox URL
-```
-https://console.twilio.com/us1/develop/sms/try-it-out/whatsapp-learn
-```
-
----
-
-## 🗺️ Google Maps API
-
-### API Key (Directions API)
-```
-AIzaSyAfsPP-qnCmulna4zNbLEQkDk_88MB-n3o
-```
-
-### Configuración
-- **API Habilitada**: Directions API
-- **Uso**: Optimización de rutas de reparto
-- **Fallback**: Si no está disponible, usa algoritmo local (Nearest Neighbor + 2-opt)
-- **Configurada en**: `.env.local` y Vercel (producción)
-
----
-
-## 📝 Notas
-
-- Fecha de creación: 7 de Noviembre, 2025
-- Fecha de actualización: 7 de Noviembre, 2025
-- Proyecto: Avícola del Sur ERP
-- Las credenciales de Supabase están activas y configuradas ✅
-- Las credenciales de Twilio están configuradas ✅
-- ✅ La API Key de Google Maps está configurada ✅
-- La integración de Botpress está pendiente (opcional)
-
----
-
-## 🔒 Seguridad
-
-- ✅ No compartir estas credenciales públicamente
-- ✅ No subir este archivo a Git (debe estar en .gitignore)
-- ✅ Cambiar las credenciales si son comprometidas
-- ✅ Usar variables de entorno para todas las credenciales sensibles
-
+Consulta [env.example](./env.example), [SUPABASE_SETUP.md](./SUPABASE_SETUP.md) y [docs/WHATSAPP_META_SETUP.md](./docs/WHATSAPP_META_SETUP.md) para ejemplos seguros.

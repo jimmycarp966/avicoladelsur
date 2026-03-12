@@ -89,10 +89,10 @@ El número `123456789012345` es tu Phone Number ID.
 
 El Verify Token es un string que tú defines para verificar que los webhooks vienen de Meta.
 
-1. Elige un token seguro (ej: `avicola_del_sur_verify_token_2025`)
+1. Elige un token seguro y largo (ej: `change-this-to-a-long-random-verify-token`)
 2. Configúralo en `.env.local`:
    ```
-   WHATSAPP_META_VERIFY_TOKEN=avicola_del_sur_verify_token_2025
+   WHATSAPP_META_VERIFY_TOKEN=change-this-to-a-long-random-verify-token
    ```
 3. **Importante**: Usa el mismo token cuando configures el webhook en Meta (Paso 7)
 
@@ -118,7 +118,7 @@ Copia la URL HTTPS generada (ej: `https://abc123.ngrok.io`)
    - **URL de devolución de llamada**: `https://tu-dominio.com/api/webhooks/whatsapp-meta`
      - Desarrollo: `https://abc123.ngrok.io/api/webhooks/whatsapp-meta`
      - Producción: `https://avicoladelsur.vercel.app/api/webhooks/whatsapp-meta`
-   - **Token de verificación**: El mismo que configuraste en `.env.local` (ej: `avicola_del_sur_verify_token_2025`)
+   - **Token de verificación**: El mismo que configuraste en `.env.local` (ej: `change-this-to-a-long-random-verify-token`)
 4. Haz clic en **"Verificar y guardar"**
 5. Meta enviará una petición GET a tu webhook para verificar
 6. Si todo está bien, verás **"Verificado"** en verde
@@ -145,7 +145,7 @@ WHATSAPP_META_ACCESS_TOKEN=tu_token_aqui
 WHATSAPP_META_PHONE_NUMBER_ID=tu_phone_number_id_aqui
 WHATSAPP_META_APP_ID=tu_app_id_aqui
 WHATSAPP_META_APP_SECRET=tu_app_secret_aqui
-WHATSAPP_META_VERIFY_TOKEN=avicola_del_sur_verify_token_2025
+WHATSAPP_META_VERIFY_TOKEN=change-this-to-a-long-random-verify-token
 WHATSAPP_META_WEBHOOK_URL=https://tu-dominio.com/api/webhooks/whatsapp-meta
 
 # Proveedor de WhatsApp (meta o twilio)

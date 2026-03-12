@@ -4,13 +4,13 @@
 
 ### Supabase (Ya existentes)
 ```
-NEXT_PUBLIC_SUPABASE_URL=https://tvijhnglmryjmrstfvbv.supabase.co
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=eyJhbGc...
 ```
 
 ### Vertex AI (Nuevas - Agregar en Vercel)
 ```
-GOOGLE_CLOUD_PROJECT_ID=gen-lang-client-0184145853
+GOOGLE_CLOUD_PROJECT_ID=your-gcp-project-id
 GOOGLE_CLOUD_CREDENTIALS_BASE64=<service-account-key-base64>
 ```
 
@@ -86,7 +86,7 @@ vercel logs --prod
 
 ### Error: "Permission denied"
 - Verificar que el service account tenga el rol `Vertex AI User`
-- Verificar que el project ID sea correcto: `gen-lang-client-0184145853`
+- Verificar que el project ID sea correcto: `your-gcp-project-id`
 
 ### Error: "Quota exceeded"
 - Verificar la cuota de Vertex AI en Google Cloud Console

@@ -259,7 +259,7 @@ main() {
     log "  3. Probar ventas desde /sucursal/ventas"
     log "  4. Revisar reportes en /sucursal/reportes"
     log ""
-    log "📖 Para más información ver TESTING.md y README.md"
+    log "📖 Para más información ver README.md"
 }
 
 # Ejecutar demo

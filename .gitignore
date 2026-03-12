@@ -61,6 +61,7 @@ google-cloud-service-account.json
 *.pem
 *.base64
 credenciales.md
+/env_list.txt
 /pres/
 /pdf_content.txt
 /read_pdf.py
@@ -72,3 +73,10 @@ credenciales.md
 *.tsbuildinfo
 next-env.d.ts
 nul
+
+# Harness runtime artifacts
+.harness/runs/
+.harness/logs/
+.harness/maintenance/reports/
+.harness/maintenance/cron.log
+.harness/maintenance/proposals/
