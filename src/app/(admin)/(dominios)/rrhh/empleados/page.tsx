@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useMemo } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { EmpleadosTable } from '@/components/tables/EmpleadosTable'
 import { Button } from '@/components/ui/button'
 import { Plus, Users, UserCheck, TrendingUp, Building2, Shuffle } from 'lucide-react'
@@ -15,6 +15,7 @@ import { useNotificationStore } from '@/store/notificationStore'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatCard } from '@/components/ui/stat-card'
 import { Card, CardContent } from '@/components/ui/card'
+import { EmpleadosFilterBar } from './_components/EmpleadosFilterBar'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,6 +30,7 @@ import type { Empleado } from '@/types/domain.types'
 
 export default function EmpleadosPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { showToast } = useNotificationStore()
   const [empleados, setEmpleados] = useState<Empleado[]>([])
   const [loading, setLoading] = useState(true)
@@ -142,6 +144,66 @@ export default function EmpleadosPage() {
     }
   }
 
+  const busqueda = searchParams.get('q')?.trim() || ''
+  const sucursalFiltro = searchParams.get('sucursal') || 'todas'
+  const puestoFiltro = searchParams.get('puesto') || 'todos'
+
+  const sucursalesDisponibles = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          empleados
+            .map((empleado) => empleado.sucursal?.nombre?.trim())
+            .filter((value): value is string => Boolean(value)),
+        ),
+      ).sort((a, b) => a.localeCompare(b, 'es')),
+    [empleados],
+  )
+
+  const puestosDisponibles = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          empleados
+            .map((empleado) => empleado.categoria?.nombre?.trim())
+            .filter((value): value is string => Boolean(value)),
+        ),
+      ).sort((a, b) => a.localeCompare(b, 'es')),
+    [empleados],
+  )
+
+  const empleadosFiltrados = useMemo(() => {
+    const term = busqueda.toLowerCase()
+
+    return empleados.filter((empleado) => {
+      const sucursalNombre = empleado.sucursal?.nombre?.trim() || 'Sin asignar'
+      const puestoNombre = empleado.categoria?.nombre?.trim() || 'Sin asignar'
+
+      if (sucursalFiltro !== 'todas' && sucursalNombre !== sucursalFiltro) {
+        return false
+      }
+
+      if (puestoFiltro !== 'todos' && puestoNombre !== puestoFiltro) {
+        return false
+      }
+
+      if (!term) {
+        return true
+      }
+
+      const nombre = empleado.usuario?.nombre || empleado.nombre || ''
+      const apellido = empleado.usuario?.apellido || empleado.apellido || ''
+      const email = empleado.usuario?.email || ''
+      const legajo = empleado.legajo || ''
+
+      const searchable = [nombre, apellido, `${nombre} ${apellido}`.trim(), email, legajo, sucursalNombre, puestoNombre]
+        .join(' ')
+        .toLowerCase()
+
+      return searchable.includes(term)
+    })
+  }, [busqueda, empleados, puestoFiltro, sucursalFiltro])
+
   if (loading) {
     return (
       <div className="space-y-8 animate-pulse">
@@ -222,9 +284,17 @@ export default function EmpleadosPage() {
 
       {/* Tabla de empleados envuelta en Card Estandarizada */}
       <Card className="overflow-hidden border-border/60">
-        <CardContent className="p-0">
+        <CardContent className="p-6 space-y-4">
+          <EmpleadosFilterBar
+            busqueda={busqueda}
+            sucursal={sucursalFiltro}
+            puesto={puestoFiltro}
+            sucursales={sucursalesDisponibles}
+            puestos={puestosDisponibles}
+          />
+
           <EmpleadosTable
-            empleados={empleados}
+            empleados={empleadosFiltrados}
             onView={handleView}
             onEdit={handleEdit}
             onDelete={handleDelete}

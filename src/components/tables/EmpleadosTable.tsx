@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import { ColumnDef } from '@tanstack/react-table'
 import { DataTable, SortableHeader, StatusBadge } from '@/components/ui/data-table'
 import { Badge } from '@/components/ui/badge'
@@ -27,6 +28,8 @@ interface EmpleadosTableProps {
 }
 
 export function EmpleadosTable({ empleados, onView, onEdit, onDelete, onCall, onEmail }: EmpleadosTableProps) {
+  const totalEmpleados = useMemo(() => empleados.length, [empleados])
+
   const columns: ColumnDef<Empleado>[] = [
     {
       accessorKey: 'legajo',
@@ -197,11 +200,15 @@ export function EmpleadosTable({ empleados, onView, onEdit, onDelete, onCall, on
   ]
 
   return (
-    <DataTable
-      columns={columns}
-      data={empleados}
-      searchKey="usuario.nombre"
-      searchPlaceholder="Buscar empleados..."
-    />
+    <div className="space-y-4 p-6">
+      <div className="flex justify-end">
+        <span className="text-sm text-muted-foreground">{totalEmpleados} empleados</span>
+      </div>
+
+      <DataTable
+        columns={columns}
+        data={empleados}
+      />
+    </div>
   )
 }
