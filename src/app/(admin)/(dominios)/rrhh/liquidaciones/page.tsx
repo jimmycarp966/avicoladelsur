@@ -128,7 +128,7 @@ async function getSucursalesOptions(): Promise<SucursalOption[]> {
   const { data, error } = await db
     .from('sucursales')
     .select('id, nombre')
-    .eq('activo', true)
+    .eq('active', true)
     .order('nombre', { ascending: true })
 
   if (error) {
