@@ -1,11 +1,10 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { ColumnDef } from '@tanstack/react-table'
 import { DataTable, SortableHeader, StatusBadge } from '@/components/ui/data-table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Edit, Eye, CheckCircle, DollarSign, MoreHorizontal, FileSpreadsheet, Printer } from 'lucide-react'
 import {
   DropdownMenu,
@@ -43,23 +42,8 @@ const MESES = [
   { value: 12, label: 'Diciembre' },
 ]
 
-const ESTADOS_OPTIONS = [
-  { value: 'todos', label: 'Todos los estados' },
-  { value: 'borrador', label: 'Borrador' },
-  { value: 'calculada', label: 'Calculada' },
-  { value: 'aprobada', label: 'Aprobada' },
-  { value: 'pagada', label: 'Pagada' },
-]
-
 export function LiquidacionesTable({ liquidaciones, onView, onEdit, onApprove, onPay }: LiquidacionesTableProps) {
-  const [filtroEstado, setFiltroEstado] = useState<string>('todos')
-
-  const liquidacionesFiltradas = useMemo(() => {
-    return liquidaciones.filter((l) => {
-      if (filtroEstado !== 'todos' && l.estado !== filtroEstado) return false
-      return true
-    })
-  }, [liquidaciones, filtroEstado])
+  const totalLiquidaciones = useMemo(() => liquidaciones.length, [liquidaciones])
 
   const getEstadoBadge = (estado: string) => {
     switch (estado) {
@@ -287,31 +271,13 @@ export function LiquidacionesTable({ liquidaciones, onView, onEdit, onApprove, o
 
   return (
     <div className="space-y-4">
-      {/* Filtro de estado (año/mes vienen del servidor via URL) */}
-      <div className="flex flex-wrap items-center gap-3">
-        <Select value={filtroEstado} onValueChange={setFiltroEstado}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Estado" />
-          </SelectTrigger>
-          <SelectContent>
-            {ESTADOS_OPTIONS.map((op) => (
-              <SelectItem key={op.value} value={op.value}>
-                {op.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <span className="text-sm text-muted-foreground ml-auto">
-          {liquidacionesFiltradas.length} de {liquidaciones.length} liquidaciones
-        </span>
+      <div className="flex justify-end">
+        <span className="text-sm text-muted-foreground">{totalLiquidaciones} liquidaciones</span>
       </div>
 
       <DataTable
         columns={columns}
-        data={liquidacionesFiltradas}
-        searchKey="empleado.usuario.nombre"
-        searchPlaceholder="Buscar por empleado..."
+        data={liquidaciones}
         enablePagination={true}
         pageSize={50}
       />

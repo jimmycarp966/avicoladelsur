@@ -200,18 +200,51 @@ export const dynamic = 'force-dynamic'
 export default async function LiquidacionesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mes?: string; anio?: string; ambito?: string; sucursal?: string }>
+  searchParams: Promise<{
+    mes?: string
+    anio?: string
+    ambito?: string
+    sucursal?: string
+    estado?: string
+    q?: string
+  }>
 }) {
   const params = await searchParams
   const periodoMes = params.mes ? Number(params.mes) : undefined
   const periodoAnio = params.anio ? Number(params.anio) : new Date().getFullYear()
   const ambito = (params.ambito || 'todos') as AmbitoFilter
   const sucursalId = params.sucursal || undefined
+  const estado = params.estado || 'todos'
+  const busqueda = params.q?.trim() || ''
 
   await ejecutarFallbackMesVencido()
-  const liquidaciones = await getLiquidaciones(periodoMes, periodoAnio, ambito, sucursalId)
+  const liquidacionesBase = await getLiquidaciones(periodoMes, periodoAnio, ambito, sucursalId)
   const sucursales = await getSucursalesOptions()
   const empleadosActivos = await getEmpleadosActivosParaRecalculo()
+
+  const busquedaNormalizada = busqueda.toLowerCase()
+  const liquidaciones = liquidacionesBase.filter((liquidacion) => {
+    if (estado !== 'todos' && liquidacion.estado !== estado) {
+      return false
+    }
+
+    if (!busquedaNormalizada) {
+      return true
+    }
+
+    const empleado = liquidacion.empleado
+    const nombre = empleado?.usuario?.nombre || empleado?.nombre || ''
+    const apellido = empleado?.usuario?.apellido || empleado?.apellido || ''
+    const email = empleado?.usuario?.email || ''
+    const legajo = empleado?.legajo || ''
+    const puesto = liquidacion.puesto_override?.trim() || empleado?.categoria?.nombre?.trim() || ''
+
+    const textoBusqueda = [nombre, apellido, `${nombre} ${apellido}`.trim(), email, legajo, puesto]
+      .join(' ')
+      .toLowerCase()
+
+    return textoBusqueda.includes(busquedaNormalizada)
+  })
 
   const totalAprobadas = liquidaciones.filter((l) => l.estado === 'aprobada').length
   const totalPendientes = liquidaciones.filter(
@@ -289,6 +322,8 @@ export default async function LiquidacionesPage({
           periodoAnio={periodoAnio}
           ambito={ambito}
           sucursalId={sucursalId}
+          estado={estado}
+          busqueda={busqueda}
           sucursales={sucursales}
         />
         <LiquidacionesTableWrapper liquidaciones={liquidaciones} />
