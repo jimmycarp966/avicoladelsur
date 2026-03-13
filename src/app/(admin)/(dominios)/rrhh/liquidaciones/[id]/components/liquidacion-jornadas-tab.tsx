@@ -123,6 +123,21 @@ export function LiquidacionJornadasTab({
     return new Date(`${isoDate}T00:00:00`).getDay() === 0
   }
 
+  const todayArgentina = useMemo(
+    () =>
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Argentina/Buenos_Aires',
+      }).format(new Date()),
+    [],
+  )
+
+  const getPlaceholderTipo = (fechaIso: string): 'ausente' | 'no_laboral' | 'pendiente' => {
+    if (!fechaIso) return 'no_laboral'
+    if (fechaIso > todayArgentina) return 'pendiente'
+    if (isSunday(fechaIso) || feriadosMap.has(fechaIso)) return 'no_laboral'
+    return 'ausente'
+  }
+
   const filteredRows = useMemo(() => {
     const rowsConTodosLosDias: JornadaRowView[] = (() => {
       const diasDelMes = new Date(liquidacion.periodo_anio, liquidacion.periodo_mes, 0).getDate()
@@ -495,12 +510,15 @@ export function LiquidacionJornadasTab({
                     const esFeriado = Boolean(feriadoLabel)
                     const esDomingo = isSunday(fechaIso)
                     const esDescanso = row.origen === 'auto_licencia_descanso'
+                    const placeholderTipo = isPlaceholder ? getPlaceholderTipo(fechaIso) : null
                     const hasDiferencia =
                       (row.horas_adicionales || 0) > 0 ||
                       (row.turno_especial_unidades || 0) > 0 ||
                       (row.tarifa_hora_base || 0) !== (liquidacion.valor_hora || 0)
                     const rowClass = isPlaceholder
-                      ? 'bg-slate-50/90'
+                      ? placeholderTipo === 'ausente'
+                        ? 'bg-red-50/70'
+                        : 'bg-slate-50/90'
                       : esFeriado || esDomingo
                       ? 'bg-rose-50/60'
                       : hasDiferencia
@@ -531,15 +549,41 @@ export function LiquidacionJornadasTab({
                             </Badge>
                           )}
                           {isPlaceholder && (
-                            <Badge variant="outline" className="bg-gray-50 text-gray-500 border-gray-200 text-[10px]">
-                              Sin carga
-                            </Badge>
+                            <>
+                              {placeholderTipo === 'ausente' ? (
+                                <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 text-[10px]">
+                                  Ausente
+                                </Badge>
+                              ) : placeholderTipo === 'pendiente' ? (
+                                <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px]">
+                                  Pendiente
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="bg-gray-50 text-gray-500 border-gray-200 text-[10px]">
+                                  Sin carga
+                                </Badge>
+                              )}
+                            </>
                           )}
                         </div>
                       </TableCell>
                       <TableCell className="text-sm">
                         {isPlaceholder ? (
-                          <span className="text-muted-foreground">Sin carga</span>
+                          <span
+                            className={
+                              placeholderTipo === 'ausente'
+                                ? 'text-red-700 font-medium'
+                                : placeholderTipo === 'pendiente'
+                                ? 'text-amber-700'
+                                : 'text-muted-foreground'
+                            }
+                          >
+                            {placeholderTipo === 'ausente'
+                              ? 'Ausente'
+                              : placeholderTipo === 'pendiente'
+                              ? 'Pendiente'
+                              : 'Sin carga'}
+                          </span>
                         ) : (() => {
                           const horasInsuf =
                             (row.horas_mensuales ?? 0) > 0 &&
