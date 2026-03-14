@@ -75,6 +75,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
   const [cargandoListas, setCargandoListas] = useState(true) // Iniciar en true para mostrar loading inicial
   const [errorListas, setErrorListas] = useState<string | null>(null)
   const agregarProductoButtonRef = useRef<HTMLButtonElement>(null)
+  const clienteSearchInputRef = useRef<HTMLInputElement>(null)
 
   // Estado para listas por producto (index -> lista_id)
   const [listasPorProducto, setListasPorProducto] = useState<Record<number, string>>({})
@@ -194,6 +195,12 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
     const maxAttempts = 12
 
     const tryFocus = () => {
+      if (clienteSearchInputRef.current) {
+        clienteSearchInputRef.current.focus()
+        clienteSearchInputRef.current.select()
+        return
+      }
+
       const searchInput = document.querySelector(
         '[data-slot="select-content"] input[placeholder*="Buscar por codigo"], ' +
         '[data-slot="select-content"] input[placeholder*="Buscar por código"], ' +
@@ -372,6 +379,16 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
     const timeoutId = window.setTimeout(openClienteSelector, 150)
     return () => clearTimeout(timeoutId)
   }, [openClienteSelector])
+
+  useEffect(() => {
+    if (!clienteDropdownOpen) return
+
+    const timeoutId = window.setTimeout(() => {
+      focusClienteSearchInput()
+    }, 0)
+
+    return () => clearTimeout(timeoutId)
+  }, [clienteDropdownOpen, focusClienteSearchInput])
 
   // Efecto para cargar y aplicar automaticamente zona y lista de precios del cliente
   useEffect(() => {
@@ -1125,6 +1142,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                       <div className="relative">
                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
+                          ref={clienteSearchInputRef}
                           placeholder="Buscar por codigo, nombre..."
                           value={clienteSearch}
                           onChange={(e) => {
@@ -1172,6 +1190,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                             }
                           }}
                           autoComplete="off"
+                          autoFocus={clienteDropdownOpen && !watchedCliente}
                         />
                         {clienteSearch && (
                           <Button
