@@ -23,7 +23,6 @@ import RutasSidebar from './RutasSidebar'
 import { toast } from 'sonner'
 import { config } from '@/lib/config'
 import { useRealtime } from '@/lib/hooks/useRealtime'
-import { getDirectionsWithFallback, getOptimizedRoute } from '@/lib/rutas/ors-directions'
 
 // Tipos
 interface UbicacionVehiculo {
@@ -80,6 +79,17 @@ interface RutaData {
 interface MonitorMapProps {
   zonaId?: string
   fecha?: string
+}
+
+interface GoogleDirectionsApiResponse {
+  success: boolean
+  data?: {
+    orderedStops?: Array<{ lat: number; lng: number; waypointIndex?: number }>
+    polyline?: string
+    distance?: number
+    duration?: number
+  }
+  error?: string
 }
 
 declare global {
@@ -746,7 +756,7 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
 
       // Si no hay polyline válido o tiene menos de 2 puntos (se necesitan al menos 2 para dibujar línea)
       if (!path || path.length < 2) {
-        console.log(`🎨 [DEBUG] Polyline insuficiente, solicitando ruta real con GraphHopper/Google para ${ruta.numero}`)
+        console.log(`🎨 [DEBUG] Polyline insuficiente, solicitando ruta real con Google Directions para ${ruta.numero}`)
 
         // Construir waypoints desde: casa central -> clientes (en orden) -> casa central
         const homeBase = config.rutas.homeBase
@@ -764,24 +774,44 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
               lng: c.lng
             }))
 
-            console.log(`🗺️ [DEBUG] Solicitando ruta OPTIMIZADA: depot=${JSON.stringify(depot)}, paradas=${stops.length}`)
+            console.log(`🗺️ [DEBUG] Solicitando ruta OPTIMIZADA con Google: depot=${JSON.stringify(depot)}, paradas=${stops.length}`)
 
-            // Usar ORS Optimization para reordenar + calcular ruta óptima
-            const { response, orderedStops, provider } = await getOptimizedRoute({
-              depot,
-              stops,
-              returnToDepot: config.rutas.returnToBase !== false,
-              vehicle: 'driving-car'
+            const directionsResponse = await fetch('/api/integrations/google/directions', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                origin: depot,
+                destination: config.rutas.returnToBase !== false ? depot : stops[stops.length - 1],
+                waypoints: config.rutas.returnToBase !== false ? stops : stops.slice(0, -1),
+                optimize: true,
+              }),
+            })
+            const directionsData = await directionsResponse.json() as GoogleDirectionsApiResponse
+
+            console.log('🗺️ [DEBUG] Google Directions status:', {
+              ok: directionsResponse.ok,
+              success: directionsData.success,
+              error: directionsData.error,
             })
 
-            console.log(`🗺️ [DEBUG] Proveedor usado: ${provider}`)
-
             // Actualizar el orden de visita según la optimización
-            if (orderedStops && orderedStops.length > 0) {
+            if (directionsData.data?.orderedStops && directionsData.data.orderedStops.length > 0) {
               const ordenOptimizado = new Map<string, number>()
-              orderedStops.forEach((stop, index) => {
-                ordenOptimizado.set(stop.id, index + 1)
+              directionsData.data.orderedStops.forEach((stop, index) => {
+                if (typeof stop.waypointIndex === 'number') {
+                  const originalStop = stops[stop.waypointIndex]
+                  if (originalStop) {
+                    ordenOptimizado.set(originalStop.id, index + 1)
+                  }
+                }
               })
+
+              if (config.rutas.returnToBase === false && stops.length > 0) {
+                const destinoFinal = stops[stops.length - 1]
+                ordenOptimizado.set(destinoFinal.id, directionsData.data.orderedStops.length + 1)
+              }
 
               // Actualizar el orden de cada cliente según la optimización
               ruta.ordenVisita.forEach(cliente => {
@@ -799,8 +829,8 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
                 ruta.ordenVisita.map(c => `${c.orden}. ${c.cliente_nombre}`).join(' → '))
             }
 
-            if (response.success && response.polyline) {
-              console.log(`✅ [DEBUG] Ruta obtenida para ruta ${ruta.numero} (provider: ${provider})`)
+            if (directionsResponse.ok && directionsData.success && directionsData.data?.polyline) {
+              console.log(`✅ [DEBUG] Ruta obtenida para ruta ${ruta.numero} (provider: google)`)
 
               // Decodificar polyline si está codificado
               let routePath: any[] = []
@@ -808,17 +838,17 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
               if (window.google?.maps?.geometry?.encoding) {
                 // Intentar decodificar como polyline de Google
                 try {
-                  routePath = window.google.maps.geometry.encoding.decodePath(response.polyline)
+                  routePath = window.google.maps.geometry.encoding.decodePath(directionsData.data.polyline)
                 } catch (e) {
                   // Si falla, intentar formato simple
-                  routePath = response.polyline.split(';').map((coord: string) => {
+                  routePath = directionsData.data.polyline.split(';').map((coord: string) => {
                     const [lat, lng] = coord.split(',').map(Number)
                     return new window.google.maps.LatLng(lat, lng)
                   })
                 }
               } else {
                 // Fallback: formato simple
-                routePath = response.polyline.split(';').map((coord: string) => {
+                routePath = directionsData.data.polyline.split(';').map((coord: string) => {
                   const [lat, lng] = coord.split(',').map(Number)
                   return new window.google.maps.LatLng(lat, lng)
                 })
@@ -836,10 +866,10 @@ export default function MonitorMap({ zonaId, fecha }: MonitorMapProps) {
                 })
 
                 polylinesRef.current.set(`ruta-directions-${ruta.id}`, directionsPolyline)
-                console.log(`🎨 [DEBUG] Polyline dibujada con ${routePath.length} puntos (provider: ${provider})`)
+                console.log(`🎨 [DEBUG] Polyline dibujada con ${routePath.length} puntos (provider: google)`)
               }
             } else {
-              console.warn(`⚠️ [DEBUG] Ruta falló para ruta ${ruta.numero}: ${response.error}`)
+              console.warn(`⚠️ [DEBUG] Ruta falló para ruta ${ruta.numero}: ${directionsData.error || 'Error desconocido de Google Directions'}`)
               // Fallback: dibujar línea recta
               drawStraightLineFallback()
             }
