@@ -493,7 +493,7 @@ export function PresupuestoItemsTable({
                       value={item.producto_id}
                       onSelect={(p) => handleProductoSelect(index, p)}
                       productos={productos}
-                      autoFocus={index === items.length - 1 && !item.producto_id}
+                      autoFocus={items.length > 1 && index === items.length - 1 && !item.producto_id}
                       rowIndex={index}
                     />
                     {hasError?.producto_id && (
