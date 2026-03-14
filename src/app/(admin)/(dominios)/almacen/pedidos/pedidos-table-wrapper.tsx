@@ -257,6 +257,7 @@ export function PedidosTableWrapper() {
           onEdit={handleEdit}
           onDelete={handleDelete}
           onDeliver={handleDeliver}
+          onPrint={handlePrint}
         />
       ) : (
         <PedidosTable
@@ -281,4 +282,3 @@ export function PedidosTableWrapper() {
     </div>
   )
 }
-
