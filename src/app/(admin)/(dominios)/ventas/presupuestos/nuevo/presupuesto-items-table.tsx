@@ -78,8 +78,10 @@ function ProductoOmnibox({
   const [search, setSearch] = useState('')
   const [isOpen, setIsOpen] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const [isEditingSelection, setIsEditingSelection] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const optionRefs = useRef<Array<HTMLDivElement | null>>([])
   const debouncedSearch = useDebounce(search, 150)
 
   // Resetear search cuando cambia el value (se selecciona un producto)
@@ -91,7 +93,7 @@ function ProductoOmnibox({
   }, [value])
 
   const filteredProductos = useMemo(() => {
-    if (!debouncedSearch.trim()) return []
+    if (!debouncedSearch.trim()) return productos.slice(0, 10)
 
     const term = debouncedSearch.toLowerCase().trim()
 
@@ -156,6 +158,14 @@ function ProductoOmnibox({
     ].slice(0, 10)
   }, [productos, debouncedSearch])
 
+  const handleSelectProducto = useCallback((producto: Producto) => {
+    onSelect(producto)
+    setSearch('')
+    setIsOpen(false)
+    setIsEditingSelection(false)
+    setSelectedIndex(0)
+  }, [onSelect])
+
   // Cerrar al hacer click fuera
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -172,48 +182,75 @@ function ProductoOmnibox({
     setSelectedIndex(0)
   }, [filteredProductos.length])
 
+  useEffect(() => {
+    if (!isOpen) return
+
+    optionRefs.current[selectedIndex]?.scrollIntoView({
+      block: 'nearest',
+    })
+  }, [isOpen, selectedIndex])
+
   const handleKeyDown = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault()
-      setSelectedIndex(prev => Math.min(prev + 1, filteredProductos.length - 1))
+      if (!isOpen) {
+        setIsOpen(true)
+      }
+      setSelectedIndex(prev => Math.min(prev + 1, Math.max(filteredProductos.length - 1, 0)))
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
+      if (!isOpen) {
+        setIsOpen(true)
+      }
       setSelectedIndex(prev => Math.max(prev - 1, 0))
     } else if (e.key === 'Enter') {
       e.preventDefault()
       if (filteredProductos[selectedIndex]) {
-        onSelect(filteredProductos[selectedIndex])
-        setSearch('')
-        setIsOpen(false)
+        handleSelectProducto(filteredProductos[selectedIndex])
       }
     } else if (e.key === 'Escape') {
       setIsOpen(false)
     }
-  }, [filteredProductos, selectedIndex, onSelect])
+  }, [filteredProductos, handleSelectProducto, isOpen, selectedIndex])
 
   const productoSeleccionado = productos.find(p => p.id === value)
+  const mostrarBusqueda = !productoSeleccionado || isEditingSelection
+
+  const beginProductChange = useCallback(() => {
+    setIsEditingSelection(true)
+    setSearch('')
+    setIsOpen(true)
+    setSelectedIndex(0)
+
+    window.setTimeout(() => {
+      inputRef.current?.focus()
+      inputRef.current?.select()
+    }, 0)
+  }, [])
 
   // Debug: log para ver qué está pasando
   console.log('[OMNIBOX] value:', value, 'productoSeleccionado:', productoSeleccionado?.codigo, productoSeleccionado?.nombre)
 
-  if (productoSeleccionado) {
+  if (productoSeleccionado && !mostrarBusqueda) {
     return (
       <div className="flex items-center gap-2 w-full">
-        <div className="flex-1 flex items-center gap-2 px-3 py-2 bg-muted rounded-md text-sm min-w-0">
+        <button
+          type="button"
+          className="flex-1 flex items-center gap-2 px-3 py-2 bg-muted rounded-md text-sm min-w-0 text-left hover:bg-muted/80 transition-colors"
+          onClick={beginProductChange}
+          title="Cambiar producto"
+        >
           <Package className="h-4 w-4 text-muted-foreground shrink-0" />
           <span className="font-medium shrink-0">{productoSeleccionado.codigo}</span>
           <span className="text-muted-foreground truncate">- {productoSeleccionado.nombre}</span>
-        </div>
+        </button>
         <Button
           id={`producto_${rowIndex}`}
           type="button"
           variant="ghost"
           size="sm"
           className="shrink-0"
-          onClick={() => {
-            onSelect({ id: '', codigo: '', nombre: '', precio_venta: 0, unidad_medida: '' } as Producto)
-            setTimeout(() => inputRef.current?.focus(), 0)
-          }}
+          onClick={beginProductChange}
         >
           Cambiar
         </Button>
@@ -233,11 +270,15 @@ function ProductoOmnibox({
           value={search}
           onChange={(e) => {
             setSearch(e.target.value)
-            setIsOpen(e.target.value.length > 0)
+            setIsOpen(true)
+            setSelectedIndex(0)
           }}
           onKeyDown={handleKeyDown}
+          onFocus={() => {
+            setIsOpen(true)
+          }}
           className="pl-8"
-          autoFocus={autoFocus}
+          autoFocus={autoFocus || isEditingSelection}
           autoComplete="off"
           data-omnibox-input={rowIndex}
         />
@@ -249,10 +290,11 @@ function ProductoOmnibox({
           {filteredProductos.map((producto, index) => (
             <div
               key={producto.id}
+              ref={(element) => {
+                optionRefs.current[index] = element
+              }}
               onClick={() => {
-                onSelect(producto)
-                setSearch('')
-                setIsOpen(false)
+                handleSelectProducto(producto)
               }}
               className={`px-3 py-2 cursor-pointer text-sm hover:bg-gray-100 flex items-center justify-between ${
                 index === selectedIndex ? 'bg-gray-100' : ''
