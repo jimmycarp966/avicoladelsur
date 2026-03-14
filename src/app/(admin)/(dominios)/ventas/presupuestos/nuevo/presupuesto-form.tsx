@@ -86,7 +86,6 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
   const {
     register,
     control,
-    handleSubmit,
     watch,
     getValues,
     setValue,
@@ -278,7 +277,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
         ctrlKey: true,
         description: 'Enfocar Cantidad del primer producto (Ctrl+Q)',
         action: () => {
-          const cantidadInput = document.getElementById('cantidad_0')
+          const cantidadInput = document.getElementById('cantidad-0')
           if (cantidadInput instanceof HTMLInputElement) {
             cantidadInput.focus()
             cantidadInput.select()
@@ -290,7 +289,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
         ctrlKey: true,
         description: 'Enfocar Precio del primer producto (Ctrl+W)',
         action: () => {
-          const precioInput = document.getElementById('precio_0')
+          const precioInput = document.getElementById('precio-0')
           if (precioInput instanceof HTMLInputElement) {
             precioInput.focus()
             precioInput.select()
@@ -912,6 +911,48 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
     }
   }, [watchedItems, append, fields.length, listasPorProducto])
 
+  const buildPresupuestoPayload = useCallback((): CrearPresupuestoFormData | null => {
+    const rawData = getValues()
+    const clienteValido = z.string().uuid().safeParse(rawData.cliente_id).success
+
+    if (!clienteValido) {
+      showToast('error', 'Debes seleccionar un cliente válido para finalizar')
+      return null
+    }
+
+    const items = Array.isArray(rawData.items) ? rawData.items : []
+    const itemsValidos = items
+      .filter((item) => {
+        const productoValido = z.string().uuid().safeParse(item?.producto_id).success
+        const cantidadValida = Number(item?.cantidad_solicitada || 0) > 0
+        const precioValido = Number(item?.precio_unit_est || 0) > 0
+
+        return productoValido && cantidadValida && precioValido
+      })
+      .map((item) => ({
+        producto_id: item.producto_id,
+        cantidad_solicitada: Number(item.cantidad_solicitada),
+        precio_unit_est: Number(item.precio_unit_est),
+        lista_precio_id: item.lista_precio_id || undefined,
+      }))
+
+    if (itemsValidos.length === 0) {
+      showToast('error', 'No se puede finalizar sin al menos un producto válido')
+      return null
+    }
+
+    return {
+      cliente_id: rawData.cliente_id,
+      zona_id: rawData.zona_id || undefined,
+      fecha_entrega_estimada: rawData.fecha_entrega_estimada || undefined,
+      observaciones: rawData.observaciones || undefined,
+      lista_precio_id: rawData.lista_precio_id || undefined,
+      tipo_venta: rawData.tipo_venta || 'reparto',
+      turno: rawData.turno || 'mañana',
+      items: itemsValidos,
+    }
+  }, [getValues, showToast])
+
   const submitPresupuesto = useCallback(async (data: CrearPresupuestoFormData) => {
     try {
       setIsLoading(true)
@@ -980,51 +1021,14 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
     }
   }, [openClienteSelector, reset, showToast])
 
-  const onSubmit = async (data: CrearPresupuestoFormData) => {
-    await submitPresupuesto(data)
-  }
-
   const handleF12Submit = useCallback(async () => {
     if (isLoading) return
 
-    const rawData = getValues()
-    const clienteValido = z.string().uuid().safeParse(rawData.cliente_id).success
-    if (!clienteValido) {
-      showToast('error', 'Debes seleccionar un cliente valido para finalizar')
-      return
-    }
+    const payload = buildPresupuestoPayload()
+    if (!payload) return
 
-    const items = Array.isArray(rawData.items) ? rawData.items : []
-    const itemsValidos = items
-      .filter((item) => {
-        const productoValido = z.string().uuid().safeParse(item?.producto_id).success
-        const cantidadValida = Number(item?.cantidad_solicitada || 0) > 0
-        const precioValido = Number(item?.precio_unit_est || 0) > 0
-        return productoValido && cantidadValida && precioValido
-      })
-      .map((item) => ({
-        producto_id: item.producto_id,
-        cantidad_solicitada: Number(item.cantidad_solicitada),
-        precio_unit_est: Number(item.precio_unit_est),
-        lista_precio_id: item.lista_precio_id || undefined,
-      }))
-
-    if (itemsValidos.length === 0) {
-      showToast('error', 'No se puede finalizar sin al menos un producto valido')
-      return
-    }
-
-    await submitPresupuesto({
-      cliente_id: rawData.cliente_id,
-      zona_id: rawData.zona_id || undefined,
-      fecha_entrega_estimada: rawData.fecha_entrega_estimada || undefined,
-      observaciones: rawData.observaciones || undefined,
-      lista_precio_id: rawData.lista_precio_id || undefined,
-      tipo_venta: rawData.tipo_venta || 'reparto',
-      turno: rawData.turno || 'mañana',
-      items: itemsValidos,
-    })
-  }, [getValues, isLoading, showToast, submitPresupuesto])
+    await submitPresupuesto(payload)
+  }, [buildPresupuestoPayload, isLoading, submitPresupuesto])
 
   // Atajos globales (F12 para guardar, Ctrl+N para agregar producto)
   // Debe estar despues de la definicion de onSubmit
@@ -1064,7 +1068,13 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
   }, [addItem, handleF12Submit])
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <form
+      onSubmit={(event) => {
+        event.preventDefault()
+        void handleF12Submit()
+      }}
+      className="space-y-6"
+    >
       <div className="grid gap-4 xl:grid-cols-[1fr,340px]">
         {/* Columna izquierda: Contenido del formulario */}
         <div className="space-y-6">
@@ -1402,6 +1412,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
             fechaEntrega={watch('fecha_entrega_estimada')}
             tipoVenta={watch('tipo_venta')}
             isLoading={isLoading}
+            onFinalize={() => void handleF12Submit()}
             onCancel={() => router.back()}
           />
         </div>

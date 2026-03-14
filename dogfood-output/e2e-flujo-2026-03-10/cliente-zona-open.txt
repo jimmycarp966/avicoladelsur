@@ -1,0 +1,7 @@
+﻿- listbox [ref=e1]
+- option "Sin zona asignada" [ref=e2] [selected]
+- option "Concepción" [ref=e3]
+- option "Famaillá" [ref=e4]
+- option "Monteros" [ref=e5]
+- option "Simoca" [ref=e6]
+- option "Tafi del valle" [ref=e7]

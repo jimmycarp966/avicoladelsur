@@ -3,7 +3,7 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { StatCardPrimary } from '@/components/ui/stat-card'
 import { Button } from '@/components/ui/button'
-import { Package, User, Calendar, Loader2, Save } from 'lucide-react'
+import { Package, User, Calendar, Loader2, Save, Store } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 
 interface PresupuestoResumenPanelProps {
@@ -13,6 +13,7 @@ interface PresupuestoResumenPanelProps {
   fechaEntrega?: string
   tipoVenta?: 'reparto' | 'retira_casa_central'
   isLoading?: boolean
+  onFinalize?: () => void
   onCancel?: () => void
 }
 
@@ -23,6 +24,7 @@ export function PresupuestoResumenPanel({
   fechaEntrega,
   tipoVenta = 'reparto',
   isLoading = false,
+  onFinalize,
   onCancel,
 }: PresupuestoResumenPanelProps) {
   const formattedDate = fechaEntrega
@@ -55,10 +57,11 @@ export function PresupuestoResumenPanel({
               </Button>
             )}
             <Button
-              type="submit"
+              type="button"
               size="sm"
               className="flex-1"
               disabled={isLoading}
+              onClick={onFinalize}
             >
               {isLoading ? (
                 <>
@@ -68,7 +71,7 @@ export function PresupuestoResumenPanel({
               ) : (
                 <>
                   <Save className="mr-2 h-4 w-4" />
-                  Guardar
+                  Finalizar
                 </>
               )}
             </Button>
@@ -100,7 +103,7 @@ export function PresupuestoResumenPanel({
             )}
             {tipoVenta === 'retira_casa_central' && (
               <div className="flex items-start gap-2">
-                <div className="h-4 w-4 shrink-0 mt-0.5">🏠</div>
+                <Store className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
                 <div className="min-w-0 flex-1">
                   <span className="text-muted-foreground block text-xs">Tipo</span>
                   <span className="font-medium block">Retira en Casa Central</span>
@@ -121,7 +124,7 @@ export function PresupuestoResumenPanel({
           </div>
           <div className="flex justify-between">
             <span><kbd className="px-1 bg-background rounded border">A</kbd> Agregar</span>
-            <span><kbd className="px-1 bg-background rounded border">F12</kbd> Guardar</span>
+            <span><kbd className="px-1 bg-background rounded border">F12</kbd> Finalizar</span>
           </div>
         </CardContent>
       </Card>

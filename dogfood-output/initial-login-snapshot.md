@@ -1,0 +1,50 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - img "Avícola del Sur" [ref=e8]
+        - generic [ref=e9]:
+          - generic [ref=e10]: Avícola
+          - generic [ref=e11]: del Sur
+      - generic [ref=e12]:
+        - heading "Calidad desde el origen." [level=1] [ref=e13]:
+          - text: Calidad desde
+          - text: el origen.
+        - paragraph [ref=e14]: Eficiencia en cada entrega y tecnología al servicio de la frescura.
+      - generic [ref=e19]: © 2026 Avícola del Sur · ERP Integral
+    - generic [ref=e23]:
+      - generic [ref=e24]:
+        - heading "Iniciar Sesión" [level=2] [ref=e25]
+        - paragraph [ref=e26]: Accede al panel de control de Avícola del Sur.
+      - generic [ref=e27]:
+        - generic [ref=e28]:
+          - generic [ref=e29]: Correo Electrónico
+          - textbox "Correo Electrónico" [active] [ref=e30]:
+            - /placeholder: nombre@empresa.com
+        - generic [ref=e31]:
+          - generic [ref=e32]: Contraseña
+          - generic [ref=e33]:
+            - textbox "Contraseña" [ref=e34]:
+              - /placeholder: ••••••••
+            - button [ref=e35]:
+              - img [ref=e36]
+        - generic [ref=e39]:
+          - generic [ref=e40]:
+            - checkbox "Recordarme" [ref=e41]
+            - generic [ref=e42] [cursor=pointer]: Recordarme
+          - button "¿Olvidaste tu contraseña?" [ref=e43]
+        - button "Entrar al Sistema" [ref=e44]
+      - generic [ref=e45]:
+        - heading "Acceso Rápido (Pruebas)" [level=4] [ref=e46]
+        - generic [ref=e47]:
+          - button "ADMIN" [ref=e48]:
+            - img [ref=e50]
+            - generic [ref=e54]: ADMIN
+          - button "VENTAS" [ref=e55]:
+            - img [ref=e57]
+            - generic [ref=e62]: VENTAS
+          - button "LOGÍSTICA" [ref=e63]:
+            - img [ref=e65]
+            - generic [ref=e70]: LOGÍSTICA
+  - region "Notifications alt+T"
+  - alert [ref=e71]

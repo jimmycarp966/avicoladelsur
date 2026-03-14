@@ -1,0 +1,40 @@
+version: 1
+repo:
+  name: avicola-erp
+  default_branch: main
+  root: .
+  docs_root: docs/harness
+branches:
+  protected: []
+  prefix: codex/
+  mode: main-only
+qa:
+  stop_on_failure: true
+  timeout_seconds: 3600
+  commands:
+    lint: npm run lint
+    typecheck: npm run type-check
+    test: npm run type-check
+    smoke: npm run build
+guardrails:
+  require_human_confirmation_for:
+    - deploy
+    - irreversible
+    - secrets
+  blocked_command_patterns:
+    - git\s+push\s+origin\s+main
+    - supabase\s+db\s+push
+maintenance:
+  retention_days: 14
+  command: node scripts/harness/bin/harness-maintenance.mjs --non-interactive --create-branch=false
+  schedule:
+    type: weekly
+    day: MON
+    time: '09:00'
+pr:
+  output_dir: .harness/runs
+  required_checks:
+    - lint
+    - typecheck
+    - test
+    - smoke

@@ -1,0 +1,159 @@
+﻿- document:
+  - img "Avícola del Sur"
+  - text: Avícola del Sur
+  - navigation:
+    - list:
+      - listitem:
+        - list:
+          - listitem:
+            - link "Dashboard" [ref=e1]:
+              - /url: /dashboard
+          - listitem:
+            - link "Notificaciones" [ref=e2]:
+              - /url: /notificaciones
+          - listitem:
+            - link "Almacén" [ref=e3]:
+              - /url: /almacen/presupuestos-dia
+          - listitem:
+            - link "Ventas" [ref=e4]:
+              - /url: /ventas/presupuestos
+            - link "Presupuestos" [ref=e5]:
+              - /url: /ventas/presupuestos
+            - link "Clientes" [ref=e6]:
+              - /url: /ventas/clientes
+            - link "Listas de Precios" [ref=e7]:
+              - /url: /ventas/listas-precios
+            - link "Comprobantes" [ref=e8]:
+              - /url: /ventas/comprobantes
+            - link "Reclamos" [ref=e9]:
+              - /url: /ventas/reclamos
+            - link "Bot WhatsApp" [ref=e10]:
+              - /url: /admin/bot-chat
+          - listitem:
+            - link "Reparto" [ref=e11]:
+              - /url: /reparto/rutas
+          - listitem:
+            - link "Tesorería" [ref=e12]:
+              - /url: /tesoreria
+          - listitem:
+            - link "IA" [ref=e13]:
+              - /url: /dashboard/predicciones
+          - listitem:
+            - link "Sucursales" [ref=e14]:
+              - /url: /sucursales
+          - listitem:
+            - link "RRHH" [ref=e15]:
+              - /url: /rrhh/empleados
+          - listitem:
+            - link "Reportes" [ref=e16]:
+              - /url: /reportes
+  - text: AS
+  - paragraph: Administrador Sistema
+  - paragraph: admin
+  - img "Avícola del Sur"
+  - text: Avícola del Sur Admin
+  - button "Atajos de teclado (F12)" [ref=e17]
+  - button [ref=e18]
+  - button "AS" [ref=e19]
+  - main:
+    - heading "Nuevo Cliente" [ref=e20] [level=1]
+    - paragraph: Agrega un nuevo cliente a la base de datos
+    - text: Información Básica Datos principales del cliente Código * C
+    - textbox "Código * C" [ref=e21]:
+      - /placeholder: "Ej: 115, CLI-001"
+      - text: QAE2E0310
+    - paragraph: Código único del cliente (números o letras mayúsculas)
+    - text: DNI / CUIT / CUIL
+    - textbox "DNI / CUIT / CUIL" [ref=e22]:
+      - /placeholder: "Ej: 20-12345678-9"
+    - paragraph: Clave de identificación tributaria o DNI del cliente
+    - text: Nombre * N
+    - textbox "Nombre * N" [ref=e23]:
+      - /placeholder: Nombre completo del cliente
+      - text: QA DOGFOOD FLUJO 2026-03-10
+    - text: Tipo de Cliente *
+    - combobox "Tipo de Cliente *" [ref=e24]: Minorista
+    - text: Límite de Crédito *
+    - spinbutton "Límite de Crédito *" [ref=e25]: "0"
+    - switch "Cliente activo" [ref=e26] [checked]
+    - text: Cliente activo Información de Contacto Teléfonos, email y dirección del cliente Teléfono T
+    - textbox "Teléfono T" [ref=e27]:
+      - /placeholder: "+5491123456789"
+      - text: "3815000310"
+    - text: WhatsApp W
+    - textbox "WhatsApp W" [ref=e28]:
+      - /placeholder: "+5491123456789"
+      - text: "3815000310"
+    - text: Email E
+    - textbox "Email E" [ref=e29]:
+      - /placeholder: cliente@email.com
+      - text: qa.dogfood.flujo.20260310@example.com
+    - text: "Cuentas / Personas Asociadas Registra otros titulares (DNIs) que pueden realizar pagos a nombre de este cliente (ej: Cónyuge, Socio)."
+    - button "Agregar" [ref=e30]
+    - paragraph: No hay personas asociadas registradas.
+    - text: Dirección y Zona de Entrega Ubicación del cliente para entregas y optimización de rutas Zona de Entrega Z
+    - combobox [ref=e31]: Concepción
+    - paragraph: Selecciona la zona de entrega del cliente para optimización de rutas
+    - text: Buscar dirección
+    - textbox "Buscar dirección" [ref=e32]:
+      - /placeholder: Buscar dirección del cliente...
+      - text: QA 123, Tucuman
+    - button "Usar ubicación actual" [ref=e33]
+    - button "Keyboard shortcuts" [ref=e34]
+    - region "Map" [ref=e35]
+    - button "Toggle fullscreen view" [ref=e36]
+    - button "Map camera controls" [ref=e37]
+    - button "Zoom in" [ref=e38]
+    - button "Zoom out" [ref=e39]
+    - link "Open this area in Google Maps (opens a new window)" [ref=e40]:
+      - /url: https://maps.google.com/maps?ll=-27.1671,-65.4995&z=10&t=m&hl=en-US&gl=US&mapclient=apiv3
+      - img "Google"
+    - button "Keyboard shortcuts" [ref=e41] [nth=1]
+    - text: Map data ©2026 Google
+    - link "Terms (opens in new tab)" [ref=e42]:
+      - /url: https://www.google.com/intl/en-US_US/help/terms_maps.html
+      - text: Terms
+    - link "Report a map error" [ref=e43]:
+      - /url: https://www.google.com/maps/@-27.1671,-65.4995,10z/data=!10m1!1e1!12b1?source=apiv3&rapsrc=apiv3
+    - text: This page can't load Google Maps correctly.
+    - table:
+      - row "Do you own this website? OK":
+        - cell "Do you own this website?" [ref=e44]:
+          - link "Do you own this website?" [ref=e45]:
+            - /url: http://g.co/dev/maps-no-account
+        - cell "OK" [ref=e46]:
+          - button "OK" [ref=e47]
+    - paragraph: • Escribe una dirección para buscar o haz clic en el mapa para seleccionar la ubicación
+    - paragraph: • Arrastra el marcador para ajustar la posición exacta
+    - text: Dirección Completa D
+    - textbox "Dirección Completa D" [ref=e48]:
+      - /placeholder: La dirección se actualizará automáticamente al seleccionar una ubicación en el mapa
+      - text: QA 123, Tucuman
+    - paragraph: Puedes editar manualmente la dirección si es necesario, o usar el mapa para autocompletar.
+    - text: "Horarios de Apertura Horarios en que el cliente puede recibir entregas. Dejar vacío si está disponible todo el día. Formato: HH:mm-HH:mm (ej: 08:00-12:00,16:00-20:00) Lunes"
+    - textbox "Lunes" [ref=e49]:
+      - /placeholder: 08:00-18:00
+    - text: Martes
+    - textbox "Martes" [ref=e50]:
+      - /placeholder: 08:00-18:00
+    - text: Miércoles
+    - textbox "Miércoles" [ref=e51]:
+      - /placeholder: 08:00-18:00
+    - text: Jueves
+    - textbox "Jueves" [ref=e52]:
+      - /placeholder: 08:00-18:00
+    - text: Viernes
+    - textbox "Viernes" [ref=e53]:
+      - /placeholder: 08:00-18:00
+    - text: Sábado
+    - textbox "Sábado" [ref=e54]:
+      - /placeholder: 08:00-18:00
+    - text: Domingo
+    - textbox "Domingo" [ref=e55]:
+      - /placeholder: 08:00-18:00
+    - paragraph: "💡 Deja el campo vacío si el cliente puede recibir entregas a cualquier hora ese día. Para horario partido usa coma: 08:00-12:00,16:00-20:00"
+    - link "Volver" [ref=e56]:
+      - /url: /ventas/clientes
+    - button "Crear Cliente" [ref=e57]
+  - region "Notifications alt+T" [ref=e58]
+  - alert

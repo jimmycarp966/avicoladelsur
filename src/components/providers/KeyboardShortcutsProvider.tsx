@@ -45,7 +45,6 @@ export function KeyboardShortcutsProvider({ children }: { children: React.ReactN
         { keys: ['F9'], description: 'Lotes' },
         { keys: ['F10'], description: 'Planificación' },
         { keys: ['F11'], description: 'Listas de Precios' },
-        { keys: ['F12'], description: 'Mostrar esta ayuda' },
       ],
     },
     {
@@ -116,7 +115,7 @@ export function KeyboardShortcutsProvider({ children }: { children: React.ReactN
 
           <div className="mt-6 pt-4 border-t">
             <p className="text-xs text-muted-foreground text-center">
-              Presiona F12 en cualquier momento para ver esta ayuda
+              Usa el botón de ayuda para ver este resumen de atajos
             </p>
           </div>
         </DialogContent>

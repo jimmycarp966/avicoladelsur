@@ -205,6 +205,7 @@ function ProductoOmnibox({
           <span className="text-muted-foreground truncate">- {productoSeleccionado.nombre}</span>
         </div>
         <Button
+          id={`producto_${rowIndex}`}
           type="button"
           variant="ghost"
           size="sm"
@@ -225,6 +226,7 @@ function ProductoOmnibox({
       <div className="relative">
         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
         <Input
+          id={`producto_${rowIndex}`}
           ref={inputRef}
           type="text"
           placeholder={placeholder}

@@ -1,0 +1,4 @@
+﻿- listbox [ref=e1]
+- option "Minorista" [ref=e2] [selected]
+- option "Mayorista" [ref=e3]
+- option "Distribuidor" [ref=e4]

@@ -225,15 +225,6 @@ export function useFunctionKeyShortcuts() {
       action: () => router.push('/ventas/listas-precios'),
       description: 'Listas de Precios',
     },
-    {
-      fn: 12,
-      action: () => {
-        // Mostrar ayuda de atajos
-        const event = new CustomEvent('show-keyboard-shortcuts')
-        window.dispatchEvent(event)
-      },
-      description: 'Ayuda de Atajos',
-    },
   ]
 
   useKeyboardShortcuts({ shortcuts })

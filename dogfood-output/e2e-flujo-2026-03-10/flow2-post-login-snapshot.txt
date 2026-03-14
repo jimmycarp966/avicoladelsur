@@ -1,0 +1,86 @@
+﻿- document:
+  - img "Avícola del Sur"
+  - text: Avícola del Sur
+  - navigation:
+    - list:
+      - listitem:
+        - list:
+          - listitem:
+            - link "Dashboard" [ref=e1]:
+              - /url: /dashboard
+          - listitem:
+            - link "Notificaciones" [ref=e2]:
+              - /url: /notificaciones
+          - listitem:
+            - link "Almacén" [ref=e3]:
+              - /url: /almacen/presupuestos-dia
+          - listitem:
+            - link "Ventas" [ref=e4]:
+              - /url: /ventas/presupuestos
+          - listitem:
+            - link "Reparto" [ref=e5]:
+              - /url: /reparto/rutas
+          - listitem:
+            - link "Tesorería" [ref=e6]:
+              - /url: /tesoreria
+          - listitem:
+            - link "IA" [ref=e7]:
+              - /url: /dashboard/predicciones
+          - listitem:
+            - link "Sucursales" [ref=e8]:
+              - /url: /sucursales
+          - listitem:
+            - link "RRHH" [ref=e9]:
+              - /url: /rrhh/empleados
+          - listitem:
+            - link "Reportes" [ref=e10]:
+              - /url: /reportes
+  - text: AS
+  - paragraph: Administrador Sistema
+  - paragraph: admin
+  - img "Avícola del Sur"
+  - text: Avícola del Sur Admin
+  - button "Atajos de teclado (F12)" [ref=e11]
+  - button [ref=e12]
+  - button "AS" [ref=e13]
+  - main:
+    - heading "Dashboard" [ref=e14] [level=1]
+    - paragraph: Bienvenido, Administrador. Resumen de tu negocio.
+    - paragraph: Productos
+    - text: 416 0%
+    - paragraph: Total registrados
+    - paragraph: desde el mes pasado
+    - paragraph: Pedidos Pendientes
+    - text: "1"
+    - paragraph: Requieren atención
+    - paragraph: Entregas Hoy
+    - text: "0"
+    - paragraph: 0 completadas, 0 pendientes
+    - paragraph: Clientes Activos
+    - text: 209 0%
+    - paragraph: Con pedidos recientes
+    - paragraph: desde el mes pasado
+    - text: "Eficiencia de Rutas Ahorro esta semana: $0 Distancia ahorrada: 0 km Tiempo ahorrado: 0 horas"
+    - link "Ver Detalles" [ref=e15]:
+      - /url: /reparto/rutas
+      - button "Ver Detalles" [ref=e16]
+    - text: Clientes en Riesgo IA asistida
+    - paragraph: No hay clientes en riesgo
+    - paragraph: Todos tus clientes estan comprando regularmente
+    - paragraph: No hubo clientes de riesgo medio/alto para enriquecer con IA.
+    - text: Prediccion de Stock IA asistida
+    - paragraph: Stock adecuado para los proximos 7 dias
+    - paragraph: No hay productos con alerta
+    - paragraph: Error no controlado al calcular prediccion de stock.
+    - text: Ventas Mensuales Evolución de ventas y pedidos en el último año
+    - application: Abr May Jun Jul Ago Sept Oct Nov Dic Ene Feb Mar $0k $0k $0k $0k $0k
+    - text: Productos por Categoría Distribución del catálogo por categorías
+    - application
+    - text: "Otros: 97% Balanza: 3% Aves: 0% Subproductos: 0% Entregas por Día Rendimiento semanal de entregas y kilometraje"
+    - application: Mié Jue Vie Sáb Dom Lun Mar 0 1 2 3 4
+    - text: Entregas Kilómetros Métricas de Rendimiento Indicadores clave de rendimiento del mes Crecimiento de Ventas +0.0% Tiempo Promedio de Entrega 0.0 horas Tasa de Satisfacción 100.0% Productos con Stock Bajo 3 productos Actividad Reciente Las últimas acciones en el sistema
+    - heading "No hay actividad reciente" [ref=e17] [level=3]
+    - paragraph: Las acciones realizadas en el sistema aparecerán aquí
+    - text: Estado del Sistema Componentes del ERP Base de Datos Operativo API de Ventas Operativo Bot WhatsApp Configuración pendiente Sistema de Reportes Operativo
+  - region "Notifications alt+T" [ref=e18]
+  - alert

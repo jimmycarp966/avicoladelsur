@@ -1,0 +1,122 @@
+﻿- document:
+  - img "Avícola del Sur"
+  - text: Avícola del Sur
+  - navigation:
+    - list:
+      - listitem:
+        - list:
+          - listitem:
+            - link "Dashboard" [ref=e1]:
+              - /url: /dashboard
+          - listitem:
+            - link "Notificaciones" [ref=e2]:
+              - /url: /notificaciones
+          - listitem:
+            - link "Almacén" [ref=e3]:
+              - /url: /almacen/presupuestos-dia
+          - listitem:
+            - link "Ventas" [ref=e4]:
+              - /url: /ventas/presupuestos
+            - link "Presupuestos" [ref=e5]:
+              - /url: /ventas/presupuestos
+            - link "Clientes" [ref=e6]:
+              - /url: /ventas/clientes
+            - link "Listas de Precios" [ref=e7]:
+              - /url: /ventas/listas-precios
+            - link "Comprobantes" [ref=e8]:
+              - /url: /ventas/comprobantes
+            - link "Reclamos" [ref=e9]:
+              - /url: /ventas/reclamos
+            - link "Bot WhatsApp" [ref=e10]:
+              - /url: /admin/bot-chat
+          - listitem:
+            - link "Reparto" [ref=e11]:
+              - /url: /reparto/rutas
+          - listitem:
+            - link "Tesorería" [ref=e12]:
+              - /url: /tesoreria
+          - listitem:
+            - link "IA" [ref=e13]:
+              - /url: /dashboard/predicciones
+          - listitem:
+            - link "Sucursales" [ref=e14]:
+              - /url: /sucursales
+          - listitem:
+            - link "RRHH" [ref=e15]:
+              - /url: /rrhh/empleados
+          - listitem:
+            - link "Reportes" [ref=e16]:
+              - /url: /reportes
+  - text: AS
+  - paragraph: Administrador Sistema
+  - paragraph: admin
+  - img "Avícola del Sur"
+  - text: Avícola del Sur Admin
+  - button "Atajos de teclado (F12)" [ref=e17]
+  - button [ref=e18]
+  - button "AS" [ref=e19]
+  - main:
+    - link "Volver a Presupuestos" [ref=e20]:
+      - /url: /ventas/presupuestos
+    - heading "Nuevo Presupuesto" [ref=e21] [level=1]
+    - paragraph: Crea un nuevo presupuesto para un cliente
+    - text: Informacion del Cliente Selecciona el cliente para el presupuesto Codigo de cliente (directo)
+    - textbox "Codigo de cliente (directo)" [ref=e22]:
+      - /placeholder: "Ej: 1024"
+      - text: "479"
+    - button "Cargar" [ref=e23]
+    - paragraph: Permite cargar el cliente directamente por su codigo.
+    - text: Cliente * C
+    - combobox "Cliente * C" [ref=e24]: "[479] CARNICERIA TITO (CONCEPCION)"
+    - text: Zona de Entrega (bloqueada)
+    - textbox "Zona de Entrega (bloqueada)" [ref=e25] [disabled]: Concepción
+    - text: Fecha de Entrega Estimada F
+    - textbox "Fecha de Entrega Estimada F" [ref=e26]:
+      - /placeholder: DD/MM/YYYY
+      - text: 10/03/2026
+    - text: Turno de Entrega
+    - combobox "Turno de Entrega" [ref=e27]: Mañana
+    - text: Lista de Precios (Global) L
+    - combobox "Lista de Precios (Global) L" [ref=e28]: MINORISTA - Lista Minorista (30% margen)
+    - paragraph: Lista por defecto para todos los productos. Puedes cambiar la lista individualmente en cada producto.
+    - text: Productos Escrib? el codigo o nombre y presion? Enter para agregar rapidamente
+    - table:
+      - rowgroup:
+        - row "Producto Cant. Lista Precio Subtotal Stock":
+          - columnheader "Producto" [ref=e29]
+          - columnheader "Cant." [ref=e30]
+          - columnheader "Lista" [ref=e31]
+          - columnheader "Precio" [ref=e32]
+          - columnheader "Subtotal" [ref=e33]
+          - columnheader "Stock" [ref=e34]
+          - columnheader
+      - rowgroup:
+        - row "27 - BOCADITO POLLO CHEDDAR XKG GTA Cambiar 1 MINORISTA $ 0,00 2000.0 kg":
+          - cell "27 - BOCADITO POLLO CHEDDAR XKG GTA Cambiar" [ref=e35]:
+            - text: 27 - BOCADITO POLLO CHEDDAR XKG GTA
+            - button "Cambiar" [ref=e36]
+          - cell "1" [ref=e37]:
+            - spinbutton [ref=e38]: "1"
+          - cell "MINORISTA" [ref=e39]:
+            - combobox [ref=e40]:
+              - option "DISTRIBUIDOR" [ref=e41]
+              - option "MAYORISTA" [ref=e42]
+              - option "MINORISTA" [ref=e43] [selected]
+          - cell:
+            - spinbutton [ref=e44] [nth=1]
+          - cell "$ 0,00" [ref=e45]
+          - cell "2000.0 kg" [ref=e46]
+          - cell:
+            - button "Duplicar producto" [ref=e47]
+    - button "Agregar Producto" [ref=e48]
+    - button "Duplicar último producto" [ref=e49]
+    - text: Observaciones O
+    - textbox "Agregar notas o instrucciones especiales..." [ref=e50]
+    - paragraph: Total Estimado
+    - text: $ 0,00
+    - paragraph: 1 producto
+    - button "Cancelar" [ref=e51]
+    - button "Guardar" [ref=e52]
+    - text: "Cliente CARNICERIA TITO Entrega 10-mar Atajos rápidos: C Cliente P Producto A Agregar F12 Guardar"
+  - region "Notifications alt+T" [ref=e53]
+  - alert

@@ -1,0 +1,14 @@
+# Dangerous command patterns (regex)
+
+vercel
+netlify
+firebase deploy
+kubectl apply
+terraform apply
+git reset --hard
+git clean -fd
+rm -rf
+Remove-Item -Recurse -Force
+Get-Content .env
+printenv
+supabase db push

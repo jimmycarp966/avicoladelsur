@@ -58,7 +58,7 @@ export function AdminHeader({ user, onMenuClick }: AdminHeaderProps) {
               const event = new CustomEvent('show-keyboard-shortcuts')
               window.dispatchEvent(event)
             }}
-            title="Atajos de teclado (F12)"
+            title="Atajos de teclado"
           >
             <HelpCircle className="h-5 w-5" />
           </Button>

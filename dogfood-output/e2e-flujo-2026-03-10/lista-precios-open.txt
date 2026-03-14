@@ -1,0 +1,4 @@
+﻿- listbox [ref=e1]
+- option "DISTRIBUIDOR - Lista Distribuidor (40% margen)" [ref=e2]
+- option "MAYORISTA - Lista Mayorista (20% margen)" [ref=e3] [selected]
+- option "MINORISTA - Lista Minorista (30% margen)" [ref=e4]
