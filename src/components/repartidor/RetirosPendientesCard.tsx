@@ -34,18 +34,23 @@ interface Retiro {
 
 interface RetirosPendientesCardProps {
   retiros: Retiro[]
+  cajaCentralId: string | null
   onValidar?: () => void
 }
 
-export function RetirosPendientesCard({ retiros, onValidar }: RetirosPendientesCardProps) {
+export function RetirosPendientesCard({ retiros, cajaCentralId, onValidar }: RetirosPendientesCardProps) {
   const [validando, setValidando] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
 
   const handleValidar = async (retiroId: string) => {
     setValidando(retiroId)
     try {
-      // TODO: Obtener caja central del usuario
-      const result = await validarRetiroAction(retiroId, 'caja-central-id')
+      if (!cajaCentralId) {
+        toast.error('No se encontro una caja central activa para validar este retiro')
+        return
+      }
+
+      const result = await validarRetiroAction(retiroId, cajaCentralId)
       
       if (result.success) {
         toast.success('Retiro validado exitosamente')
@@ -53,7 +58,7 @@ export function RetirosPendientesCard({ retiros, onValidar }: RetirosPendientesC
       } else {
         toast.error(result.error || 'Error al validar retiro')
       }
-    } catch (error) {
+    } catch {
       toast.error('Error inesperado al validar retiro')
     } finally {
       setValidando(null)
@@ -145,7 +150,7 @@ export function RetirosPendientesCard({ retiros, onValidar }: RetirosPendientesC
                       <Button
                         size="sm"
                         onClick={() => handleValidar(retiro.id)}
-                        disabled={validando === retiro.id}
+                        disabled={validando === retiro.id || !cajaCentralId}
                         className="bg-green-600 hover:bg-green-700"
                       >
                         {validando === retiro.id ? (

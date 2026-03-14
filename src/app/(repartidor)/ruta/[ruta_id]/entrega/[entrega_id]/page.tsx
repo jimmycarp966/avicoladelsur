@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { createSignedStorageUrlServer } from '@/lib/supabase/storage-server'
 import { Card, CardContent } from '@/components/ui/card'
 import { Package } from 'lucide-react'
 import { EntregaDetalleContent } from './entrega-detalle-content'
@@ -26,6 +27,7 @@ export default async function EntregaDetallePage({ params }: PageProps) {
     .from('detalles_ruta')
     .select(`
       *,
+      comprobante_storage_path,
       pedido:pedidos(
         id,
         numero_pedido,
@@ -115,6 +117,12 @@ export default async function EntregaDetallePage({ params }: PageProps) {
             estado_pago,
             metodo_pago,
             monto_cobrado,
+            numero_transaccion,
+            comprobante_url,
+            comprobante_storage_path,
+            notas_pago,
+            notas_entrega,
+            motivo_rechazo,
             orden_entrega,
             cliente:clientes(
               id, nombre, telefono, direccion, zona_entrega, coordenadas
@@ -178,6 +186,7 @@ export default async function EntregaDetallePage({ params }: PageProps) {
         .from('detalles_ruta')
         .select(`
                 id, ruta_id, orden_entrega, pago_registrado, monto_cobrado_registrado, metodo_pago_registrado,
+                numero_transaccion_registrado, comprobante_url_registrado, comprobante_storage_path,
                 pedido:pedidos(
                     id, numero_pedido, total, pago_estado, metodos_pago, instruccion_repartidor,
                     detalle_pedido:detalles_pedido(
@@ -247,6 +256,7 @@ export default async function EntregaDetallePage({ params }: PageProps) {
         entrega = {
           ...detalleRutaPadre, // Heredar props del padre (incluye orden_entrega del detalle_ruta)
           id: entregaIndividual.id, // SOBRESCRIBIR ID con el de la entrega individual
+          es_pedido_agrupado: true,
           detalle_ruta_id_padre: detalleRutaPadre.id, // Guardar ref al padre por si acaso
           pedido_id: entregaIndividual.pedido_id, // Agregar pedido_id a nivel raíz también
           estado_entrega: entregaIndividual.estado_entrega, // Estado especifico
@@ -259,6 +269,12 @@ export default async function EntregaDetallePage({ params }: PageProps) {
           pago_registrado: ['pagado', 'cuenta_corriente', 'parcial'].includes(entregaIndividual.estado_pago),
           monto_cobrado_registrado: entregaIndividual.monto_cobrado || 0,
           metodo_pago_registrado: entregaIndividual.metodo_pago,
+          numero_transaccion_registrado: entregaIndividual.numero_transaccion,
+          comprobante_url_registrado: entregaIndividual.comprobante_url,
+          comprobante_storage_path: entregaIndividual.comprobante_storage_path,
+          notas_pago: entregaIndividual.notas_pago,
+          notas_entrega: entregaIndividual.notas_entrega,
+          motivo_rechazo: entregaIndividual.motivo_rechazo,
           // Cliente especifico de esta entrega
           pedido: {
             ...pedidoBase,
@@ -321,6 +337,20 @@ export default async function EntregaDetallePage({ params }: PageProps) {
         </Card>
       </div>
     )
+  }
+
+  if (entrega?.comprobante_storage_path) {
+    try {
+      const signedUrl = await createSignedStorageUrlServer(
+        'reparto-comprobantes',
+        entrega.comprobante_storage_path,
+      )
+      if (signedUrl) {
+        entrega.comprobante_url_registrado = signedUrl
+      }
+    } catch (storageError) {
+      console.error('[EntregaDetallePage] Error firmando comprobante:', storageError)
+    }
   }
 
   // 3. Obtener resumen de cuenta del cliente (facturas pendientes)

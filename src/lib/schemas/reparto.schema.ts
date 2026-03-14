@@ -188,7 +188,7 @@ export const actualizarEstadoEntregaSchema = z.object({
     'pendiente',
     'en_camino',
     'entregado',
-    'fallido'
+    'rechazado'
   ]),
 
   notas_entrega: z
@@ -245,7 +245,7 @@ export const entregasFilterSchema = z.object({
   search: z.string().optional(),
   ruta_id: z.string().uuid().optional(),
   pedido_id: z.string().uuid().optional(),
-  estado_entrega: z.enum(['pendiente', 'en_camino', 'entregado', 'fallido']).optional(),
+  estado_entrega: z.enum(['pendiente', 'en_camino', 'entregado', 'rechazado']).optional(),
   fecha_desde: z.string().optional(),
   fecha_hasta: z.string().optional(),
   page: z.number().int().min(1).default(1),

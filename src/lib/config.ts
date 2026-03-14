@@ -115,7 +115,7 @@ export const ESTADOS_ENTREGA = {
   PENDIENTE: 'pendiente',
   EN_CAMINO: 'en_camino',
   ENTREGADO: 'entregado',
-  FALLIDO: 'fallido',
+  RECHAZADO: 'rechazado',
 } as const
 
 export type EstadoEntrega = typeof ESTADOS_ENTREGA[keyof typeof ESTADOS_ENTREGA]

@@ -11,11 +11,6 @@ import {
   Home
 } from 'lucide-react'
 
-interface RepartidorBottomNavProps {
-  currentTab: string
-  onTabChange: (tab: string) => void
-}
-
 const navigation = [
   {
     name: 'Inicio',
@@ -49,20 +44,22 @@ const navigation = [
   },
 ]
 
-export function RepartidorBottomNav({ currentTab, onTabChange }: RepartidorBottomNavProps) {
+export function RepartidorBottomNav() {
   const pathname = usePathname()
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-2 py-2 safe-area-inset-bottom">
       <div className="flex justify-around items-center max-w-md mx-auto">
         {navigation.map((item) => {
-          const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+          const isRutaPath = pathname.startsWith('/ruta/')
+          const isActive = item.id === 'ruta'
+            ? pathname === '/ruta-diaria' || isRutaPath
+            : pathname === item.href || pathname.startsWith(item.href + '/')
 
           return (
             <Link
               key={item.name}
               href={item.href}
-              onClick={() => onTabChange(item.id)}
               className={cn(
                 'flex flex-col items-center justify-center px-3 py-2 rounded-lg transition-colors min-w-0 flex-1',
                 isActive

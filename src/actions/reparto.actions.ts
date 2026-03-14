@@ -6,6 +6,8 @@ import { generateRutaOptimizada } from '@/lib/services/ruta-optimizer'
 import { getNowArgentina, getTodayArgentina } from '@/lib/utils'
 import { optimizeRouteLocal, generateSimplePolyline, haversineDistance } from '@/lib/rutas/local-optimizer'
 import { config } from '@/lib/config'
+import { obtenerEntregasExpandidasRuta, resumirEntregasRuta } from '@/lib/reparto/entregas-normalizadas'
+import { normalizarEstadoEntrega } from '@/lib/utils/estado-pago'
 import { devError, devWarn } from '@/lib/utils/logger'
 import type {
   CrearVehiculoParams,
@@ -422,11 +424,12 @@ export async function iniciarRutaAction(
 ): Promise<ApiResponse> {
   try {
     const supabase = await createClient()
+    const nowIso = getNowArgentina().toISOString()
 
     // Obtener estado actual de la ruta
     const { data: ruta, error: rutaError } = await supabase
       .from('rutas_reparto')
-      .select('estado')
+      .select('estado, hora_inicio_reparto')
       .eq('id', rutaId)
       .single()
 
@@ -440,7 +443,8 @@ export async function iniciarRutaAction(
       const { error } = await supabase
         .from('rutas_reparto')
         .update({
-          updated_at: getNowArgentina().toISOString(),
+          hora_inicio_reparto: ruta.hora_inicio_reparto || nowIso,
+          updated_at: nowIso,
         })
         .eq('id', rutaId)
 
@@ -462,7 +466,8 @@ export async function iniciarRutaAction(
         .from('rutas_reparto')
         .update({
           estado: 'en_curso',
-          updated_at: getNowArgentina().toISOString(),
+          hora_inicio_reparto: ruta.hora_inicio_reparto || nowIso,
+          updated_at: nowIso,
         })
         .eq('id', rutaId)
 
@@ -509,42 +514,10 @@ export async function finalizarRutaAction(
       ? { checklistFinId: checklistFinIdOrOptions }
       : (checklistFinIdOrOptions || {})
 
-    const { data: detalles, error: detallesError } = await supabase
-      .from('detalles_ruta')
-      .select('id, estado_entrega, pedido:pedidos(cliente_id)')
-      .eq('ruta_id', rutaId)
+    const entregasExpandidas = await obtenerEntregasExpandidasRuta(supabase, rutaId)
+    const resumenRuta = resumirEntregasRuta(entregasExpandidas)
 
-    if (detallesError) throw detallesError
-
-    let entregasPendientes = detalles?.filter((d) => {
-      if (d.pedido?.cliente_id) {
-        return d.estado_entrega !== 'entregado' && d.estado_entrega !== 'fallido' && d.estado_entrega !== 'rechazado'
-      }
-      return false
-    }) || []
-
-    const pedidosAgrupados = detalles?.filter((d) => !d.pedido?.cliente_id).map((d) => d.id) || []
-
-    if (pedidosAgrupados.length > 0) {
-      const { data: entregasIndividuales, error: entregasError } = await supabase
-        .from('entregas')
-        .select('id, estado_entrega, pedido_id')
-        .in('pedido_id', await supabase
-          .from('detalles_ruta')
-          .select('pedido_id')
-          .eq('ruta_id', rutaId)
-          .then((r) => r.data?.map((d) => d.pedido_id) || [])
-        )
-
-      if (!entregasError && entregasIndividuales) {
-        const entregasAgrupPendientes = entregasIndividuales.filter((e) =>
-          e.estado_entrega !== 'entregado' && e.estado_entrega !== 'fallido' && e.estado_entrega !== 'rechazado'
-        )
-        entregasPendientes = [...entregasPendientes, ...entregasAgrupPendientes]
-      }
-    }
-
-    if (entregasPendientes.length > 0) {
+    if (resumenRuta.pendientes > 0) {
       throw new Error('No se puede finalizar la ruta. Todas las entregas deben estar completas.')
     }
 
@@ -641,6 +614,10 @@ export async function finalizarRutaAction(
 
     revalidatePath('/(admin)/(dominios)/reparto/rutas')
     revalidatePath('/(repartidor)/ruta')
+    revalidatePath('/(repartidor)/entregas')
+    revalidatePath('/(repartidor)/home')
+    revalidatePath('/(repartidor)/entregas')
+    revalidatePath('/(repartidor)/home')
 
     return {
       success: true,
@@ -820,23 +797,28 @@ export async function actualizarEstadoEntrega(
 ): Promise<ApiResponse> {
   try {
     const supabase = await createClient()
+    const estadoNormalizado = normalizarEstadoEntrega(estado)
+    const nowIso = getNowArgentina().toISOString()
 
     const updateData: any = {
-      estado_entrega: estado,
-      updated_at: getNowArgentina().toISOString(),
+      estado_entrega: estadoNormalizado,
+      updated_at: nowIso,
     }
 
-    if (estado === 'entregado') {
-      updateData.fecha_hora_entrega = getNowArgentina().toISOString()
+    if (estadoNormalizado === 'entregado' || estadoNormalizado === 'rechazado') {
+      updateData.fecha_hora_entrega = nowIso
     }
 
     // Verificar si el ID corresponde a la tabla 'entregas' (para pedidos agrupados)
-    const { count } = await supabase
+    const { data: entregaIndividual, error: entregaLookupError } = await supabase
       .from('entregas')
-      .select('*', { count: 'exact', head: true })
+      .select('id, pedido_id')
       .eq('id', detalleRutaId)
+      .maybeSingle()
 
-    if (count && count > 0) {
+    if (entregaLookupError) throw entregaLookupError
+
+    if (entregaIndividual?.id) {
       // Es una entrega individual (pedido agrupado)
       // Si es 'entregado', también marcamos estado_pago si no estaba definido?
       // No, eso va por separado en registrar pago.
@@ -847,6 +829,13 @@ export async function actualizarEstadoEntrega(
         .eq('id', detalleRutaId)
 
       if (error) throw error
+      if (entregaIndividual.pedido_id) {
+        const { error: recalcError } = await supabase.rpc('fn_recalcular_detalle_ruta_agrupado', {
+          p_pedido_id: entregaIndividual.pedido_id,
+        })
+
+        if (recalcError) throw recalcError
+      }
 
     } else {
       // Asumimos que es detalles_ruta (comportamiento original)
@@ -860,6 +849,8 @@ export async function actualizarEstadoEntrega(
 
     revalidatePath('/(admin)/(dominios)/reparto/rutas')
     revalidatePath('/(repartidor)/ruta')
+    revalidatePath('/(repartidor)/entregas')
+    revalidatePath('/(repartidor)/home')
 
     return {
       success: true,
@@ -929,9 +920,6 @@ export async function obtenerRutaActivaAction(
           patente,
           marca,
           modelo
-        ),
-        detalles_ruta (
-          estado_entrega
         )
       `)
       .eq('repartidor_id', repartidorId)
@@ -957,9 +945,8 @@ export async function obtenerRutaActivaAction(
       }
     }
 
-    const detalles = Array.isArray(ruta.detalles_ruta) ? ruta.detalles_ruta : []
-    const entregasPendientes = detalles.filter((d: any) => d.estado_entrega === 'pendiente').length
-    const entregasCompletadas = detalles.filter((d: any) => d.estado_entrega === 'entregado').length
+    const entregasExpandidas = await obtenerEntregasExpandidasRuta(supabase, ruta.id)
+    const resumenRuta = resumirEntregasRuta(entregasExpandidas)
 
     // Manejar el hecho de que vehiculo podría ser un objeto o un array de un solo elemento
     const vehiculoData = Array.isArray((ruta as any).vehiculo)
@@ -978,8 +965,8 @@ export async function obtenerRutaActivaAction(
           marca: vehiculoData?.marca || '',
           modelo: vehiculoData?.modelo || '',
         },
-        entregas_pendientes: entregasPendientes,
-        entregas_completadas: entregasCompletadas,
+        entregas_pendientes: resumenRuta.pendientes,
+        entregas_completadas: resumenRuta.completadas,
         distancia_estimada_km: Number(ruta.distancia_estimada_km || 0)
       },
     }
@@ -2236,17 +2223,43 @@ export async function moverClienteAlFinalAction(
 ): Promise<ApiResponse> {
   try {
     const supabase = await createClient()
+    const { data: entregaObjetivo, error: entregaObjetivoError } = await supabase
+      .from('entregas')
+      .select('id, pedido_id')
+      .eq('id', entregaId)
+      .maybeSingle()
+
+    if (entregaObjetivoError) throw entregaObjetivoError
+    if (!entregaObjetivo?.id) {
+      return {
+        success: false,
+        error: 'Solo se pueden reordenar entregas individuales de pedidos agrupados.',
+      }
+    }
+
+    const { data: detallesRuta, error: detallesRutaError } = await supabase
+      .from('detalles_ruta')
+      .select('pedido_id')
+      .eq('ruta_id', rutaId)
+
+    if (detallesRutaError) throw detallesRutaError
+
+    const pedidoIds = (detallesRuta || [])
+      .map((detalle) => detalle.pedido_id)
+      .filter(Boolean)
+
+    if (pedidoIds.length === 0) {
+      return {
+        success: false,
+        error: 'No se encontraron pedidos en la ruta',
+      }
+    }
 
     // Obtener todas las entregas de la ruta ordenadas
     const { data: entregas, error: entregasError } = await supabase
       .from('entregas')
       .select('id, orden_entrega, cliente_id, pedido_id')
-      .eq('pedido_id', (
-        await supabase
-          .from('detalles_ruta')
-          .select('pedido_id')
-          .eq('ruta_id', rutaId)
-      ).data?.map(d => d.pedido_id) || [])
+      .in('pedido_id', pedidoIds)
       .order('orden_entrega', { ascending: true })
 
     if (entregasError || !entregas || entregas.length === 0) {
@@ -2312,15 +2325,35 @@ async function recalcularETAsRuta(
   // Obtener hora_inicio_reparto de la ruta
   const { data: rutaData } = await supabase
     .from('rutas_reparto')
-    .select('hora_inicio_reparto, fecha_ruta')
+    .select('id, hora_inicio_reparto, fecha_ruta')
     .eq('id', rutaId)
     .single()
 
-  const horaInicioReparto = rutaData?.hora_inicio_reparto
-    ? new Date(rutaData.hora_inicio_reparto)
-    : new Date()
+  const horaInicioRepartoIso = rutaData?.hora_inicio_reparto || getNowArgentina().toISOString()
+  if (rutaData?.id && !rutaData.hora_inicio_reparto) {
+    await supabase
+      .from('rutas_reparto')
+      .update({
+        hora_inicio_reparto: horaInicioRepartoIso,
+        updated_at: getNowArgentina().toISOString(),
+      })
+      .eq('id', rutaId)
+  }
+
+  const horaInicioReparto = new Date(horaInicioRepartoIso)
 
   const fechaRuta = rutaData?.fecha_ruta ? new Date(rutaData.fecha_ruta) : new Date()
+
+  const { data: detallesRuta } = await supabase
+    .from('detalles_ruta')
+    .select('pedido_id')
+    .eq('ruta_id', rutaId)
+
+  const pedidoIds = (detallesRuta || [])
+    .map((detalle: any) => detalle.pedido_id)
+    .filter(Boolean)
+
+  if (pedidoIds.length === 0) return
 
   // Obtener entregas ordenadas con datos de cliente
   const { data: entregas } = await supabase
@@ -2340,12 +2373,7 @@ async function recalcularETAsRuta(
         horario_domingo
       )
     `)
-    .eq('pedido_id', (
-      await supabase
-        .from('detalles_ruta')
-        .select('pedido_id')
-        .eq('ruta_id', rutaId)
-    ).data?.map((d: any) => d.pedido_id) || [])
+    .in('pedido_id', pedidoIds)
     .order('orden_entrega', { ascending: true })
 
   if (!entregas || entregas.length === 0) return

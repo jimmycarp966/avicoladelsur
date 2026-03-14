@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import { useAuth } from '@/components/providers/AuthProvider'
 import { RepartidorBottomNav } from './RepartidorBottomNav'
 import { RepartidorHeader } from './RepartidorHeader'
@@ -10,7 +9,6 @@ interface RepartidorLayoutProps {
 }
 
 export function RepartidorLayout({ children }: RepartidorLayoutProps) {
-  const [currentTab, setCurrentTab] = useState('ruta')
   const { user } = useAuth()
 
   return (
@@ -24,10 +22,7 @@ export function RepartidorLayout({ children }: RepartidorLayoutProps) {
       </main>
 
       {/* Bottom navigation */}
-      <RepartidorBottomNav
-        currentTab={currentTab}
-        onTabChange={setCurrentTab}
-      />
+      <RepartidorBottomNav />
     </div>
   )
 }

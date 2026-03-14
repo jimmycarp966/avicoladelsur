@@ -8,7 +8,7 @@ import { devError } from '@/lib/utils/logger'
 // Schemas de validación
 const registrarCobroEntregaSchema = z.object({
   entrega_id: z.string().uuid(),
-  estado_pago: z.enum(['pagado', 'parcial', 'fiado']),
+  estado_pago: z.enum(['pagado', 'parcial', 'cuenta_corriente']),
   metodo_pago: z.string().min(1),
   monto_cobrado: z.number().min(0),
   numero_transaccion: z.string().optional(),
@@ -147,8 +147,8 @@ export async function registrarCobroEntregaAction(formData: FormData) {
 
     const entrega = entregaResult.entrega
     const montoTotal = Number(entrega.total || 0)
-    const montoCobrado = data.estado_pago === 'fiado' ? 0 : data.monto_cobrado
-    const montoCuentaCorriente = data.estado_pago === 'fiado'
+    const montoCobrado = data.estado_pago === 'cuenta_corriente' ? 0 : data.monto_cobrado
+    const montoCuentaCorriente = data.estado_pago === 'cuenta_corriente'
       ? montoTotal
       : data.estado_pago === 'parcial'
         ? Math.max(montoTotal - montoCobrado, 0)
@@ -159,10 +159,10 @@ export async function registrarCobroEntregaAction(formData: FormData) {
       p_repartidor_id: auth.user.id,
       p_entrega_id: entrega.id,
       p_estado_entrega: entrega.estado_entrega || 'pendiente',
-      p_metodo_pago: data.estado_pago === 'fiado' ? 'cuenta_corriente' : data.metodo_pago,
+      p_metodo_pago: data.estado_pago === 'cuenta_corriente' ? 'cuenta_corriente' : data.metodo_pago,
       p_monto_cobrado: montoCobrado,
       p_monto_cuenta_corriente: montoCuentaCorriente,
-      p_es_cuenta_corriente: data.estado_pago === 'fiado',
+      p_es_cuenta_corriente: data.estado_pago === 'cuenta_corriente',
       p_es_pago_parcial: data.estado_pago === 'parcial',
       p_numero_transaccion: data.numero_transaccion || null,
       p_comprobante_url: data.comprobante_url || null,
@@ -186,7 +186,7 @@ export async function registrarCobroEntregaAction(formData: FormData) {
 
     return {
       success: true,
-      message: data.estado_pago === 'fiado'
+      message: data.estado_pago === 'cuenta_corriente'
         ? 'Cobro registrado como cuenta corriente'
         : `Cobro registrado: $${montoCobrado} - ${data.metodo_pago}`,
       data: result
@@ -348,8 +348,8 @@ export async function marcarEntregaFallidaAction(formData: FormData) {
       p_repartidor_id: auth.user.id,
       p_entrega_id: entrega.id,
       p_estado_entrega: 'rechazado',
-      p_motivo_rechazo: notas || 'Entrega fallida',
-      p_notas_entrega: notas || 'Entrega fallida',
+      p_motivo_rechazo: notas || 'Entrega rechazada',
+      p_notas_entrega: notas || 'Entrega rechazada',
     })
 
     if (error) {
@@ -367,7 +367,7 @@ export async function marcarEntregaFallidaAction(formData: FormData) {
 
     return {
       success: true,
-      message: 'Entrega marcada como fallida'
+      message: 'Entrega marcada como rechazada'
     }
 
   } catch (error) {
@@ -395,11 +395,11 @@ export async function obtenerResumenEntregasAction(pedidoId: string) {
       total_entregas: data.length,
       pendientes: data.filter(e => e.estado_entrega === 'pendiente').length,
       entregados: data.filter(e => e.estado_entrega === 'entregado').length,
-      fallidos: data.filter(e => e.estado_entrega === 'fallido').length,
+      rechazados: data.filter(e => e.estado_entrega === 'rechazado').length,
       total_a_cobrar: data.reduce((sum, e) => sum + (e.total || 0), 0),
       total_cobrado: data.reduce((sum, e) => sum + (e.monto_cobrado || 0), 0),
       pagados: data.filter(e => e.estado_pago === 'pagado').length,
-      fiados: data.filter(e => e.estado_pago === 'fiado').length,
+      cuenta_corriente: data.filter(e => e.estado_pago === 'cuenta_corriente').length,
     }
 
     return { success: true, data: resumen }

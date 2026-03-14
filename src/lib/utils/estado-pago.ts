@@ -1,151 +1,218 @@
-/**
- * Utilidades para gestión de estado de pago en entregas
- * Centraliza la lógica para evitar inconsistencias entre componentes
- */
-
-/**
- * Representa el estado de pago de una entrega
- */
 export type EstadoPagoType =
-    | 'pagado'           // Monto completo cobrado
-    | 'pendiente'        // Tiene método de pago pero monto = 0
-    | 'pagara_despues'   // Sin monto ni método definido
-    | 'parcial'          // Monto parcial con saldo pendiente
-    | 'cuenta_corriente' // Todo cargado a cuenta corriente del cliente
-    | 'rechazado'        // Pedido no entregado
+  | 'pagado'
+  | 'pendiente'
+  | 'pagara_despues'
+  | 'parcial'
+  | 'cuenta_corriente'
+  | 'rechazado'
 
-/**
- * Interfaz mínima para verificar estado de pago
- */
 export interface EntregaConEstadoPago {
-    estado_entrega?: string | null
-    pago_registrado?: boolean | null
-    monto_cobrado_registrado?: number | null
-    metodo_pago_registrado?: string | null
-    notas_pago?: string | null
-    estado_pago?: string | null // Usado en tabla entregas
+  estado_entrega?: string | null
+  pago_registrado?: boolean | null
+  monto_cobrado_registrado?: number | null
+  metodo_pago_registrado?: string | null
+  notas_pago?: string | null
+  estado_pago?: string | null
+  pedido?: {
+    total?: number | null
+    pago_estado?: string | null
+  } | null
+  total?: number | null
+  monto_cobrado?: number | null
+  metodo_pago?: string | null
 }
 
-/**
- * Verifica si una entrega completada tiene un estado de pago definido
- * 
- * Una entrega tiene estado definido si:
- * - Tiene pago_registrado = true con monto > 0 (ya pagó o pago parcial)
- * - Tiene metodo_pago_registrado (pendiente con método)
- * - Tiene notas_pago indicando que pagará después
- * - Fue rechazada (siempre tiene estado definido)
- * - Tiene estado_pago definido en tabla entregas
- */
+const ESTADOS_ENTREGA_NEGATIVOS = new Set(['rechazado', 'fallido', 'cancelado'])
+const ESTADOS_ENTREGA_TERMINALES = new Set(['entregado', ...ESTADOS_ENTREGA_NEGATIVOS])
+const ESTADOS_PAGO_RESUELTOS = new Set<EstadoPagoType>(['pagado', 'cuenta_corriente', 'parcial'])
+const ESTADOS_PAGO_DEFINIDOS = new Set<EstadoPagoType>([
+  'pagado',
+  'pendiente',
+  'pagara_despues',
+  'parcial',
+  'cuenta_corriente',
+  'rechazado',
+])
+
+function tieneNotaPagaraDespues(notasPago?: string | null) {
+  const notas = notasPago?.toLowerCase() || ''
+  return (
+    notas.includes('pagara despues') ||
+    notas.includes('pagara despues.')
+  )
+}
+
+export function normalizarEstadoEntrega(
+  estado?: string | null,
+): 'pendiente' | 'en_camino' | 'entregado' | 'rechazado' {
+  if (!estado) return 'pendiente'
+  if (estado === 'en_camino') return 'en_camino'
+  if (ESTADOS_ENTREGA_NEGATIVOS.has(estado)) return 'rechazado'
+  return estado === 'entregado' ? 'entregado' : 'pendiente'
+}
+
+export function normalizarEstadoPago(entrega: EntregaConEstadoPago): EstadoPagoType | null {
+  const estadoEntrega = normalizarEstadoEntrega(entrega.estado_entrega)
+  if (estadoEntrega === 'rechazado') {
+    return 'rechazado'
+  }
+
+  const estadoPago = entrega.estado_pago
+  const metodoPago = entrega.metodo_pago_registrado || entrega.metodo_pago
+  const montoCobrado = Number(
+    entrega.monto_cobrado_registrado ?? entrega.monto_cobrado ?? 0,
+  )
+  const pagoEstadoPedido = entrega.pedido?.pago_estado
+  const notaPagaraDespues = tieneNotaPagaraDespues(entrega.notas_pago)
+
+  if (estadoPago === 'pago_parcial') return 'parcial'
+  if (estadoPago === 'fiado') return 'cuenta_corriente'
+  if (
+    estadoPago === 'pagado' ||
+    estadoPago === 'parcial' ||
+    estadoPago === 'cuenta_corriente' ||
+    estadoPago === 'rechazado'
+  ) {
+    return estadoPago
+  }
+  if (estadoPago === 'pagara_despues' || (estadoPago === 'pendiente' && notaPagaraDespues)) {
+    return 'pagara_despues'
+  }
+  if (estadoPago === 'pendiente' && Boolean(metodoPago)) {
+    return 'pendiente'
+  }
+
+  if (metodoPago === 'cuenta_corriente' || pagoEstadoPedido === 'cuenta_corriente') {
+    return 'cuenta_corriente'
+  }
+
+  const total = Number(entrega.pedido?.total ?? entrega.total ?? 0)
+  if (montoCobrado > 0 && total > 0 && montoCobrado < total) {
+    return 'parcial'
+  }
+
+  if (montoCobrado > 0 || pagoEstadoPedido === 'pagado') {
+    return 'pagado'
+  }
+
+  if (notaPagaraDespues) {
+    return 'pagara_despues'
+  }
+
+  if (metodoPago) {
+    return 'pendiente'
+  }
+
+  if (
+    estadoPago &&
+    estadoPago !== 'pendiente' &&
+    ESTADOS_PAGO_DEFINIDOS.has(estadoPago as EstadoPagoType)
+  ) {
+    return estadoPago as EstadoPagoType
+  }
+
+  return null
+}
+
+export function esEntregaTerminal(
+  entrega: Pick<EntregaConEstadoPago, 'estado_entrega'> | string | null | undefined,
+): boolean {
+  const estado =
+    typeof entrega === 'string' || entrega == null ? entrega : entrega.estado_entrega
+
+  return ESTADOS_ENTREGA_TERMINALES.has(estado || '')
+}
+
 export function tieneEstadoPagoDefinido(entrega: EntregaConEstadoPago): boolean {
-    // Entregas rechazadas siempre tienen pago "definido"
-    if (entrega.estado_entrega === 'rechazado') {
-        return true
-    }
-
-    // Si tiene estado_pago de la tabla entregas
-    if (entrega.estado_pago && entrega.estado_pago !== '') {
-        return true
-    }
-
-    // Si tiene pago registrado con monto > 0
-    if (entrega.pago_registrado && (entrega.monto_cobrado_registrado ?? 0) > 0) {
-        return true
-    }
-
-    // Si tiene método de pago registrado (aunque monto sea 0)
-    if (entrega.metodo_pago_registrado && entrega.metodo_pago_registrado !== '') {
-        return true
-    }
-
-    // Si tiene notas de pago (indica que definió algo)
-    if (entrega.notas_pago && entrega.notas_pago.trim() !== '') {
-        return true
-    }
-
-    return false
+  const estadoPago = normalizarEstadoPago(entrega)
+  return estadoPago !== null && ESTADOS_PAGO_DEFINIDOS.has(estadoPago)
 }
 
-/**
- * Verifica si una entrega está completamente pagada
- */
-/**
- * Verifica si una entrega tiene su pago resuelto (pagado, cuenta corriente, o parcial)
- * Esto NO significa que se cobró dinero, sino que el estado fue definido
- */
 export function estaPagado(entrega: EntregaConEstadoPago): boolean {
-    const estadosResueltos = ['pagado', 'cuenta_corriente', 'parcial']
-    return (
-        estadosResueltos.includes(entrega.estado_pago || '') ||
-        (entrega.pago_registrado === true && (entrega.monto_cobrado_registrado ?? 0) > 0)
-    )
+  const estadoPago = normalizarEstadoPago(entrega)
+  return estadoPago !== null && ESTADOS_PAGO_RESUELTOS.has(estadoPago)
 }
 
-/**
- * Obtiene el estado de pago legible para UI
- */
+export function calcularMontoPorCobrar(entrega: EntregaConEstadoPago): number {
+  const estadoEntrega = normalizarEstadoEntrega(entrega.estado_entrega)
+  if (estadoEntrega === 'rechazado') {
+    return 0
+  }
+
+  const total = Number(entrega.pedido?.total ?? entrega.total ?? 0)
+  const montoCobrado = Number(entrega.monto_cobrado_registrado ?? entrega.monto_cobrado ?? 0)
+  const estadoPago = normalizarEstadoPago(entrega)
+
+  if (!estadoPago) {
+    return total
+  }
+
+  if (
+    estadoPago === 'pagado' ||
+    estadoPago === 'cuenta_corriente' ||
+    estadoPago === 'rechazado'
+  ) {
+    return 0
+  }
+
+  if (estadoPago === 'parcial') {
+    return Math.max(total - montoCobrado, 0)
+  }
+
+  return total
+}
+
+export function sumarMontoPorCobrar<T extends EntregaConEstadoPago>(entregas: T[]): number {
+  return entregas.reduce((sum, entrega) => sum + calcularMontoPorCobrar(entrega), 0)
+}
+
 export function getEstadoPagoLabel(entrega: EntregaConEstadoPago): string {
-    if (entrega.estado_entrega === 'rechazado') {
-        return 'Rechazado'
-    }
+  const estadoPago = normalizarEstadoPago(entrega)
 
-    if (entrega.estado_pago === 'pagado' ||
-        (entrega.pago_registrado && (entrega.monto_cobrado_registrado ?? 0) > 0)) {
-        return 'Pagado'
-    }
-
-    if (entrega.estado_pago === 'cuenta_corriente') {
-        return 'Cuenta corriente'
-    }
-
-    if (entrega.estado_pago === 'parcial') {
-        return 'Pago parcial'
-    }
-
-    if (entrega.metodo_pago_registrado) {
-        return 'Pendiente (método definido)'
-    }
-
-    if (entrega.notas_pago?.includes('pagará después')) {
-        return 'Pagará después'
-    }
-
-    return 'Sin definir'
+  switch (estadoPago) {
+    case 'pagado':
+      return 'Pagado'
+    case 'pendiente':
+      return 'Pendiente'
+    case 'pagara_despues':
+      return 'Pagara despues'
+    case 'parcial':
+      return 'Pago parcial'
+    case 'cuenta_corriente':
+      return 'Cuenta corriente'
+    case 'rechazado':
+      return 'Rechazado'
+    default:
+      return 'Sin definir'
+  }
 }
 
-/**
- * Obtiene el color/variante de badge para el estado de pago
- */
-export function getEstadoPagoBadgeVariant(entrega: EntregaConEstadoPago):
-    'default' | 'secondary' | 'destructive' | 'outline' {
+export function getEstadoPagoBadgeVariant(
+  entrega: EntregaConEstadoPago,
+): 'default' | 'secondary' | 'destructive' | 'outline' {
+  const estadoPago = normalizarEstadoPago(entrega)
 
-    if (entrega.estado_entrega === 'rechazado') {
-        return 'destructive'
-    }
+  if (estadoPago === 'rechazado') {
+    return 'destructive'
+  }
 
-    if (estaPagado(entrega)) {
-        return 'default' // Verde/primario
-    }
+  if (estadoPago && ESTADOS_PAGO_RESUELTOS.has(estadoPago)) {
+    return 'default'
+  }
 
-    if (tieneEstadoPagoDefinido(entrega)) {
-        return 'secondary' // Gris
-    }
+  if (estadoPago && ESTADOS_PAGO_DEFINIDOS.has(estadoPago)) {
+    return 'secondary'
+  }
 
-    return 'outline' // Sin estado - requiere acción
+  return 'outline'
 }
 
-/**
- * Filtra entregas completadas que no tienen estado de pago definido
- * Útil para validar si se puede finalizar una ruta
- */
-export function getEntregasSinEstadoPago<T extends EntregaConEstadoPago>(
-    entregas: T[]
-): T[] {
-    return entregas.filter(e => {
-        // Solo verificar entregas completadas
-        if (e.estado_entrega !== 'entregado' && e.estado_entrega !== 'rechazado') {
-            return false
-        }
+export function getEntregasSinEstadoPago<T extends EntregaConEstadoPago>(entregas: T[]): T[] {
+  return entregas.filter((entrega) => {
+    if (!esEntregaTerminal(entrega)) {
+      return false
+    }
 
-        return !tieneEstadoPagoDefinido(e)
-    })
+    return !tieneEstadoPagoDefinido(entrega)
+  })
 }

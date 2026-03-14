@@ -3,27 +3,24 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  Truck,
-  MapPin,
   Clock,
   CheckCircle,
   DollarSign,
-  Camera,
-  FileText,
   AlertCircle,
-  Navigation,
   Package,
-  X,
-  Plus,
   Map,
   List
 } from 'lucide-react'
-import { getEntregasSinEstadoPago, estaPagado } from '@/lib/utils/estado-pago'
+import {
+  calcularMontoPorCobrar,
+  esEntregaTerminal,
+  getEntregasSinEstadoPago,
+  normalizarEstadoPago,
+} from '@/lib/utils/estado-pago'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { toast } from 'sonner'
 import { iniciarRutaAction, finalizarRutaAction } from '@/actions/reparto.actions'
@@ -66,22 +63,12 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
   // Vista lista existente (original)
   const entregas = ruta.detalles_ruta || []
   const entregasOrdenadas = [...entregas].sort((a, b) => a.orden_entrega - b.orden_entrega)
-  const entregasCompletadas = entregas.filter((e: any) =>
-    e.estado_entrega === 'entregado' || e.estado_entrega === 'rechazado'
-  ).length
-  const entregasPendientes = entregas.filter((e: any) =>
-    e.estado_entrega === 'pendiente' || e.estado_entrega === 'en_camino' || !e.estado_entrega
-  ).length
-
-  // Total por cobrar: solo sumar entregas que NO tienen estado de pago resuelto
-  // Estados resueltos: pagado, cuenta_corriente, parcial (ya definieron el pago)
-  const estadosPagoResueltos = ['pagado', 'cuenta_corriente', 'parcial']
-  const totalCobrar = entregas
-    .filter((e: any) => {
-      const estadoPago = e.estado_pago || (e.pago_registrado ? 'pagado' : null)
-      return !estadosPagoResueltos.includes(estadoPago) && e.pedido?.pago_estado !== 'pagado'
-    })
-    .reduce((sum: number, e: any) => sum + (e.pedido?.total || 0), 0)
+  const entregasCompletadas = entregas.filter((e: any) => esEntregaTerminal(e)).length
+  const entregasPendientes = entregas.filter((e: any) => !esEntregaTerminal(e)).length
+  const totalCobrar = entregas.reduce(
+    (sum: number, e: any) => sum + calcularMontoPorCobrar(e),
+    0,
+  )
 
   // Debug: Log si no hay entregas
   if (entregas.length === 0) {
@@ -95,10 +82,9 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
 
   // Calcular recaudación registrada
   // Incluir todos los estados de pago válidos (pagado, parcial, cuenta_corriente)
-  const entregasConPago = entregas.filter((e: any) => {
-    const estadoPago = e.estado_pago || (e.pago_registrado ? 'pagado' : null)
-    return ['pagado', 'parcial', 'cuenta_corriente'].includes(estadoPago)
-  })
+  const entregasConPago = entregas.filter((e: any) =>
+    ['pagado', 'parcial', 'cuenta_corriente'].includes(normalizarEstadoPago(e) || '')
+  )
 
   // Solo sumar monto_cobrado_registrado (dinero efectivamente recibido, no cuenta corriente)
   const recaudacionCalculada = entregasConPago.reduce((sum: number, e: any) => {
@@ -122,12 +108,6 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
 
   // Permitir iniciar rutas en estado 'planificada' o 'en_curso' (rutas iniciadas desde almacén)
   // El botón aparecerá si tiene checklist_inicio_id completado
-  const puedeIniciar = (ruta.estado === 'planificada' || ruta.estado === 'en_curso') && ruta.checklist_inicio_id
-  const puedeFinalizar = ruta.estado === 'en_curso' &&
-    entregasPendientes === 0 &&
-    entregasSinEstadoPago.length === 0 &&
-    ruta.checklist_fin_id
-
   const handleIniciarRuta = async () => {
     if (!ruta.checklist_inicio_id) {
       toast.error('Debes completar el checklist de inicio antes de iniciar la ruta')

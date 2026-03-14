@@ -32,6 +32,11 @@ import { ChecklistInicioForm } from './checklist-inicio-form'
 import { useLocationTracker } from '@/hooks/useLocationTracker'
 import { config } from '@/lib/config'
 import { getDirectionsWithFallback } from '@/lib/rutas/ors-directions'
+import {
+    calcularMontoPorCobrar,
+    esEntregaTerminal,
+    normalizarEstadoPago,
+} from '@/lib/utils/estado-pago'
 
 interface RutaMapaContentProps {
     ruta: any
@@ -278,17 +283,14 @@ export function RutaMapaContent({ ruta }: RutaMapaContentProps) {
     }, [entregasOrdenadas])
 
     // Estadísticas
-    const entregasCompletadas = entregas.filter((e: any) =>
-        e.estado_entrega === 'entregado' || e.estado_entrega === 'rechazado'
-    ).length
-    const entregasPendientes = entregasOrdenadas.filter((e: any) =>
-        e.estado_entrega === 'pendiente' || e.estado_entrega === 'en_camino' || !e.estado_entrega
+    const entregasCompletadas = entregas.filter((e: any) => esEntregaTerminal(e)).length
+    const entregasPendientes = entregasOrdenadas.filter((e: any) => !esEntregaTerminal(e))
+    const totalCobrar = entregas.reduce(
+        (sum: number, e: any) => sum + calcularMontoPorCobrar(e),
+        0,
     )
-    const totalCobrar = entregas
-        .filter((e: any) => e.pedido?.pago_estado !== 'pagado')
-        .reduce((sum: number, e: any) => sum + (e.pedido?.total || 0), 0)
     const totalCobrado = entregas
-        .filter((e: any) => e.pago_registrado)
+        .filter((e: any) => ['pagado', 'parcial', 'cuenta_corriente'].includes(normalizarEstadoPago(e) || ''))
         .reduce((sum: number, e: any) => sum + (e.monto_cobrado_registrado || 0), 0)
 
     // Próxima entrega pendiente

@@ -284,20 +284,20 @@ export async function obtenerMetricasRendimientoAction(): Promise<ApiResponse<{
         : 0
     }
 
-    // Tasa de satisfacción (basada en entregas exitosas vs fallidas)
+    // Tasa de satisfacción (basada en entregas exitosas vs rechazadas)
     const { count: entregasExitosas } = await supabase
       .from('detalles_ruta')
       .select('*', { count: 'exact', head: true })
       .eq('estado_entrega', 'entregado')
       .gte('created_at', inicioMes.toISOString())
 
-    const { count: entregasFallidas } = await supabase
+    const { count: entregasRechazadas } = await supabase
       .from('detalles_ruta')
       .select('*', { count: 'exact', head: true })
-      .eq('estado_entrega', 'cancelado')
+      .eq('estado_entrega', 'rechazado')
       .gte('created_at', inicioMes.toISOString())
 
-    const totalEntregas = (entregasExitosas || 0) + (entregasFallidas || 0)
+    const totalEntregas = (entregasExitosas || 0) + (entregasRechazadas || 0)
     const tasaSatisfaccion = totalEntregas > 0
       ? ((entregasExitosas || 0) / totalEntregas) * 100
       : 100
@@ -648,7 +648,7 @@ export async function obtenerMetricasRepartidorAction(repartidorId: string): Pro
               tiempoTotalEntrega += tiempoEntrega
               entregasConTiempo++
             }
-          } catch (e) {
+          } catch {
             // Ignorar errores en parsing de fechas
           }
         }
