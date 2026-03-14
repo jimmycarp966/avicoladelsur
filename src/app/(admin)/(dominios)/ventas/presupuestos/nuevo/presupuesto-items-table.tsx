@@ -84,6 +84,12 @@ function ProductoOmnibox({
   const optionRefs = useRef<Array<HTMLDivElement | null>>([])
   const debouncedSearch = useDebounce(search, 150)
 
+  const focusOption = useCallback((index: number) => {
+    window.setTimeout(() => {
+      optionRefs.current[index]?.focus()
+    }, 0)
+  }, [])
+
   // Resetear search cuando cambia el value (se selecciona un producto)
   useEffect(() => {
     if (value) {
@@ -190,7 +196,7 @@ function ProductoOmnibox({
     })
   }, [isOpen, selectedIndex])
 
-  const handleKeyDown = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
+  const handleInputKeyDown = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault()
       if (!isOpen) {
@@ -203,6 +209,14 @@ function ProductoOmnibox({
         setIsOpen(true)
       }
       setSelectedIndex(prev => Math.max(prev - 1, 0))
+    } else if (e.key === 'Tab' && !e.shiftKey && filteredProductos.length > 0) {
+      e.preventDefault()
+      if (!isOpen) {
+        setIsOpen(true)
+      }
+      const nextIndex = Math.min(selectedIndex, Math.max(filteredProductos.length - 1, 0))
+      setSelectedIndex(nextIndex)
+      focusOption(nextIndex)
     } else if (e.key === 'Enter') {
       e.preventDefault()
       if (filteredProductos[selectedIndex]) {
@@ -211,7 +225,30 @@ function ProductoOmnibox({
     } else if (e.key === 'Escape') {
       setIsOpen(false)
     }
-  }, [filteredProductos, handleSelectProducto, isOpen, selectedIndex])
+  }, [filteredProductos, focusOption, handleSelectProducto, isOpen, selectedIndex])
+
+  const handleOptionKeyDown = useCallback((e: KeyboardEvent<HTMLDivElement>, index: number) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      const nextIndex = Math.min(index + 1, filteredProductos.length - 1)
+      setSelectedIndex(nextIndex)
+      focusOption(nextIndex)
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      const nextIndex = Math.max(index - 1, 0)
+      setSelectedIndex(nextIndex)
+      focusOption(nextIndex)
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      if (filteredProductos[index]) {
+        handleSelectProducto(filteredProductos[index])
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      inputRef.current?.focus()
+      setIsOpen(false)
+    }
+  }, [filteredProductos, focusOption, handleSelectProducto])
 
   const productoSeleccionado = productos.find(p => p.id === value)
   const mostrarBusqueda = !productoSeleccionado || isEditingSelection
@@ -227,9 +264,6 @@ function ProductoOmnibox({
       inputRef.current?.select()
     }, 0)
   }, [])
-
-  // Debug: log para ver qué está pasando
-  console.log('[OMNIBOX] value:', value, 'productoSeleccionado:', productoSeleccionado?.codigo, productoSeleccionado?.nombre)
 
   if (productoSeleccionado && !mostrarBusqueda) {
     return (
@@ -273,7 +307,7 @@ function ProductoOmnibox({
             setIsOpen(true)
             setSelectedIndex(0)
           }}
-          onKeyDown={handleKeyDown}
+          onKeyDown={handleInputKeyDown}
           onFocus={() => {
             setIsOpen(true)
           }}
@@ -286,16 +320,26 @@ function ProductoOmnibox({
       
       {/* Dropdown simple con absolute positioning */}
       {isOpen && filteredProductos.length > 0 && (
-        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-[250px] overflow-y-auto z-50">
+        <div
+          role="listbox"
+          className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-[250px] overflow-y-auto z-50"
+        >
           {filteredProductos.map((producto, index) => (
             <div
               key={producto.id}
               ref={(element) => {
                 optionRefs.current[index] = element
               }}
+              role="option"
+              aria-selected={index === selectedIndex}
+              tabIndex={index === selectedIndex ? 0 : -1}
               onClick={() => {
                 handleSelectProducto(producto)
               }}
+              onFocus={() => {
+                setSelectedIndex(index)
+              }}
+              onKeyDown={(e) => handleOptionKeyDown(e, index)}
               className={`px-3 py-2 cursor-pointer text-sm hover:bg-gray-100 flex items-center justify-between ${
                 index === selectedIndex ? 'bg-gray-100' : ''
               }`}
@@ -354,10 +398,8 @@ export function PresupuestoItemsTable({
   // Usar itemsCount (de fields.length) como la fuente de verdad para la cantidad de items
   const displayItems = itemsCount !== undefined ? items.slice(0, itemsCount) : items
 
-  console.log('[TABLE] items.length:', items?.length, 'itemsCount:', itemsCount, 'displayItems.length:', displayItems?.length)
 
   const handleProductoSelect = useCallback((index: number, producto: Producto) => {
-    console.log('[TABLE] handleProductoSelect:', { index, productoId: producto.id, productoCodigo: producto.codigo })
     if (producto.id) {
       setValue(`items.${index}.producto_id`, producto.id, { shouldValidate: true, shouldDirty: true })
       onProductoChange(index, producto.id)
@@ -412,11 +454,8 @@ export function PresupuestoItemsTable({
   }
 
   const handleRemove = useCallback((index: number) => {
-    console.log('[TABLE] handleRemove llamado, index:', index, 'items.length:', items?.length)
     if (canRemoveItem(index)) {
       onRemoveItem(index)
-    } else {
-      console.log('[TABLE] No se puede eliminar: solo queda 1 item')
     }
   }, [onRemoveItem, canRemoveItem])
 
