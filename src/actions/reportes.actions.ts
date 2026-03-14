@@ -478,42 +478,18 @@ export async function generarPDFPedido(pedidoId: string): Promise<ApiResponse<Bu
   try {
     const supabase = await createClient()
 
-    // Obtener datos del pedido
-    const { data: pedido, error } = await supabase
-      .from('pedidos')
-      .select(`
-        id,
-        numero_pedido,
-        fecha_pedido,
-        total,
-        estado,
-        pago_estado,
-        clientes (
-          nombre,
-          telefono,
-          zona_entrega
-        ),
-        usuarios (
-          nombre,
-          apellido
-        ),
-        detalles_pedido (
-          cantidad,
-          precio_unitario,
-          subtotal,
-          productos (
-            nombre,
-            codigo
-          )
-        )
-      `)
-      .eq('id', pedidoId)
-      .single()
+    // Usar la misma RPC del detalle para soportar pedidos agrupados.
+    const { data: resultado, error } = await supabase
+      .rpc('fn_obtener_pedido_completo', {
+        p_pedido_id: pedidoId
+      })
 
-    if (error || !pedido) {
+    const pedido = resultado?.data?.pedido
+
+    if (error || !resultado?.success || !pedido) {
       return {
         success: false,
-        error: 'Pedido no encontrado',
+        error: error?.message || resultado?.error || 'Pedido no encontrado',
       }
     }
 
@@ -547,9 +523,14 @@ export async function generarPDFPedido(pedidoId: string): Promise<ApiResponse<Bu
       doc.fontSize(14).text('Cliente:', { underline: true })
       doc.fontSize(12)
       const clientesData = pedido.clientes as any
-      const clienteNombre = Array.isArray(clientesData) ? clientesData[0]?.nombre : clientesData?.nombre
-      const clienteTelefono = Array.isArray(clientesData) ? clientesData[0]?.telefono : clientesData?.telefono
-      const clienteZona = Array.isArray(clientesData) ? clientesData[0]?.zona_entrega : clientesData?.zona_entrega
+      let clienteNombre = Array.isArray(clientesData) ? clientesData[0]?.nombre : clientesData?.nombre
+      let clienteTelefono = Array.isArray(clientesData) ? clientesData[0]?.telefono : clientesData?.telefono
+      let clienteZona = Array.isArray(clientesData) ? clientesData[0]?.zona_entrega : clientesData?.zona_entrega
+      if (!pedido.cliente_id) {
+        clienteNombre = 'Pedido agrupado'
+        clienteTelefono = 'Multiples entregas'
+        clienteZona = pedido.zonas?.nombre || clienteZona
+      }
       doc.text(`Nombre: ${clienteNombre || 'N/A'}`)
       doc.text(`Teléfono: ${clienteTelefono || 'N/A'}`)
       doc.text(`Zona: ${clienteZona || 'N/A'}`)
