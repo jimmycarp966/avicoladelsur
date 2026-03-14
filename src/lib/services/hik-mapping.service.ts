@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createAdminClient } from '@/lib/supabase/server'
+import { RRHH_HIK_PERSON_MAP } from '@/lib/config/rrhh-hik-person-map'
 import { devError } from '@/lib/utils/logger'
 
 interface DbHikMapRow {
@@ -58,6 +59,19 @@ function parseEnvHikMap(raw: string): Map<string, string> {
   return map
 }
 
+function buildStaticHikMap(): Map<string, string> {
+  const map = new Map<string, string>()
+
+  for (const [hikCode, employeeRef] of Object.entries(RRHH_HIK_PERSON_MAP)) {
+    const normalizedHikCode = normalizeHikIdentity(hikCode)
+    const normalizedEmployeeRef = employeeRef.trim()
+    if (!normalizedHikCode || !normalizedEmployeeRef) continue
+    map.set(normalizedHikCode, normalizedEmployeeRef)
+  }
+
+  return map
+}
+
 function isMissingHikMapTableError(error: { code?: string; message?: string; details?: string } | null): boolean {
   if (!error) return false
   const code = String(error.code || '').toUpperCase()
@@ -73,6 +87,7 @@ function isMissingHikMapTableError(error: { code?: string; message?: string; det
 
 export async function loadHikPersonMapConfig(options: HikMapLoadOptions = {}): Promise<HikMapLoadResult> {
   const warnings: string[] = []
+  const dbMap = new Map<string, string>()
   const mergedMap = new Map<string, string>()
 
   let dbEntries = 0
@@ -95,9 +110,9 @@ export async function loadHikPersonMapConfig(options: HikMapLoadOptions = {}): P
         const hikCode = typeof row.hik_code === 'string' ? normalizeHikIdentity(row.hik_code) : ''
         const empleadoId = typeof row.empleado_id === 'string' ? row.empleado_id.trim() : ''
         if (!hikCode || !empleadoId) continue
-        mergedMap.set(hikCode, empleadoId)
+        dbMap.set(hikCode, empleadoId)
       }
-      dbEntries = mergedMap.size
+      dbEntries = dbMap.size
     }
   } catch (error) {
     warnings.push('No se pudo consultar rrhh_hik_person_map por un error inesperado.')
@@ -106,10 +121,33 @@ export async function loadHikPersonMapConfig(options: HikMapLoadOptions = {}): P
 
   const envRaw = (process.env.HIK_CONNECT_PERSON_MAP || '').trim()
   const envMap = parseEnvHikMap(envRaw)
+  const staticMap = buildStaticHikMap()
   envEntries = envMap.size
 
-  for (const [hikCode, employeeRef] of envMap.entries()) {
-    mergedMap.set(hikCode, employeeRef)
+  if (dbMap.size > 0) {
+    for (const [hikCode, employeeRef] of dbMap.entries()) {
+      mergedMap.set(hikCode, employeeRef)
+    }
+
+    if (envMap.size > 0) {
+      warnings.push(
+        'Se detecto HIK_CONNECT_PERSON_MAP, pero se ignora porque rrhh_hik_person_map ya tiene mapeos cargados.',
+      )
+    }
+  } else if (staticMap.size > 0) {
+    for (const [hikCode, employeeRef] of staticMap.entries()) {
+      mergedMap.set(hikCode, employeeRef)
+    }
+
+    if (envMap.size > 0) {
+      warnings.push(
+        'Se detecto HIK_CONNECT_PERSON_MAP, pero se ignora porque el proyecto ya tiene un mapa Hik versionado en codigo.',
+      )
+    }
+  } else {
+    for (const [hikCode, employeeRef] of envMap.entries()) {
+      mergedMap.set(hikCode, employeeRef)
+    }
   }
 
   return {
