@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
 import type { LiquidacionJornada } from '@/types/domain.types'
+import { isAusenciaObservacion } from './liquidacion-utils'
 
 type JornadasCalendarioProps = {
   jornadas: LiquidacionJornada[]
@@ -41,6 +42,7 @@ function clasificarDia(dia: DiaCalendario): DiaCalendario['tipo'] {
   }
 
   const { jornada } = dia
+  if (isAusenciaObservacion(jornada.observaciones)) return 'ausente'
   if (jornada.origen === 'auto_licencia_descanso') return 'descanso'
 
   const hs = jornada.horas_mensuales ?? 0

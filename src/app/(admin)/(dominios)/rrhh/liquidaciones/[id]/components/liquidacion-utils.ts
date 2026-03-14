@@ -1,5 +1,7 @@
 import type { LiquidacionJornada } from '@/types/domain.types'
 
+export const AUSENCIA_OBSERVACION_PREFIX = '[AUSENTE]'
+
 export const TURNO_OPTIONS = [
   { value: 'general', label: 'General (turno habitual)' },
   { value: 'turno_completo', label: 'Turno completo' },
@@ -66,6 +68,22 @@ export function normalizeOrigen(origen?: string | null): 'hik' | 'asistencia' | 
   return 'manual'
 }
 
+export function isAusenciaObservacion(value?: string | null): boolean {
+  return (value || '').trim().toUpperCase().startsWith(AUSENCIA_OBSERVACION_PREFIX)
+}
+
+export function buildAusenciaObservacion(motivo: string): string {
+  const clean = motivo.trim()
+  return clean ? `${AUSENCIA_OBSERVACION_PREFIX} ${clean}` : AUSENCIA_OBSERVACION_PREFIX
+}
+
+export function getAusenciaMotivo(value?: string | null): string {
+  const raw = (value || '').trim()
+  if (!raw) return ''
+  if (!isAusenciaObservacion(raw)) return raw
+  return raw.slice(AUSENCIA_OBSERVACION_PREFIX.length).trim()
+}
+
 export type JornadaCalculoInput = Pick<
   LiquidacionJornada,
   | 'horas_mensuales'
@@ -105,7 +123,16 @@ export type NewRowDraft = {
 }
 
 export function validateJornada(
-  row: { fecha?: string; horas_mensuales?: number; horas_adicionales?: number; turno_especial_unidades?: number; tarifa_hora_base?: number; tarifa_hora_extra?: number; tarifa_turno_especial?: number },
+  row: {
+    fecha?: string
+    horas_mensuales?: number
+    horas_adicionales?: number
+    turno_especial_unidades?: number
+    tarifa_hora_base?: number
+    tarifa_hora_extra?: number
+    tarifa_turno_especial?: number
+    observaciones?: string | null
+  },
   isSucursalEmployee: boolean,
 ): string | null {
   if (!row.fecha) return 'La fecha es obligatoria.'
@@ -124,7 +151,8 @@ export function validateJornada(
 
   const unidades =
     (row.horas_mensuales || 0) + (row.horas_adicionales || 0) + (row.turno_especial_unidades || 0)
-  if (unidades <= 0) {
+  const esAusencia = isAusenciaObservacion(row.observaciones)
+  if (unidades <= 0 && !esAusencia) {
     return 'Debe cargar al menos hs mensuales, hs adicionales o turno especial mayor a 0.'
   }
 

@@ -9,9 +9,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Textarea } from '@/components/ui/textarea'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useNotificationStore } from '@/store/notificationStore'
 import { upsertLiquidacionJornadaAction } from '@/actions/rrhh.actions'
 import { JornadaEditSheet } from './jornada-edit-sheet'
@@ -26,6 +28,9 @@ import {
   sanitizeTaskValue,
   formatMoney,
   getRowBreakdown,
+  getAusenciaMotivo,
+  buildAusenciaObservacion,
+  isAusenciaObservacion,
   validateJornada,
   type NewRowDraft,
 } from './liquidacion-utils'
@@ -89,6 +94,10 @@ export function LiquidacionJornadasTab({
   const [addSheetOpen, setAddSheetOpen] = useState(false)
   const [addSheetInitialDraft, setAddSheetInitialDraft] = useState<Partial<NewRowDraft> | undefined>(undefined)
   const [addSheetSession, setAddSheetSession] = useState(0)
+  const [ausenciaDialogOpen, setAusenciaDialogOpen] = useState(false)
+  const [ausenciaFecha, setAusenciaFecha] = useState('')
+  const [ausenciaMotivo, setAusenciaMotivo] = useState('')
+  const [ausenciaRow, setAusenciaRow] = useState<LiquidacionJornada | null>(null)
 
   // Filters
   const [jornadaSearch, setJornadaSearch] = useState('')
@@ -313,15 +322,53 @@ export function LiquidacionJornadasTab({
 
   const rowTotal = (row: LiquidacionJornada) => getRowBreakdown(row, isSucursalEmployee).total
 
-  const handleAusenteCalendarioClick = (fecha: string) => {
-    setAddSheetInitialDraft({
-      fecha,
-      turno: 'general',
-      tarea: '',
-      observaciones: '',
-    })
-    setAddSheetSession((prev) => prev + 1)
-    setAddSheetOpen(true)
+  const handleAusenteCalendarioClick = (fecha: string, row?: LiquidacionJornada | null) => {
+    setAusenciaFecha(fecha)
+    setAusenciaRow(row || null)
+    setAusenciaMotivo(getAusenciaMotivo(row?.observaciones))
+    setAusenciaDialogOpen(true)
+  }
+
+  const handleSaveAusencia = async () => {
+    const motivo = ausenciaMotivo.trim()
+    if (!motivo) {
+      showToast('error', 'Debe escribir el motivo de ausencia', 'Validacion')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const result = await upsertLiquidacionJornadaAction(liquidacion.id, {
+        id: ausenciaRow?.id,
+        fecha: ausenciaFecha,
+        turno: ausenciaRow?.turno?.trim() || 'general',
+        tarea: sanitizeTaskValue(ausenciaRow?.tarea) || null,
+        horas_mensuales: 0,
+        horas_adicionales: 0,
+        turno_especial_unidades: 0,
+        tarifa_hora_base: ausenciaRow?.tarifa_hora_base ?? liquidacion.valor_hora ?? 0,
+        tarifa_hora_extra: ausenciaRow?.tarifa_hora_extra ?? liquidacion.valor_hora ?? 0,
+        tarifa_turno_especial: ausenciaRow?.tarifa_turno_especial ?? 0,
+        origen: ausenciaRow?.origen || 'manual',
+        observaciones: buildAusenciaObservacion(motivo),
+      })
+
+      if (!result.success) {
+        showToast('error', result.error || 'No se pudo guardar la ausencia', 'Error')
+        return
+      }
+
+      showToast('success', 'Motivo de ausencia guardado', 'Guardado')
+      setAusenciaDialogOpen(false)
+      setAusenciaFecha('')
+      setAusenciaMotivo('')
+      setAusenciaRow(null)
+      router.refresh()
+    } catch {
+      showToast('error', 'Error inesperado al guardar la ausencia', 'Error')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -474,7 +521,7 @@ export function LiquidacionJornadasTab({
               periodoAnio={liquidacion.periodo_anio}
               onDiaClick={(dia) => {
                 if (dia.tipo !== 'ausente') return
-                handleAusenteCalendarioClick(dia.fecha)
+                handleAusenteCalendarioClick(dia.fecha, dia.jornada)
               }}
             />
           )}
@@ -510,6 +557,7 @@ export function LiquidacionJornadasTab({
                     const esFeriado = Boolean(feriadoLabel)
                     const esDomingo = isSunday(fechaIso)
                     const esDescanso = row.origen === 'auto_licencia_descanso'
+                    const esAusenciaRegistrada = isAusenciaObservacion(row.observaciones)
                     const placeholderTipo = isPlaceholder ? getPlaceholderTipo(fechaIso) : null
                     const hasDiferencia =
                       (row.horas_adicionales || 0) > 0 ||
@@ -519,6 +567,8 @@ export function LiquidacionJornadasTab({
                       ? placeholderTipo === 'ausente'
                         ? 'bg-red-50/70'
                         : 'bg-slate-50/90'
+                      : esAusenciaRegistrada
+                      ? 'bg-red-50/70'
                       : esFeriado || esDomingo
                       ? 'bg-rose-50/60'
                       : hasDiferencia
@@ -546,6 +596,11 @@ export function LiquidacionJornadasTab({
                           {esDescanso && (
                             <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px]">
                               Descanso
+                            </Badge>
+                          )}
+                          {!isPlaceholder && esAusenciaRegistrada && (
+                            <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 text-[10px]">
+                              Ausente
                             </Badge>
                           )}
                           {isPlaceholder && (
@@ -584,6 +639,8 @@ export function LiquidacionJornadasTab({
                               ? 'Pendiente'
                               : 'Sin carga'}
                           </span>
+                        ) : esAusenciaRegistrada ? (
+                          <span className="text-red-700 font-medium">Ausente</span>
                         ) : (() => {
                           const horasInsuf =
                             (row.horas_mensuales ?? 0) > 0 &&
@@ -708,6 +765,51 @@ export function LiquidacionJornadasTab({
         onAdd={handleAddRow}
         initialDraft={addSheetInitialDraft}
       />
+
+      <Dialog
+        open={ausenciaDialogOpen}
+        onOpenChange={(open) => {
+          setAusenciaDialogOpen(open)
+          if (!open) {
+            setAusenciaFecha('')
+            setAusenciaMotivo('')
+            setAusenciaRow(null)
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Motivo de ausencia</DialogTitle>
+            <DialogDescription>
+              Registre el motivo para el día {formatDateDMY(ausenciaFecha)}.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <Label htmlFor="motivo-ausencia">Detalle</Label>
+            <Textarea
+              id="motivo-ausencia"
+              value={ausenciaMotivo}
+              onChange={(event) => setAusenciaMotivo(event.target.value)}
+              placeholder="Ej: enfermedad, trámite, falta sin aviso..."
+              rows={4}
+            />
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setAusenciaDialogOpen(false)}
+              disabled={loading}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={() => void handleSaveAusencia()} disabled={loading}>
+              {loading ? 'Guardando...' : 'Guardar motivo'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
