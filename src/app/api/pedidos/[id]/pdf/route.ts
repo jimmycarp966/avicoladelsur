@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { generarPDFPedido } from '@/actions/reportes.actions'
+import { generarPDFPedidoAgrupado } from '@/actions/pedidos-pdf.actions'
 
 export async function GET(
   request: NextRequest,
@@ -7,7 +7,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const result = await generarPDFPedido(id)
+    const result = await generarPDFPedidoAgrupado(id)
 
     if (!result.success || !result.data) {
       return NextResponse.json(
