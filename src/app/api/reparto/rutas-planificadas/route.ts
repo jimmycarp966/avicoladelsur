@@ -254,11 +254,16 @@ export async function GET(request: NextRequest) {
           // Buscar detalle para obtener productos y estado de pago
           const detallesFlat = Array.from(detallesMap.values()).flat()
           const detalleMatch = detallesFlat.find((d: any) =>
+            d.id === cliente.id ||
+            d.virtual_id === cliente.id ||
+            d.detalle_ruta_id === cliente.detalle_ruta_id ||
+            d.pedido_id === cliente.pedido_id ||
             d.cliente_final_id === cliente.cliente_id ||
             d.pedido?.cliente?.id === cliente.cliente_id
           )
 
           const pedido = detalleMatch?.pedido
+          const clienteData = Array.isArray(pedido?.cliente) ? pedido.cliente[0] : pedido?.cliente
           const detallesPedido = Array.isArray(pedido?.detalle_pedido)
             ? pedido.detalle_pedido
             : (pedido?.detalle_pedido ? [pedido.detalle_pedido] : [])
@@ -273,6 +278,9 @@ export async function GET(request: NextRequest) {
 
           return {
             ...cliente,
+            id: cliente.id || detalleMatch?.virtual_id || detalleMatch?.id || cliente.cliente_id,
+            telefono: cliente.telefono || clienteData?.telefono || null,
+            direccion: cliente.direccion || clienteData?.direccion || null,
             estado_entrega: detalleMatch?.estado_entrega || cliente.estado || 'pendiente',
             pago_registrado: detalleMatch?.pago_registrado || false,
             monto_cobrado_registrado: detalleMatch?.monto_cobrado_registrado || 0,

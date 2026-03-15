@@ -82,16 +82,8 @@ export function ChecklistFinForm({ rutaId, vehiculoId, onComplete }: ChecklistFi
         return
       }
 
-      const { data: checklistData, error: checklistError } = await supabase
-        .from('checklists_vehiculos')
-        .select('id')
-        .eq('vehiculo_id', vehiculoId)
-        .eq('usuario_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
-
-      if (checklistError || !checklistData) {
+      const checklistId = result.data?.checklistId
+      if (!checklistId) {
         toast.error('Error al obtener checklist creado')
         setLoading(false)
         return
@@ -99,7 +91,7 @@ export function ChecklistFinForm({ rutaId, vehiculoId, onComplete }: ChecklistFi
 
       const { error: updateError } = await supabase
         .from('rutas_reparto')
-        .update({ checklist_fin_id: checklistData.id })
+        .update({ checklist_fin_id: checklistId })
         .eq('id', rutaId)
 
       if (updateError) {

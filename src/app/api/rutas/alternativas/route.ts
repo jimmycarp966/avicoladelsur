@@ -1,7 +1,7 @@
 /**
  * API Route: Rutas Alternativas
  * 
- * Obtiene rutas alternativas de OpenRouteService (con fallback a Google) para un origen y destino.
+ * Obtiene rutas alternativas de Google Directions para un origen y destino.
  * POST /api/rutas/alternativas
  * 
  * Body: { origen: { lat, lng }, destino: { lat, lng } }
@@ -9,10 +9,17 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getDirectionsWithFallback, type RutaAlternativa } from '@/lib/rutas/ors-directions'
+import { getGoogleDirections, isGoogleDirectionsAvailable, type RutaAlternativa } from '@/lib/rutas/google-directions'
 
 export async function POST(request: NextRequest) {
     try {
+        if (!isGoogleDirectionsAvailable()) {
+            return NextResponse.json(
+                { error: 'Google Directions API no está configurada' },
+                { status: 503 }
+            )
+        }
+
         const body = await request.json()
         const { origen, destino } = body
 
@@ -25,16 +32,14 @@ export async function POST(request: NextRequest) {
 
         console.log('[API rutas/alternativas] Solicitando rutas:', { origen, destino })
 
-        // Usar OpenRouteService con fallback a Google y local
-        const { response, provider } = await getDirectionsWithFallback({
+        const response = await getGoogleDirections({
             origin: origen,
             destination: destino,
             waypoints: [], // Sin waypoints para habilitar alternativas
             alternatives: true,
-            vehicle: 'driving-car'
         })
 
-        console.log('[API rutas/alternativas] Proveedor usado:', provider)
+        console.log('[API rutas/alternativas] Proveedor usado: google')
 
         if (!response.success) {
             console.error('[API rutas/alternativas] Error:', response.error)
@@ -57,7 +62,7 @@ export async function POST(request: NextRequest) {
 
         console.log('[API rutas/alternativas] Rutas encontradas:', rutas.length)
 
-        return NextResponse.json({ rutas, provider })
+        return NextResponse.json({ rutas, provider: 'google' })
     } catch (error: any) {
         console.error('[API rutas/alternativas] Error:', error)
         return NextResponse.json(
