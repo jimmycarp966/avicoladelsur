@@ -17,6 +17,12 @@ type GenerateRutaOptions = {
   usarGoogle?: boolean
 }
 
+function normalizeOptimizadaPorForRutaPlanificada(
+  optimizadaPor: 'fleet-routing' | 'optimization' | 'google' | 'ors' | 'local'
+): 'google' | 'local' {
+  return optimizadaPor === 'local' ? 'local' : 'google'
+}
+
 export async function generateRutaOptimizada({
   supabase,
   rutaId,
@@ -258,6 +264,8 @@ export async function generateRutaOptimizada({
   }
 
   // Actualizar ruta_planificada
+  const optimizadaPorRutaPlanificada = normalizeOptimizadaPorForRutaPlanificada(optimizadaPor)
+
   const { data: rutaPlanificada, error: saveError } = await (supabase as any)
     .from('rutas_planificadas')
     .upsert(
@@ -271,7 +279,7 @@ export async function generateRutaOptimizada({
         polyline,
         distancia_total_km: distanciaTotal,
         duracion_total_min: duracionTotal,
-        optimizada_por: optimizadaPor,
+        optimizada_por: optimizadaPorRutaPlanificada,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'ruta_reparto_id' }
