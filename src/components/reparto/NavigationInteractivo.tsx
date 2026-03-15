@@ -81,6 +81,20 @@ export default function NavigationInteractivo({
     // Clientes pendientes
     const clientesPendientes = stops.filter(s => s.estado !== 'entregado')
 
+    // Sincronizar la posición inicial cuando llega de forma asíncrona desde el tracker padre
+    useEffect(() => {
+        if (
+            initialPosition &&
+            (
+                !posicionActual ||
+                posicionActual.lat !== initialPosition.lat ||
+                posicionActual.lng !== initialPosition.lng
+            )
+        ) {
+            setPosicionActual(initialPosition)
+        }
+    }, [initialPosition, posicionActual])
+
     // Obtener posición actual
     useEffect(() => {
         if (posicionActual) return
@@ -173,20 +187,26 @@ export default function NavigationInteractivo({
 
         if (!posicionActual) {
             console.log('[NavigationInteractivo] 🔍 DEBUG: No hay posicionActual, retornando')
-            return
+            throw new Error('Todavía no hay ubicación GPS disponible')
         }
 
         try {
+            const controller = new AbortController()
+            const timeoutId = setTimeout(() => controller.abort(), 20000)
+
             console.log('[NavigationInteractivo] 🔍 DEBUG: Llamando a /api/rutas/alternativas...')
             // Llamar a la API de rutas alternativas
             const response = await fetch('/api/rutas/alternativas', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                cache: 'no-store',
+                signal: controller.signal,
                 body: JSON.stringify({
                     origen: posicionActual,
                     destino: { lat: cliente.lat, lng: cliente.lng }
                 })
             })
+            clearTimeout(timeoutId)
 
             console.log('[NavigationInteractivo] 🔍 DEBUG: Response status:', response.status)
 
@@ -214,7 +234,11 @@ export default function NavigationInteractivo({
         } catch (err: any) {
             console.error('[NavigationInteractivo] 🔍 DEBUG Error en obtenerRutasAlternativas:', err)
             console.error('[NavigationInteractivo] Error obteniendo rutas:', err)
-            setError(err.message || 'Error al obtener rutas')
+            setError(
+                err?.name === 'AbortError'
+                    ? 'La consulta de rutas tardó demasiado. Intentá nuevamente.'
+                    : (err.message || 'Error al obtener rutas')
+            )
             setFase('error')
         }
     }
@@ -222,6 +246,11 @@ export default function NavigationInteractivo({
     // Iniciar cálculo cuando hay posición
     const isCalculating = useRef(false)
     useEffect(() => {
+        if (clientesPendientes.length === 0 && fase === 'calculando') {
+            setFase('completado')
+            return
+        }
+
         if (posicionActual && clientesPendientes.length > 0 && fase === 'calculando' && !isCalculating.current) {
             isCalculating.current = true
             calcularProximoCliente().finally(() => {

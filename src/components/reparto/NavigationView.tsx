@@ -156,6 +156,20 @@ export default function NavigationView({
     const [durationToNextStop, setDurationToNextStop] = useState<string>('')
     const [showArrivalPanel, setShowArrivalPanel] = useState(false)
 
+    // Sincronizar la posición inicial cuando llega más tarde desde el tracker padre
+    useEffect(() => {
+        if (
+            initialPosition &&
+            (
+                !currentPosition ||
+                currentPosition.lat !== initialPosition.lat ||
+                currentPosition.lng !== initialPosition.lng
+            )
+        ) {
+            setCurrentPosition(initialPosition)
+        }
+    }, [initialPosition, currentPosition])
+
     // Get pending stops (not yet delivered)
     const pendingStops = stops.filter(s => s.estado !== 'entregado')
     const currentStop = pendingStops[currentStopIndex]
