@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import { RutaHojaContent } from './ruta-hoja-content'
 import { Card, CardContent } from '@/components/ui/card'
 import { Truck } from 'lucide-react'
+import { config } from '@/lib/config'
+import { getGoogleDirections } from '@/lib/rutas/google-directions'
 
 export const dynamic = 'force-dynamic'
 
@@ -95,8 +97,6 @@ async function RutaHojaPage({ params }: { params: Promise<{ ruta_id: string }> }
     console.log('🔍 [DEBUG] No hay ruta planificada, generando orden optimizado en tiempo real...')
     
     try {
-      const { getOptimizedRoute } = await import('@/lib/rutas/ors-directions')
-      
       // Obtener coordenadas de los clientes
       const unwrap = (v: any) => (Array.isArray(v) ? v[0] : v)
       const stops = detallesConCliente
@@ -120,21 +120,24 @@ async function RutaHojaPage({ params }: { params: Promise<{ ruta_id: string }> }
       console.log('🔍 [DEBUG] stops para optimización:', stops)
       
       if (stops.length > 0) {
-        const homeBase = (await import('@/lib/config')).config.rutas.homeBase
-        
-        const optimized = await getOptimizedRoute({
-          depot: homeBase,
-          stops: stops,
-          vehicle: 'driving-car',
-          returnToDepot: true
+        const homeBase = config.rutas.homeBase
+
+        const optimized = await getGoogleDirections({
+          origin: homeBase,
+          destination: homeBase,
+          waypoints: stops,
+          optimize: true,
         })
         
-        if (optimized.response.success && optimized.orderedStops && optimized.orderedStops.length > 0) {
-          console.log('🔍 [DEBUG] Orden optimizado generado:', optimized.orderedStops.map(s => s.id))
-          
-          // Mapear el orden optimizado a los detalles
-          ordenVisitaOptimizado = optimized.orderedStops.map((stop, order) => {
-            const detalle = detallesConCliente.find((d: any) => d.id === stop.id)
+        if (optimized.success && optimized.orderedStops && optimized.orderedStops.length > 0) {
+          const orderedStopIds = optimized.orderedStops
+            .map((stop) => typeof stop.waypointIndex === 'number' ? stops[stop.waypointIndex]?.id : null)
+            .filter((id): id is string => typeof id === 'string')
+
+          console.log('🔍 [DEBUG] Orden optimizado generado:', orderedStopIds)
+
+          ordenVisitaOptimizado = orderedStopIds.map((stopId, order) => {
+            const detalle = detallesConCliente.find((d: any) => d.id === stopId)
             const pedido = unwrap(detalle?.pedido)
             const cliente = unwrap(pedido?.cliente)
             return {
@@ -147,7 +150,7 @@ async function RutaHojaPage({ params }: { params: Promise<{ ruta_id: string }> }
             }
           })
           
-          polylineOptimizada = optimized.response.polyline || null
+          polylineOptimizada = optimized.polyline || null
         }
       }
     } catch (error) {

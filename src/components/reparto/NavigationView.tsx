@@ -31,7 +31,6 @@ import {
     Phone,
     FileText
 } from 'lucide-react'
-import { getDirectionsWithFallback } from '@/lib/rutas/ors-directions'
 
 // Types
 interface DeliveryStop {
@@ -59,6 +58,17 @@ interface NavigationViewProps {
     onDeliveryComplete: (stopId: string) => void
     /** Ubicación inicial pre-obtenida (del hook useLocationTracker) */
     initialPosition?: { lat: number; lng: number } | null
+}
+
+interface GoogleDirectionsApiResponse {
+    success: boolean
+    data?: {
+        orderedStops?: Array<{ lat: number; lng: number; waypointIndex?: number }>
+        polyline?: string
+        distance?: number
+        duration?: number
+    }
+    error?: string
 }
 
 // Voice synthesis helper
@@ -344,19 +354,25 @@ export default function NavigationView({
         })
 
         try {
-            console.log('[NavigationView] requesting route with GraphHopper/Google fallback...')
-            
-            // Usar GraphHopper con fallback a Google y local
-            const { response, provider } = await getDirectionsWithFallback({
-                origin: currentPosition,
-                destination: { lat: currentStop.lat, lng: currentStop.lng },
-                vehicle: 'driving-car'
+            console.log('[NavigationView] requesting route with Google Directions...')
+
+            const directionsResponse = await fetch('/api/integrations/google/directions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    origin: currentPosition,
+                    destination: { lat: currentStop.lat, lng: currentStop.lng },
+                    waypoints: []
+                })
             })
+            const directionsData = await directionsResponse.json() as GoogleDirectionsApiResponse
 
-            console.log(`[NavigationView] Route received from provider: ${provider}`)
+            console.log('[NavigationView] Route received from provider: google')
 
-            if (!response.success || !response.polyline) {
-                throw new Error(response.error || 'No se pudo calcular la ruta')
+            if (!directionsResponse.ok || !directionsData.success || !directionsData.data?.polyline) {
+                throw new Error(directionsData.error || 'No se pudo calcular la ruta')
             }
 
             // Decodificar polyline
@@ -364,16 +380,16 @@ export default function NavigationView({
             
             if (window.google?.maps?.geometry?.encoding) {
                 try {
-                    routePath = window.google.maps.geometry.encoding.decodePath(response.polyline)
+                    routePath = window.google.maps.geometry.encoding.decodePath(directionsData.data.polyline)
                 } catch (e) {
                     // Si falla, intentar formato simple
-                    routePath = response.polyline.split(';').map((coord: string) => {
+                    routePath = directionsData.data.polyline.split(';').map((coord: string) => {
                         const [lat, lng] = coord.split(',').map(Number)
                         return new window.google.maps.LatLng(lat, lng)
                     })
                 }
             } else {
-                routePath = response.polyline.split(';').map((coord: string) => {
+                routePath = directionsData.data.polyline.split(';').map((coord: string) => {
                     const [lat, lng] = coord.split(',').map(Number)
                     return new window.google.maps.LatLng(lat, lng)
                 })
@@ -408,13 +424,13 @@ export default function NavigationView({
             }
 
             // Calcular distancia y duración
-            const distanceM = response.distance || 0
-            const durationS = response.duration || 0
+            const distanceM = directionsData.data.distance || 0
+            const durationS = directionsData.data.duration || 0
 
             setDistanceToNextStop(distanceM < 1000 ? `${Math.round(distanceM)}m` : `${(distanceM / 1000).toFixed(1)}km`)
             setDurationToNextStop(durationS < 3600 ? `${Math.round(durationS / 60)}min` : `${Math.floor(durationS / 3600)}h ${Math.round((durationS % 3600) / 60)}min`)
 
-            // Crear instrucciones simples (GraphHopper no devuelve steps detallados como Google)
+            // Crear instrucciones simples para el trayecto actual
             const newSteps: NavigationStep[] = [
                 {
                     instruction: `Continúa hacia ${currentStop.cliente_nombre}`,

@@ -31,12 +31,22 @@ import NavigationInteractivo from '@/components/reparto/NavigationInteractivo'
 import { ChecklistInicioForm } from './checklist-inicio-form'
 import { useLocationTracker } from '@/hooks/useLocationTracker'
 import { config } from '@/lib/config'
-import { getDirectionsWithFallback } from '@/lib/rutas/ors-directions'
 import {
     calcularMontoPorCobrar,
     esEntregaTerminal,
     normalizarEstadoPago,
 } from '@/lib/utils/estado-pago'
+
+interface GoogleDirectionsApiResponse {
+    success: boolean
+    data?: {
+        orderedStops?: Array<{ lat: number; lng: number; waypointIndex?: number }>
+        polyline?: string
+        distance?: number
+        duration?: number
+    }
+    error?: string
+}
 
 interface RutaMapaContentProps {
     ruta: any
@@ -492,7 +502,7 @@ export function RutaMapaContent({ ruta }: RutaMapaContentProps) {
                 }
             }
 
-            // 2) Si no se puede decodificar, recalcular ruta real (ORS/Google/local)
+            // 2) Si no se puede decodificar, recalcular ruta real con Google Directions
             const stopsCoords = entregasOrdenadas
                 .map((e: any) => getClienteCoords(e))
                 .filter(isLatLng)
@@ -503,19 +513,26 @@ export function RutaMapaContent({ ruta }: RutaMapaContentProps) {
                 const destination = returnToBase ? { lat: homeBase.lat, lng: homeBase.lng } : stopsCoords[stopsCoords.length - 1]
                 const waypoints = returnToBase ? stopsCoords : stopsCoords.slice(0, -1)
 
-                const { response, provider } = await getDirectionsWithFallback({
-                    origin: { lat: homeBase.lat, lng: homeBase.lng },
-                    destination,
-                    waypoints,
-                    vehicle: 'driving-car',
+                const directionsResponse = await fetch('/api/integrations/google/directions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        origin: { lat: homeBase.lat, lng: homeBase.lng },
+                        destination,
+                        waypoints,
+                        optimize: true,
+                    }),
                 })
+                const directionsData = await directionsResponse.json() as GoogleDirectionsApiResponse
 
                 if (cancelled) return
 
-                if (response.success && response.polyline) {
-                    const path = decodePolylineToPath(response.polyline)
+                if (directionsResponse.ok && directionsData.success && directionsData.data?.polyline) {
+                    const path = decodePolylineToPath(directionsData.data.polyline)
                     if (path) {
-                        drawPolylinePath(path, `✅ Polyline recalculada (${provider}) con puntos:`)
+                        drawPolylinePath(path, '✅ Polyline recalculada (google) con puntos:')
                         return
                     }
                 }
