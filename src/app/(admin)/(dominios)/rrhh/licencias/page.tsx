@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { LicenciasTable } from '@/components/tables/LicenciasTable'
 import { Button } from '@/components/ui/button'
-import { Calendar, Plus, CheckCircle, Clock, AlertTriangle } from 'lucide-react'
+import { Calendar, CalendarDays, Plus, CheckCircle, Clock, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import type { Licencia } from '@/types/domain.types'
 
@@ -69,12 +69,24 @@ export default async function LicenciasPage() {
             Gestión de licencias, vacaciones y permisos del personal
           </p>
         </div>
-        <Button asChild>
-          <Link href="/rrhh/licencias/nueva">
-            <Plus className="w-4 h-4 mr-2" />
-            Nueva Licencia
-          </Link>
-        </Button>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <Button asChild>
+            <Link href="/rrhh/licencias/nueva">
+              <Plus className="w-4 h-4 mr-2" />
+              Nueva Licencia
+            </Link>
+          </Button>
+          <Button
+            asChild
+            variant="outline"
+            className="border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800"
+          >
+            <Link href="/rrhh/licencias/nueva?tipo=vacaciones">
+              <CalendarDays className="w-4 h-4 mr-2" />
+              Programar Vacaciones
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Estadísticas rápidas */}
@@ -165,8 +177,9 @@ export default async function LicenciasPage() {
           <div>
             <h3 className="font-semibold text-blue-900">Sistema de Licencias</h3>
             <p className="text-blue-700 text-sm mt-1">
-              Sin certificado no se valida. Cada licencia queda en revision manual de RRHH con auditoria IA
-              y control de plazo de presentacion dentro de 24 horas (con excepciones autorizadas).
+              Vacaciones se cargan sin certificado ni auditoria IA. Las licencias medicas mantienen la
+              revision manual de RRHH y el control de plazo de presentacion dentro de 24 horas
+              (con excepciones autorizadas).
             </p>
           </div>
         </div>

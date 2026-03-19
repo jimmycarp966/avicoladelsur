@@ -400,7 +400,7 @@ export default async function EmpleadoLegajoPage({ params }: PageProps) {
                       {formatDate(licencia.fecha_inicio || "")} a {formatDate(licencia.fecha_fin || "")}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Presentacion: {formatDateTime(licencia.fecha_presentacion_certificado)} • {licencia.dias_total || 0} dia(s)
+                      Presentacion: {licencia.tipo === "vacaciones" ? "No aplica" : formatDateTime(licencia.fecha_presentacion_certificado)} • {licencia.dias_total || 0} dia(s)
                     </p>
                   </div>
                 ))}

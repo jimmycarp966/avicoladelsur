@@ -2418,30 +2418,35 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
     const motivo_excepcion = String(formData.get('motivo_excepcion') || '').trim() || undefined
     const observaciones = String(formData.get('observaciones') || '').trim() || undefined
     const certificado = formData.get('certificado') as File | null
+    const esVacaciones = tipo === 'vacaciones'
 
     if (!empleado_id || !tipo || !fecha_inicio || !fecha_fin) {
       return { success: false, error: 'Faltan campos obligatorios de la licencia' }
     }
 
-    if (!certificado || certificado.size <= 0) {
-      return { success: false, error: 'Debe adjuntar el certificado en imagen para validar la licencia' }
-    }
+    if (!esVacaciones) {
+      if (!certificado || certificado.size <= 0) {
+        return { success: false, error: 'Debe adjuntar el certificado en imagen para validar la licencia' }
+      }
 
-    if (!certificado.type.startsWith('image/')) {
-      return { success: false, error: 'El certificado debe ser una imagen valida (JPG, PNG o WEBP)' }
+      if (!certificado.type.startsWith('image/')) {
+        return { success: false, error: 'El certificado debe ser una imagen valida (JPG, PNG o WEBP)' }
+      }
     }
 
     const fechaInicio = new Date(fecha_inicio)
     const fechaFin = new Date(fecha_fin)
-    const fechaControlPresentacion = fecha_presentacion_raw
-      ? new Date(fecha_presentacion_raw)
-      : new Date(`${fecha_inicio}T00:00:00`)
+    const fechaControlPresentacion = esVacaciones
+      ? null
+      : (fecha_presentacion_raw
+          ? new Date(fecha_presentacion_raw)
+          : new Date(`${fecha_inicio}T00:00:00`))
     const ahora = new Date()
 
     if (
       Number.isNaN(fechaInicio.getTime()) ||
       Number.isNaN(fechaFin.getTime()) ||
-      Number.isNaN(fechaControlPresentacion.getTime())
+      (!esVacaciones && (!fechaControlPresentacion || Number.isNaN(fechaControlPresentacion.getTime())))
     ) {
       return { success: false, error: 'Las fechas informadas no son validas' }
     }
@@ -2450,12 +2455,14 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
       return { success: false, error: 'La fecha de fin no puede ser anterior a la fecha de inicio' }
     }
 
-    const fechaLimitePresentacion = new Date(fechaControlPresentacion.getTime() + 24 * 60 * 60 * 1000)
-    const presentadoEnTermino = ahora <= fechaLimitePresentacion
-    const fechaPresentacionIso = fechaControlPresentacion.toISOString()
+    const fechaLimitePresentacion = !esVacaciones && fechaControlPresentacion
+      ? new Date(fechaControlPresentacion.getTime() + 24 * 60 * 60 * 1000)
+      : null
+    const presentadoEnTermino = !esVacaciones && fechaLimitePresentacion ? ahora <= fechaLimitePresentacion : null
+    const fechaPresentacionIso = !esVacaciones && fechaControlPresentacion ? fechaControlPresentacion.toISOString() : null
     const fechaCargaIso = ahora.toISOString()
 
-    if (!presentadoEnTermino && !excepcion_plazo) {
+    if (!esVacaciones && !presentadoEnTermino && !excepcion_plazo && fechaLimitePresentacion) {
       await registrarEventoLegajo(supabase, {
         empleadoId: empleado_id,
         tipo: 'certificado_fuera_termino',
@@ -2480,7 +2487,7 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
       }
     }
 
-    if (excepcion_plazo && !motivo_excepcion) {
+    if (!esVacaciones && excepcion_plazo && !motivo_excepcion) {
       return { success: false, error: 'Debe informar el motivo de excepcion de plazo' }
     }
 
@@ -2498,26 +2505,39 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
       `${(empleado as any).usuario?.nombre || (empleado as any).nombre || ''} ${(empleado as any).usuario?.apellido || (empleado as any).apellido || ''}`.trim() ||
       'Empleado'
 
-    const safeFileName = certificado.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-    const storagePath = `rrhh/licencias/${empleado_id}/${Date.now()}-${safeFileName}`
-    const certBuffer = Buffer.from(await certificado.arrayBuffer())
+    let certificadoUrl: string | null = null
+    let storagePath: string | null = null
+    let certificadoNombreArchivo: string | null = null
+    let certificadoMimeType: string | null = null
+    let certificadoTamanoBytes: number | null = null
+    let auditoriaIA: AuditoriaCertificadoIA | null = null
 
-    const { error: uploadError } = await supabase.storage.from('documentos').upload(storagePath, certBuffer, {
-      contentType: certificado.type || 'image/jpeg',
-      upsert: false,
-    })
+    if (!esVacaciones && certificado) {
+      const safeFileName = certificado.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+      storagePath = `rrhh/licencias/${empleado_id}/${Date.now()}-${safeFileName}`
+      const certBuffer = Buffer.from(await certificado.arrayBuffer())
 
-    if (uploadError) {
-      devError('Error subiendo certificado de licencia:', uploadError)
-      return { success: false, error: 'No se pudo subir el certificado. Intenta nuevamente.' }
+      const { error: uploadError } = await supabase.storage.from('documentos').upload(storagePath, certBuffer, {
+        contentType: certificado.type || 'image/jpeg',
+        upsert: false,
+      })
+
+      if (uploadError) {
+        devError('Error subiendo certificado de licencia:', uploadError)
+        return { success: false, error: 'No se pudo subir el certificado. Intenta nuevamente.' }
+      }
+
+      const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(storagePath)
+      certificadoUrl = urlData.publicUrl
+      certificadoNombreArchivo = certificado.name
+      certificadoMimeType = certificado.type || 'image/jpeg'
+      certificadoTamanoBytes = certificado.size
+
+      auditoriaIA = await auditarCertificadoConIA(certificado, {
+        nombreEmpleado,
+        diagnosticoReportado: diagnostico_reportado,
+      })
     }
-
-    const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(storagePath)
-
-    const auditoriaIA = await auditarCertificadoConIA(certificado, {
-      nombreEmpleado,
-      diagnosticoReportado: diagnostico_reportado,
-    })
 
     const diasTotal = Math.ceil((fechaFin.getTime() - fechaInicio.getTime()) / (1000 * 60 * 60 * 24)) + 1
 
@@ -2528,25 +2548,25 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
         tipo,
         fecha_inicio,
         fecha_fin,
-        fecha_sintomas: fechaControlPresentacion.toISOString(),
-        diagnostico_reportado,
-        excepcion_plazo,
-        motivo_excepcion,
+        fecha_sintomas: esVacaciones || !fechaControlPresentacion ? null : fechaControlPresentacion.toISOString(),
+        diagnostico_reportado: esVacaciones ? null : diagnostico_reportado,
+        excepcion_plazo: esVacaciones ? false : excepcion_plazo,
+        motivo_excepcion: esVacaciones ? null : motivo_excepcion,
         fecha_presentacion_certificado: fechaPresentacionIso,
-        fecha_limite_presentacion: fechaLimitePresentacion.toISOString(),
+        fecha_limite_presentacion: fechaLimitePresentacion ? fechaLimitePresentacion.toISOString() : null,
         presentado_en_termino: presentadoEnTermino,
-        certificado_url: urlData.publicUrl,
+        certificado_url: certificadoUrl,
         certificado_storage_path: storagePath,
-        certificado_nombre_archivo: certificado.name,
-        certificado_mime_type: certificado.type || 'image/jpeg',
-        certificado_tamano_bytes: certificado.size,
+        certificado_nombre_archivo: certificadoNombreArchivo,
+        certificado_mime_type: certificadoMimeType,
+        certificado_tamano_bytes: certificadoTamanoBytes,
         estado_revision: 'pendiente',
         revision_manual_required: true,
-        ia_certificado_valido: auditoriaIA.valido,
-        ia_confianza: auditoriaIA.confianza,
-        ia_observaciones: auditoriaIA.observaciones,
-        ia_nombre_detectado: auditoriaIA.nombreDetectado || null,
-        ia_diagnostico_detectado: auditoriaIA.diagnosticoDetectado || null,
+        ia_certificado_valido: auditoriaIA?.valido ?? null,
+        ia_confianza: auditoriaIA?.confianza ?? null,
+        ia_observaciones: auditoriaIA?.observaciones ?? null,
+        ia_nombre_detectado: auditoriaIA?.nombreDetectado || null,
+        ia_diagnostico_detectado: auditoriaIA?.diagnosticoDetectado || null,
         observaciones,
         dias_total: diasTotal,
         aprobado: false,
@@ -2574,10 +2594,10 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
         fecha_inicio,
         fecha_fin,
         dias_total: diasTotal,
-        fecha_presentacion_certificado: fechaPresentacionIso,
+        ...(fechaPresentacionIso ? { fecha_presentacion_certificado: fechaPresentacionIso } : {}),
         fecha_registro_sistema: fechaCargaIso,
-        presentado_en_termino: presentadoEnTermino,
-        excepcion_plazo,
+        ...(presentadoEnTermino !== null ? { presentado_en_termino: presentadoEnTermino } : {}),
+        excepcion_plazo: esVacaciones ? false : excepcion_plazo,
       },
       createdBy: actorId,
     })
@@ -2587,7 +2607,9 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
     return {
       success: true,
       data: { licenciaId: data.id },
-      message: 'Licencia creada con certificado. Queda pendiente de revision manual por RRHH.',
+      message: esVacaciones
+        ? 'Vacaciones programadas correctamente. Quedan pendientes de revision manual por RRHH.'
+        : 'Licencia creada con certificado. Queda pendiente de revision manual por RRHH.',
     }
   } catch (error) {
     devError('Error en crearLicencia:', error)

@@ -75,7 +75,23 @@ export function LicenciasTable({ licencias, onView, onApprove, onReject }: Licen
     }
   }
 
+  const getCertificadoBadge = (licencia: Licencia) => {
+    if (licencia.tipo === 'vacaciones') {
+      return <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">No aplica</Badge>
+    }
+
+    return licencia.certificado_url ? (
+      <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">Cargado</Badge>
+    ) : (
+      <Badge variant="destructive">Falta</Badge>
+    )
+  }
+
   const getIABadge = (licencia: Licencia) => {
+    if (licencia.tipo === 'vacaciones') {
+      return <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">No aplica</Badge>
+    }
+
     if (licencia.ia_certificado_valido === true) {
       return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">IA valida</Badge>
     }
@@ -114,8 +130,16 @@ export function LicenciasTable({ licencias, onView, onApprove, onReject }: Licen
       header: ({ column }) => <SortableHeader column={column}>Presentacion</SortableHeader>,
       cell: ({ row }) => {
         const licencia = row.original
+        if (licencia.tipo === 'vacaciones') {
+          return <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">No aplica</Badge>
+        }
+
         const fechaPresentacion = licencia.fecha_presentacion_certificado || licencia.created_at
-        return <div className="text-sm text-muted-foreground">{fechaPresentacion ? formatDate(fechaPresentacion) : '-'}</div>
+        return (
+          <div className="text-sm text-muted-foreground">
+            {fechaPresentacion ? formatDate(fechaPresentacion) : '-'}
+          </div>
+        )
       },
     },
     {
@@ -143,12 +167,7 @@ export function LicenciasTable({ licencias, onView, onApprove, onReject }: Licen
     {
       id: 'certificado',
       header: 'Certificado',
-      cell: ({ row }) =>
-        row.original.certificado_url ? (
-          <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">Cargado</Badge>
-        ) : (
-          <Badge variant="destructive">Falta</Badge>
-        ),
+      cell: ({ row }) => getCertificadoBadge(row.original),
     },
     {
       id: 'auditoria_ia',
@@ -169,7 +188,7 @@ export function LicenciasTable({ licencias, onView, onApprove, onReject }: Licen
       accessorKey: 'aprobado_por',
       header: 'Aprobado Por',
       cell: ({ row }) => {
-        const aprobador = row.original.aprobado_por as any
+        const aprobador = row.original.aprobado_por as { nombre?: string; apellido?: string } | null | undefined
         const nombre = aprobador && typeof aprobador === 'object' ? aprobador.nombre || '' : ''
         const apellido = aprobador && typeof aprobador === 'object' ? aprobador.apellido || '' : ''
         const nombreCompleto = `${nombre} ${apellido}`.trim()

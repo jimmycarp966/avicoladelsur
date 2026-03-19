@@ -29,7 +29,11 @@ import { useNotificationStore } from '@/store/notificationStore'
 import type { Empleado } from '@/types/domain.types'
 import { getEmpleadoNombre } from '@/lib/utils/empleado-display'
 
-export function NuevaLicenciaForm() {
+type NuevaLicenciaFormProps = {
+  defaultTipo?: LicenciaFormData['tipo']
+}
+
+export function NuevaLicenciaForm({ defaultTipo }: NuevaLicenciaFormProps) {
   const router = useRouter()
   const { showToast } = useNotificationStore()
   const [isLoading, setIsLoading] = useState(false)
@@ -47,13 +51,26 @@ export function NuevaLicenciaForm() {
     resolver: zodResolver(licenciaSchema),
     defaultValues: {
       excepcion_plazo: false,
+      tipo: defaultTipo,
     },
   })
 
+  const tipoSeleccionado = watch('tipo')
+  const esVacaciones = tipoSeleccionado === 'vacaciones'
   const fechaInicio = watch('fecha_inicio')
   const fechaFin = watch('fecha_fin')
   const fechaPresentacion = watch('fecha_presentacion')
   const excepcionPlazo = watch('excepcion_plazo')
+
+  useEffect(() => {
+    if (!esVacaciones) return
+
+    setCertificadoFile(null)
+    setValue('fecha_presentacion', '')
+    setValue('diagnostico_reportado', '')
+    setValue('excepcion_plazo', false)
+    setValue('motivo_excepcion', '')
+  }, [esVacaciones, setValue])
 
   useEffect(() => {
     if (fechaInicio && fechaFin) {
@@ -82,6 +99,7 @@ export function NuevaLicenciaForm() {
   const empleadoSeleccionado = empleados.find((e) => e.id === watch('empleado_id'))
 
   const estadoPlazo = useMemo(() => {
+    if (esVacaciones) return null
     const fechaControl = fechaPresentacion || fechaInicio
     if (!fechaControl) return null
     const inicio = fechaPresentacion ? new Date(fechaPresentacion) : new Date(`${fechaInicio}T00:00:00`)
@@ -94,11 +112,13 @@ export function NuevaLicenciaForm() {
       enTermino: restanteMs >= 0,
       horasRestantes: Math.round(restanteMs / (1000 * 60 * 60)),
     }
-  }, [fechaPresentacion, fechaInicio])
+  }, [esVacaciones, fechaPresentacion, fechaInicio])
 
   const onSubmit = async (data: LicenciaFormData) => {
     try {
-      if (!certificadoFile) {
+      const esVacacionesForm = data.tipo === 'vacaciones'
+
+      if (!esVacacionesForm && !certificadoFile) {
         showToast('error', 'Debes adjuntar el certificado en imagen', 'Certificado requerido')
         return
       }
@@ -109,22 +129,27 @@ export function NuevaLicenciaForm() {
       payload.append('tipo', data.tipo)
       payload.append('fecha_inicio', data.fecha_inicio)
       payload.append('fecha_fin', data.fecha_fin)
-      if (data.fecha_presentacion) {
-        payload.append('fecha_presentacion', data.fecha_presentacion)
-      }
       payload.append('observaciones', data.observaciones || '')
-      payload.append('diagnostico_reportado', data.diagnostico_reportado || '')
-      payload.append('excepcion_plazo', data.excepcion_plazo ? 'true' : 'false')
-      payload.append('motivo_excepcion', data.motivo_excepcion || '')
-      payload.append('certificado', certificadoFile)
+      if (!esVacacionesForm) {
+        if (data.fecha_presentacion) {
+          payload.append('fecha_presentacion', data.fecha_presentacion)
+        }
+        payload.append('diagnostico_reportado', data.diagnostico_reportado || '')
+        payload.append('excepcion_plazo', data.excepcion_plazo ? 'true' : 'false')
+        payload.append('motivo_excepcion', data.motivo_excepcion || '')
+        payload.append('certificado', certificadoFile!)
+      }
 
       const result = await crearLicenciaAction(payload)
 
       if (result.success) {
         showToast(
           'success',
-          result.message || 'La solicitud de licencia fue creada correctamente',
-          'Licencia creada'
+          result.message ||
+            (esVacacionesForm
+              ? 'La solicitud de vacaciones fue creada correctamente'
+              : 'La solicitud de licencia fue creada correctamente'),
+          esVacacionesForm ? 'Vacaciones programadas' : 'Licencia creada'
         )
         router.push('/rrhh/licencias')
       } else {
@@ -139,7 +164,7 @@ export function NuevaLicenciaForm() {
   }
 
   const tiposLicencia = [
-    { value: 'vacaciones', label: 'Vacaciones', description: 'Periodo de descanso anual' },
+    { value: 'vacaciones', label: 'Vacaciones', description: 'Periodo de descanso anual, sin certificado' },
     { value: 'enfermedad', label: 'Enfermedad', description: 'Licencia por enfermedad' },
     { value: 'maternidad', label: 'Maternidad', description: 'Licencia por maternidad/paternidad' },
     { value: 'estudio', label: 'Estudio', description: 'Licencia por estudios' },
@@ -164,7 +189,9 @@ export function NuevaLicenciaForm() {
               <Users className="w-5 h-5 text-blue-600" />
               Informacion de la Licencia
             </CardTitle>
-            <CardDescription>Seleccion del empleado y datos generales de la solicitud</CardDescription>
+            <CardDescription>
+              Seleccion del empleado y datos generales de la solicitud
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -191,7 +218,10 @@ export function NuevaLicenciaForm() {
 
             <div className="space-y-2">
               <Label htmlFor="tipo">Tipo de Licencia *</Label>
-              <Select value={watch('tipo') || ''} onValueChange={(value) => setValue('tipo', value as any)}>
+              <Select
+                value={watch('tipo') || ''}
+                onValueChange={(value) => setValue('tipo', value as LicenciaFormData['tipo'])}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar tipo de licencia" />
                 </SelectTrigger>
@@ -228,11 +258,12 @@ export function NuevaLicenciaForm() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <CalendarDays className="w-5 h-5 text-green-600" />
-              Fechas, Diagnostico y Plazo 24h
+              {esVacaciones ? 'Fechas de vacaciones' : 'Fechas, Diagnostico y Plazo 24h'}
             </CardTitle>
             <CardDescription>
-              El certificado debe presentarse dentro de 24 horas desde la fecha de presentacion declarada.
-              Si no se informa, se usa la fecha de inicio.
+              {esVacaciones
+                ? 'Solo necesitamos el periodo solicitado. No hace falta certificado, diagnostico ni plazo 24h.'
+                : 'El certificado debe presentarse dentro de 24 horas desde la fecha de presentacion declarada. Si no se informa, se usa la fecha de inicio.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -250,34 +281,36 @@ export function NuevaLicenciaForm() {
               </div>
             </div>
 
-            {watch('tipo') === 'vacaciones' && (
+            {esVacaciones && (
               <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
                 Vacaciones: se cargan solo de fecha a fecha y se consideran dias corridos.
-                Para sucursales, domingos y feriados se liquidan como dia completo (regla vigente).
+                No hace falta certificado, diagnostico ni control 24 horas.
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="fecha_presentacion">Fecha de presentacion del certificado (control 24h)</Label>
-                <Input id="fecha_presentacion" type="datetime-local" {...register('fecha_presentacion')} />
-                {errors.fecha_presentacion && (
-                  <p className="text-sm text-red-600">{errors.fecha_presentacion.message}</p>
-                )}
-              </div>
+            {!esVacaciones && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="fecha_presentacion">Fecha de presentacion del certificado (control 24h)</Label>
+                  <Input id="fecha_presentacion" type="datetime-local" {...register('fecha_presentacion')} />
+                  {errors.fecha_presentacion && (
+                    <p className="text-sm text-red-600">{errors.fecha_presentacion.message}</p>
+                  )}
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="diagnostico_reportado">Diagnostico reportado</Label>
-                <Input
-                  id="diagnostico_reportado"
-                  placeholder="Ej: Gastroenteritis aguda"
-                  {...register('diagnostico_reportado')}
-                />
-                {errors.diagnostico_reportado && (
-                  <p className="text-sm text-red-600">{errors.diagnostico_reportado.message}</p>
-                )}
+                <div className="space-y-2">
+                  <Label htmlFor="diagnostico_reportado">Diagnostico reportado</Label>
+                  <Input
+                    id="diagnostico_reportado"
+                    placeholder="Ej: Gastroenteritis aguda"
+                    {...register('diagnostico_reportado')}
+                  />
+                  {errors.diagnostico_reportado && (
+                    <p className="text-sm text-red-600">{errors.diagnostico_reportado.message}</p>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="flex items-center justify-between">
@@ -287,10 +320,12 @@ export function NuevaLicenciaForm() {
                 </div>
                 <div className="text-2xl font-bold text-green-700">{diasCalculados}</div>
               </div>
-              <div className="text-sm text-green-700 mt-1">dia{diasCalculados !== 1 ? 's' : ''}</div>
+              <div className="text-sm text-green-700 mt-1">
+                dia{diasCalculados !== 1 ? 's' : ''}{esVacaciones ? ' corridos' : ''}
+              </div>
             </div>
 
-            {estadoPlazo && (
+            {!esVacaciones && estadoPlazo && (
               <div
                 className={`rounded-lg p-4 border ${
                   estadoPlazo.enTermino ? 'bg-blue-50 border-blue-200' : 'bg-orange-50 border-orange-200'
@@ -307,30 +342,34 @@ export function NuevaLicenciaForm() {
               </div>
             )}
 
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="excepcion_plazo"
-                checked={!!excepcionPlazo}
-                onCheckedChange={(checked) => setValue('excepcion_plazo', checked === true)}
-              />
-              <Label htmlFor="excepcion_plazo" className="cursor-pointer">
-                Aplicar excepcion de plazo (fuera de 24h)
-              </Label>
-            </div>
+            {!esVacaciones && (
+              <>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="excepcion_plazo"
+                    checked={!!excepcionPlazo}
+                    onCheckedChange={(checked) => setValue('excepcion_plazo', checked === true)}
+                  />
+                  <Label htmlFor="excepcion_plazo" className="cursor-pointer">
+                    Aplicar excepcion de plazo (fuera de 24h)
+                  </Label>
+                </div>
 
-            {excepcionPlazo && (
-              <div className="space-y-2">
-                <Label htmlFor="motivo_excepcion">Motivo de excepcion *</Label>
-                <Textarea
-                  id="motivo_excepcion"
-                  rows={2}
-                  placeholder="Detalle de la excepcion autorizada por RRHH"
-                  {...register('motivo_excepcion')}
-                />
-                {errors.motivo_excepcion && (
-                  <p className="text-sm text-red-600">{errors.motivo_excepcion.message}</p>
+                {excepcionPlazo && (
+                  <div className="space-y-2">
+                    <Label htmlFor="motivo_excepcion">Motivo de excepcion *</Label>
+                    <Textarea
+                      id="motivo_excepcion"
+                      rows={2}
+                      placeholder="Detalle de la excepcion autorizada por RRHH"
+                      {...register('motivo_excepcion')}
+                    />
+                    {errors.motivo_excepcion && (
+                      <p className="text-sm text-red-600">{errors.motivo_excepcion.message}</p>
+                    )}
+                  </div>
                 )}
-              </div>
+              </>
             )}
           </CardContent>
         </Card>
@@ -338,53 +377,85 @@ export function NuevaLicenciaForm() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-purple-600" />
-              Certificado y Auditoria IA
+              {esVacaciones ? (
+                <CalendarDays className="w-5 h-5 text-emerald-600" />
+              ) : (
+                <ShieldCheck className="w-5 h-5 text-purple-600" />
+              )}
+              {esVacaciones ? 'Observaciones de la solicitud' : 'Certificado y Auditoria IA'}
             </CardTitle>
             <CardDescription>
-              Sin certificado no se valida. La IA analiza imagen y RRHH revisa manualmente en estado pendiente.
+              {esVacaciones
+                ? 'Usá este espacio para aclarar cobertura, viaje, fechas especiales o cualquier nota interna.'
+                : 'Sin certificado no se valida. La IA analiza imagen y RRHH revisa manualmente en estado pendiente.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="certificado">Certificado medico (imagen) *</Label>
-              <Input
-                id="certificado"
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                onChange={(event) => setCertificadoFile(event.target.files?.[0] || null)}
-              />
-              {certificadoFile ? (
-                <p className="text-sm text-muted-foreground">
-                  <Upload className="w-4 h-4 inline mr-1" />
-                  {certificadoFile.name} ({Math.round(certificadoFile.size / 1024)} KB)
-                </p>
-              ) : (
-                <p className="text-sm text-red-600">Adjuntar certificado es obligatorio.</p>
-              )}
-            </div>
+            {esVacaciones ? (
+              <div className="space-y-2">
+                <Label htmlFor="observaciones">Observaciones</Label>
+                <Textarea
+                  id="observaciones"
+                  placeholder="Notas internas para RRHH..."
+                  rows={3}
+                  {...register('observaciones')}
+                />
+                {errors.observaciones && <p className="text-sm text-red-600">{errors.observaciones.message}</p>}
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="certificado">Certificado medico (imagen) *</Label>
+                  <Input
+                    id="certificado"
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={(event) => setCertificadoFile(event.target.files?.[0] || null)}
+                  />
+                  {certificadoFile ? (
+                    <p className="text-sm text-muted-foreground">
+                      <Upload className="w-4 h-4 inline mr-1" />
+                      {certificadoFile.name} ({Math.round(certificadoFile.size / 1024)} KB)
+                    </p>
+                  ) : (
+                    <p className="text-sm text-red-600">Adjuntar certificado es obligatorio.</p>
+                  )}
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="observaciones">Observaciones</Label>
-              <Textarea
-                id="observaciones"
-                placeholder="Notas internas para RRHH..."
-                rows={3}
-                {...register('observaciones')}
-              />
-              {errors.observaciones && <p className="text-sm text-red-600">{errors.observaciones.message}</p>}
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="observaciones">Observaciones</Label>
+                  <Textarea
+                    id="observaciones"
+                    placeholder="Notas internas para RRHH..."
+                    rows={3}
+                    {...register('observaciones')}
+                  />
+                  {errors.observaciones && <p className="text-sm text-red-600">{errors.observaciones.message}</p>}
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <div
+          className={`rounded-lg border p-4 ${
+            esVacaciones ? 'border-emerald-200 bg-emerald-50' : 'border-yellow-200 bg-yellow-50'
+          }`}
+        >
           <div className="flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-yellow-700 mt-0.5" />
+            {esVacaciones ? (
+              <CalendarDays className="mt-0.5 h-5 w-5 text-emerald-700" />
+            ) : (
+              <AlertCircle className="mt-0.5 h-5 w-5 text-yellow-700" />
+            )}
             <div>
-              <h3 className="font-semibold text-yellow-900">Flujo de validacion</h3>
-              <p className="text-yellow-800 text-sm mt-1">
-                1) Se valida carga del certificado. 2) IA audita nombre/diagnostico de la imagen.
-                3) RRHH realiza revision manual y mantiene estado pendiente hasta resolucion.
+              <h3 className={`font-semibold ${esVacaciones ? 'text-emerald-900' : 'text-yellow-900'}`}>
+                {esVacaciones ? 'Flujo de vacaciones' : 'Flujo de validacion'}
+              </h3>
+              <p className={`mt-1 text-sm ${esVacaciones ? 'text-emerald-800' : 'text-yellow-800'}`}>
+                {esVacaciones
+                  ? '1) Se guardan fechas y observaciones. 2) RRHH revisa la solicitud y mantiene el seguimiento hasta resolverla.'
+                  : '1) Se valida carga del certificado. 2) IA audita nombre/diagnostico de la imagen. 3) RRHH realiza revision manual y mantiene estado pendiente hasta resolucion.'}
               </p>
             </div>
           </div>
@@ -403,7 +474,7 @@ export function NuevaLicenciaForm() {
             ) : (
               <>
                 <Save className="w-4 h-4 mr-2" />
-                Crear Licencia
+                {esVacaciones ? 'Programar Vacaciones' : 'Crear Licencia'}
               </>
             )}
           </Button>
