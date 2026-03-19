@@ -894,7 +894,7 @@ export async function actualizarPesoItemAction(formData: FormData) {
     const reconcileAfterWeight = await reconciliarFinalesPresupuesto(itemActualizado.presupuesto_id)
     if (!reconcileAfterWeight.success) {
       devError('[PRESUPUESTOS] El peso se guardo pero la reconciliacion fallo:', reconcileAfterWeight.error)
-      return { success: false, error: reconcileAfterWeight.error || 'No se pudo reconciliar el presupuesto despues del pesaje' }
+      return { success: false, error: reconcileAfterWeight.error || 'No se pudo reconciliar el presupuesto después del pesaje' }
     }
 
     revalidatePath(`/almacen/presupuesto/*`)

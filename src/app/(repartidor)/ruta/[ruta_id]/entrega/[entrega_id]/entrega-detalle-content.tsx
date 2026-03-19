@@ -152,7 +152,7 @@ export function EntregaDetalleContent({ entrega, resumenCuenta }: EntregaDetalle
       requestBody.append('pedido_id', pedidoId)
       const notasRegistradas =
         estadoPago === 'pagara_despues' && !notasEntrega.trim()
-          ? 'Pagara despues'
+          ? 'Pagará después'
           : notasEntrega
 
       requestBody.append('notas_entrega', notasRegistradas || '')
@@ -437,7 +437,7 @@ export function EntregaDetalleContent({ entrega, resumenCuenta }: EntregaDetalle
                   <option value="cuenta_corriente">Todo a cuenta corriente</option>
                   <option value="parcial">Pago parcial + resto a cuenta corriente</option>
                   <option value="pendiente">Pendiente con metodo definido</option>
-                  <option value="pagara_despues">Pagara despues</option>
+                  <option value="pagara_despues">Pagará después</option>
                   <option value="rechazado">Rechazo el pedido</option>
                 </select>
               </div>
@@ -571,7 +571,7 @@ export function EntregaDetalleContent({ entrega, resumenCuenta }: EntregaDetalle
                 <>
                   {metodoPago === 'transferencia' && (
                     <div className="space-y-1">
-                      <Label>Numero de transaccion</Label>
+                      <Label>Número de transacción</Label>
                       <Input
                         value={numeroTransaccion}
                         onChange={(event) => setNumeroTransaccion(event.target.value)}

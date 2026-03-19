@@ -329,7 +329,7 @@ export function TransferenciaForm() {
 
                         <div className="md:col-span-2 grid gap-4 md:grid-cols-2">
                             <div className="space-y-2">
-                                <FormLabel>Solicitado Por (automatico)</FormLabel>
+                                <FormLabel>Solicitado Por (automático)</FormLabel>
                                 <Input value={solicitadoPor} readOnly className="bg-muted" />
                             </div>
                             <FormField
@@ -337,7 +337,7 @@ export function TransferenciaForm() {
                                 name="observaciones"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Informacion General</FormLabel>
+                                        <FormLabel>Información General</FormLabel>
                                         <FormControl>
                                             <Textarea
                                                 placeholder="Detalle adicional para la transferencia..."

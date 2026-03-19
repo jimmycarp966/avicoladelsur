@@ -556,7 +556,7 @@ export function RecepcionAlmacenForm({
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="numero-comprobante-ref">
-                      Numero comprobante {motivo === 'compra' ? '*' : '(opcional)'}
+                      Número comprobante {motivo === 'compra' ? '*' : '(opcional)'}
                     </Label>
                     <Input
                       id="numero-comprobante-ref"

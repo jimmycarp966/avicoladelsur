@@ -111,7 +111,7 @@ export function PedidoConsolidadoFinal({ consolidado }: PedidoConsolidadoFinalPr
                             </Badge>
                             {producto.codigo && (
                               <span className="text-xs text-muted-foreground">
-                                Codigo: {producto.codigo}
+                                Código: {producto.codigo}
                               </span>
                             )}
                           </div>

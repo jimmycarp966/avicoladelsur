@@ -114,13 +114,13 @@ export async function registrarChecklistVehiculoAction(
     return {
       success: true,
       data: { checklistId: data.id },
-      message: 'Checklist de vehiculo registrado exitosamente',
+      message: 'Checklist de vehículo registrado exitosamente',
     }
   } catch (error: any) {
     devError('Error al registrar checklist:', error)
     return {
       success: false,
-      error: error.message || 'Error al registrar checklist de vehiculo',
+      error: error.message || 'Error al registrar checklist de vehículo',
     }
   }
 }
@@ -2008,14 +2008,14 @@ export async function asignarTransferenciaARutaDesdeAlmacen(
           .limit(1)
           .maybeSingle()
         if (vehiculoFallbackError && vehiculoFallbackError.code !== 'PGRST116') {
-          throw new Error(`Error al buscar vehiculo fallback: ${vehiculoFallbackError.message}`)
+          throw new Error(`Error al buscar vehículo fallback: ${vehiculoFallbackError.message}`)
         }
         vehiculoRutaId = vehiculoFallback?.id || null
       }
       if (!vehiculoRutaId) {
         return {
           success: false,
-          error: 'No hay vehiculos activos disponibles para crear la ruta de la transferencia.',
+          error: 'No hay vehículos activos disponibles para crear la ruta de la transferencia.',
         }
       }
       if (!repartidorRutaId) {
@@ -2028,7 +2028,7 @@ export async function asignarTransferenciaARutaDesdeAlmacen(
           .limit(1)
           .maybeSingle()
         if (repartidorVehiculoError && repartidorVehiculoError.code !== 'PGRST116') {
-          throw new Error(`Error al buscar repartidor por vehiculo: ${repartidorVehiculoError.message}`)
+          throw new Error(`Error al buscar repartidor por vehículo: ${repartidorVehiculoError.message}`)
         }
         repartidorRutaId = repartidorVehiculo?.id || null
       }

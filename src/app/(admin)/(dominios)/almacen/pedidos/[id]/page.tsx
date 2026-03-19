@@ -36,7 +36,7 @@ export const dynamic = 'force-dynamic'
 
 export const metadata = {
   title: 'Detalle Pedido - Avicola del Sur ERP',
-  description: 'Informacion detallada del pedido',
+  description: 'Información detallada del pedido',
 }
 
 const estadoConfig = (estado: string) => {
@@ -202,7 +202,7 @@ export default async function PedidoDetallePage({ params }: PedidoDetallePagePro
 
         <Card className="border-t-[3px] border-t-slate-400 bg-slate-50">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Vehiculo</CardTitle>
+            <CardTitle className="text-sm font-medium">Vehículo</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="line-clamp-2 text-sm font-semibold">{pedidoFinal.resumenOperativo.vehiculo}</p>
@@ -329,7 +329,7 @@ export default async function PedidoDetallePage({ params }: PedidoDetallePagePro
 
         <Card>
           <CardHeader>
-            <CardTitle>Asignacion y vehiculo</CardTitle>
+            <CardTitle>Asignación y vehículo</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2 text-sm">
@@ -342,7 +342,7 @@ export default async function PedidoDetallePage({ params }: PedidoDetallePagePro
                 </span>
               </div>
               <div className="flex justify-between gap-3">
-                <span className="text-muted-foreground">Vehiculo:</span>
+                <span className="text-muted-foreground">Vehículo:</span>
                 <span className="text-right">{pedidoFinal.resumenOperativo.vehiculo}</span>
               </div>
               <div className="flex justify-between gap-3">

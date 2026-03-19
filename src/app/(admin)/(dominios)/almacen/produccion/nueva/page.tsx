@@ -287,7 +287,7 @@ export default function NuevaOrdenProduccionPage() {
         console.log('[Produccion] Codigo escaneado (salida):', code, parsed)
 
         if (!parsed.isValid || !parsed.plu) {
-            toast.error(parsed.error || 'Codigo no valido')
+            toast.error(parsed.error || 'Código no válido')
             return false
         }
 
@@ -318,7 +318,7 @@ export default function NuevaOrdenProduccionPage() {
         console.log('[Produccion] Codigo escaneado (entrada):', code, parsed)
 
         if (!parsed.isValid || !parsed.plu) {
-            toast.error(parsed.error || 'Codigo no valido')
+            toast.error(parsed.error || 'Código no válido')
             return false
         }
 

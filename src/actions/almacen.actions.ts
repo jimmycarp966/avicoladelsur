@@ -1141,7 +1141,7 @@ export async function actualizarCategoriaProductosAction(
   }
 }
 
-// Buscar producto por codigo de barras o PLU.
+// Buscar producto por código de barras o PLU.
 // Soporta codigos EAN-13 con peso embebido de balanza SDP.
 export async function buscarProductoPorCodigoBarrasAction(
   codigo: string
@@ -1226,7 +1226,7 @@ export async function buscarProductoPorCodigoBarrasAction(
       },
     }
   } catch (error: any) {
-    devError('Error al buscar producto por codigo de barras:', error)
+    devError('Error al buscar producto por código de barras:', error)
     return {
       success: false,
       error: error.message || 'Error al buscar producto',

@@ -255,7 +255,7 @@ export function EntregasPedido({ entregas, resumen }: EntregasPedidoProps) {
                                       </Badge>
                                     </div>
                                     <p className="text-[10px] text-muted-foreground">
-                                      {item.codigo || 'Sin codigo'}
+                                      {item.codigo || 'Sin código'}
                                     </p>
                                   </td>
                                   <td className="px-3 py-2 text-right">

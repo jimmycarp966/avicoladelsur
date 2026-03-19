@@ -80,7 +80,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
   // Estado para listas por producto (index -> lista_id)
   const [listasPorProducto, setListasPorProducto] = useState<Record<number, string>>({})
 
-  // Estado para rastrear qu? precios fueron modificados manualmente por el usuario
+  // Estado para rastrear qué precios fueron modificados manualmente por el usuario
   // Para no sobrescribirlos al agregar nuevos productos
   const preciosModificadosManualmenteRef = useRef<Set<number>>(new Set())
 
@@ -121,7 +121,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
   // Suscribirse a cambios en items usando watch con callback para detectar cambios profundos
   useEffect(() => {
     const subscription = watch((value, { name, type }) => {
-      // Si cambi? algun precio o cantidad, forzar actualizacion del total
+      // Si cambió algún precio o cantidad, forzar actualización del total
       if (name && (name.includes('precio_unit_est') || name.includes('cantidad_solicitada'))) {
         setTotalUpdateKey(prev => prev + 1)
       }
@@ -155,7 +155,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
   // Usar watch('items') directamente para obtener valores actuales en cada render
   const itemsParaTotal = watch('items')
 
-  // Crear una clave ?nica basada en los valores de los items para detectar cambios profundos
+  // Crear una clave única basada en los valores de los items para detectar cambios profundos
   const itemsKey = useMemo(() => {
     if (!itemsParaTotal || itemsParaTotal.length === 0) return 'empty'
     return JSON.stringify(itemsParaTotal.map(item => ({
@@ -202,9 +202,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
       }
 
       const searchInput = document.querySelector(
-        '[data-slot="select-content"] input[placeholder*="Buscar por codigo"], ' +
         '[data-slot="select-content"] input[placeholder*="Buscar por código"], ' +
-        '[data-radix-popper-content-wrapper] input[placeholder*="Buscar por codigo"], ' +
         '[data-radix-popper-content-wrapper] input[placeholder*="Buscar por código"]'
       ) as HTMLInputElement | null
 
@@ -248,7 +246,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
           const firstProductSelect = document.getElementById('producto_0')
           if (firstProductSelect) {
             firstProductSelect.click()
-            // El hook mejorado manejar? el focus del input de busqueda
+            // El hook mejorado manejará el focus del input de búsqueda
           }
         },
       },
@@ -303,7 +301,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
           }
         },
       },
-      // Atajos numericos para enfocar productos por ?ndice (Ctrl+1-9)
+      // Atajos numéricos para enfocar productos por índice (Ctrl+1-9)
       ...Array.from({ length: 9 }, (_, i) => ({
         key: String(i + 1),
         ctrlKey: true,
@@ -431,7 +429,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
   // Actualizar precios cuando cambia la lista global o lista por producto
   const watchedListaPrecioGlobal = useWatch({ control, name: 'lista_precio_id' })
 
-  // Ref para rastrear las ?ltimas listas usadas y evitar loops infinitos
+  // Ref para rastrear las últimas listas usadas y evitar loops infinitos
   const ultimasListasRef = useRef<Record<number, string>>({})
   const ultimaListaGlobalRef = useRef<string | undefined>(undefined)
   const productosProcesadosRef = useRef<Set<string>>(new Set())
@@ -445,10 +443,10 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
 
       console.log('[PRESUPUESTO FORM] actualizarPrecios llamado - items:', itemsActuales.length, 'precios modificados:', Array.from(preciosModificadosManualmenteRef.current))
 
-      // Verificar si realmente cambi? la lista global
+      // Verificar si realmente cambió la lista global
       const listaGlobalCambio = ultimaListaGlobalRef.current !== watchedListaPrecioGlobal
 
-      // Si cambi? la lista global, limpiar el cache de productos procesados
+      // Si cambió la lista global, limpiar el cache de productos procesados
       // Y tambien limpiar los precios modificados manualmente (para actualizar todos)
       if (listaGlobalCambio) {
         productosProcesadosRef.current.clear()
@@ -463,28 +461,28 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
         const listaId = listasPorProducto[i] || watchedListaPrecioGlobal
         if (!listaId) continue
 
-        // Crear una clave ?nica para este producto+lista
+        // Crear una clave única para este producto+lista
         const clave = `${item.producto_id}-${listaId}`
 
-        // Verificar si la lista para este producto cambi?
+        // Verificar si la lista para este producto cambió
         const listaAnterior = ultimasListasRef.current[i]
         const listaCambio = listaAnterior !== listaId || listaGlobalCambio
 
-        console.log('[PRESUPUESTO FORM] Procesando ?ndice', i, '- listaCambio:', listaCambio, 'precioModificado:', preciosModificadosManualmenteRef.current.has(i), 'listaAnterior:', listaAnterior, 'listaId:', listaId)
+        console.log('[PRESUPUESTO FORM] Procesando índice', i, '- listaCambio:', listaCambio, 'precioModificado:', preciosModificadosManualmenteRef.current.has(i), 'listaAnterior:', listaAnterior, 'listaId:', listaId)
 
         // IMPORTANTE: PRIMERO verificar si el precio fue modificado manualmente
-        // Esta verificacion tiene prioridad sobre listaCambio
-        // Solo debemos saltar la actualizacion si NO cambi? explicitamente la lista global
+        // Esta verificación tiene prioridad sobre listaCambio
+        // Solo debemos saltar la actualización si NO cambió explícitamente la lista global
         // (listaGlobalCambio se maneja aparte - limpia todos los precios modificados)
         if (preciosModificadosManualmenteRef.current.has(i) && !listaGlobalCambio) {
-          console.log('[PRESUPUESTO FORM] Saltando actualizacion de precio para ?ndice', i, '- fue modificado manualmente')
+          console.log('[PRESUPUESTO FORM] Saltando actualización de precio para índice', i, '- fue modificado manualmente')
           // Marcar como procesado para no volver a intentar en futuras iteraciones
           productosProcesadosRef.current.add(clave)
           ultimasListasRef.current[i] = listaId
           continue
         }
 
-        // Si la lista no cambi? y ya procesamos este producto con esta lista, saltar
+        // Si la lista no cambió y ya procesamos este producto con esta lista, saltar
         if (!listaCambio && productosProcesadosRef.current.has(clave)) {
           continue
         }
@@ -630,7 +628,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
       return clientes.slice(0, MAX_RESULTS)
     }
 
-    // Asegurar que el cliente seleccionado siempre est? en la lista si existe
+    // Asegurar que el cliente seleccionado siempre está en la lista si existe
     const clienteSeleccionado = watchedCliente
       ? clientes.find(c => c.id === watchedCliente)
       : null
@@ -648,7 +646,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
       const codigoLower = cliente.codigo?.toLowerCase() || ''
       const telefono = cliente.telefono || ''
 
-      // Si es el cliente seleccionado, incluirlo siempre (se agregar? al inicio despues)
+      // Si es el cliente seleccionado, incluirlo siempre (se agregará al inicio después)
       if (cliente.id === watchedCliente) {
         continue // Se maneja separadamente al final
       }
@@ -711,7 +709,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
     // Limitar a MAX_RESULTS
     results = results.slice(0, MAX_RESULTS)
 
-    // Si hay un cliente seleccionado y no est? en los resultados, agregarlo al inicio
+    // Si hay un cliente seleccionado y no está en los resultados, agregarlo al inicio
     if (clienteSeleccionado && !results.find(c => c.id === clienteSeleccionado.id)) {
       results.unshift(clienteSeleccionado)
     }
@@ -721,7 +719,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
 
   // Funcion para marcar que el precio fue modificado manualmente
   const handlePrecioModificadoManualmente = useCallback((index: number) => {
-    console.log('[PRESUPUESTO FORM] Precio modificado manualmente para ?ndice:', index)
+    console.log('[PRESUPUESTO FORM] Precio modificado manualmente para índice:', index)
     preciosModificadosManualmenteRef.current.add(index)
     console.log('[PRESUPUESTO FORM] Precios modificados:', Array.from(preciosModificadosManualmenteRef.current))
   }, [])
@@ -749,7 +747,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
     // Actualizar precio del producto con la nueva lista
     const item = watchedItems?.[index]
     if (item?.producto_id) {
-      // Determinar qu? lista usar: individual si existe, sino lista global
+      // Determinar qué lista usar: individual si existe, sino lista global
       const listaAUsar = listaId || watchedListaPrecioGlobal
 
       if (listaAUsar) {
@@ -797,7 +795,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
       setValue(`items.${newIndex}.lista_precio_id`, watchedListaPrecioGlobal, { shouldDirty: false })
     }
 
-    // Enfocar el select del producto recien agregado despues de que React lo renderice
+    // Enfocar el select del producto recién agregado después de que React lo renderice
     // Usar multiples intentos para asegurar que funcione
     const focusProductSelect = (attempts = 0) => {
       if (attempts > 20) return // Maximo 20 intentos
@@ -813,12 +811,12 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
         // Hacer click para abrir el dropdown
         nuevoProductoSelect.click()
 
-        // Esperar a que se abra el dropdown y luego enfocar el input de busqueda
+        // Esperar a que se abra el dropdown y luego enfocar el input de búsqueda
         // Buscar el input dentro del SelectContent que se acaba de abrir
         const focusSearchInput = (searchAttempts = 0) => {
           if (searchAttempts > 30) return // Maximo 30 intentos para encontrar el input
 
-          // Buscar el input de busqueda usando el atributo data-product-search
+          // Buscar el input de búsqueda usando el atributo data-product-search
           const searchInput = document.querySelector(`input[data-product-search="${newIndex}"]`) as HTMLInputElement
           if (searchInput) {
             // Enfocar y seleccionar el texto
@@ -840,19 +838,19 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
             }
           }
 
-          // Si no se encuentra, intentar de nuevo despues de un breve delay
+          // Si no se encuentra, intentar de nuevo después de un breve delay
           setTimeout(() => focusSearchInput(searchAttempts + 1), 50)
         }
 
-        // Iniciar la busqueda del input despues de un pequeno delay para que el dropdown se abra
+        // Iniciar la búsqueda del input después de un pequeño delay para que el dropdown se abra
         setTimeout(() => focusSearchInput(), 100)
       } else {
-        // Si no se encuentra el select, intentar de nuevo despues de un breve delay
+        // Si no se encuentra el select, intentar de nuevo después de un breve delay
         setTimeout(() => focusProductSelect(attempts + 1), 50)
       }
     }
 
-    // Iniciar el proceso despues de que React renderice
+    // Iniciar el proceso después de que React renderice
     requestAnimationFrame(() => {
       setTimeout(() => focusProductSelect(), 100)
     })
@@ -867,7 +865,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
       // Limpiar lista individual si existe
       const nuevaListasPorProducto = { ...listasPorProducto }
       delete nuevaListasPorProducto[index]
-      // Reindexar las listas (despues de eliminar, los ?ndices cambian)
+      // Reindexar las listas (después de eliminar, los índices cambian)
       const reindexed: Record<number, string> = {}
       Object.keys(nuevaListasPorProducto).forEach(key => {
         const oldIndex = parseInt(key)
@@ -1005,7 +1003,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
         const presupuestoId = result.data?.presupuesto_id
         const presupuestoCodigo = result.data?.codigo || presupuestoId
 
-        // Mostrar toast de ?xito
+        // Mostrar toast de éxito
         showToast('success', `Presupuesto ${presupuestoCodigo} creado! Listo para crear otro.`)
 
         // Reiniciar formulario para nuevo presupuesto
@@ -1048,7 +1046,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
   }, [buildPresupuestoPayload, isLoading, submitPresupuesto])
 
   // Atajos globales (F12 para guardar, Ctrl+N para agregar producto)
-  // Debe estar despues de la definicion de onSubmit
+  // Debe estar después de la definición de onSubmit
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       // Solo procesar si no estamos escribiendo en un input/textarea
@@ -1095,10 +1093,10 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
       <div className="grid gap-4 xl:grid-cols-[1fr,340px]">
         {/* Columna izquierda: Contenido del formulario */}
         <div className="space-y-6">
-          {/* Informacion del Cliente */}
+          {/* Información del Cliente */}
           <Card className="border-l-[3px] border-l-primary">
             <CardHeader>
-              <CardTitle className="text-primary">Informacion del Cliente</CardTitle>
+              <CardTitle className="text-primary">Información del Cliente</CardTitle>
               <CardDescription>
                 Selecciona el cliente para el presupuesto
               </CardDescription>
@@ -1115,7 +1113,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                   onValueChange={(value) => {
                     // Establecer el valor primero
                     setValue('cliente_id', value, { shouldValidate: true, shouldDirty: true })
-                    // Limpiar la busqueda despues de un pequeno delay para asegurar que el valor se estableci?
+                    // Limpiar la búsqueda después de un pequeño delay para asegurar que el valor se estableció
                     setTimeout(() => {
                       setClienteSearch('')
                       const fechaInput = document.getElementById('fecha_entrega_estimada')
@@ -1135,7 +1133,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                   }}
                 >
                   <SelectTrigger id="cliente_id" autoFocus className={errors.cliente_id ? 'border-red-500' : ''}>
-                    <SelectValue placeholder="Buscar por codigo, nombre, telefono o zona..." />
+                    <SelectValue placeholder="Buscar por código, nombre, teléfono o zona..." />
                   </SelectTrigger>
                   <SelectContent className="max-h-[300px]">
                     <div className="sticky top-0 bg-background p-2 border-b">
@@ -1143,7 +1141,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
                           ref={clienteSearchInputRef}
-                          placeholder="Buscar por codigo, nombre..."
+                          placeholder="Buscar por código, nombre..."
                           value={clienteSearch}
                           onChange={(e) => {
                             setClienteSearch(e.target.value)
@@ -1214,12 +1212,12 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                         const totalClientes = clientes.length
                         const showingAll = filtered.length >= totalClientes || filtered.length < MAX_RESULTS
 
-                        // Asegurar que el cliente seleccionado siempre est? en la lista si existe
+                        // Asegurar que el cliente seleccionado siempre está en la lista si existe
                         const clienteSeleccionadoEnLista = watchedCliente
                           ? clientes.find(c => c.id === watchedCliente)
                           : null
 
-                        // Si hay un cliente seleccionado y no est? en los resultados filtrados, agregarlo
+                        // Si hay un cliente seleccionado y no está en los resultados filtrados, agregarlo
                         const listaFinal = [...filtered]
                         if (clienteSeleccionadoEnLista && !listaFinal.find(c => c.id === clienteSeleccionadoEnLista.id)) {
                           listaFinal.unshift(clienteSeleccionadoEnLista)
@@ -1254,7 +1252,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                 )}
               </div>
 
-              {/* Zona y Fecha - Visible despues de seleccionar cliente */}
+              {/* Zona y Fecha - Visible después de seleccionar cliente */}
               {clienteSeleccionado && (
                 <div className="grid gap-4 md:grid-cols-3">
                   <input type="hidden" {...register('zona_id')} />
@@ -1356,7 +1354,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                 </Select>
                 {errorListas && (
                   <p className="text-sm text-destructive">
-                    Error al cargar listas. Intenta recargar la pagina.
+                    Error al cargar listas. Intenta recargar la página.
                   </p>
                 )}
                 {watch('lista_precio_id') && (
@@ -1373,7 +1371,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
             <CardHeader className="pb-3">
               <CardTitle className="text-accent">Productos</CardTitle>
               <CardDescription>
-                Escrib? el codigo o nombre y presion? Enter para agregar rapidamente
+                Escribí el código o nombre y presioná Enter para agregar rápidamente
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

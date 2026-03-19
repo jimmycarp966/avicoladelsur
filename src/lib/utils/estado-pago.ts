@@ -37,8 +37,8 @@ const ESTADOS_PAGO_DEFINIDOS = new Set<EstadoPagoType>([
 function tieneNotaPagaraDespues(notasPago?: string | null) {
   const notas = notasPago?.toLowerCase() || ''
   return (
-    notas.includes('pagara despues') ||
-    notas.includes('pagara despues.')
+    notas.includes('pagará después') ||
+    notas.includes('pagará después.')
   )
 }
 
@@ -175,7 +175,7 @@ export function getEstadoPagoLabel(entrega: EntregaConEstadoPago): string {
     case 'pendiente':
       return 'Pendiente'
     case 'pagara_despues':
-      return 'Pagara despues'
+      return 'Pagará después'
     case 'parcial':
       return 'Pago parcial'
     case 'cuenta_corriente':

@@ -325,7 +325,7 @@ export function BarcodeScanner({
                 processingScanRef.current = true
 
                 addDebugLog(`CODIGO detectado: ${code}`)
-                logToServer('info', 'Codigo detectado', { code })
+                logToServer('info', 'Código detectado', { code })
 
                 Promise.resolve(onScan(code))
                     .then((scanResult) => {
@@ -343,8 +343,8 @@ export function BarcodeScanner({
                     })
                     .catch((scanError: unknown) => {
                         const message = scanError instanceof Error ? scanError.message : 'Error desconocido'
-                        addDebugLog(`Error procesando codigo: ${message}`, true)
-                        logToServer('error', 'Error procesando codigo detectado', { code, message })
+                        addDebugLog(`Error procesando código: ${message}`, true)
+                        logToServer('error', 'Error procesando código detectado', { code, message })
                     })
                     .finally(() => {
                         processingScanRef.current = false

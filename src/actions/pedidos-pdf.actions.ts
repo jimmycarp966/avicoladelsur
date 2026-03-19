@@ -104,7 +104,7 @@ export async function generarPDFPedidoAgrupado(
             : 'Sin ruta'
         }  |  Chofer: ${pedidoFinal.resumenOperativo.repartidor}`,
       )
-      doc.text(`Vehiculo: ${pedidoFinal.resumenOperativo.vehiculo}`)
+      doc.text(`Vehículo: ${pedidoFinal.resumenOperativo.vehiculo}`)
       doc.moveDown()
 
       const summaryTop = doc.y

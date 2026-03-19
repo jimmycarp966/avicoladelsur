@@ -1,6 +1,6 @@
 ﻿import { z } from 'zod'
 
-// Esquema para crear/editar vehiculo
+// Esquema para crear/editar vehículo
 export const vehiculoSchema = z.object({
   patente: z
     .string()
@@ -77,9 +77,9 @@ export const vehiculoSchema = z.object({
     .default(true),
 })
 
-// Esquema para checklist de vehiculo
+// Esquema para checklist de vehículo
 export const checklistVehiculoSchema = z.object({
-  vehiculo_id: z.string().uuid('ID de vehiculo invalido'),
+  vehiculo_id: z.string().uuid('ID de vehículo inválido'),
 
   // Campos legacy
   aceite_motor: z.boolean().optional(),
@@ -145,7 +145,7 @@ export const checklistVehiculoSchema = z.object({
 
 // Esquema para crear ruta
 export const crearRutaSchema = z.object({
-  vehiculo_id: z.string().uuid('ID de vehiculo invalido'),
+  vehiculo_id: z.string().uuid('ID de vehículo inválido'),
 
   repartidor_id: z.string().uuid('ID de repartidor invalido'),
 
@@ -216,7 +216,7 @@ export const validarEntregaSchema = z.object({
     .optional(),
 })
 
-// Esquema para busqueda y filtros de vehiculos
+// Esquema para búsqueda y filtros de vehículos
 export const vehiculosFilterSchema = z.object({
   search: z.string().optional(),
   tipo_vehiculo: z.enum(['Camion', 'Furgon', 'Camioneta', 'Moto', 'Pickup']).optional(),
@@ -226,7 +226,7 @@ export const vehiculosFilterSchema = z.object({
   limit: z.number().int().min(1).max(100).default(10),
 })
 
-// Esquema para busqueda y filtros de rutas
+// Esquema para búsqueda y filtros de rutas
 export const rutasFilterSchema = z.object({
   search: z.string().optional(),
   vehiculo_id: z.string().uuid().optional(),
@@ -240,7 +240,7 @@ export const rutasFilterSchema = z.object({
   limit: z.number().int().min(1).max(100).default(10),
 })
 
-// Esquema para busqueda y filtros de entregas
+// Esquema para búsqueda y filtros de entregas
 export const entregasFilterSchema = z.object({
   search: z.string().optional(),
   ruta_id: z.string().uuid().optional(),

@@ -391,7 +391,7 @@ export function PesajeItemCard({
     const parsed = parseBarcodeEAN13(code)
 
     if (!parsed.isValid || !parsed.plu) {
-      toast.error('Codigo no valido: ' + (parsed.error || 'formato desconocido'))
+      toast.error('Código no válido: ' + (parsed.error || 'formato desconocido'))
       return false
     }
 
@@ -406,7 +406,7 @@ export function PesajeItemCard({
 
       if (!coincideCodigo) {
         toast.error(
-          `El codigo escaneado (${parsed.plu}) NO corresponde al producto "${item.producto?.nombre}" (codigo: ${codigoProducto}). Escanea la etiqueta correcta.`,
+          `El código escaneado (${parsed.plu}) NO corresponde al producto "${item.producto?.nombre}" (código: ${codigoProducto}). Escanea la etiqueta correcta.`,
           { duration: 5000 }
         )
         return false
@@ -431,7 +431,7 @@ export function PesajeItemCard({
       return true
     }
 
-    toast.info(`Codigo PLU: ${parsed.plu} (sin peso embebido)`)
+    toast.info(`Código PLU: ${parsed.plu} (sin peso embebido)`)
     return false
   }, [item.producto?.codigo, item.producto?.nombre, pesoTotalAcumulado, scanEntries.length])
 

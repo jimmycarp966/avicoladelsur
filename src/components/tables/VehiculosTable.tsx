@@ -42,7 +42,7 @@ export function VehiculosTable({ data, onView, onEdit, onDelete, onMaintenance, 
   const columns: ColumnDef<Vehiculo>[] = [
     {
       accessorKey: 'patente',
-      header: ({ column }) => <SortableHeader column={column}>Vehiculo</SortableHeader>,
+      header: ({ column }) => <SortableHeader column={column}>Vehículo</SortableHeader>,
       cell: ({ row }) => {
         const patente = row.getValue('patente') as string
         const vehiculo = row.original

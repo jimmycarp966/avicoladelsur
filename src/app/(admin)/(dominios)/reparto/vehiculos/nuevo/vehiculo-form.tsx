@@ -86,14 +86,14 @@ export function VehiculoForm() {
       })
 
       if (result.success) {
-        showToast('success', result.message || 'Vehiculo creado exitosamente')
+        showToast('success', result.message || 'Vehículo creado exitosamente')
         router.push('/reparto/vehiculos')
       } else {
-        showToast('error', result.error || 'Error al crear vehiculo')
+        showToast('error', result.error || 'Error al crear vehículo')
       }
     } catch (error: any) {
-      console.error('Error creando vehiculo:', error)
-      showToast('error', error.message || 'Error al crear vehiculo')
+      console.error('Error creando vehículo:', error)
+      showToast('error', error.message || 'Error al crear vehículo')
     } finally {
       setIsLoading(false)
     }
@@ -103,8 +103,8 @@ export function VehiculoForm() {
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Informacion del Vehiculo</CardTitle>
-          <CardDescription>Completa los datos del nuevo vehiculo</CardDescription>
+          <CardTitle>Información del Vehículo</CardTitle>
+          <CardDescription>Completa los datos del nuevo vehículo</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
@@ -115,14 +115,14 @@ export function VehiculoForm() {
             </div>
 
             <div>
-              <Label htmlFor="tipo_vehiculo">Tipo de Vehiculo *</Label>
+              <Label htmlFor="tipo_vehiculo">Tipo de Vehículo *</Label>
               <Select value={watch('tipo_vehiculo')} onValueChange={(value) => setValue('tipo_vehiculo', value as TipoVehiculo)}>
                 <SelectTrigger id="tipo_vehiculo" className={errors.tipo_vehiculo ? 'border-red-500' : ''}>
                   <SelectValue placeholder="Selecciona un tipo" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Camion">Camion</SelectItem>
-                  <SelectItem value="Furgon">Furgon</SelectItem>
+                  <SelectItem value="Camion">Camión</SelectItem>
+                  <SelectItem value="Furgon">Furgón</SelectItem>
                   <SelectItem value="Camioneta">Camioneta</SelectItem>
                   <SelectItem value="Moto">Moto</SelectItem>
                   <SelectItem value="Pickup">Pickup</SelectItem>
@@ -202,7 +202,7 @@ export function VehiculoForm() {
           ) : (
             <>
               <Save className="mr-2 h-4 w-4" />
-              Crear Vehiculo
+              Crear Vehículo
             </>
           )}
         </Button>

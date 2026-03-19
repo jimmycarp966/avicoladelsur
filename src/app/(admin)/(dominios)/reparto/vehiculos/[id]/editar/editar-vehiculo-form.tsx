@@ -87,12 +87,12 @@ export function EditarVehiculoForm({ vehiculoId }: EditarVehiculoFormProps) {
         setValue('combustible_actual_litros', data.combustible_actual_litros)
         setValue('activo', data.activo ?? true)
       } else {
-        showToast('error', result.error || 'Error al cargar vehiculo')
+        showToast('error', result.error || 'Error al cargar vehículo')
         router.push('/reparto/vehiculos')
       }
     } catch (error: any) {
-      console.error('Error cargando vehiculo:', error)
-      showToast('error', 'Error al cargar vehiculo')
+      console.error('Error cargando vehículo:', error)
+      showToast('error', 'Error al cargar vehículo')
       router.push('/reparto/vehiculos')
     } finally {
       setIsLoadingData(false)
@@ -119,14 +119,14 @@ export function EditarVehiculoForm({ vehiculoId }: EditarVehiculoFormProps) {
       })
 
       if (result.success) {
-        showToast('success', result.message || 'Vehiculo actualizado exitosamente')
+        showToast('success', result.message || 'Vehículo actualizado exitosamente')
         router.push('/reparto/vehiculos')
       } else {
-        showToast('error', result.error || 'Error al actualizar vehiculo')
+        showToast('error', result.error || 'Error al actualizar vehículo')
       }
     } catch (error: any) {
-      console.error('Error actualizando vehiculo:', error)
-      showToast('error', error.message || 'Error al actualizar vehiculo')
+      console.error('Error actualizando vehículo:', error)
+      showToast('error', error.message || 'Error al actualizar vehículo')
     } finally {
       setIsLoading(false)
     }
@@ -138,7 +138,7 @@ export function EditarVehiculoForm({ vehiculoId }: EditarVehiculoFormProps) {
         <CardContent className="pt-6">
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            <span className="ml-2">Cargando vehiculo...</span>
+            <span className="ml-2">Cargando vehículo...</span>
           </div>
         </CardContent>
       </Card>
@@ -150,7 +150,7 @@ export function EditarVehiculoForm({ vehiculoId }: EditarVehiculoFormProps) {
       <Card>
         <CardContent className="pt-6">
           <div className="text-center py-8">
-            <p className="text-muted-foreground">Vehiculo no encontrado</p>
+            <p className="text-muted-foreground">Vehículo no encontrado</p>
           </div>
         </CardContent>
       </Card>
@@ -161,8 +161,8 @@ export function EditarVehiculoForm({ vehiculoId }: EditarVehiculoFormProps) {
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Informacion del Vehiculo</CardTitle>
-          <CardDescription>Modifica los datos del vehiculo</CardDescription>
+          <CardTitle>Información del Vehículo</CardTitle>
+          <CardDescription>Modifica los datos del vehículo</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
@@ -172,14 +172,14 @@ export function EditarVehiculoForm({ vehiculoId }: EditarVehiculoFormProps) {
               {errors.patente && <p className="text-sm text-red-500 mt-1">{errors.patente.message}</p>}
             </div>
             <div>
-              <Label htmlFor="tipo_vehiculo">Tipo de Vehiculo *</Label>
+              <Label htmlFor="tipo_vehiculo">Tipo de Vehículo *</Label>
               <Select value={watch('tipo_vehiculo')} onValueChange={(value) => setValue('tipo_vehiculo', value as TipoVehiculo)}>
                 <SelectTrigger id="tipo_vehiculo" className={errors.tipo_vehiculo ? 'border-red-500' : ''}>
                   <SelectValue placeholder="Selecciona un tipo" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Camion">Camion</SelectItem>
-                  <SelectItem value="Furgon">Furgon</SelectItem>
+                  <SelectItem value="Camion">Camión</SelectItem>
+                  <SelectItem value="Furgon">Furgón</SelectItem>
                   <SelectItem value="Camioneta">Camioneta</SelectItem>
                   <SelectItem value="Moto">Moto</SelectItem>
                   <SelectItem value="Pickup">Pickup</SelectItem>
@@ -245,7 +245,7 @@ export function EditarVehiculoForm({ vehiculoId }: EditarVehiculoFormProps) {
 
           <div className="flex items-center space-x-2">
             <Switch id="activo" checked={watch('activo')} onCheckedChange={(checked) => setValue('activo', checked)} />
-            <Label htmlFor="activo" className="cursor-pointer">Vehiculo activo</Label>
+            <Label htmlFor="activo" className="cursor-pointer">Vehículo activo</Label>
           </div>
         </CardContent>
       </Card>
@@ -263,7 +263,7 @@ export function EditarVehiculoForm({ vehiculoId }: EditarVehiculoFormProps) {
           ) : (
             <>
               <Save className="mr-2 h-4 w-4" />
-              Actualizar Vehiculo
+              Actualizar Vehículo
             </>
           )}
         </Button>

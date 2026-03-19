@@ -87,12 +87,12 @@ export function EditarPresupuestoForm({ presupuesto }: EditarPresupuestoFormProp
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="border-l-[3px] border-l-primary">
           <CardHeader>
-            <CardTitle className="text-primary">Informacion del Presupuesto</CardTitle>
-            <CardDescription>Datos basicos del presupuesto {presupuesto.numero_presupuesto}</CardDescription>
+            <CardTitle className="text-primary">Información del Presupuesto</CardTitle>
+            <CardDescription>Datos básicos del presupuesto {presupuesto.numero_presupuesto}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Numero de Presupuesto</Label>
+              <Label>Número de Presupuesto</Label>
               <Input value={presupuesto.numero_presupuesto} disabled />
             </div>
 

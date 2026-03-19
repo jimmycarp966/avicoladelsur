@@ -180,12 +180,12 @@ export function NuevoAdelantoForm() {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        {/* Informacion basica */}
+        {/* Información básica */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              Informacion Basica
+              Información Básica
             </CardTitle>
             <CardDescription>
               Seleccione el empleado y el tipo de adelanto
@@ -410,7 +410,7 @@ export function NuevoAdelantoForm() {
               Observaciones
             </CardTitle>
             <CardDescription>
-              Informacion adicional sobre el adelanto (opcional)
+              Información adicional sobre el adelanto (opcional)
             </CardDescription>
           </CardHeader>
           <CardContent>

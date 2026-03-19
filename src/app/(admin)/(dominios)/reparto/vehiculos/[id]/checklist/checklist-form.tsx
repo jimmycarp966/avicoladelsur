@@ -97,8 +97,8 @@ export function ChecklistVehiculoForm({ vehiculoId }: ChecklistVehiculoFormProps
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Checklist Diario del Vehiculo</CardTitle>
-          <CardDescription>Verifica el estado del vehiculo antes de iniciar la jornada</CardDescription>
+          <CardTitle>Checklist Diario del Vehículo</CardTitle>
+          <CardDescription>Verifica el estado del vehículo antes de iniciar la jornada</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-4">
@@ -186,7 +186,7 @@ export function ChecklistVehiculoForm({ vehiculoId }: ChecklistVehiculoFormProps
 
           <div>
             <Label htmlFor="observaciones">Observaciones</Label>
-            <Textarea id="observaciones" {...register('observaciones')} rows={4} placeholder="Notas adicionales sobre el estado del vehiculo..." />
+            <Textarea id="observaciones" {...register('observaciones')} rows={4} placeholder="Notas adicionales sobre el estado del vehículo..." />
           </div>
         </CardContent>
       </Card>

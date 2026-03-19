@@ -463,7 +463,7 @@ export function LiquidacionControlTab({
 
                     <FieldWithTooltip
                       label="Orden de pago"
-                      tooltip="Numero secuencial para ordenar los pagos al momento de emitir."
+                      tooltip="Número secuencial para ordenar los pagos al momento de emitir."
                     >
                       <Input
                         type="number"

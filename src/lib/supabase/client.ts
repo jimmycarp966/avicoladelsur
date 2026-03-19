@@ -41,7 +41,7 @@ export function createClient() {
       `Ejemplo valido: https://tu-proyecto.supabase.co\n\n` +
       `Verifica tu archivo .env.local:\n` +
       `- No debe tener comillas alrededor del valor\n` +
-      `- No debe tener espacios antes o despues del =\n` +
+      `- No debe tener espacios antes o después del =\n` +
       `- Debe estar en una sola linea\n\n` +
       `Formato correcto:\n` +
       `NEXT_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co`

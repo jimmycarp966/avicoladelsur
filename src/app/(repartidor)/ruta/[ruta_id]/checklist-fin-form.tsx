@@ -192,7 +192,7 @@ export function ChecklistFinForm({ rutaId, vehiculoId, onComplete }: ChecklistFi
 
           <div>
             <Label htmlFor="observaciones">Observaciones</Label>
-            <Textarea id="observaciones" {...register('observaciones')} placeholder="Notas adicionales sobre el estado del vehiculo..." rows={3} />
+            <Textarea id="observaciones" {...register('observaciones')} placeholder="Notas adicionales sobre el estado del vehículo..." rows={3} />
           </div>
 
           {(errors.aceite_motor_porcentaje || errors.presion_neumaticos_psi || errors.combustible || errors.kilometraje) && (

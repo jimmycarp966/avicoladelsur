@@ -16,8 +16,8 @@ interface VehiculoDetallePageProps {
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
-  title: 'Detalle Vehiculo - Avicola del Sur ERP',
-  description: 'Informacion detallada del vehiculo',
+  title: 'Detalle Vehículo - Avícola del Sur ERP',
+  description: 'Información detallada del vehículo',
 }
 
 const getEstadoConfig = (estado: string) => {
@@ -111,7 +111,7 @@ export default async function VehiculoDetallePage({ params }: VehiculoDetallePag
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Informacion General</CardTitle>
+            <CardTitle>Información General</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
@@ -136,7 +136,7 @@ export default async function VehiculoDetallePage({ params }: VehiculoDetallePag
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Activo</p>
-              <Badge variant={vehiculo.activo ? 'default' : 'secondary'}>{vehiculo.activo ? 'Si' : 'No'}</Badge>
+              <Badge variant={vehiculo.activo ? 'default' : 'secondary'}>{vehiculo.activo ? 'Sí' : 'No'}</Badge>
             </div>
           </CardContent>
         </Card>

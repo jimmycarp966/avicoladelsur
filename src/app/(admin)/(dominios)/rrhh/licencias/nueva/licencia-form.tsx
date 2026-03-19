@@ -187,7 +187,7 @@ export function NuevaLicenciaForm({ defaultTipo }: NuevaLicenciaFormProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="w-5 h-5 text-blue-600" />
-              Informacion de la Licencia
+              Información de la Licencia
             </CardTitle>
             <CardDescription>
               Seleccion del empleado y datos generales de la solicitud
@@ -336,8 +336,8 @@ export function NuevaLicenciaForm({ defaultTipo }: NuevaLicenciaFormProps) {
                 </p>
                 <p className={`text-sm ${estadoPlazo.enTermino ? 'text-blue-700' : 'text-orange-700'}`}>
                   {estadoPlazo.enTermino
-                    ? `En termino. Restan aprox ${estadoPlazo.horasRestantes} horas.`
-                    : 'Fuera de termino: marque excepcion para continuar.'}
+                    ? `En término. Restan aprox. ${estadoPlazo.horasRestantes} horas.`
+                    : 'Fuera de término: marque excepción para continuar.'}
                 </p>
               </div>
             )}

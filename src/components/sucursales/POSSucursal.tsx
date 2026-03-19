@@ -213,7 +213,7 @@ export function POSSucursal({
     console.log('[POS Sucursal] Codigo escaneado:', code, parsed)
 
     if (!parsed.isValid || !parsed.plu) {
-      toast.error(parsed.error || 'Codigo no valido')
+      toast.error(parsed.error || 'Código no válido')
       return false
     }
 

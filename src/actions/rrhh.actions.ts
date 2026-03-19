@@ -86,7 +86,7 @@ export async function crearEmpleadoAction(
       if (existingEmpleado) {
         return {
           success: false,
-          error: 'El legajo ya est? en uso por otro empleado',
+          error: 'El legajo ya está en uso por otro empleado',
         }
       }
     }
@@ -102,7 +102,7 @@ export async function crearEmpleadoAction(
       if (existingEmpleado) {
         return {
           success: false,
-          error: 'El DNI ya est? en uso por otro empleado',
+          error: 'El DNI ya está en uso por otro empleado',
         }
       }
     }
@@ -118,7 +118,7 @@ export async function crearEmpleadoAction(
       if (existingEmpleado) {
         return {
           success: false,
-          error: 'El CUIL ya est? en uso por otro empleado',
+          error: 'El CUIL ya está en uso por otro empleado',
         }
       }
     }
@@ -142,7 +142,7 @@ export async function crearEmpleadoAction(
       if (!usuarioData.activo) {
         return {
           success: false,
-          error: 'El usuario seleccionado est? inactivo',
+          error: 'El usuario seleccionado está inactivo',
         }
       }
 
@@ -157,7 +157,7 @@ export async function crearEmpleadoAction(
       if (empleadoExistente) {
         return {
           success: false,
-          error: 'Este usuario ya est? asignado a otro empleado activo',
+          error: 'Este usuario ya está asignado a otro empleado activo',
         }
       }
 
@@ -278,7 +278,7 @@ export async function actualizarEmpleadoAction(
       if (existingEmpleado) {
         return {
           success: false,
-          error: 'El legajo ya est? en uso por otro empleado',
+          error: 'El legajo ya está en uso por otro empleado',
         }
       }
     }
@@ -295,7 +295,7 @@ export async function actualizarEmpleadoAction(
       if (existingEmpleado) {
         return {
           success: false,
-          error: 'El DNI ya est? en uso por otro empleado',
+          error: 'El DNI ya está en uso por otro empleado',
         }
       }
     }
@@ -312,7 +312,7 @@ export async function actualizarEmpleadoAction(
       if (existingEmpleado) {
         return {
           success: false,
-          error: 'El CUIL ya est? en uso por otro empleado',
+          error: 'El CUIL ya está en uso por otro empleado',
         }
       }
     }
@@ -2467,8 +2467,8 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
         empleadoId: empleado_id,
         tipo: 'certificado_fuera_termino',
         categoria: 'licencias',
-        titulo: 'Intento de certificado fuera de termino',
-        descripcion: 'Se intento cargar un certificado despues de las 24 horas permitidas.',
+        titulo: 'Intento de certificado fuera de término',
+        descripcion: 'Se intentó cargar un certificado después de las 24 horas permitidas.',
         metadata: {
           tipo_licencia: tipo,
           fecha_inicio,
