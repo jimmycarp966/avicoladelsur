@@ -336,11 +336,13 @@ async function PresupuestosDiaContent({
 
       {/* Agrupación por zona y turno */}
       {Object.keys(presupuestosPorZonaTurno).length > 0 && (
-        <div className="space-y-6">
+        <Accordion type="single" collapsible className="space-y-6">
           {Object.entries(presupuestosPorZonaTurno).map(([key, grupo]: [string, any]) => (
-            <Card key={key}>
-              <CardHeader>
-                <div className="flex items-center justify-between">
+            <AccordionItem key={key} value={key} className="border-none">
+              <Card className="overflow-hidden">
+                <CardHeader className="pb-0">
+                  <AccordionTrigger className="py-0 hover:no-underline">
+                    <div className="flex flex-1 items-center justify-between gap-4 pr-4 text-left">
                   <div>
                     <CardTitle className="flex items-center gap-2">
                       <MapPin className="h-5 w-5" />
@@ -360,10 +362,12 @@ async function PresupuestosDiaContent({
                   <Badge variant="outline" className="text-lg">
                     {grupo.totalKg.toFixed(1)} kg
                   </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
+                    </div>
+                  </AccordionTrigger>
+                </CardHeader>
+                <AccordionContent className="pb-0">
+                  <CardContent className="pt-6">
+                    <div className="space-y-4">
                   {grupo.presupuestos.map((presupuesto: any) => {
                     const itemsPesables = presupuesto.items?.filter((item: any) => esItemPesable(item, esVentaMayorista(presupuesto, item))) || []
                     const itemsPesados = itemsPesables.filter((item: any) => item.peso_final)
@@ -597,10 +601,12 @@ async function PresupuestosDiaContent({
                     )
                   })}
                 </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </AccordionContent>
+              </Card>
+            </AccordionItem>
           ))}
-        </div>
+        </Accordion>
       )}
 
       {/* Lista de presupuestos fallback si no hay agrupacion */}
