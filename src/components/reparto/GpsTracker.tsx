@@ -2,13 +2,14 @@
 
 /**
  * GpsTracker Component
- * 
- * Componente para tracking GPS en tiempo real desde la PWA del repartidor
- * Envía ubicaciones cada 5 segundos al servidor
+ *
+ * Tracking GPS en tiempo real desde la PWA del repartidor.
+ * Envía ubicaciones cada 5 segundos y guarda una cola mínima local
+ * para reintentar cuando vuelve la conexión.
  */
 
-import { useEffect, useRef, useState } from 'react'
-import { MapPin, Navigation, AlertCircle } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { AlertCircle, Loader2, MapPin, Navigation } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -18,145 +19,337 @@ interface GpsTrackerProps {
   vehiculoId: string
   rutaId?: string
   compact?: boolean
+  autoStart?: boolean
 }
 
-export default function GpsTracker({ repartidorId, vehiculoId, rutaId, compact = false }: GpsTrackerProps) {
+type GPSPoint = {
+  lat: number
+  lng: number
+  timestamp: number
+}
+
+const MAX_QUEUE_POINTS = 100
+
+export default function GpsTracker({
+  repartidorId,
+  vehiculoId,
+  rutaId,
+  compact = false,
+  autoStart = false,
+}: GpsTrackerProps) {
   const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isTracking, setIsTracking] = useState(false)
+  const [isStarting, setIsStarting] = useState(false)
   const [lastSent, setLastSent] = useState<Date | null>(null)
+
   const watchIdRef = useRef<number | null>(null)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
-  const currentPositionRef = useRef<{ lat: number; lng: number } | null>(null)
+  const currentPositionRef = useRef<GPSPoint | null>(null)
+  const flushInProgressRef = useRef(false)
+  const autoStartTriggeredRef = useRef(false)
 
-  // Solicitar permisos de ubicación
-  const startTracking = async () => {
-    if (!navigator.geolocation) {
-      setError('Geolocalización no está disponible en este dispositivo')
+  const queueStorageKey = `gps-queue:${repartidorId}:${vehiculoId}:${rutaId || 'sin-ruta'}`
+
+  const readQueue = useCallback((): GPSPoint[] => {
+    if (typeof window === 'undefined') return []
+
+    try {
+      const raw = window.localStorage.getItem(queueStorageKey)
+      if (!raw) return []
+
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed)
+        ? parsed.filter((item) => (
+          item &&
+          Number.isFinite(item.lat) &&
+          Number.isFinite(item.lng) &&
+          Number.isFinite(item.timestamp)
+        ))
+        : []
+    } catch (error) {
+      console.warn('[GpsTracker] No se pudo leer la cola local:', error)
+      return []
+    }
+  }, [queueStorageKey])
+
+  const writeQueue = useCallback((queue: GPSPoint[]) => {
+    if (typeof window === 'undefined') return
+
+    try {
+      const limitedQueue = queue.slice(-MAX_QUEUE_POINTS)
+      window.localStorage.setItem(queueStorageKey, JSON.stringify(limitedQueue))
+    } catch (error) {
+      console.warn('[GpsTracker] No se pudo guardar la cola local:', error)
+    }
+  }, [queueStorageKey])
+
+  const enqueueLocation = useCallback((point: GPSPoint) => {
+    const queue = readQueue()
+    queue.push(point)
+    writeQueue(queue)
+  }, [readQueue, writeQueue])
+
+  const postLocation = useCallback(async (point: GPSPoint) => {
+    const response = await fetch('/api/reparto/ubicacion', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        repartidorId,
+        vehiculoId,
+        rutaId,
+        lat: point.lat,
+        lng: point.lng,
+      }),
+    })
+
+    if (!response.ok) {
+      let message = 'Error al enviar ubicación'
+
+      try {
+        const data = await response.json()
+        message = data?.error || data?.message || message
+      } catch {
+        const text = await response.text().catch(() => '')
+        if (text) message = text
+      }
+
+      throw new Error(message)
+    }
+  }, [repartidorId, rutaId, vehiculoId])
+
+  const flushQueue = useCallback(async () => {
+    if (typeof window === 'undefined' || flushInProgressRef.current) {
+      return
+    }
+
+    if (!navigator.onLine) {
+      return
+    }
+
+    const queue = readQueue()
+    if (queue.length === 0) {
+      return
+    }
+
+    flushInProgressRef.current = true
+
+    try {
+      const pending = [...queue]
+
+      while (pending.length > 0) {
+        const point = pending[0]
+
+        try {
+          await postLocation(point)
+          pending.shift()
+          setLastSent(new Date(point.timestamp))
+          setError(null)
+        } catch (error: any) {
+          console.warn('[GpsTracker] Reintento de cola interrumpido:', error)
+          break
+        }
+      }
+
+      writeQueue(pending)
+    } finally {
+      flushInProgressRef.current = false
+    }
+  }, [postLocation, readQueue, writeQueue])
+
+  const sendOrQueueLocation = useCallback(async (point: GPSPoint) => {
+    if (!repartidorId || !vehiculoId) {
+      return
+    }
+
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      enqueueLocation(point)
+      setError('Sin conexión. Las ubicaciones quedan en cola para reintento.')
       return
     }
 
     try {
-      // Solicitar permiso
-      const permission = await navigator.permissions.query({ name: 'geolocation' })
-      if (permission.state === 'denied') {
-        setError('Permisos de ubicación denegados. Por favor, habilítalos en la configuración del navegador.')
-        return
+      await postLocation(point)
+      setLastSent(new Date(point.timestamp))
+      setError(null)
+      void flushQueue()
+    } catch (error: any) {
+      enqueueLocation(point)
+      setError(`Se guardó la ubicación para reintento: ${error?.message || 'error de red'}`)
+    }
+  }, [enqueueLocation, flushQueue, postLocation, repartidorId, vehiculoId])
+
+  const handlePosition = useCallback((pos: GeolocationPosition) => {
+    const currentPos: GPSPoint = {
+      lat: pos.coords.latitude,
+      lng: pos.coords.longitude,
+      timestamp: pos.timestamp,
+    }
+
+    currentPositionRef.current = currentPos
+    setPosition({ lat: currentPos.lat, lng: currentPos.lng })
+    setError(null)
+    setIsStarting(false)
+
+    return currentPos
+  }, [])
+
+  const handleGeoError = useCallback((err: GeolocationPositionError) => {
+    let message = 'Error de geolocalización'
+
+    switch (err.code) {
+      case err.PERMISSION_DENIED:
+        message = 'Permisos de ubicación denegados. Habilítalos en la configuración del navegador.'
+        break
+      case err.POSITION_UNAVAILABLE:
+        message = 'Ubicación no disponible. Verifica el GPS del dispositivo.'
+        break
+      case err.TIMEOUT:
+        message = 'Tiempo de espera agotado. Reintentando...'
+        break
+    }
+
+    setError(message)
+    setIsStarting(false)
+
+    if (err.code === err.PERMISSION_DENIED) {
+      if (watchIdRef.current !== null && navigator.geolocation) {
+        navigator.geolocation.clearWatch(watchIdRef.current)
+        watchIdRef.current = null
+      }
+
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+
+      setIsTracking(false)
+      currentPositionRef.current = null
+    }
+  }, [])
+
+  const startTracking = useCallback(async () => {
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      setError('Geolocalización no está disponible en este dispositivo')
+      return
+    }
+
+    if (isTracking || isStarting) {
+      return
+    }
+
+    setIsStarting(true)
+
+    try {
+      if (navigator.permissions) {
+        try {
+          const permission = await navigator.permissions.query({ name: 'geolocation' })
+          if (permission.state === 'denied') {
+            setError('Permisos de ubicación denegados. Habilítalos en la configuración del navegador.')
+            setIsStarting(false)
+            return
+          }
+        } catch {
+          // Algunos navegadores no soportan permissions.query
+        }
       }
 
       setIsTracking(true)
       setError(null)
 
-      // Obtener posición inicial
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          const currentPos = { lat: pos.coords.latitude, lng: pos.coords.longitude }
-          setPosition(currentPos)
-          currentPositionRef.current = currentPos
-          sendLocation(currentPos.lat, currentPos.lng)
+          const currentPos = handlePosition(pos)
+          void sendOrQueueLocation(currentPos)
         },
-        (err) => {
-          setError(`Error al obtener ubicación: ${err.message}`)
-          setIsTracking(false)
-        },
+        handleGeoError,
         {
           enableHighAccuracy: true,
           timeout: 10000,
-          maximumAge: 0
-        }
+          maximumAge: 0,
+        },
       )
 
-      // Iniciar watchPosition para actualizaciones continuas
       watchIdRef.current = navigator.geolocation.watchPosition(
-        (pos) => {
-          const currentPos = { lat: pos.coords.latitude, lng: pos.coords.longitude }
-          setPosition(currentPos)
-          currentPositionRef.current = currentPos
-        },
-        (err) => {
-          console.error('Error en watchPosition:', err)
-          setError(`Error al rastrear ubicación: ${err.message}`)
-        },
+        handlePosition,
+        handleGeoError,
         {
           enableHighAccuracy: true,
           timeout: 10000,
-          maximumAge: 5000 // Usar posición de máximo 5 segundos de antigüedad
-        }
+          maximumAge: 5000,
+        },
       )
 
-      // Enviar ubicación cada 5 segundos usando la ref para evitar problemas de closure
       intervalRef.current = setInterval(() => {
         if (currentPositionRef.current) {
-          sendLocation(currentPositionRef.current.lat, currentPositionRef.current.lng)
+          void sendOrQueueLocation(currentPositionRef.current)
         }
       }, 5000)
     } catch (err: any) {
       setError(`Error al iniciar tracking: ${err.message}`)
+      setIsStarting(false)
       setIsTracking(false)
     }
-  }
+  }, [handleGeoError, handlePosition, isStarting, isTracking, sendOrQueueLocation])
 
-  // Detener tracking
-  const stopTracking = () => {
-    if (watchIdRef.current !== null) {
+  const stopTracking = useCallback(() => {
+    if (watchIdRef.current !== null && navigator.geolocation) {
       navigator.geolocation.clearWatch(watchIdRef.current)
       watchIdRef.current = null
     }
+
     if (intervalRef.current) {
       clearInterval(intervalRef.current)
       intervalRef.current = null
     }
+
     setIsTracking(false)
+    setIsStarting(false)
     currentPositionRef.current = null
-  }
+  }, [])
 
-  // Enviar ubicación al servidor
-  const sendLocation = async (lat: number, lng: number) => {
-    try {
-      const response = await fetch('/api/reparto/ubicacion', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          repartidorId,
-          vehiculoId,
-          lat,
-          lng
-        })
-      })
-
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Error al enviar ubicación')
-      }
-
-      setLastSent(new Date())
-    } catch (err: any) {
-      console.error('Error al enviar ubicación:', err)
-      setError(`Error al enviar ubicación: ${err.message}`)
+  useEffect(() => {
+    const handleOnline = () => {
+      void flushQueue()
     }
-  }
 
-  // Limpiar al desmontar
+    window.addEventListener('online', handleOnline)
+    void flushQueue()
+
+    return () => {
+      window.removeEventListener('online', handleOnline)
+    }
+  }, [flushQueue])
+
+  useEffect(() => {
+    if (!autoStart || autoStartTriggeredRef.current || !repartidorId || !vehiculoId) {
+      return
+    }
+
+    autoStartTriggeredRef.current = true
+    void startTracking()
+  }, [autoStart, repartidorId, startTracking, vehiculoId])
+
   useEffect(() => {
     return () => {
       stopTracking()
     }
-  }, [])
+  }, [stopTracking])
 
-  // Modo compacto para vista mapa
   if (compact) {
     return (
       <div className="bg-white rounded-full shadow-lg p-2 flex items-center gap-2">
         {!isTracking ? (
           <Button
             size="sm"
-            onClick={startTracking}
+            onClick={() => void startTracking()}
+            disabled={isStarting}
             className="rounded-full h-10 w-10 p-0"
             title="Iniciar Tracking GPS"
           >
-            <Navigation className="h-5 w-5" />
+            {isStarting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Navigation className="h-5 w-5" />}
           </Button>
         ) : (
           <>
@@ -172,7 +365,7 @@ export default function GpsTracker({ repartidorId, vehiculoId, rutaId, compact =
               title="Detener Tracking"
             >
               <span className="sr-only">Detener</span>
-              ✕
+              ×
             </Button>
           </>
         )}
@@ -217,9 +410,18 @@ export default function GpsTracker({ repartidorId, vehiculoId, rutaId, compact =
 
         <div className="flex items-center gap-2">
           {!isTracking ? (
-            <Button onClick={startTracking} className="w-full">
-              <Navigation className="mr-2 h-4 w-4" />
-              Iniciar Tracking
+            <Button onClick={() => void startTracking()} className="w-full" disabled={isStarting}>
+              {isStarting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Iniciando...
+                </>
+              ) : (
+                <>
+                  <Navigation className="mr-2 h-4 w-4" />
+                  Iniciar Tracking
+                </>
+              )}
             </Button>
           ) : (
             <>
@@ -242,4 +444,3 @@ export default function GpsTracker({ repartidorId, vehiculoId, rutaId, compact =
     </Card>
   )
 }
-

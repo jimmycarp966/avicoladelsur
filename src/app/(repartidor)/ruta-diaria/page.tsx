@@ -59,8 +59,8 @@ export default async function RutaDiariaPage() {
   return (
     <div className="space-y-6 p-4 pb-20">
       <div className="rounded-lg border border-border bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Rutas</h1>
-        <p className="mt-2 text-muted-foreground">Todas las rutas asignadas</p>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">Rutas del día</h1>
+        <p className="mt-2 text-muted-foreground">Todas las rutas asignadas para hoy</p>
       </div>
 
       {rutasConResumen.length === 0 ? (
@@ -138,14 +138,14 @@ export default async function RutaDiariaPage() {
                       <Button asChild className="flex-1">
                         <Link href={`/ruta/${ruta.id}`}>
                           <MapPin className="mr-2 h-4 w-4" />
-                          Ver ruta
+                          Abrir ruta
                         </Link>
                       </Button>
                       {ruta.estado === 'planificada' && !ruta.checklist_inicio_id && (
                         <Button variant="outline" asChild className="flex-1">
                           <Link href="/checkin">
                             <CheckCircle className="mr-2 h-4 w-4" />
-                            Check-in
+                            Completar check-in
                           </Link>
                         </Button>
                       )}

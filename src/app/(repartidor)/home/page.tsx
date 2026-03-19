@@ -3,6 +3,7 @@ import {
   CheckCircle2,
   CheckSquare,
   Clock,
+  Package,
   Navigation,
 } from 'lucide-react'
 
@@ -120,15 +121,24 @@ export default async function RepartidorDashboard() {
                 <Button asChild className="flex-1">
                   <Link href={`/ruta/${rutaActiva.ruta_id}`}>
                     <Navigation className="mr-2 h-4 w-4" />
-                    Ver ruta
+                    Abrir ruta
                   </Link>
                 </Button>
-                <Button variant="outline" asChild className="flex-1">
-                  <Link href={`/ruta/${rutaActiva.ruta_id}`}>
-                    <CheckSquare className="mr-2 h-4 w-4" />
-                    Check-in
-                  </Link>
-                </Button>
+                {rutaActiva.estado === 'planificada' && !rutaActiva.checklist_inicio_id ? (
+                  <Button variant="outline" asChild className="flex-1">
+                    <Link href="/checkin">
+                      <CheckSquare className="mr-2 h-4 w-4" />
+                      Completar check-in
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button variant="outline" asChild className="flex-1">
+                    <Link href="/entregas">
+                      <Package className="mr-2 h-4 w-4" />
+                      Ver entregas
+                    </Link>
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>

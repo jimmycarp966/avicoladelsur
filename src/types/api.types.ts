@@ -247,6 +247,8 @@ export interface RutaActivaResponse {
   numero_ruta: string
   fecha_ruta: string
   estado: string
+  checklist_inicio_id?: string | null
+  checklist_fin_id?: string | null
   vehiculo: {
     patente: string
     marca?: string

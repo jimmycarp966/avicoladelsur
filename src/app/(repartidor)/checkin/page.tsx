@@ -115,14 +115,14 @@ export default async function CheckinPage() {
                 {ruta.estado === 'planificada' && (
                   <Button asChild>
                     <Link href={`/ruta/${ruta.id}`}>
-                      Iniciar Ruta
+                      Abrir hoja de ruta
                     </Link>
                   </Button>
                 )}
                 {ruta.estado === 'en_curso' && (
                   <Button asChild>
                     <Link href={`/ruta/${ruta.id}`}>
-                      Ver Hoja de Ruta
+                      Continuar ruta
                     </Link>
                   </Button>
                 )}
@@ -154,7 +154,7 @@ export default async function CheckinPage() {
             <div className="flex gap-2">
               <Button asChild>
                 <Link href={`/ruta/${ruta.id}`}>
-                  Ver Hoja de Ruta
+                  {ruta.estado === 'en_curso' ? 'Continuar ruta' : 'Ver hoja de ruta'}
                 </Link>
               </Button>
               <Button variant="outline" asChild>

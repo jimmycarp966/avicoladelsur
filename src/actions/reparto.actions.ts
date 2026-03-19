@@ -517,8 +517,8 @@ export async function finalizarRutaAction(
     const entregasExpandidas = await obtenerEntregasExpandidasRuta(supabase, rutaId)
     const resumenRuta = resumirEntregasRuta(entregasExpandidas)
 
-    if (resumenRuta.pendientes > 0) {
-      throw new Error('No se puede finalizar la ruta. Todas las entregas deben estar completas.')
+    if (resumenRuta.pendientes > 0 || resumenRuta.sinEstadoPago.length > 0) {
+      throw new Error('No se puede finalizar la ruta. Todas las entregas deben estar completas y con estado de pago definido.')
     }
 
     const { data: ruta, error: rutaError } = await supabase
@@ -906,36 +906,59 @@ export async function obtenerRutaActivaAction(
 ): Promise<ApiResponse<RutaActivaResponse | null>> {
   try {
     const supabase = await createClient()
-
-    // Buscar ruta activa del repartidor
-    const { data: ruta, error: rutaError } = await supabase
-      .from('rutas_reparto')
-      .select(`
+    const fechaHoy = getTodayArgentina()
+    const selectRutaActiva = `
         id,
         numero_ruta,
         fecha_ruta,
         estado,
+        checklist_inicio_id,
+        checklist_fin_id,
         distancia_estimada_km,
         vehiculo:vehiculos (
           patente,
           marca,
           modelo
         )
-      `)
+      `
+
+    // Buscar ruta en curso del día antes que la planificada
+    const { data: rutaEnCurso, error: rutaEnCursoError } = await supabase
+      .from('rutas_reparto')
+      .select(selectRutaActiva)
       .eq('repartidor_id', repartidorId)
-      .in('estado', ['planificada', 'en_curso'])
-      .order('fecha_ruta', { ascending: false })
+      .eq('fecha_ruta', fechaHoy)
+      .eq('estado', 'en_curso')
+      .order('updated_at', { ascending: false })
       .limit(1)
       .maybeSingle()
 
     console.log('🔍 [ACTION DEBUG] obtenerRutaActivaAction:', {
       repartidorId,
-      rutaId: ruta?.id,
-      estado: ruta?.estado,
-      error: rutaError?.message
+      fechaHoy,
+      rutaEnCursoId: rutaEnCurso?.id,
+      rutaEnCursoEstado: rutaEnCurso?.estado,
+      error: rutaEnCursoError?.message
     })
 
-    if (rutaError && rutaError.code !== 'PGRST116') throw rutaError
+    if (rutaEnCursoError && rutaEnCursoError.code !== 'PGRST116') throw rutaEnCursoError
+
+    let ruta = rutaEnCurso
+
+    if (!ruta) {
+      const { data: rutaPlanificada, error: rutaPlanificadaError } = await supabase
+        .from('rutas_reparto')
+        .select(selectRutaActiva)
+        .eq('repartidor_id', repartidorId)
+        .eq('fecha_ruta', fechaHoy)
+        .eq('estado', 'planificada')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (rutaPlanificadaError && rutaPlanificadaError.code !== 'PGRST116') throw rutaPlanificadaError
+      ruta = rutaPlanificada
+    }
 
     if (!ruta) {
       return {
@@ -960,6 +983,8 @@ export async function obtenerRutaActivaAction(
         numero_ruta: ruta.numero_ruta,
         fecha_ruta: ruta.fecha_ruta,
         estado: ruta.estado,
+        checklist_inicio_id: ruta.checklist_inicio_id || null,
+        checklist_fin_id: ruta.checklist_fin_id || null,
         vehiculo: {
           patente: vehiculoData?.patente || 'N/A',
           marca: vehiculoData?.marca || '',

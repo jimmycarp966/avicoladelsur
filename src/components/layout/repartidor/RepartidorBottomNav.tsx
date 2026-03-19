@@ -25,7 +25,7 @@ const navigation = [
     id: 'checkin',
   },
   {
-    name: 'Ruta',
+    name: 'Ruta diaria',
     href: '/ruta-diaria',
     icon: MapPin,
     id: 'ruta',

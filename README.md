@@ -91,7 +91,7 @@
 ### 🚛 Logística Avanzada (TMS)
 - **Navegación Interactiva**: App de repartidor con selección de rutas alternativas en tiempo real (OpenRouteService con datos OSM actualizados).
 - **Decisión Inteligente**: Priorización automática de próximo cliente basada en horario de cierre y distancia.
-- **PWA Offline-First**: Tracking GPS continuo (cada 5s), firma digital y cobros sin conexión.
+- **PWA del repartidor**: GPS auto-start cuando la ruta está en curso, tracking continuo cada 5s y cola local mínima para reintentar ubicaciones. Firma/cobros no tienen offline completo.
 - **Voz Sintética**: Instrucciones de navegación "Turn-by-turn" integradas en la app.
 - **Alertas Automáticas**: Detección de desvíos (>200m) y clientes saltados (<100m) en tiempo real.
 
@@ -186,12 +186,12 @@
 - **Formularios**: React Hook Form + Zod validation
 - **Tablas**: TanStack Table (paginación, filtros, sorting)
 - **PDF**: pdfkit + Supabase Storage
-- **GPS**: Navigator API + polling cada 5s
+- **GPS**: Navigator API + polling cada 5s con auto-start y cola mínima de reintentos
 - **Optimización**: OpenRouteService (ORS) con fallback a Google/local
 
 ### Estructura Modular
 - **App Admin**: Backoffice (`src/app/(admin)`), con layout + sidebar.
-- **App Repartidor**: PWA móvil (`src/app/(repartidor)`), tracking GPS y entregas.
+- **App Repartidor**: PWA móvil (`src/app/(repartidor)`) con rutas operativas `/home`, `/checkin`, `/ruta-diaria`, `/ruta/[ruta_id]`, `/entregas` y `/perfil`.
 - **App Sucursal**: POS y panel local (`src/app/sucursal`).
 - **Bot Vendedor**: Endpoint principal (`POST /api/bot`) + webhook Meta (`/api/webhooks/whatsapp-meta`, opcional).
 - **Catálogo Público**: Sin autenticación (`src/app/catalogo`), sincronizado con WhatsApp.
@@ -352,18 +352,19 @@ scripts/                         # Scripts de automatización
 - **Reserva automática**: FIFO inteligente al crear presupuestos
 - **Confirmación explícita**: SÍ/NO obligatorio antes de procesar
 
-### 📱 **PWA Móvil Completa para Repartidores**
-- **App nativa-like**: Dashboard, entregas, GPS tracking
-- **Hoja ruta digital**: `/repartidor/ruta/[ruta_id]` con optimización visual
-- **GPS tracking**: Envío automático cada 5s durante reparto activo
-- **Registro de pagos**: 5 estados disponibles:
-  - "Ya pagó" (monto completo)
-  - "Pendiente de pago" (método definido)
-  - "Pagará después" (sin método)
-  - "Pagó parcialmente" (monto parcial con saldo)
-  - "Rechazó el pedido" (con motivo de rechazo)
-- **Pago obligatorio**: Se requiere registrar estado de pago ANTES de marcar como entregado
-- **Validación requerida**: Todas las entregas deben tener estado de pago definido antes de finalizar ruta
+  ### 📱 **PWA Móvil Completa para Repartidores**
+  - **App nativa-like**: Dashboard, entregas, GPS tracking
+  - **Hoja ruta digital**: `/ruta/[ruta_id]` con vista lista por defecto y mapa secundario
+  - **GPS tracking**: Auto-start cuando la ruta está en curso y cola local mínima para reintentos de ubicaciones
+  - **Registro de pagos**: 5 estados disponibles:
+    - `pagado`
+    - `pagara_despues`
+    - `parcial`
+    - `cuenta_corriente`
+    - `rechazado`
+    - `pendiente` queda solo como alias legacy de `pagara_despues`
+  - **Pago obligatorio**: Se requiere registrar estado de pago ANTES de marcar como entregado
+  - **Validación requerida**: Todas las entregas deben tener estado de pago definido antes de finalizar ruta
 - **Firma digital**: QR verificación + subida automática a Storage
 
 ### 🗺️ **Optimización de Rutas Híbrida**
@@ -405,7 +406,8 @@ scripts/                         # Scripts de automatización
   - Pagos se acreditan automáticamente en Caja Central
   - Botón "Desbloquear Cliente" para casos especiales
 - **Facturas con Estado de Pago**:
-  - Estados: `pendiente`, `parcial`, `pagada`, `anulada`
+  - Estados de cobro: `pagado`, `pagara_despues`, `parcial`, `cuenta_corriente`, `rechazado`
+  - `pendiente` queda solo como alias legacy de `pagara_despues`
   - Trigger automático actualiza estado según pagos recibidos
   - Tabla visual con badges y colores por estado
 - **Sistema de Moras** (integrado en `/tesoreria/cuentas-corrientes`):
@@ -544,7 +546,7 @@ Cada entrega representa la porción específica de un pedido para un cliente ind
 - `direccion`, `coordenadas` (ubicación histórica)
 - `orden_entrega` (secuencia en la ruta)
 - `estado_entrega` ('pendiente', 'en_camino', 'entregado', 'fallido', 'parcial')
-- `estado_pago` ('pendiente', 'parcial', 'pagado', 'fiado')
+- `estado_pago` ('pagado', 'pagara_despues', 'parcial', 'cuenta_corriente', 'rechazado')
 - `metodo_pago`, `monto_cobrado`, `referencia_pago`
 - `pago_validado` (control de tesorería)
 
@@ -577,12 +579,12 @@ Resultado: 1 Pedido (XYZ) con 3 Entregas (A, B, C) en 1 ruta
 - **Cobros por cliente**: Cada entrega tiene su propio estado de pago
 - **Referencias únicas**: `PAY-YYYYMMDD-XXXXXX` por entrega
 - **Métodos de pago flexibles**: efectivo, transferencia, QR, tarjeta, cuenta corriente
-- **Estados detallados**: pendiente → pagado/parcial/fiado con montos precisos
+- **Estados detallados**: `pagado`, `pagara_despues`, `parcial`, `cuenta_corriente`, `rechazado` con montos precisos
 - **Cuenta corriente individual**: Cada cliente mantiene su saldo independiente
 
 #### 📊 **Vista Administrativa Mejorada**
 - **Lista de entregas por pedido**: Expansible con detalles por cliente
-- **Resumen de cobros**: Total cobrado vs pendiente vs fiado
+- **Resumen de cobros**: Total cobrado vs por cobrar vs cuenta corriente
 - **Estado de cierre**: Pedidos abiertos vs cerrados automáticamente
 - **Navegación intuitiva**: De pedido → entregas → clientes individuales
 
@@ -640,7 +642,7 @@ SELECT * FROM fn_obtener_entregas_pedido('uuid-pedido');
 #### 📱 **Experiencia del Repartidor**
 - **Hoja de ruta clara** con orden de entregas
 - **Registro simple** de cobros por cliente
-- **Estados flexibles** (pagado/parcial/fiado) por entrega
+- **Estados flexibles** (`pagado`, `pagara_despues`, `parcial`, `cuenta_corriente`, `rechazado`) por entrega
 - **Validación automática** antes de finalizar ruta
 
 #### 📊 **Gestión Administrativa**
@@ -694,24 +696,26 @@ POST /api/almacen/presupuestos/convertir-masivo
 # Resultado: 1 pedido con 2 entregas
 ```
 
-#### 3. **Registro de Cobros (Repartidor)**
-```bash
-# Cobrar al cliente A
-POST /api/entregas/registrar-cobro
-{
-  "entrega_id": "uuid-entrega-a",
-  "metodo_pago": "efectivo",
-  "monto_cobrado": 2500.00
-}
-
-# Cliente B pagará después
-POST /api/entregas/registrar-cobro
-{
-  "entrega_id": "uuid-entrega-b",
-  "metodo_pago": "cuenta_corriente",
-  "monto_cobrado": 0
-}
-```
+  #### 3. **Registro de Cobros (Repartidor)**
+  ```bash
+  # Cobrar al cliente A
+  POST /api/reparto/entrega
+  {
+    "pedido_id": "uuid-pedido-a",
+    "estado_pago": "pagado",
+    "metodo_pago": "efectivo",
+    "monto_cobrado": 2500.00
+  }
+  
+  # Cliente B pagará después
+  POST /api/reparto/entrega
+  {
+    "pedido_id": "uuid-pedido-b",
+    "estado_pago": "pagara_despues",
+    "metodo_pago": "cuenta_corriente",
+    "monto_cobrado": 0
+  }
+  ```
 
 #### 4. **Validación de Tesorería**
 ```bash
@@ -724,24 +728,22 @@ POST /api/tesoreria/validar-entregas
 }
 ```
 
-### Endpoints Nuevos
+  ### Endpoints Nuevos
+  
+  | Método | Endpoint | Descripción |
+  |--------|----------|-------------|
+  | `POST` | `/api/reparto/entrega` | Registrar entrega y estado de pago |
+  | `POST` | `/api/reparto/devoluciones` | Registrar devoluciones |
+  | `POST` | `/api/tesoreria/validar-entregas` | Validar cobros de entregas |
+  | `GET` | `/api/tesoreria/pedidos-pendientes-validacion` | Pedidos pendientes de validación |
 
-| Método | Endpoint | Descripción |
-|--------|----------|-------------|
-| `GET` | `/api/entregas/pedido/[pedido_id]` | Lista entregas de un pedido |
-| `GET` | `/api/entregas/[entrega_id]` | Detalle de entrega específica |
-| `POST` | `/api/entregas/registrar-cobro` | Registrar cobro de entrega |
-| `POST` | `/api/entregas/marcar-completada` | Marcar entrega como entregada |
-| `POST` | `/api/entregas/marcar-fallida` | Marcar entrega como fallida |
-| `GET` | `/api/entregas/resumen/[pedido_id]` | Resumen de entregas |
-| `POST` | `/api/tesoreria/validar-entregas` | Validar cobros de entregas |
-| `GET` | `/api/tesoreria/pedidos-pendientes-validacion` | Pedidos pendientes de validación |
+  > Los endpoints `/api/entregas/*` quedaron como legacy y no forman parte del flujo operativo actual.
 
-### Páginas Actualizadas
-
-- **`/almacen/pedidos/[id]`**: Nueva sección "Entregas del Pedido"
-- **`/repartidor/ruta/[ruta_id]/entrega/[entrega_id]`**: Formulario por cliente individual
-- **`/tesoreria/validar-rutas`**: Nueva opción para validar entregas por pedido
+  ### Páginas Actualizadas
+  
+  - **`/almacen/pedidos/[id]`**: Nueva sección "Entregas del Pedido"
+  - **`/ruta/[ruta_id]/entrega/[entrega_id]`**: Formulario por cliente individual
+  - **`/tesoreria/validar-rutas`**: Nueva opción para validar entregas por pedido
 
 ### Scripts de Prueba
 
@@ -974,7 +976,7 @@ URL: /almacen/presupuestos-dia
 - Pedido disponible para ruta
 
 # 5. Repartidor registra entrega
-URL: /repartidor/ruta/[ruta_id]/entrega/[entrega_id]
+URL: /ruta/[ruta_id]/entrega/[entrega_id]
 - Registrar cobro (múltiples métodos de pago)
 - Registrar devolución (si aplica)
 - Marcar como entregado
@@ -1120,7 +1122,7 @@ El hito intermedio incorpora la capa financiera básica y el sistema de validaci
 - ✅ Campos en BD: `detalles_ruta` tiene campos de tracking, `rutas_reparto` tiene campos de validación
 
 **Páginas relacionadas**:
-- `/repartidor/ruta/[ruta_id]/entrega/[entrega_id]` - Registro de pagos por repartidor
+  - `/ruta/[ruta_id]/entrega/[entrega_id]` - Registro de pagos por repartidor
 - `/tesoreria/validar-rutas` - Validación de rutas por tesorero
 - `/reparto/rutas/[id]` - Vista detalle con estado de validación
 
@@ -1222,12 +1224,12 @@ Sistema de autenticación basado en Supabase Auth con 4 roles:
 - Gestión completa de todos los módulos
 - Reportes y estadísticas
 
-### PWA Repartidor
-- Hoja de ruta digital con orden optimizado
-- **Tracking GPS en tiempo real** (envío cada 5 segundos)
-- Firma digital y QR
-- Modo offline básico
-- **Visualización de ruta optimizada en mapa**
+  ### PWA Repartidor
+  - Hoja de ruta digital con orden optimizado
+  - **Tracking GPS en tiempo real** con auto-start en rutas `en_curso` y cola local mínima para reintentos de ubicaciones
+  - Firma digital y QR
+  - Modo offline básico
+  - **Visualización de ruta optimizada en mapa**
 
 ### Bot Vendedor ✅ (FUNCIONANDO)
 - ✅ Toma de pedidos vía WhatsApp con validación de stock en tiempo real
@@ -1416,8 +1418,8 @@ Ver la guía completa en [`docs/GOOGLE_MAPS_SETUP.md`](./docs/GOOGLE_MAPS_SETUP.
 - Controla qué rutas existen cada día y su capacidad disponible (vehículos base: Fiat Fiorino 600 kg, Toyota Hilux 1500 kg, Ford F-4000 4000 kg)
 
 **Repartidor:**
-- `/repartidor/ruta/[ruta_id]` - Hoja de ruta con GPS tracker integrado
-- Componente `GpsTracker` envía ubicaciones automáticamente cuando la ruta está en curso
+  - `/ruta/[ruta_id]` - Hoja de ruta con GPS tracker integrado
+  - Componente `GpsTracker` auto-arranca cuando la ruta está en `en_curso` y reintenta ubicaciones en una cola local mínima
 
 ### Generación de Datos Mock para Monitor GPS
 
@@ -1461,8 +1463,8 @@ Sistema completo para generar datos de prueba (rutas, clientes, vehículos, ubic
 # Navegar a: http://localhost:3000/reparto/monitor
 
 # 3. Abrir PWA repartidor
-# Navegar a: http://localhost:3000/repartidor/ruta/[ruta_id]
-# Iniciar tracking GPS desde el componente
+# Navegar a: http://localhost:3000/ruta/[ruta_id]
+# El GPS se auto-inicia si la ruta está en curso
 
 # 4. Verificar alertas
 curl http://localhost:3000/api/reparto/alertas

@@ -36,7 +36,7 @@ interface RutaHojaContentProps {
 
 export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
   const router = useRouter()
-  const [vistaActual, setVistaActual] = useState<'mapa' | 'lista'>('mapa')
+  const [vistaActual, setVistaActual] = useState<'mapa' | 'lista'>('lista')
   const [showChecklistInicio, setShowChecklistInicio] = useState(false)
   const [showChecklistFin, setShowChecklistFin] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -225,6 +225,7 @@ export function RutaHojaContent({ ruta }: RutaHojaContentProps) {
             repartidorId={ruta.repartidor_id}
             vehiculoId={ruta.vehiculo_id}
             rutaId={ruta.id}
+            autoStart={ruta.estado === 'en_curso'}
           />
         </div>
       )}

@@ -192,7 +192,7 @@ export function RutaMapaContent({ ruta }: RutaMapaContentProps) {
         isReady: isGpsReady,
         isTracking: isGpsTracking
     } = useLocationTracker({
-        autoStart: true,
+        autoStart: ruta.estado === 'en_curso',
         repartidorId: ruta.repartidor_id,
         vehiculoId: ruta.vehiculo_id,
         rutaId: ruta.id,
@@ -763,7 +763,7 @@ export function RutaMapaContent({ ruta }: RutaMapaContentProps) {
                 )}
 
                 {/* GPS Tracker flotante */}
-                {ruta.estado === 'en_curso' && (
+                {ruta.estado === 'en_curso' && !isGpsTracking && !isGpsLoading && (
                     <div className="absolute top-2 right-2 z-10">
                         <GpsTracker
                             repartidorId={ruta.repartidor_id}

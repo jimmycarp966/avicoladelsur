@@ -21,7 +21,7 @@ import {
 
 import { actualizarEstadoEntrega } from '@/actions/reparto.actions'
 import { createClient } from '@/lib/supabase/client'
-import { normalizarEstadoPago, tieneEstadoPagoDefinido } from '@/lib/utils/estado-pago'
+import { normalizarEstadoPago, tieneEstadoPagoDefinido, type EstadoPagoType } from '@/lib/utils/estado-pago'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -43,12 +43,7 @@ interface EntregaDetalleContentProps {
 }
 
 type EstadoPagoForm =
-  | 'pagado'
-  | 'pendiente'
-  | 'pagara_despues'
-  | 'parcial'
-  | 'rechazado'
-  | 'cuenta_corriente'
+  | Exclude<EstadoPagoType, 'pendiente'>
   | ''
 
 const motivosDevolucion = [
@@ -75,7 +70,7 @@ export function EntregaDetalleContent({ entrega, resumenCuenta }: EntregaDetalle
   const productos = agruparProductos(pedido?.detalle_pedido || [])
   const entregaEsAgrupada = Boolean(entrega.detalle_ruta_id_padre || entrega.es_pedido_agrupado)
   const facturasPendientes = resumenCuenta?.facturas_pendientes || []
-  const estadoPagoInicial = normalizarEstadoPago(entrega)
+  const estadoPagoInicial = normalizarEstadoPago(entrega) as Exclude<EstadoPagoType, 'pendiente'> | null
 
   const [estadoPago, setEstadoPago] = useState<EstadoPagoForm>(estadoPagoInicial || '')
   const [metodoPago, setMetodoPago] = useState(entrega.metodo_pago_registrado || 'efectivo')
@@ -84,7 +79,7 @@ export function EntregaDetalleContent({ entrega, resumenCuenta }: EntregaDetalle
     String(entrega.monto_cobrado_registrado || pedido?.total || ''),
   )
   const [montoParcial, setMontoParcial] = useState(
-    entrega.estado_pago === 'parcial' ? String(entrega.monto_cobrado_registrado || '') : '',
+    estadoPagoInicial === 'parcial' ? String(entrega.monto_cobrado_registrado || '') : '',
   )
   const [numeroTransaccion, setNumeroTransaccion] = useState(entrega.numero_transaccion_registrado || '')
   const [comprobanteFile, setComprobanteFile] = useState<File | null>(null)
@@ -110,7 +105,7 @@ export function EntregaDetalleContent({ entrega, resumenCuenta }: EntregaDetalle
   const estadoPagoDefinido = tieneEstadoPagoDefinido({
     ...entrega,
     estado_pago: estadoPago || entrega.estado_pago,
-    metodo_pago_registrado: estadoPago === 'pendiente' ? metodoPagoFuturo : metodoPago,
+    metodo_pago_registrado: estadoPago === 'pagara_despues' ? metodoPagoFuturo : metodoPago,
     monto_cobrado_registrado: estadoPago === 'parcial'
       ? Number(montoParcial || 0)
       : Number(montoCobrado || entrega.monto_cobrado_registrado || 0),
@@ -172,11 +167,6 @@ export function EntregaDetalleContent({ entrega, resumenCuenta }: EntregaDetalle
         requestBody.append('monto_cobrado', '0')
         requestBody.append('monto_cuenta_corriente', String(totalPedido))
         requestBody.append('es_cuenta_corriente', 'true')
-      }
-
-      if (estadoPago === 'pendiente') {
-        requestBody.append('metodo_pago', metodoPagoFuturo)
-        requestBody.append('monto_cobrado', '0')
       }
 
       if (estadoPago === 'pagara_despues') {
@@ -436,7 +426,6 @@ export function EntregaDetalleContent({ entrega, resumenCuenta }: EntregaDetalle
                   <option value="pagado">Pago total</option>
                   <option value="cuenta_corriente">Todo a cuenta corriente</option>
                   <option value="parcial">Pago parcial + resto a cuenta corriente</option>
-                  <option value="pendiente">Pendiente con metodo definido</option>
                   <option value="pagara_despues">Pagará después</option>
                   <option value="rechazado">Rechazo el pedido</option>
                 </select>
@@ -616,7 +605,7 @@ export function EntregaDetalleContent({ entrega, resumenCuenta }: EntregaDetalle
                 </div>
               )}
 
-              {estadoPago === 'pendiente' && (
+              {estadoPago === 'pagara_despues' && (
                 <div className="space-y-1">
                   <Label>Metodo previsto</Label>
                   <select

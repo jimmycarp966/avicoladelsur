@@ -27,18 +27,28 @@ const ESTADOS_ENTREGA_TERMINALES = new Set(['entregado', ...ESTADOS_ENTREGA_NEGA
 const ESTADOS_PAGO_RESUELTOS = new Set<EstadoPagoType>(['pagado', 'cuenta_corriente', 'parcial'])
 const ESTADOS_PAGO_DEFINIDOS = new Set<EstadoPagoType>([
   'pagado',
-  'pendiente',
   'pagara_despues',
   'parcial',
   'cuenta_corriente',
   'rechazado',
 ])
 
+const ALIAS_ESTADOS_PAGO: Record<string, Exclude<EstadoPagoType, 'pendiente'>> = {
+  pago_parcial: 'parcial',
+  fiado: 'cuenta_corriente',
+  pendiente: 'pagara_despues',
+}
+
 function tieneNotaPagaraDespues(notasPago?: string | null) {
   const notas = notasPago?.toLowerCase() || ''
+
   return (
+    notas.includes('pagara despues') ||
+    notas.includes('pagará despues') ||
+    notas.includes('pagara después') ||
     notas.includes('pagará después') ||
-    notas.includes('pagará después.')
+    notas.includes('pagar despues') ||
+    notas.includes('pagar después')
   )
 }
 
@@ -57,33 +67,48 @@ export function normalizarEstadoPago(entrega: EntregaConEstadoPago): EstadoPagoT
     return 'rechazado'
   }
 
-  const estadoPago = entrega.estado_pago
+  const estadoPago = entrega.estado_pago?.trim().toLowerCase() || null
   const metodoPago = entrega.metodo_pago_registrado || entrega.metodo_pago
   const montoCobrado = Number(
     entrega.monto_cobrado_registrado ?? entrega.monto_cobrado ?? 0,
   )
-  const pagoEstadoPedido = entrega.pedido?.pago_estado
+  const pagoEstadoPedido = entrega.pedido?.pago_estado?.trim().toLowerCase() || null
   const notaPagaraDespues = tieneNotaPagaraDespues(entrega.notas_pago)
 
-  if (estadoPago === 'pago_parcial') return 'parcial'
-  if (estadoPago === 'fiado') return 'cuenta_corriente'
-  if (
-    estadoPago === 'pagado' ||
-    estadoPago === 'parcial' ||
-    estadoPago === 'cuenta_corriente' ||
-    estadoPago === 'rechazado'
-  ) {
-    return estadoPago
-  }
-  if (estadoPago === 'pagara_despues' || (estadoPago === 'pendiente' && notaPagaraDespues)) {
-    return 'pagara_despues'
-  }
-  if (estadoPago === 'pendiente' && Boolean(metodoPago)) {
-    return 'pendiente'
+  if (!estadoPago && !metodoPago && !montoCobrado && !pagoEstadoPedido && !notaPagaraDespues) {
+    return null
   }
 
-  if (metodoPago === 'cuenta_corriente' || pagoEstadoPedido === 'cuenta_corriente') {
+  const estadoPagoCanonico = estadoPago ? ALIAS_ESTADOS_PAGO[estadoPago] ?? estadoPago : null
+  const pagoEstadoPedidoCanonico = pagoEstadoPedido
+    ? ALIAS_ESTADOS_PAGO[pagoEstadoPedido] ?? pagoEstadoPedido
+    : null
+
+  if (estadoPagoCanonico === 'pagado' || pagoEstadoPedidoCanonico === 'pagado') {
+    return 'pagado'
+  }
+
+  if (estadoPagoCanonico === 'parcial' || pagoEstadoPedidoCanonico === 'parcial') {
+    return 'parcial'
+  }
+
+  if (
+    estadoPagoCanonico === 'cuenta_corriente' ||
+    metodoPago === 'cuenta_corriente' ||
+    pagoEstadoPedidoCanonico === 'cuenta_corriente'
+  ) {
     return 'cuenta_corriente'
+  }
+
+  if (
+    estadoPagoCanonico === 'rechazado' ||
+    pagoEstadoPedidoCanonico === 'rechazado'
+  ) {
+    return 'rechazado'
+  }
+
+  if (estadoPagoCanonico === 'pagara_despues' || pagoEstadoPedidoCanonico === 'pagara_despues') {
+    return 'pagara_despues'
   }
 
   const total = Number(entrega.pedido?.total ?? entrega.total ?? 0)
@@ -91,7 +116,7 @@ export function normalizarEstadoPago(entrega: EntregaConEstadoPago): EstadoPagoT
     return 'parcial'
   }
 
-  if (montoCobrado > 0 || pagoEstadoPedido === 'pagado') {
+  if (montoCobrado > 0) {
     return 'pagado'
   }
 
@@ -100,15 +125,15 @@ export function normalizarEstadoPago(entrega: EntregaConEstadoPago): EstadoPagoT
   }
 
   if (metodoPago) {
-    return 'pendiente'
+    return 'pagara_despues'
   }
 
-  if (
-    estadoPago &&
-    estadoPago !== 'pendiente' &&
-    ESTADOS_PAGO_DEFINIDOS.has(estadoPago as EstadoPagoType)
-  ) {
-    return estadoPago as EstadoPagoType
+  if (estadoPagoCanonico && ESTADOS_PAGO_DEFINIDOS.has(estadoPagoCanonico as EstadoPagoType)) {
+    return estadoPagoCanonico as EstadoPagoType
+  }
+
+  if (estadoPago === 'pendiente') {
+    return 'pagara_despues'
   }
 
   return null
@@ -172,9 +197,8 @@ export function getEstadoPagoLabel(entrega: EntregaConEstadoPago): string {
   switch (estadoPago) {
     case 'pagado':
       return 'Pagado'
-    case 'pendiente':
-      return 'Pendiente'
     case 'pagara_despues':
+    case 'pendiente':
       return 'Pagará después'
     case 'parcial':
       return 'Pago parcial'

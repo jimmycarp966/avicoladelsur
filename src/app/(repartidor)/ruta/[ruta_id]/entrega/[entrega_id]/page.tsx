@@ -4,6 +4,7 @@ import { createSignedStorageUrlServer } from '@/lib/supabase/storage-server'
 import { Card, CardContent } from '@/components/ui/card'
 import { Package } from 'lucide-react'
 import { EntregaDetalleContent } from './entrega-detalle-content'
+import { normalizarEstadoPago } from '@/lib/utils/estado-pago'
 
 export const dynamic = 'force-dynamic'
 
@@ -179,10 +180,12 @@ export default async function EntregaDetallePage({ params }: PageProps) {
       }
     }
 
-    if (entregaIndividual) {
-      // Validar relación con ruta a través del pedido
-      // Un pedido agrupado tiene UN detalle_ruta en esta ruta
-      const { data: detalleRutaPadre, error: errPadre } = await supabase
+      if (entregaIndividual) {
+        const estadoPagoNormalizado = normalizarEstadoPago(entregaIndividual)
+
+        // Validar relación con ruta a través del pedido
+        // Un pedido agrupado tiene UN detalle_ruta en esta ruta
+        const { data: detalleRutaPadre, error: errPadre } = await supabase
         .from('detalles_ruta')
         .select(`
                 id, ruta_id, orden_entrega, pago_registrado, monto_cobrado_registrado, metodo_pago_registrado,
@@ -263,12 +266,12 @@ export default async function EntregaDetallePage({ params }: PageProps) {
           fecha_hora_entrega: entregaIndividual.fecha_hora_entrega,
           // Usar orden_entrega de la entrega individual si existe, sino del padre
           orden_entrega: entregaIndividual.orden_entrega || (detalleRutaPadre as any).orden_entrega,
-          // Estado de pago: para entregas individuales (pedidos agrupados), 
-          // cada entrega tiene su propio estado de pago en la tabla entregas
-          // Considerar pagado si: pagó total, pagó parcial + cuenta corriente, o todo a cuenta corriente
-          pago_registrado: ['pagado', 'cuenta_corriente', 'parcial'].includes(entregaIndividual.estado_pago),
-          monto_cobrado_registrado: entregaIndividual.monto_cobrado || 0,
-          metodo_pago_registrado: entregaIndividual.metodo_pago,
+            // Estado de pago: para entregas individuales (pedidos agrupados), 
+            // cada entrega tiene su propio estado de pago en la tabla entregas
+            // Considerar definido si: pagó total, pago parcial, cuenta corriente o pago diferido
+            pago_registrado: ['pagado', 'cuenta_corriente', 'parcial', 'pagara_despues'].includes(estadoPagoNormalizado || ''),
+            monto_cobrado_registrado: entregaIndividual.monto_cobrado || 0,
+            metodo_pago_registrado: entregaIndividual.metodo_pago,
           numero_transaccion_registrado: entregaIndividual.numero_transaccion,
           comprobante_url_registrado: entregaIndividual.comprobante_url,
           comprobante_storage_path: entregaIndividual.comprobante_storage_path,
