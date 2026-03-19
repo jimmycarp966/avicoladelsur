@@ -110,10 +110,10 @@ export function SucursalSidebar({ className }: SucursalSidebarProps) {
   }
 
   return (
-    <div className={cn('fixed inset-y-0 left-0 z-50 w-64 bg-card border-r', className)}>
+    <div className={cn('fixed inset-y-0 left-0 z-50 w-[min(18rem,calc(100vw-1rem))] bg-card border-r lg:w-64', className)}>
       <div className="flex h-full flex-col">
         {/* Logo */}
-        <div className="flex h-16 items-center border-b px-6">
+        <div className="flex h-14 items-center border-b px-4 sm:h-16 sm:px-6">
           <Link href="/sucursal/dashboard" className="flex items-center gap-2">
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
               <Package className="w-5 h-5 text-primary-foreground" />
@@ -125,8 +125,8 @@ export function SucursalSidebar({ className }: SucursalSidebarProps) {
           </Link>
         </div>
 
-        <ScrollArea className="flex-1 px-3 py-4">
-          <nav className="space-y-6">
+        <ScrollArea className="flex-1 px-2 py-3 sm:px-3 sm:py-4">
+          <nav className="space-y-5 sm:space-y-6">
             {/* SECCIÓN 1: ACCIONES PRINCIPALES */}
             <div className="space-y-1">
               <p className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
@@ -141,7 +141,7 @@ export function SucursalSidebar({ className }: SucursalSidebarProps) {
                     <Button
                       variant={item.highlight && !isActive ? 'default' : isActive ? 'secondary' : 'ghost'}
                       className={cn(
-                        'w-full justify-start gap-3 h-12 px-3',
+                        'w-full justify-start gap-3 h-11 px-3 sm:h-12',
                         item.highlight && !isActive && 'bg-primary text-primary-foreground hover:bg-primary/90',
                         isActive && 'bg-secondary'
                       )}
@@ -174,7 +174,7 @@ export function SucursalSidebar({ className }: SucursalSidebarProps) {
                     <Button
                       variant={isActive ? 'secondary' : 'ghost'}
                       className={cn(
-                        'w-full justify-start gap-3 h-10 px-3',
+                        'w-full justify-start gap-3 h-9 px-3 sm:h-10',
                         isActive && 'bg-secondary'
                       )}
                     >
@@ -237,7 +237,7 @@ export function SucursalSidebar({ className }: SucursalSidebarProps) {
         </ScrollArea>
 
         {/* Footer simplificado */}
-        <div className="border-t p-4">
+        <div className="border-t p-4 sm:p-4">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
               <Package className="w-4 h-4" />

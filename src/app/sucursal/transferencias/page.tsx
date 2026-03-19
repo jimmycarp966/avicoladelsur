@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Truck, Plus, PackageCheck, ArrowRightLeft, AlertCircle, AlertTriangle, Building2 } from 'lucide-react'
+import { Truck, PackageCheck, ArrowRightLeft, AlertCircle, AlertTriangle, Building2 } from 'lucide-react'
 import Link from 'next/link'
 import { TransferenciasTable } from '@/components/sucursales/TransferenciasTable'
 import { TransferenciasPendientesRecepcion } from '@/components/sucursales/TransferenciasPendientesRecepcion'
@@ -44,11 +44,11 @@ async function getTransferenciasSucursal(sidParam?: string) {
         recibidas: 0,
         comoOrigen: 0,
         comoDestino: 0,
-        pendientesRecepcion: 0
+        pendientesRecepcion: 0,
       },
       sucursalId: '',
       sinSucursal: true,
-      esAdmin: true
+      esAdmin: true,
     }
   }
 
@@ -76,7 +76,7 @@ async function getTransferenciasSucursal(sidParam?: string) {
   }
 
   // Obtener transferencias pendientes de recepción (entregadas o en_ruta hacia esta sucursal)
-  const { data: pendientesRecepcion, error: pendientesError } = await supabase
+  const { data: pendientesRecepcion } = await supabase
     .from('transferencias_stock')
     .select(`
       *,
@@ -94,24 +94,23 @@ async function getTransferenciasSucursal(sidParam?: string) {
     .in('estado', ['entregado', 'en_ruta', 'en_transito'])
     .order('fecha_solicitud', { ascending: false })
 
-  // Calcular estadísticas con los nuevos estados
   const transferenciasList = transferencias || []
   const pendientesRecepcionList = pendientesRecepcion || []
-  
+
   const estadisticas = {
     total: transferenciasList.length,
-    pendientes: transferenciasList.filter(t => 
-      ['pendiente', 'solicitud', 'en_almacen', 'preparado'].includes(t.estado)
+    pendientes: transferenciasList.filter((t) =>
+      ['pendiente', 'solicitud', 'en_almacen', 'preparado'].includes(t.estado),
     ).length,
-    enTransito: transferenciasList.filter(t => 
-      ['en_transito', 'en_ruta', 'entregado'].includes(t.estado)
+    enTransito: transferenciasList.filter((t) =>
+      ['en_transito', 'en_ruta', 'entregado'].includes(t.estado),
     ).length,
-    recibidas: transferenciasList.filter(t => 
-      ['recibida', 'recibido'].includes(t.estado)
+    recibidas: transferenciasList.filter((t) =>
+      ['recibida', 'recibido'].includes(t.estado),
     ).length,
-    comoOrigen: transferenciasList.filter(t => t.sucursal_origen_id === sucursalId).length,
-    comoDestino: transferenciasList.filter(t => t.sucursal_destino_id === sucursalId).length,
-    pendientesRecepcion: pendientesRecepcionList.length
+    comoOrigen: transferenciasList.filter((t) => t.sucursal_origen_id === sucursalId).length,
+    comoDestino: transferenciasList.filter((t) => t.sucursal_destino_id === sucursalId).length,
+    pendientesRecepcion: pendientesRecepcionList.length,
   }
 
   return {
@@ -120,230 +119,241 @@ async function getTransferenciasSucursal(sidParam?: string) {
     estadisticas,
     sucursalId,
     sinSucursal: false,
-    esAdmin
+    esAdmin,
   }
+}
+
+type TransferenciasData = Awaited<ReturnType<typeof getTransferenciasSucursal>>
+
+function TransferenciasErrorState(error: unknown) {
+  return (
+    <div className="flex min-h-[400px] items-center justify-center">
+      <Card className="w-full max-w-md">
+        <CardContent className="pt-6">
+          <div className="text-center">
+            <Truck className="mx-auto mb-4 h-12 w-12 text-red-500" />
+            <h3 className="mb-2 text-lg font-semibold">Error al cargar transferencias</h3>
+            <p className="text-muted-foreground">
+              {error instanceof Error ? error.message : 'Error desconocido'}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function TransferenciasSinSucursalState() {
+  return (
+    <div className="flex min-h-[400px] items-center justify-center">
+      <Card className="w-full max-w-md border-amber-200 bg-amber-50">
+        <CardContent className="pt-6">
+          <div className="text-center">
+            <AlertTriangle className="mx-auto mb-4 h-12 w-12 text-amber-600" />
+            <h3 className="mb-2 text-lg font-semibold text-amber-900">
+              No hay sucursales activas
+            </h3>
+            <p className="mb-4 text-amber-800">
+              Como administrador, necesitas crear una sucursal antes de poder ver las transferencias.
+            </p>
+            <Button asChild>
+              <Link href="/sucursales/nueva">
+                <Building2 className="mr-2 h-4 w-4" />
+                Crear Primera Sucursal
+              </Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function TransferenciasContent(data: TransferenciasData, sucursalId: string) {
+  return (
+    <div className="space-y-6">
+      {sucursalId && <TransferenciasRealtime sucursalId={sucursalId} />}
+
+      {/* Header */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight sm:text-3xl">
+            <Truck className="h-8 w-8" />
+            Transferencias de Sucursal
+          </h1>
+          <p className="text-muted-foreground">
+            Gestiona transferencias de stock entre sucursales
+          </p>
+        </div>
+
+        <div className="rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">
+          <p className="mb-1 font-medium">💡 Solicitar Transferencias</p>
+          <p>Las transferencias deben ser solicitadas a través del administrador del sistema.</p>
+          <p>Contacte al administrador para solicitar movimientos de stock entre sucursales.</p>
+        </div>
+      </div>
+
+      {/* Estadísticas */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Transferencias</CardTitle>
+            <ArrowRightLeft className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{data.estadisticas.total}</div>
+            <p className="text-xs text-muted-foreground">Historial completo</p>
+          </CardContent>
+        </Card>
+
+        <Card className={data.estadisticas.pendientesRecepcion > 0 ? 'border-orange-300 bg-orange-50' : ''}>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Por Recibir</CardTitle>
+            <PackageCheck className="h-4 w-4 text-orange-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">{data.estadisticas.pendientesRecepcion}</div>
+            <p className="text-xs text-muted-foreground">Esperando tu confirmación</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">En Proceso</CardTitle>
+            <Truck className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">{data.estadisticas.enTransito}</div>
+            <p className="text-xs text-muted-foreground">En tránsito</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Completadas</CardTitle>
+            <Truck className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{data.estadisticas.recibidas}</div>
+            <p className="text-xs text-muted-foreground">Recibidas exitosamente</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Transferencias pendientes de recepción - Sección destacada */}
+      {data.pendientesRecepcion && data.pendientesRecepcion.length > 0 && (
+        <Card className="border-2 border-orange-300 bg-orange-50/50">
+          <CardHeader>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-orange-600" />
+                <CardTitle className="text-orange-700">Transferencias Pendientes de Recepción</CardTitle>
+              </div>
+              <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-300">
+                {data.pendientesRecepcion.length} pendiente(s)
+              </Badge>
+            </div>
+            <CardDescription>
+              Estas transferencias han llegado y requieren tu confirmación de recepción
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <TransferenciasPendientesRecepcion
+              transferencias={data.pendientesRecepcion}
+              sucursalId={data.sucursalId}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Lista de Transferencias */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Transferencias</CardTitle>
+          <CardDescription>
+            Historial de transferencias de tu sucursal (como origen y destino)
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Suspense
+            fallback={
+              <div className="space-y-4">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="flex animate-pulse items-center space-x-4 rounded-lg border p-4">
+                    <div className="h-10 w-10 rounded-full bg-muted" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 w-1/3 rounded bg-muted" />
+                      <div className="h-3 w-1/4 rounded bg-muted" />
+                    </div>
+                    <div className="h-8 w-20 rounded bg-muted" />
+                  </div>
+                ))}
+              </div>
+            }
+          >
+            <TransferenciasTable transferencias={data.transferencias} sucursalId={data.sucursalId} />
+          </Suspense>
+        </CardContent>
+      </Card>
+
+      {/* Información adicional */}
+      <Card>
+        <CardHeader>
+          <CardTitle>¿Cómo funcionan las transferencias?</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <h4 className="font-semibold">Proceso de Transferencia</h4>
+              <ol className="list-inside list-decimal space-y-1 text-sm text-muted-foreground">
+                <li>Casa Central crea la transferencia</li>
+                <li>Almacén prepara y pesa los productos</li>
+                <li>Se asigna a una ruta de reparto</li>
+                <li>Repartidor entrega en tu sucursal</li>
+                <li><strong>Tú confirmas la recepción</strong></li>
+                <li>Stock se actualiza automáticamente</li>
+              </ol>
+            </div>
+
+            <div className="space-y-2">
+              <h4 className="font-semibold">Estados de Transferencia</h4>
+              <ul className="space-y-1 text-sm text-muted-foreground">
+                <li>• <span className="text-blue-600">En Almacén</span>: En preparación</li>
+                <li>• <span className="text-purple-600">Preparado</span>: Listo para envío</li>
+                <li>• <span className="text-indigo-600">En Ruta</span>: En camino</li>
+                <li>• <span className="text-orange-600">Entregado</span>: Esperando tu confirmación</li>
+                <li>• <span className="text-green-600">Recibido</span>: Completada exitosamente</li>
+                <li>• <span className="text-red-600">Cancelada</span>: Transferencia cancelada</li>
+              </ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
 }
 
 export default async function SucursalTransferenciasPage({ searchParams }: PageProps) {
   const params = await searchParams
+
   try {
     const data = await getTransferenciasSucursal(params.sid)
 
-    // Si es admin sin sucursal, mostrar mensaje informativo
     if (data.sinSucursal && data.esAdmin) {
-      return (
-        <div className="flex items-center justify-center min-h-[400px]">
-          <Card className="w-full max-w-md border-amber-200 bg-amber-50">
-            <CardContent className="pt-6">
-              <div className="text-center">
-                <AlertTriangle className="w-12 h-12 text-amber-600 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2 text-amber-900">
-                  No hay sucursales activas
-                </h3>
-                <p className="text-amber-800 mb-4">
-                  Como administrador, necesitas crear una sucursal antes de poder ver las transferencias.
-                </p>
-                <Button asChild>
-                  <Link href="/sucursales/nueva">
-                    <Building2 className="w-4 h-4 mr-2" />
-                    Crear Primera Sucursal
-                  </Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )
+      return TransferenciasSinSucursalState()
     }
 
-    // Obtener sucursalId para el componente Realtime
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    const { sucursalId } = await getSucursalUsuarioConAdmin(supabase, user?.id || '', user?.email || '', params.sid)
-
-    return (
-      <div className="space-y-6">
-        {/* Componente Realtime que actualiza la página automáticamente */}
-        {sucursalId && <TransferenciasRealtime sucursalId={sucursalId} />}
-
-        {/* Header */}
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-              <Truck className="w-8 h-8" />
-              Transferencias de Sucursal
-            </h1>
-            <p className="text-muted-foreground">
-              Gestiona transferencias de stock entre sucursales
-            </p>
-          </div>
-
-          <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
-            <p className="font-medium mb-1">💡 Solicitar Transferencias</p>
-            <p>Las transferencias deben ser solicitadas a través del administrador del sistema.</p>
-            <p>Contacte al administrador para solicitar movimientos de stock entre sucursales.</p>
-          </div>
-        </div>
-
-        {/* Estadísticas */}
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Transferencias</CardTitle>
-              <ArrowRightLeft className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{data.estadisticas.total}</div>
-              <p className="text-xs text-muted-foreground">
-                Historial completo
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className={data.estadisticas.pendientesRecepcion > 0 ? 'border-orange-300 bg-orange-50' : ''}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Por Recibir</CardTitle>
-              <PackageCheck className="h-4 w-4 text-orange-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-600">{data.estadisticas.pendientesRecepcion}</div>
-              <p className="text-xs text-muted-foreground">
-                Esperando tu confirmación
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">En Proceso</CardTitle>
-              <Truck className="h-4 w-4 text-blue-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">{data.estadisticas.enTransito}</div>
-              <p className="text-xs text-muted-foreground">
-                En tránsito
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Completadas</CardTitle>
-              <Truck className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{data.estadisticas.recibidas}</div>
-              <p className="text-xs text-muted-foreground">
-                Recibidas exitosamente
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Transferencias pendientes de recepción - Sección destacada */}
-        {data.pendientesRecepcion && data.pendientesRecepcion.length > 0 && (
-          <Card className="border-2 border-orange-300 bg-orange-50/50">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-5 w-5 text-orange-600" />
-                  <CardTitle className="text-orange-700">Transferencias Pendientes de Recepción</CardTitle>
-                </div>
-                <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-300">
-                  {data.pendientesRecepcion.length} pendiente(s)
-                </Badge>
-              </div>
-              <CardDescription>
-                Estas transferencias han llegado y requieren tu confirmación de recepción
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <TransferenciasPendientesRecepcion 
-                transferencias={data.pendientesRecepcion} 
-                sucursalId={data.sucursalId} 
-              />
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Lista de Transferencias */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Transferencias</CardTitle>
-            <CardDescription>
-              Historial de transferencias de tu sucursal (como origen y destino)
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Suspense fallback={
-              <div className="space-y-4">
-                {[...Array(5)].map((_, i) => (
-                  <div key={i} className="flex items-center space-x-4 p-4 border rounded-lg animate-pulse">
-                    <div className="w-10 h-10 bg-muted rounded-full"></div>
-                    <div className="flex-1 space-y-2">
-                      <div className="h-4 bg-muted rounded w-1/3"></div>
-                      <div className="h-3 bg-muted rounded w-1/4"></div>
-                    </div>
-                    <div className="w-20 h-8 bg-muted rounded"></div>
-                  </div>
-                ))}
-              </div>
-            }>
-              <TransferenciasTable transferencias={data.transferencias} sucursalId={data.sucursalId} />
-            </Suspense>
-          </CardContent>
-        </Card>
-
-        {/* Información adicional */}
-        <Card>
-          <CardHeader>
-            <CardTitle>¿Cómo funcionan las transferencias?</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <h4 className="font-semibold">Proceso de Transferencia</h4>
-                <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
-                  <li>Casa Central crea la transferencia</li>
-                  <li>Almacén prepara y pesa los productos</li>
-                  <li>Se asigna a una ruta de reparto</li>
-                  <li>Repartidor entrega en tu sucursal</li>
-                  <li><strong>Tú confirmas la recepción</strong></li>
-                  <li>Stock se actualiza automáticamente</li>
-                </ol>
-              </div>
-
-              <div className="space-y-2">
-                <h4 className="font-semibold">Estados de Transferencia</h4>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>• <span className="text-blue-600">En Almacén</span>: En preparación</li>
-                  <li>• <span className="text-purple-600">Preparado</span>: Listo para envío</li>
-                  <li>• <span className="text-indigo-600">En Ruta</span>: En camino</li>
-                  <li>• <span className="text-orange-600">Entregado</span>: Esperando tu confirmación</li>
-                  <li>• <span className="text-green-600">Recibido</span>: Completada exitosamente</li>
-                  <li>• <span className="text-red-600">Cancelada</span>: Transferencia cancelada</li>
-                </ul>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+    const { sucursalId } = await getSucursalUsuarioConAdmin(
+      supabase,
+      user?.id || '',
+      user?.email || '',
+      params.sid,
     )
+
+    return TransferenciasContent(data, sucursalId)
   } catch (error) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Card className="w-full max-w-md">
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <Truck className="w-12 h-12 text-red-500 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Error al cargar transferencias</h3>
-              <p className="text-muted-foreground">
-                {error instanceof Error ? error.message : 'Error desconocido'}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
+    return TransferenciasErrorState(error)
   }
 }

@@ -315,7 +315,7 @@ export function AdminSidebar({ onClose, user }: AdminSidebarProps) {
 
   return (
     <div className="relative flex h-full grow flex-col overflow-y-auto bg-gradient-sidebar">
-      <div className="flex h-20 shrink-0 items-center justify-between border-b border-white/10 px-6">
+      <div className="flex h-16 shrink-0 items-center justify-between border-b border-white/10 px-4 sm:h-20 sm:px-6">
         <div className="flex items-center gap-3">
           <Logo size="lg" variant="full" light />
         </div>
@@ -331,7 +331,7 @@ export function AdminSidebar({ onClose, user }: AdminSidebarProps) {
         )}
       </div>
 
-      <nav className="flex flex-1 flex-col px-4 py-6">
+      <nav className="flex flex-1 flex-col px-3 py-4 sm:px-4 sm:py-6">
         <ul role="list" className="flex flex-1 flex-col space-y-2">
           <li>
             <ul role="list" className="space-y-1">
@@ -352,7 +352,7 @@ export function AdminSidebar({ onClose, user }: AdminSidebarProps) {
       </nav>
 
       {user && (
-        <div className="mt-auto border-t border-white/10 px-6 py-4">
+        <div className="mt-auto border-t border-white/10 px-4 py-4 sm:px-6">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 ring-2 ring-white/30">
               <span className="text-sm font-semibold text-white">

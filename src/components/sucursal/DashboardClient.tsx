@@ -9,6 +9,22 @@ import Link from 'next/link'
 import { DashboardRealtime } from './DashboardRealtime'
 import { formatFixed } from '@/lib/utils'
 
+type VentaDia = {
+  total?: number | null
+}
+
+type AlertaSucursal = {
+  id?: string
+}
+
+type CajaSucursal = {
+  saldo_actual?: number | null
+} | null
+
+type TransferenciaSucursal = {
+  estado: string
+}
+
 interface DashboardClientProps {
   sucursal: {
     id: string
@@ -17,10 +33,10 @@ interface DashboardClientProps {
     telefono?: string | null
     active: boolean
   }
-  ventasDiaInicial: any[]
-  alertasInicial: any[]
-  cajaInicial: any
-  transferenciasInicial: any[]
+  ventasDiaInicial: VentaDia[]
+  alertasInicial: AlertaSucursal[]
+  cajaInicial: CajaSucursal
+  transferenciasInicial: TransferenciaSucursal[]
   esAdmin: boolean
   todasLasSucursales: Array<{ id: string; nombre: string }>
   sinSucursal: boolean
@@ -61,7 +77,7 @@ export function DashboardClient({
 
       <div className="space-y-6">
         {/* Banner de Sucursal (compacto) */}
-        <div className="flex items-center justify-between bg-primary/5 rounded-lg p-4 border border-primary/20">
+        <div className="flex flex-col gap-3 rounded-lg border border-primary/20 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
               <Building2 className="w-5 h-5 text-primary" />
@@ -100,23 +116,23 @@ export function DashboardClient({
         {/* BOTÓN PRINCIPAL: VENDER */}
         <Button
           asChild
-          className="w-full h-20 text-xl font-bold bg-green-600 hover:bg-green-700 shadow-lg"
+          className="h-20 w-full text-lg font-bold bg-green-600 shadow-lg hover:bg-green-700 sm:text-xl"
         >
-          <Link href="/sucursal/ventas" className="flex items-center justify-center gap-3">
+          <Link href="/sucursal/ventas" className="flex items-center justify-center gap-2 sm:gap-3">
             <ShoppingCart className="w-8 h-8" />
             VENDER
           </Link>
         </Button>
 
         {/* BOTONES SECUNDARIOS */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {/* RECIBIR MERCADERÍA */}
           <Button
             asChild
             variant="outline"
-            className="h-16 text-base font-medium relative"
+            className="relative h-16 text-sm font-medium sm:text-base"
           >
-            <Link href="/sucursal/transferencias" className="flex flex-col items-center justify-center gap-1">
+            <Link href="/sucursal/transferencias" className="flex flex-col items-center justify-center gap-1 text-center">
               <Truck className="w-6 h-6" />
               <span>Recibir Mercadería</span>
               {transferenciasPendientes > 0 && (
@@ -134,9 +150,9 @@ export function DashboardClient({
           <Button
             asChild
             variant="outline"
-            className="h-16 text-base font-medium"
+            className="h-16 text-sm font-medium sm:text-base"
           >
-            <Link href="/sucursal/inventario" className="flex flex-col items-center justify-center gap-1">
+            <Link href="/sucursal/inventario" className="flex flex-col items-center justify-center gap-1 text-center">
               <Package className="w-6 h-6" />
               <span>Ver Stock</span>
             </Link>

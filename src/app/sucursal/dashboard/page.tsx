@@ -1,7 +1,6 @@
-import { Suspense } from 'react'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { AlertTriangle } from 'lucide-react'
 import { getSucursalUsuario } from '@/lib/utils'
 import { DashboardClient } from '@/components/sucursal/DashboardClient'
@@ -10,6 +9,22 @@ interface PageProps {
   searchParams: Promise<{
     sid?: string
   }>
+}
+
+type VentaDia = {
+  total?: number | null
+}
+
+type AlertaStock = Record<string, unknown>
+
+type CajaSucursal = {
+  saldo_actual?: number | null
+} | null
+
+type TransferenciaSucursal = {
+  estado: string
+  sucursal_origen_id?: string | null
+  sucursal_destino_id?: string | null
 }
 
 async function getSucursalData(searchParams?: { sid?: string }) {
@@ -123,10 +138,10 @@ async function getSucursalData(searchParams?: { sid?: string }) {
   }
 
   // Obtener datos solo si hay una sucursal válida
-  let ventasDia: any[] = []
-  let alertas: any[] = []
-  let caja: any = null
-  let transferencias: any[] = []
+  let ventasDia: VentaDia[] = []
+  let alertas: AlertaStock[] = []
+  let caja: CajaSucursal = null
+  let transferencias: TransferenciaSucursal[] = []
 
   if (sucursalIdFinal) {
     // Obtener ventas del día
@@ -178,32 +193,40 @@ async function getSucursalData(searchParams?: { sid?: string }) {
   }
 }
 
-function DashboardSkeleton() {
-  return (
-    <div className="space-y-6">
-      {/* Header Skeleton */}
-      <div className="flex items-center justify-between">
-        <div className="space-y-2">
-          <div className="h-8 bg-muted rounded w-64 animate-pulse"></div>
-          <div className="h-4 bg-muted rounded w-96 animate-pulse"></div>
-        </div>
-      </div>
+type SucursalData = Awaited<ReturnType<typeof getSucursalData>>
 
-      {/* Cards Skeleton */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {[...Array(4)].map((_, i) => (
-          <Card key={i} className="animate-pulse">
-            <CardHeader>
-              <div className="h-4 bg-muted rounded w-24"></div>
-            </CardHeader>
-            <CardContent>
-              <div className="h-8 bg-muted rounded w-16 mb-2"></div>
-              <div className="h-3 bg-muted rounded"></div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+function DashboardErrorState(error: unknown) {
+  return (
+    <div className="flex min-h-[400px] items-center justify-center">
+      <Card className="w-full max-w-md">
+        <CardContent className="pt-6">
+          <div className="text-center">
+            <AlertTriangle className="mx-auto mb-4 h-12 w-12 text-red-500" />
+            <h3 className="mb-2 text-lg font-semibold">Error al cargar dashboard</h3>
+            <p className="text-muted-foreground">
+              {error instanceof Error ? error.message : 'Error desconocido'}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
+  )
+}
+
+function DashboardContent(data: SucursalData) {
+  const sinSucursal = data.esAdmin && !data.sucursalId
+
+  return (
+    <DashboardClient
+      sucursal={data.sucursal}
+      ventasDiaInicial={data.ventasDia}
+      alertasInicial={data.alertas}
+      cajaInicial={data.caja}
+      transferenciasInicial={data.transferencias}
+      esAdmin={data.esAdmin}
+      todasLasSucursales={data.todasLasSucursales}
+      sinSucursal={sinSucursal}
+    />
   )
 }
 
@@ -211,36 +234,8 @@ export default async function SucursalDashboardPage(props: PageProps) {
   try {
     const searchParams = await props.searchParams
     const data = await getSucursalData(searchParams)
-
-    const sinSucursal = data.esAdmin && !data.sucursalId
-
-    return (
-      <DashboardClient
-        sucursal={data.sucursal}
-        ventasDiaInicial={data.ventasDia}
-        alertasInicial={data.alertas}
-        cajaInicial={data.caja}
-        transferenciasInicial={data.transferencias}
-        esAdmin={data.esAdmin}
-        todasLasSucursales={data.todasLasSucursales}
-        sinSucursal={sinSucursal}
-      />
-    )
+    return DashboardContent(data)
   } catch (error) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Card className="w-full max-w-md">
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Error al cargar dashboard</h3>
-              <p className="text-muted-foreground">
-                {error instanceof Error ? error.message : 'Error desconocido'}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
+    return DashboardErrorState(error)
   }
 }

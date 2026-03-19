@@ -69,6 +69,7 @@ function normalizePageSize(value: number | undefined, fallback = MIN_PAGE_SIZE):
   return Math.max(MIN_PAGE_SIZE, Math.trunc(parsed))
 }
 
+
 export function DataTable<TData, TValue>({
   columns,
   data,
@@ -121,7 +122,7 @@ export function DataTable<TData, TValue>({
         return prev
       })
     }
-  }, [serverPagination?.pageIndex, serverPagination?.pageSize, normalizedInitialPageSize])
+  }, [serverPagination, serverPagination?.pageIndex, serverPagination?.pageSize, normalizedInitialPageSize])
 
   // Add row selection column if enabled
   const tableColumns = React.useMemo(() => {
@@ -169,9 +170,9 @@ export function DataTable<TData, TValue>({
               <DropdownMenuLabel>Acciones</DropdownMenuLabel>
               <DropdownMenuItem
                 onClick={() => {
-                  const rowData = row.original as any
+                  const rowData = row.original as CopyableRow
                   // Intentar obtener el ID del objeto
-                  let idToCopy = rowData.id
+                  let idToCopy: unknown = rowData.id
 
                   // Si no existe 'id', buscar campos que terminen en '_id'
                   if (!idToCopy) {
@@ -258,8 +259,8 @@ export function DataTable<TData, TValue>({
   return (
     <div className="w-full">
       {/* Search and filters */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-4">
-        <div className="flex items-center space-x-2 w-full sm:w-auto">
+      <div className="flex flex-col gap-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex w-full items-center space-x-2 sm:w-auto">
           {searchKey && (
             <div className="relative flex-1 sm:flex-initial">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -342,8 +343,8 @@ export function DataTable<TData, TValue>({
                           <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                           <DropdownMenuItem
                             onClick={() => {
-                              const rowData = row.original as any
-                              let idToCopy = rowData.id
+                              const rowData = row.original as CopyableRow
+                              let idToCopy: unknown = rowData.id
 
                               if (!idToCopy) {
                                 const idFields = Object.keys(rowData).filter(key => key.endsWith('_id'))
@@ -438,7 +439,7 @@ export function DataTable<TData, TValue>({
 
       {/* Pagination */}
       {enablePagination && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-4">
+        <div className="flex flex-col gap-4 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-muted-foreground order-2 sm:order-1">
             {(() => {
               const totalRows = serverPagination?.totalCount ?? table.getFilteredRowModel().rows.length
@@ -451,12 +452,12 @@ export function DataTable<TData, TValue>({
               return `Mostrando ${start}-${end} de ${totalRows}${selectedText}`
             })()}
           </div>
-          <div className="flex items-center justify-center gap-2 order-1 sm:order-2">
+          <div className="flex w-full flex-col gap-2 order-1 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-center sm:order-2">
             <Select
               value={String(pagination.pageSize)}
               onValueChange={(value) => table.setPageSize(Number(value))}
             >
-              <SelectTrigger className="h-8 w-[100px]">
+              <SelectTrigger className="h-8 w-full sm:w-[100px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -475,7 +476,7 @@ export function DataTable<TData, TValue>({
               size="sm"
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}
-              className="flex-1 sm:flex-initial"
+              className="w-full sm:w-auto"
             >
               Anterior
             </Button>
@@ -484,7 +485,7 @@ export function DataTable<TData, TValue>({
               size="sm"
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}
-              className="flex-1 sm:flex-initial"
+              className="w-full sm:w-auto"
             >
               Siguiente
             </Button>
@@ -501,7 +502,10 @@ export function SortableHeader({
   column,
 }: {
   children: React.ReactNode
-  column: any
+  column: {
+    toggleSorting: (descending: boolean) => void
+    getIsSorted: () => false | 'asc' | 'desc'
+  }
 }) {
   return (
     <Button

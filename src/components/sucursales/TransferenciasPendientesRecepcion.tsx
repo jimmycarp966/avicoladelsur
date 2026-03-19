@@ -23,7 +23,6 @@ import {
     AccordionTrigger,
 } from '@/components/ui/accordion'
 import {
-    ArrowRightLeft,
     PackageCheck,
     Loader2,
     MapPin,
@@ -69,7 +68,8 @@ export function TransferenciasPendientesRecepcion({
     const [loadingId, setLoadingId] = useState<string | null>(null)
     const [dialogOpen, setDialogOpen] = useState<string | null>(null)
     const [cantidadesRecibidas, setCantidadesRecibidas] = useState<Record<string, number>>({})
-    const [hayDiferencias, setHayDiferencias] = useState(false)
+
+    void sucursalId
 
     const handleConfirmarRecepcion = async (transferenciaId: string, conDiferencias: boolean = false) => {
         setLoadingId(transferenciaId)
@@ -94,7 +94,7 @@ export function TransferenciasPendientesRecepcion({
             } else {
                 toast.error(result.message || 'Error al confirmar recepción')
             }
-        } catch (error) {
+        } catch {
             toast.error('Error inesperado al confirmar recepción')
         } finally {
             setLoadingId(null)
@@ -107,15 +107,6 @@ export function TransferenciasPendientesRecepcion({
             cantidades[item.id] = item.cantidad_enviada || item.cantidad_solicitada
         })
         setCantidadesRecibidas(cantidades)
-    }
-
-    const verificarDiferencias = (items: TransferenciaItem[]) => {
-        const hasDiff = items.some(item => {
-            const cantidadRecibida = cantidadesRecibidas[item.id]
-            const cantidadEnviada = item.cantidad_enviada || item.cantidad_solicitada
-            return cantidadRecibida !== undefined && cantidadRecibida !== cantidadEnviada
-        })
-        setHayDiferencias(hasDiff)
     }
 
     const getEstadoBadge = (estado: string) => {
@@ -148,7 +139,7 @@ export function TransferenciasPendientesRecepcion({
                 return (
                     <Card key={transferencia.id} className={`border-2 transition-shadow hover:shadow-lg ${esEntregado ? 'border-orange-400 bg-orange-50/50' : 'border-blue-200'}`}>
                         <CardContent className="p-4">
-                            <div className="flex items-start justify-between">
+                            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                                 <div className="flex-1">
                                     <div className="flex items-center gap-3 mb-2">
                                         <h3 className="text-lg font-semibold">
@@ -174,14 +165,14 @@ export function TransferenciasPendientesRecepcion({
                                     )}
                                 </div>
 
-                                <div className="flex items-center gap-2">
+                                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                                     {esEntregado ? (
                                         <>
                                             {/* Botón de confirmación rápida - GRANDE Y PROMINENTE */}
                                             <Button
                                                 onClick={() => handleConfirmarRecepcion(transferencia.id)}
                                                 disabled={loadingId === transferencia.id}
-                                                className="bg-green-600 hover:bg-green-700 h-12 px-6 text-base font-bold"
+                                                className="h-12 bg-green-600 px-6 text-base font-bold hover:bg-green-700"
                                             >
                                                 {loadingId === transferencia.id ? (
                                                     <Loader2 className="mr-2 h-5 w-5 animate-spin" />
@@ -205,12 +196,12 @@ export function TransferenciasPendientesRecepcion({
                                                 }}
                                             >
                                                 <DialogTrigger asChild>
-                                                    <Button variant="outline" className="border-orange-300 text-orange-700">
-                                                        <AlertTriangle className="mr-2 h-4 w-4" />
-                                                        Hay Diferencias
-                                                    </Button>
-                                                </DialogTrigger>
-                                                <DialogContent className="max-w-2xl">
+                                                <Button variant="outline" className="w-full border-orange-300 text-orange-700 sm:w-auto">
+                                                    <AlertTriangle className="mr-2 h-4 w-4" />
+                                                    Hay Diferencias
+                                                </Button>
+                                            </DialogTrigger>
+                                                <DialogContent className="w-[calc(100vw-1rem)] max-w-2xl">
                                                     <DialogHeader>
                                                         <DialogTitle>Reportar Diferencias en Recepción</DialogTitle>
                                                         <DialogDescription>
@@ -224,14 +215,14 @@ export function TransferenciasPendientesRecepcion({
                                                             const cantidadRecibida = cantidadesRecibidas[item.id] ?? cantidadEnviada
 
                                                             return (
-                                                                <div key={item.id} className="flex items-center gap-4 p-3 border rounded-lg">
+                                                                <div key={item.id} className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center">
                                                                     <div className="flex-1">
                                                                         <p className="font-medium">{item.producto.nombre}</p>
                                                                         <p className="text-sm text-muted-foreground">
                                                                             Código: {item.producto.codigo} | Enviado: {cantidadEnviada} {item.producto.unidad_medida}
                                                                         </p>
                                                                     </div>
-                                                                    <div className="w-32">
+                                                                    <div className="w-full sm:w-32">
                                                                         <Label className="text-xs">Recibido</Label>
                                                                         <Input
                                                                             type="number"
@@ -244,7 +235,6 @@ export function TransferenciasPendientesRecepcion({
                                                                                     ...prev,
                                                                                     [item.id]: newValue
                                                                                 }))
-                                                                                verificarDiferencias(transferencia.items)
                                                                             }}
                                                                             className={cantidadRecibida !== cantidadEnviada ? 'border-orange-400' : ''}
                                                                         />
@@ -255,13 +245,13 @@ export function TransferenciasPendientesRecepcion({
                                                     </div>
 
                                                     <DialogFooter>
-                                                        <Button variant="outline" onClick={() => setDialogOpen(null)}>
+                                                        <Button variant="outline" onClick={() => setDialogOpen(null)} className="w-full sm:w-auto">
                                                             Cancelar
                                                         </Button>
                                                         <Button
                                                             onClick={() => handleConfirmarRecepcion(transferencia.id, true)}
                                                             disabled={loadingId === transferencia.id}
-                                                            className="bg-orange-600 hover:bg-orange-700"
+                                                            className="w-full bg-orange-600 hover:bg-orange-700 sm:w-auto"
                                                         >
                                                             {loadingId === transferencia.id ? (
                                                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -293,7 +283,7 @@ export function TransferenciasPendientesRecepcion({
                                             {transferencia.items.map((item) => (
                                                 <div
                                                     key={item.id}
-                                                    className="flex items-center justify-between p-2 bg-muted/30 rounded"
+                                                    className="flex flex-col gap-2 rounded bg-muted/30 p-2 sm:flex-row sm:items-center sm:justify-between"
                                                 >
                                                     <div>
                                                         <p className="font-medium text-sm">{item.producto.nombre}</p>

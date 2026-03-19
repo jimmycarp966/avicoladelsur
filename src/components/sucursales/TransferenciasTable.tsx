@@ -101,8 +101,8 @@ export function TransferenciasTable({ transferencias, sucursalId }: Transferenci
         return (
           <Card key={transferencia.id} className="hover:shadow-md transition-shadow">
             <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4 flex-1">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-start">
                   <div
                     className={`w-12 h-12 rounded-lg flex items-center justify-center ${tipo === 'origen'
                         ? 'bg-blue-100'
@@ -121,8 +121,8 @@ export function TransferenciasTable({ transferencias, sucursalId }: Transferenci
                     />
                   </div>
 
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-1 flex flex-wrap items-center gap-2">
                       <h4 className="font-semibold">{transferencia.numero_transferencia}</h4>
                       {getEstadoBadge(transferencia.estado)}
                       <Badge variant="outline" className="text-xs">
@@ -130,7 +130,7 @@ export function TransferenciasTable({ transferencias, sucursalId }: Transferenci
                       </Badge>
                     </div>
 
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                    <div className="flex flex-col gap-2 text-sm text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
                       <span className="flex items-center gap-1">
                         <span>{tipo === 'origen' ? 'Para:' : 'Desde:'}</span>
                         <span className="font-medium">
@@ -170,11 +170,11 @@ export function TransferenciasTable({ transferencias, sucursalId }: Transferenci
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="flex items-center gap-1"
+                    className="w-full items-center gap-1 sm:w-auto"
                     onClick={async () => {
                       const { generarRemitoTransferenciaAction } = await import('@/actions/remitos.actions')
                       const res = await generarRemitoTransferenciaAction(transferencia.id)
@@ -188,7 +188,7 @@ export function TransferenciasTable({ transferencias, sucursalId }: Transferenci
                     <Truck className="w-4 h-4" />
                     Remito
                   </Button>
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" className="w-full sm:w-auto">
                     Ver Detalles
                   </Button>
                 </div>
@@ -201,14 +201,14 @@ export function TransferenciasTable({ transferencias, sucursalId }: Transferenci
       {/* Resumen */}
       <Card className="bg-muted/50">
         <CardContent className="p-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-sm text-muted-foreground">
               <strong>{transferencias.filter((t) => t.sucursal_origen?.id === sucursalId).length}</strong> enviadas •
               <strong> {transferencias.filter((t) => t.sucursal_destino?.id === sucursalId).length}</strong> recibidas •
               <strong> {transferencias.filter((t) => t.estado === 'recibida').length}</strong> completadas
             </div>
 
-            <div className="text-right">
+            <div className="text-left sm:text-right">
               <div className="font-medium">
                 Total productos transferidos
               </div>

@@ -25,7 +25,7 @@ export default function SucursalReportesPage() {
       // En el futuro aquí iría la lógica real para generar y descargar el reporte
       // Por ahora solo mostramos el mensaje
 
-    } catch (error) {
+    } catch {
       toast.error('Error al generar el reporte')
     } finally {
       setGenerandoReporte(null)
@@ -64,7 +64,7 @@ export default function SucursalReportesPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight sm:text-3xl">
             <BarChart3 className="w-8 h-8" />
             Reportes de Sucursal
           </h1>
@@ -80,7 +80,7 @@ export default function SucursalReportesPage() {
           <CardTitle>Información de Reportes</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-2">
               <h4 className="font-semibold flex items-center gap-2">
                 <Badge variant="default">PDF</Badge>
@@ -115,7 +115,7 @@ export default function SucursalReportesPage() {
       </Card>
 
       {/* Tipos de Reportes */}
-      <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-3">
         {reportes.map((reporte) => {
           const Icono = reporte.icono
           const isGenerating = generandoReporte === reporte.tipo
@@ -136,7 +136,7 @@ export default function SucursalReportesPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                   <Button
                     size="sm"
                     variant="outline"
@@ -200,7 +200,7 @@ export default function SucursalReportesPage() {
           <CardTitle>Reportes Disponibles</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <h4 className="font-semibold">Contenido de Reportes</h4>
               <ul className="text-sm text-muted-foreground space-y-1">

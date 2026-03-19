@@ -1,13 +1,11 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
-import { usePathname } from 'next/navigation'
-import Link from 'next/link'
+import { Suspense, useSyncExternalStore } from 'react'
 import { SucursalSidebar } from '@/components/layout/SucursalSidebar'
 import { NotificationBell } from '@/components/layout/NotificationBell'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
-import { Menu, Loader2 } from 'lucide-react'
+import { Menu } from 'lucide-react'
 import { LogoutButton } from '@/components/auth/LogoutButton'
 
 // Fallback para el sidebar mientras carga
@@ -32,16 +30,14 @@ interface SucursalLayoutProps {
 }
 
 export default function SucursalLayout({ children }: SucursalLayoutProps) {
-  const pathname = usePathname()
-  const [mounted, setMounted] = useState(false)
-
-  // Evitar problemas de hidratación renderizando componentes con Radix UI solo en el cliente
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  )
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-dvh bg-background">
       {/* Desktop Sidebar */}
       <div className="hidden lg:flex lg:w-64 lg:flex-col">
         <Suspense fallback={<SidebarSkeleton />}>
@@ -61,7 +57,7 @@ export default function SucursalLayout({ children }: SucursalLayoutProps) {
                   <Menu className="h-6 w-6" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-64 p-0">
+              <SheetContent side="left" className="w-[min(18rem,calc(100vw-1rem))] p-0">
                 <Suspense fallback={<SidebarSkeleton />}>
                   <SucursalSidebar />
                 </Suspense>

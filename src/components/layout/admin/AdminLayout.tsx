@@ -18,7 +18,7 @@ export function AdminLayout({ children, user }: AdminLayoutProps) {
 
   return (
     <KeyboardShortcutsProvider>
-      <div className="min-h-screen bg-background">
+      <div className="min-h-dvh bg-background">
         {/* Sidebar para desktop */}
         <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
           <AdminSidebar user={user} />
@@ -38,7 +38,7 @@ export function AdminLayout({ children, user }: AdminLayoutProps) {
           />
 
           {/* Sidebar móvil */}
-          <div className="fixed left-0 top-0 bottom-0 w-72 bg-[#2F7058] shadow-lg">
+          <div className="fixed left-0 top-0 bottom-0 w-[min(18rem,calc(100vw-1rem))] bg-[#2F7058] shadow-lg">
             <AdminSidebar onClose={() => setSidebarOpen(false)} user={user} />
           </div>
         </div>

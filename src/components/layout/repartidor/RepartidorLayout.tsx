@@ -12,12 +12,12 @@ export function RepartidorLayout({ children }: RepartidorLayoutProps) {
   const { user } = useAuth()
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="flex min-h-dvh flex-col bg-background">
       {/* Header */}
       <RepartidorHeader user={user} />
 
       {/* Main content */}
-      <main className="flex-1 pb-16">
+      <main className="flex-1 pb-[calc(4rem+env(safe-area-inset-bottom))]">
         {children}
       </main>
 
