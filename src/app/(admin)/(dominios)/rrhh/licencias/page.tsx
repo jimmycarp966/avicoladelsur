@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { LicenciasTable } from '@/components/tables/LicenciasTable'
 import { Button } from '@/components/ui/button'
 import { Calendar, CalendarDays, Plus, CheckCircle, Clock, AlertTriangle } from 'lucide-react'
@@ -8,8 +8,26 @@ import type { Licencia } from '@/types/domain.types'
 
 async function getLicencias() {
   const supabase = await createClient()
+  const adminSupabase = createAdminClient()
 
-  const { data, error } = await supabase
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return []
+  }
+
+  const { data: userData } = await adminSupabase
+    .from('usuarios')
+    .select('rol, activo')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  const db = userData?.activo && userData.rol === 'admin' ? adminSupabase : supabase
+
+  const { data, error } = await db
     .from('rrhh_licencias')
     .select(`
       *,
@@ -18,7 +36,7 @@ async function getLicencias() {
         legajo,
         usuario:usuarios(nombre, apellido)
       ),
-      aprobado_por:usuarios(id, nombre, apellido)
+      aprobado_por:usuarios!rrhh_licencias_aprobado_por_fkey(id, nombre, apellido)
     `)
     .order('fecha_presentacion_certificado', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false })

@@ -93,7 +93,7 @@ Esta carpeta contiene todos los scripts SQL necesarios para configurar y mantene
 1. Ve a Authentication → Users
 2. Click en "Add User"
 3. Email: `admin@avicoladelsur.com`
-4. Password: `Admin123!` (o la que prefieras)
+4. Password: `123456` (clave de QA/dev actual para este entorno)
 5. ✅ Marca "Auto Confirm User"
 
 ### Paso 4: Vincular Usuario y Configurar RLS

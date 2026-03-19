@@ -47,6 +47,35 @@ async function registrarEventoLegajo(db: any, input: LegajoEventoInput): Promise
   }
 }
 
+async function getDbForCurrentUser() {
+  const supabase = await createClient()
+  const adminSupabase = createAdminClient()
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return { supabase, db: supabase, user: null, isAdmin: false }
+  }
+
+  const { data: userRow } = await adminSupabase
+    .from('usuarios')
+    .select('rol, activo')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  const isAdmin = !!userRow?.activo && userRow.rol === 'admin'
+
+  return {
+    supabase,
+    db: isAdmin ? adminSupabase : supabase,
+    user,
+    isAdmin,
+  }
+}
+
 // ========== EMPLEADOS ==========
 
 export async function crearEmpleadoAction(
@@ -123,7 +152,7 @@ export async function crearEmpleadoAction(
       }
     }
 
-    // Validar que el usuario_id tenga cuenta de autenticacion si se proporciona
+    // Validar que el usuario_id tenga cuenta de autenticación si se proporciona
     if (empleadoData.usuario_id) {
       // Verificar que el usuario existe en la tabla usuarios
       const { data: usuarioData, error: usuarioError } = await supabase
@@ -146,7 +175,7 @@ export async function crearEmpleadoAction(
         }
       }
 
-      // Verificar que el usuario no est? ya asignado a otro empleado
+      // Verificar que el usuario no está ya asignado a otro empleado
       const { data: empleadoExistente, error: empleadoError } = await supabase
         .from('rrhh_empleados')
         .select('id')
@@ -162,11 +191,11 @@ export async function crearEmpleadoAction(
       }
 
       // Nota: La verificacion de que existe en auth.users se hace automaticamente
-      // mediante el trigger sync_user_from_auth() o se puede verificar con una funcion RPC
-      // Por ahora, asumimos que si est? en la tabla usuarios y est? activo, tiene cuenta de auth
+      // mediante el trigger sync_user_from_auth() o se puede verificar con una función RPC
+      // Por ahora, asumimos que si está en la tabla usuarios y está activo, tiene cuenta de auth
     }
 
-    // Limpiar campos de fecha vacios (convertir "" a null/undefined)
+    // Limpiar campos de fecha vacíos (convertir "" a null/undefined)
     const cleanedData: any = {
       ...empleadoData,
       activo: empleadoData.activo ?? true,
@@ -178,7 +207,7 @@ export async function crearEmpleadoAction(
     delete cleanedData.nombre
     delete cleanedData.apellido
     
-    // Validar que fecha_ingreso no est? vacio (es requerido)
+    // Validar que fecha_ingreso no está vacío (es requerido)
     if (!cleanedData.fecha_ingreso || cleanedData.fecha_ingreso === '' || cleanedData.fecha_ingreso === null) {
       return {
         success: false,
@@ -191,7 +220,7 @@ export async function crearEmpleadoAction(
       delete cleanedData.fecha_nacimiento
     }
     
-    // Limpiar otros campos opcionales vacios
+    // Limpiar otros campos opcionales vacíos
     const optionalFields = ['legajo', 'dni', 'cuil', 'domicilio', 'telefono_personal', 
                             'contacto_emergencia', 'telefono_emergencia', 'obra_social', 
                             'numero_afiliado', 'banco', 'cbu', 'numero_cuenta', 'usuario_id',
@@ -317,20 +346,20 @@ export async function actualizarEmpleadoAction(
       }
     }
 
-    // Limpiar campos de fecha vacios (convertir "" a null/undefined)
+    // Limpiar campos de fecha vacíos (convertir "" a null/undefined)
     const cleanedData: any = { ...empleadoData }
     
     // IMPORTANTE: Manejar nombre y apellido correctamente
     // El nombre y apellido del empleado vienen del usuario vinculado (usuario_id)
     // Solo se usan si el empleado NO tiene usuario_id asignado
     
-    // Si se est? asignando un usuario_id, limpiar nombre y apellido del empleado
+    // Si se está asignando un usuario_id, limpiar nombre y apellido del empleado
     // porque el nombre debe venir del usuario vinculado, no de campos directos
     if (cleanedData.usuario_id) {
       cleanedData.nombre = null
       cleanedData.apellido = null
     } else {
-      // Si no se est? asignando usuario_id, eliminar estos campos para que no se actualicen
+      // Si no se está asignando usuario_id, eliminar estos campos para que no se actualicen
       delete cleanedData.nombre
       delete cleanedData.apellido
     }
@@ -345,7 +374,7 @@ export async function actualizarEmpleadoAction(
       delete cleanedData.fecha_nacimiento
     }
     
-    // Limpiar otros campos opcionales vacios
+    // Limpiar otros campos opcionales vacíos
     const optionalFields = ['legajo', 'dni', 'cuil', 'domicilio', 'telefono_personal', 
                             'contacto_emergencia', 'telefono_emergencia', 'obra_social', 
                             'numero_afiliado', 'banco', 'cbu', 'numero_cuenta', 'usuario_id',
@@ -2395,9 +2424,7 @@ Analiza esta imagen de certificado medico laboral y responde SOLO JSON valido:
 
 export async function crearLicenciaAction(formData: FormData): Promise<ApiResponse<{ licenciaId: string }>> {
   try {
-    const supabase = await createClient()
-
-    const { data: { user } } = await supabase.auth.getUser()
+    const { db, user } = await getDbForCurrentUser()
     const actorId = user?.id || null
 
     const empleado_id = String(formData.get('empleado_id') || '')
@@ -2463,7 +2490,7 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
     const fechaCargaIso = ahora.toISOString()
 
     if (!esVacaciones && !presentadoEnTermino && !excepcion_plazo && fechaLimitePresentacion) {
-      await registrarEventoLegajo(supabase, {
+      await registrarEventoLegajo(db, {
         empleadoId: empleado_id,
         tipo: 'certificado_fuera_termino',
         categoria: 'licencias',
@@ -2491,7 +2518,7 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
       return { success: false, error: 'Debe informar el motivo de excepcion de plazo' }
     }
 
-    const { data: empleado, error: empleadoError } = await supabase
+    const { data: empleado, error: empleadoError } = await db
       .from('rrhh_empleados')
       .select('id, nombre, apellido, usuario:usuarios(nombre, apellido)')
       .eq('id', empleado_id)
@@ -2517,7 +2544,7 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
       storagePath = `rrhh/licencias/${empleado_id}/${Date.now()}-${safeFileName}`
       const certBuffer = Buffer.from(await certificado.arrayBuffer())
 
-      const { error: uploadError } = await supabase.storage.from('documentos').upload(storagePath, certBuffer, {
+      const { error: uploadError } = await db.storage.from('documentos').upload(storagePath, certBuffer, {
         contentType: certificado.type || 'image/jpeg',
         upsert: false,
       })
@@ -2527,7 +2554,7 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
         return { success: false, error: 'No se pudo subir el certificado. Intenta nuevamente.' }
       }
 
-      const { data: urlData } = supabase.storage.from('documentos').getPublicUrl(storagePath)
+      const { data: urlData } = db.storage.from('documentos').getPublicUrl(storagePath)
       certificadoUrl = urlData.publicUrl
       certificadoNombreArchivo = certificado.name
       certificadoMimeType = certificado.type || 'image/jpeg'
@@ -2541,7 +2568,7 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
 
     const diasTotal = Math.ceil((fechaFin.getTime() - fechaInicio.getTime()) / (1000 * 60 * 60 * 24)) + 1
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('rrhh_licencias')
       .insert({
         empleado_id,
@@ -2582,7 +2609,7 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
       }
     }
 
-    await registrarEventoLegajo(supabase, {
+    await registrarEventoLegajo(db, {
       empleadoId: empleado_id,
       tipo: 'licencia_solicitada',
       categoria: 'licencias',
@@ -2622,24 +2649,22 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
 
 export async function aprobarLicenciaAction(licenciaId: string): Promise<ApiResponse<void>> {
   try {
-    const supabase = await createClient()
-
-    // Obtener el usuario actual
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) {
+    const { db, user, isAdmin } = await getDbForCurrentUser()
+    if (!isAdmin || !user) {
       return {
         success: false,
-        error: 'Usuario no autenticado',
+        error: 'No autorizado',
       }
     }
 
-    const { data: licenciaSnapshot } = await supabase
+    // Obtener el usuario actual
+    const { data: licenciaSnapshot } = await db
       .from('rrhh_licencias')
       .select('id, empleado_id, tipo, fecha_inicio, fecha_fin, dias_total')
       .eq('id', licenciaId)
       .maybeSingle()
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('rrhh_licencias')
       .update({
         aprobado: true,
@@ -2663,7 +2688,7 @@ export async function aprobarLicenciaAction(licenciaId: string): Promise<ApiResp
     }
 
     if (licenciaSnapshot?.empleado_id) {
-      await registrarEventoLegajo(supabase, {
+      await registrarEventoLegajo(db, {
         empleadoId: licenciaSnapshot.empleado_id,
         tipo: 'licencia_aprobada',
         categoria: 'licencias',
@@ -3319,7 +3344,7 @@ export async function actualizarCategoriaEmpleadoAction(
   }
 }
 
-// Obtener usuarios activos con cuenta de autenticacion (para formularios)
+// Obtener usuarios activos con cuenta de autenticación (para formularios)
 export async function obtenerUsuariosConAuthAction(): Promise<ApiResponse<Array<{
   id: string
   email: string
@@ -3346,9 +3371,9 @@ export async function obtenerUsuariosConAuthAction(): Promise<ApiResponse<Array<
       }
     }
 
-    // Verificar cuales tienen cuenta de autenticacion usando funcion RPC
+    // Verificar cuáles tienen cuenta de autenticación usando función RPC
     // Nota: No podemos consultar auth.users directamente, pero podemos usar
-    // la funcion usuario_tiene_auth() si est? disponible, o asumir que todos
+    // la función usuario_tiene_auth() si está disponible, o asumir que todos
     // los usuarios activos en la tabla usuarios tienen cuenta de auth
     // (ya que el trigger sync_user_from_auth() los sincroniza automaticamente)
 

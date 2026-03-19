@@ -1,9 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
+
+async function getDbForCurrentUser() {
+  const supabase = await createClient()
+  const adminSupabase = createAdminClient()
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return { db: supabase }
+  }
+
+  const { data: userRow } = await adminSupabase
+    .from('usuarios')
+    .select('rol, activo')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  const isAdmin = !!userRow?.activo && userRow.rol === 'admin'
+
+  return { db: isAdmin ? adminSupabase : supabase }
+}
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const { db: supabase } = await getDbForCurrentUser()
     const { searchParams } = new URL(request.url)
 
     const tipo = searchParams.get('tipo') as 'empleados' | 'liquidaciones' | 'adelantos' | 'evaluaciones' | 'asistencia' | 'licencias'
@@ -14,7 +38,7 @@ export async function GET(request: NextRequest) {
     }
 
     let data: any[] = []
-    let filename = `reporte_${tipo}_${new Date().toISOString().split('T')[0]}`
+    const filename = `reporte_${tipo}_${new Date().toISOString().split('T')[0]}`
 
     // Construir consulta según el tipo de reporte
     switch (tipo) {
@@ -156,7 +180,7 @@ export async function GET(request: NextRequest) {
               legajo,
               usuario:usuarios(nombre, apellido)
             ),
-            aprobado_por:usuarios(nombre, apellido)
+            aprobado_por:usuarios!rrhh_licencias_aprobado_por_fkey(nombre, apellido)
           `)
 
         if (licFechaDesde) {
