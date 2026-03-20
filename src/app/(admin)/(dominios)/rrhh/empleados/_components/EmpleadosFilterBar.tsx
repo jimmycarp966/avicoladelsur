@@ -70,7 +70,7 @@ export function EmpleadosFilterBar({
   }, [busqueda, navigate, puesto, searchValue, sucursal])
 
   return (
-    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-start lg:gap-4">
       <div className="w-full lg:max-w-sm">
         <Input
           value={searchValue}

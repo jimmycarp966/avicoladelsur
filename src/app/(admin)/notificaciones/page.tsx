@@ -17,6 +17,7 @@ import { createClient } from '@/lib/supabase/client'
 import { formatDistanceToNow, format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import Link from 'next/link'
+import { resolveNotificationLink } from '@/lib/utils/notification-links'
 
 type Notification = {
   id: string
@@ -138,17 +139,17 @@ export default function NotificacionesPage() {
 
   async function markAsRead(notificationIds: string[]) {
     try {
+      setNotifications((prev) =>
+        prev.map((n) => (notificationIds.includes(n.id) ? { ...n, leida: true } : n))
+      )
+      setSelectedIds(new Set())
+
       const { error } = await supabase
         .from('notificaciones')
         .update({ leida: true })
         .in('id', notificationIds)
 
       if (error) throw error
-
-      setNotifications((prev) =>
-        prev.map((n) => (notificationIds.includes(n.id) ? { ...n, leida: true } : n))
-      )
-      setSelectedIds(new Set())
     } catch (error) {
       console.error('Error marcando como leida:', error)
     }
@@ -353,50 +354,66 @@ export default function NotificacionesPage() {
               </span>
             </div>
 
-            {notifications.map((notification) => (
-              <Card
-                key={notification.id}
-                className={`transition-all ${
-                  !notification.leida ? getNotificationColor(notification.tipo) : 'bg-white'
-                } ${selectedIds.has(notification.id) ? 'ring-2 ring-primary' : ''}`}
-              >
-                <CardContent className="py-4">
-                  <div className="flex items-start gap-4">
-                    <Checkbox
-                      checked={selectedIds.has(notification.id)}
-                      onCheckedChange={() => toggleSelect(notification.id)}
-                    />
-                    <span className="text-sm font-semibold w-5 text-center">
-                      {getNotificationIcon(notification.tipo)}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="font-semibold text-sm">{notification.titulo}</p>
-                          <p className="text-sm text-muted-foreground mt-1">{notification.mensaje}</p>
+            {notifications.map((notification) => {
+              const target = resolveNotificationLink(notification)
+
+              return (
+                <Card
+                  key={notification.id}
+                  className={`transition-all ${
+                    !notification.leida ? getNotificationColor(notification.tipo) : 'bg-white'
+                  } ${selectedIds.has(notification.id) ? 'ring-2 ring-primary' : ''}`}
+                >
+                  <CardContent className="py-4">
+                    <div className="flex items-start gap-4">
+                      <Checkbox
+                        checked={selectedIds.has(notification.id)}
+                        onCheckedChange={() => toggleSelect(notification.id)}
+                      />
+                      <span className="text-sm font-semibold w-5 text-center">
+                        {getNotificationIcon(notification.tipo)}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="font-semibold text-sm">{notification.titulo}</p>
+                            <p className="text-sm text-muted-foreground mt-1">{notification.mensaje}</p>
+                            {target && (
+                              <Button variant="outline" size="sm" asChild className="mt-3 h-8">
+                                <Link
+                                  href={target.href}
+                                  onClick={() => {
+                                    void markAsRead([notification.id])
+                                  }}
+                                >
+                                  {target.label}
+                                </Link>
+                              </Button>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {!notification.leida && (
+                              <Badge variant="default" className="bg-blue-500">
+                                Nueva
+                              </Badge>
+                            )}
+                            <Badge variant="outline">{getAreaLabel(notification.categoria)}</Badge>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          {!notification.leida && (
-                            <Badge variant="default" className="bg-blue-500">
-                              Nueva
-                            </Badge>
-                          )}
-                          <Badge variant="outline">{getAreaLabel(notification.categoria)}</Badge>
-                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          {format(new Date(notification.created_at), 'PPP p', { locale: es })} (
+                          {formatDistanceToNow(new Date(notification.created_at), {
+                            addSuffix: true,
+                            locale: es,
+                          })}
+                          )
+                        </p>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        {format(new Date(notification.created_at), 'PPP p', { locale: es })} (
-                        {formatDistanceToNow(new Date(notification.created_at), {
-                          addSuffix: true,
-                          locale: es,
-                        })}
-                        )
-                      </p>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              )
+            })}
           </>
         )}
       </div>
