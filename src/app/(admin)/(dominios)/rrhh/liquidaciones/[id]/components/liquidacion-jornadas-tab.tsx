@@ -23,6 +23,7 @@ import type { Liquidacion, LiquidacionJornada } from '@/types/domain.types'
 import {
   TURNO_OPTIONS,
   getTurnoLabel,
+  getAutoLicenciaLabel,
   normalizeOrigen,
   normalizeTurno,
   sanitizeTaskValue,
@@ -578,7 +579,7 @@ export function LiquidacionJornadasTab({
                     const feriadoLabel = feriadosMap.get(fechaIso)
                     const esFeriado = Boolean(feriadoLabel)
                     const esDomingo = isSunday(fechaIso)
-                    const esDescanso = row.origen === 'auto_licencia_descanso'
+                    const licenciaLabel = getAutoLicenciaLabel(row)
                     const esAusenciaRegistrada = isAusenciaObservacion(row.observaciones)
                     const placeholderTipo = isPlaceholder ? getPlaceholderTipo(fechaIso) : null
                     const hasDiferencia =
@@ -615,9 +616,9 @@ export function LiquidacionJornadasTab({
                               {feriadoLabel}
                             </Badge>
                           )}
-                          {esDescanso && (
+                          {licenciaLabel && (
                             <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px]">
-                              Descanso
+                              {licenciaLabel}
                             </Badge>
                           )}
                           {!isPlaceholder && esAusenciaRegistrada && (

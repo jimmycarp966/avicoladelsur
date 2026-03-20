@@ -3,7 +3,7 @@
 import { useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
 import type { LiquidacionJornada } from '@/types/domain.types'
-import { isAusenciaObservacion } from './liquidacion-utils'
+import { getAutoLicenciaLabel, isAusenciaObservacion } from './liquidacion-utils'
 
 type JornadasCalendarioProps = {
   jornadas: LiquidacionJornada[]
@@ -75,7 +75,7 @@ const TIPO_CONFIG: Record<
   descanso: {
     bg: 'bg-blue-50 border-blue-200',
     text: 'text-blue-700',
-    label: 'Descanso',
+    label: 'Licencia',
     icon: '~',
   },
   ausente: {
@@ -213,6 +213,7 @@ export function JornadasCalendario({
             const cfg = TIPO_CONFIG[dia.tipo]
             const esHoy = dia.fecha === today
             const esClicable = dia.tipo === 'ausente'
+            const licenciaLabel = getAutoLicenciaLabel(dia.jornada)
 
             return (
               <div
@@ -258,7 +259,7 @@ export function JornadasCalendario({
 
                 {dia.tipo !== 'no_laboral' && cfg.label && (
                   <p className={`text-[9px] leading-tight mt-0.5 ${cfg.text} opacity-70`}>
-                    {cfg.label}
+                    {licenciaLabel || cfg.label}
                   </p>
                 )}
               </div>

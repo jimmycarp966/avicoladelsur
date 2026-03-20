@@ -205,6 +205,13 @@ export function LicenciasTable({ licencias, onView, onApprove, onReject }: Licen
       header: 'Acciones',
       cell: ({ row }) => {
         const licencia = row.original
+        const hasRowActions = !licencia.aprobado && Boolean(onApprove || onReject)
+        const hasActions = Boolean(onView) || hasRowActions
+
+        if (!hasActions) {
+          return <span className="text-xs text-muted-foreground">-</span>
+        }
+
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

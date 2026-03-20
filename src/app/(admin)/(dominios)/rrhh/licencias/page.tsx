@@ -1,6 +1,6 @@
 import { Suspense } from 'react'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
-import { LicenciasTable } from '@/components/tables/LicenciasTable'
+import { LicenciasTableWrapper } from './licencias-table-wrapper'
 import { Button } from '@/components/ui/button'
 import { Calendar, CalendarDays, Plus, CheckCircle, Clock, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
@@ -16,7 +16,7 @@ async function getLicencias() {
   } = await supabase.auth.getUser()
 
   if (authError || !user) {
-    return []
+    return { licencias: [], canApprove: false }
   }
 
   const { data: userData } = await adminSupabase
@@ -25,7 +25,8 @@ async function getLicencias() {
     .eq('id', user.id)
     .maybeSingle()
 
-  const db = userData?.activo && userData.rol === 'admin' ? adminSupabase : supabase
+  const canApprove = !!userData?.activo && userData.rol === 'admin'
+  const db = canApprove ? adminSupabase : supabase
 
   const { data, error } = await db
     .from('rrhh_licencias')
@@ -44,15 +45,15 @@ async function getLicencias() {
 
   if (error) {
     console.error('Error fetching licencias:', error)
-    return []
+    return { licencias: [], canApprove: false }
   }
 
-  return data as Licencia[]
+  return { licencias: data as Licencia[], canApprove }
 }
 
 export const dynamic = 'force-dynamic'
 export default async function LicenciasPage() {
-  const licencias = await getLicencias()
+  const { licencias, canApprove } = await getLicencias()
 
   // Calcular estadísticas
   const totalLicencias = licencias.length
@@ -207,7 +208,7 @@ export default async function LicenciasPage() {
       <div className="bg-white rounded-lg border border-gray-200">
         <div className="p-6">
           <Suspense fallback={<div>Cargando licencias...</div>}>
-            <LicenciasTable licencias={licencias} />
+            <LicenciasTableWrapper licencias={licencias} canApprove={canApprove} />
           </Suspense>
         </div>
       </div>

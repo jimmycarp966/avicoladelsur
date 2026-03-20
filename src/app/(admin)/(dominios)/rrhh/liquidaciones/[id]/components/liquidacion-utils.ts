@@ -68,6 +68,25 @@ export function normalizeOrigen(origen?: string | null): 'hik' | 'asistencia' | 
   return 'manual'
 }
 
+export function getAutoLicenciaLabel(
+  row?: Pick<LiquidacionJornada, 'origen' | 'turno' | 'tarea'> | null,
+): string | null {
+  if (!row || row.origen !== 'auto_licencia_descanso') return null
+
+  const turno = normalizeTurno(row.turno)
+  const tarea = (row.tarea || '').trim().toLowerCase()
+
+  if (turno === 'vacaciones' || tarea.includes('vacaciones')) {
+    return 'Vacaciones'
+  }
+
+  if (turno === 'descanso' || tarea.includes('descanso')) {
+    return 'Descanso programado'
+  }
+
+  return 'Licencia'
+}
+
 export function isAusenciaObservacion(value?: string | null): boolean {
   return (value || '').trim().toUpperCase().startsWith(AUSENCIA_OBSERVACION_PREFIX)
 }

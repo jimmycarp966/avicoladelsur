@@ -20,7 +20,14 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Trash2 } from 'lucide-react'
 import type { LiquidacionJornada } from '@/types/domain.types'
-import { TURNO_OPTIONS, getTurnoSelectValue, toNum, formatMoney, sanitizeTaskValue } from './liquidacion-utils'
+import {
+  TURNO_OPTIONS,
+  getAutoLicenciaLabel,
+  getTurnoSelectValue,
+  toNum,
+  formatMoney,
+  sanitizeTaskValue,
+} from './liquidacion-utils'
 
 type JornadaEditSheetProps = {
   open: boolean
@@ -48,8 +55,8 @@ export function JornadaEditSheet({
   const [showAdvancedTarifas, setShowAdvancedTarifas] = useState(false)
   const editingTurnoSelectValue = getTurnoSelectValue(editingRow?.turno)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
-  const isDescansoAutomatico = editingRow?.origen === 'auto_licencia_descanso'
-  const deleteButtonLabel = isDescansoAutomatico ? 'Quitar descanso' : 'Eliminar jornada'
+  const licenciaLabel = getAutoLicenciaLabel(editingRow)
+  const deleteButtonLabel = licenciaLabel ? `Quitar ${licenciaLabel.toLowerCase()}` : 'Eliminar jornada'
 
   // Estados locales string para inputs numéricos — evita que el campo se fuerce a "0" al borrar
   const [hsInput, setHsInput] = useState(String(editingRow?.horas_mensuales ?? ''))
@@ -270,8 +277,8 @@ export function JornadaEditSheet({
           <AlertDialogHeader>
             <AlertDialogTitle>{deleteButtonLabel}</AlertDialogTitle>
             <AlertDialogDescription>
-              {isDescansoAutomatico
-                ? 'Se eliminara la jornada de esta liquidacion y tambien el descanso de origen para que no vuelva a aparecer al recalcular.'
+              {licenciaLabel
+                ? 'Se eliminara la jornada de esta liquidacion y tambien la licencia de origen para que no vuelva a aparecer al recalcular.'
                 : 'Se eliminara la jornada de esta liquidacion. Esta accion no se puede deshacer.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
