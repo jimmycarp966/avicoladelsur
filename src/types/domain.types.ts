@@ -910,6 +910,8 @@ export interface HorariosHoyData {
   registros: HorarioDiarioEmpleado[]
   warnings: string[]
   sincronizados?: number
+  consulta_incompleta?: boolean
+  consulta_incompleta_motivo?: string
 }
 
 // Lista de Precios

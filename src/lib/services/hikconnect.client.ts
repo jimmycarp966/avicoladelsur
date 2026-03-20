@@ -15,6 +15,19 @@ interface HikConnectTokenResponse {
   expiresIn?: number
 }
 
+type HikPaginationStopReason = 'date_covered' | 'all_pages' | 'empty_page' | 'max_pages'
+
+export interface HikConnectPaginationInfo {
+  startPage: number
+  fetchedPages: number
+  maxPages: number
+  totalPages?: number
+  requestedDate?: string
+  complete: boolean
+  truncated: boolean
+  stopReason: HikPaginationStopReason
+}
+
 export interface HikConnectEventsRequest {
   startTime: string
   endTime: string
@@ -28,6 +41,7 @@ export interface HikConnectEventsResponse {
   raw: unknown
   events: Record<string, unknown>[]
   warnings: string[]
+  pagination: HikConnectPaginationInfo
 }
 
 interface HikPageResult {
@@ -36,6 +50,23 @@ interface HikPageResult {
   totalNum?: number
   pageSize?: number
 }
+
+const HIK_BUSINESS_TIMEZONE = 'America/Argentina/Buenos_Aires'
+const HIK_EVENT_TIMESTAMP_KEYS = [
+  'occurTime',
+  'eventTime',
+  'time',
+  'timestamp',
+  'punchTime',
+  'recordTime',
+  'deviceTime',
+  'authTime',
+  'verifyTime',
+  'eventDateTime',
+  'captureTime',
+  'localTime',
+  'createdAt',
+]
 
 function getConfig(): HikConnectConfig {
   const baseUrl = (process.env.HIK_CONNECT_BASE_URL || '').trim()
@@ -173,6 +204,64 @@ function readNumber(source: Record<string, unknown>, keys: string[]): number | u
   return undefined
 }
 
+function normalizeTimestampValue(value: string | number): string {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    if (value > 1e10) return new Date(value).toISOString()
+    if (value > 1e9) return new Date(value * 1000).toISOString()
+    return String(value)
+  }
+
+  if (typeof value !== 'string') {
+    return String(value)
+  }
+
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  if (/^\d{13}$/.test(trimmed)) return new Date(Number(trimmed)).toISOString()
+  if (/^\d{10}$/.test(trimmed)) return new Date(Number(trimmed) * 1000).toISOString()
+  return trimmed
+}
+
+function extractEventTimestamp(raw: Record<string, unknown>): string | undefined {
+  for (const key of HIK_EVENT_TIMESTAMP_KEYS) {
+    const value = raw[key]
+    if (typeof value === 'string' && value.trim()) return normalizeTimestampValue(value)
+    if (typeof value === 'number' && Number.isFinite(value)) return normalizeTimestampValue(value)
+  }
+
+  return undefined
+}
+
+function toArgentinaDate(timestamp: string): string | undefined {
+  const parsed = new Date(normalizeTimestampValue(timestamp))
+  if (Number.isNaN(parsed.getTime())) return undefined
+
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: HIK_BUSINESS_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(parsed)
+}
+
+function inspectPageDateCoverage(events: Record<string, unknown>[]): { minDate?: string; maxDate?: string } {
+  let minDate: string | undefined
+  let maxDate: string | undefined
+
+  for (const event of events) {
+    if (!event || typeof event !== 'object') continue
+    const timestamp = extractEventTimestamp(event)
+    if (!timestamp) continue
+    const date = toArgentinaDate(timestamp)
+    if (!date) continue
+
+    if (!minDate || date < minDate) minDate = date
+    if (!maxDate || date > maxDate) maxDate = date
+  }
+
+  return { minDate, maxDate }
+}
+
 function extractPagingMeta(payload: unknown): { totalNum?: number; pageSize?: number } {
   const root = (payload && typeof payload === 'object' ? payload : {}) as Record<string, unknown>
   const data = (root.data && typeof root.data === 'object' ? root.data : {}) as Record<string, unknown>
@@ -202,9 +291,13 @@ export async function fetchHikConnectEvents(params: HikConnectEventsRequest): Pr
         }
 
   const defaultPageSize = Math.min(params.pageSize || 200, 200)
-  const maxPagesFromEnv = Number(process.env.HIK_CONNECT_MAX_PAGES || '10')
+  const maxPagesFromEnv = Number(process.env.HIK_CONNECT_MAX_PAGES || '50')
   const maxPagesFromParams = typeof params.maxPages === 'number' ? params.maxPages : maxPagesFromEnv
-  const maxPages = Number.isFinite(maxPagesFromParams) ? Math.max(1, Math.min(maxPagesFromParams, 50)) : 10
+  const maxPages = Number.isFinite(maxPagesFromParams) ? Math.max(1, Math.min(maxPagesFromParams, 100)) : 50
+  const startPage = Math.max(1, params.pageNo || 1)
+  const requestedDate = typeof params.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(params.date.trim())
+    ? params.date.trim()
+    : undefined
 
   const fetchPage = async (pageNo: number): Promise<HikPageResult> => {
     let response: Response
@@ -266,24 +359,57 @@ export async function fetchHikConnectEvents(params: HikConnectEventsRequest): Pr
     return { payload, events, totalNum: paging.totalNum, pageSize: paging.pageSize ?? defaultPageSize }
   }
 
-  const firstPageNo = params.pageNo || 1
-  const first = await fetchPage(firstPageNo)
+  const first = await fetchPage(startPage)
   const mergedEvents = [...first.events]
   const totalNum = first.totalNum
   const effectivePageSize = first.pageSize || defaultPageSize
+  const totalPages = typeof totalNum === 'number' ? Math.ceil(totalNum / effectivePageSize) : undefined
+  const lastPageAllowed = typeof totalPages === 'number'
+    ? Math.min(totalPages, startPage + maxPages - 1)
+    : startPage + maxPages - 1
 
-  if (typeof totalNum === 'number' && totalNum > effectivePageSize) {
-    const totalPages = Math.ceil(totalNum / effectivePageSize)
-    const pagesToFetch = Math.min(totalPages, maxPages)
+  let fetchedPages = 1
+  let stopReason: HikPaginationStopReason = first.events.length === 0 ? 'empty_page' : 'all_pages'
+  let stoppedEarly = first.events.length === 0 || (typeof totalPages !== 'number' && first.events.length < effectivePageSize)
 
-    for (let page = firstPageNo + 1; page <= pagesToFetch; page++) {
+  if (!stoppedEarly) {
+    for (let page = startPage + 1; page <= lastPageAllowed; page++) {
       const next = await fetchPage(page)
       mergedEvents.push(...next.events)
-    }
+      fetchedPages += 1
 
-    if (totalPages > maxPages) {
-      warnings.push(`Se recuperaron ${maxPages} paginas de Hik-Connect y puede haber mas eventos pendientes.`)
+      if (next.events.length === 0) {
+        stopReason = 'empty_page'
+        stoppedEarly = true
+        break
+      }
+
+      if (requestedDate) {
+        const coverage = inspectPageDateCoverage(next.events)
+        if (coverage.maxDate && coverage.maxDate < requestedDate) {
+          stopReason = 'date_covered'
+          stoppedEarly = true
+          break
+        }
+      }
+
+      if (typeof totalPages !== 'number' && next.events.length < effectivePageSize) {
+        stopReason = 'all_pages'
+        stoppedEarly = true
+        break
+      }
     }
+  }
+
+  const hitHardLimit =
+    !stoppedEarly &&
+    (typeof totalPages !== 'number'
+      ? lastPageAllowed >= startPage + maxPages - 1
+      : totalPages > startPage + maxPages - 1)
+  const truncated = hitHardLimit
+
+  if (truncated) {
+    warnings.push(`Se alcanzo el limite de ${maxPages} paginas de Hik-Connect desde la pagina ${startPage} y puede haber mas eventos pendientes.`)
   }
 
   const withPersonCode = mergedEvents.filter((row) => {
@@ -306,6 +432,16 @@ export async function fetchHikConnectEvents(params: HikConnectEventsRequest): Pr
     raw: first.payload,
     events: mergedEvents,
     warnings,
+    pagination: {
+      startPage,
+      fetchedPages,
+      maxPages,
+      totalPages,
+      requestedDate,
+      complete: !truncated,
+      truncated,
+      stopReason: truncated ? 'max_pages' : stopReason,
+    },
   }
 }
 

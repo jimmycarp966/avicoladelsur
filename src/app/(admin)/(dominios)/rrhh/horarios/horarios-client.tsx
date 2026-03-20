@@ -5,6 +5,7 @@ import { RefreshCw, Clock3, UserCheck, UserX, Database, CheckSquare, CalendarSyn
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatCard } from '@/components/ui/stat-card'
 import { useNotificationStore } from '@/store/notificationStore'
@@ -95,6 +96,10 @@ export function HorariosClient() {
   const mesesNombres = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
   const aniosDisponibles = [syncAnio - 1, syncAnio]
   const fechaValida = ISO_DATE_REGEX.test(fecha)
+  const consultaIncompleta = Boolean(data?.consulta_incompleta)
+  const consultaIncompletaMotivo =
+    data?.consulta_incompleta_motivo ||
+    (consultaIncompleta ? 'La consulta de Hik-Connect puede estar incompleta por paginacion.' : undefined)
 
   return (
     <div className="space-y-8">
@@ -142,6 +147,20 @@ export function HorariosClient() {
           </div>
         }
       />
+
+      {consultaIncompleta && (
+        <Alert className="border-amber-300 bg-amber-50 text-amber-950 shadow-sm">
+          <AlertTitle className="flex flex-wrap items-center gap-2">
+            <span>Consulta parcial de Hik-Connect</span>
+            <Badge variant="warning" className="rounded-full">
+              Revisar
+            </Badge>
+          </AlertTitle>
+          <AlertDescription className="text-amber-900">
+            {consultaIncompletaMotivo}
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title="Eventos Crudos" value={stats.totalEventos} subtitle="Recibidos desde Hik" icon={Database} variant="primary" />

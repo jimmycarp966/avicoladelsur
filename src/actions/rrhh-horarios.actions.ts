@@ -65,6 +65,10 @@ function normalizeTimestampValue(value: string | number): string {
     return String(value)
   }
 
+  if (typeof value !== 'string') {
+    return String(value)
+  }
+
   const trimmed = value.trim()
   if (!trimmed) return ''
   if (/^\d{13}$/.test(trimmed)) return new Date(Number(trimmed)).toISOString()
@@ -496,17 +500,17 @@ export async function obtenerHorariosHoyDesdeHikAction(fecha?: string): Promise<
     let rawEventsForDate = filterRawEventsForDate(hikResponse.events)
     const todayArgentina = getArgentinaDateRange(new Date()).date
     const isHistoricalDate = range.date < todayArgentina
-    const paginationWasTrimmed = hikResponse.warnings.some((warning) => warning.includes('puede haber mas eventos pendientes'))
-    const defaultMaxPagesRaw = Number(process.env.HIK_CONNECT_MAX_PAGES || '10')
+    const paginationWasTrimmed = !hikResponse.pagination.complete
+    const defaultMaxPagesRaw = Number(process.env.HIK_CONNECT_MAX_PAGES || '50')
     const defaultMaxPages = Number.isFinite(defaultMaxPagesRaw)
-      ? Math.max(1, Math.min(defaultMaxPagesRaw, 50))
-      : 10
-    const fallbackMaxPagesRaw = Number(process.env.HIK_CONNECT_MAX_PAGES_HISTORICAL || '50')
-    const fallbackMaxPages = Number.isFinite(fallbackMaxPagesRaw)
-      ? Math.max(1, Math.min(fallbackMaxPagesRaw, 50))
+      ? Math.max(1, Math.min(defaultMaxPagesRaw, 100))
       : 50
+    const fallbackMaxPagesRaw = Number(process.env.HIK_CONNECT_MAX_PAGES_HISTORICAL || '100')
+    const fallbackMaxPages = Number.isFinite(fallbackMaxPagesRaw)
+      ? Math.max(1, Math.min(fallbackMaxPagesRaw, 100))
+      : 100
 
-    if (isHistoricalDate && rawEventsForDate.length === 0 && paginationWasTrimmed && fallbackMaxPages > defaultMaxPages) {
+    if (isHistoricalDate && paginationWasTrimmed && fallbackMaxPages > defaultMaxPages) {
       const retryResponse = await fetchHikConnectEvents({
         startTime: range.start,
         endTime: range.end,
@@ -516,13 +520,18 @@ export async function obtenerHorariosHoyDesdeHikAction(fecha?: string): Promise<
         maxPages: fallbackMaxPages,
       })
       const retryRawEventsForDate = filterRawEventsForDate(retryResponse.events)
-      if (retryRawEventsForDate.length > 0) {
+      const retryImprovedCoverage = retryRawEventsForDate.length > rawEventsForDate.length
+      const retryClosedPaginationGap = retryResponse.pagination.complete && !hikResponse.pagination.complete
+
+      if (retryImprovedCoverage || retryClosedPaginationGap) {
         rawEventsForDate = retryRawEventsForDate
         hikResponse = {
           ...retryResponse,
           warnings: [
             ...hikResponse.warnings,
-            `Reintento para fecha historica con ${fallbackMaxPages} paginas: se recuperaron marcaciones.`,
+            retryImprovedCoverage
+              ? `Reintento para fecha historica con ${fallbackMaxPages} paginas: se recuperaron marcaciones.`
+              : `Reintento para fecha historica con ${fallbackMaxPages} paginas: se completo la cobertura de la consulta.`,
             ...retryResponse.warnings,
           ],
         }
@@ -531,7 +540,7 @@ export async function obtenerHorariosHoyDesdeHikAction(fecha?: string): Promise<
           ...retryResponse,
           warnings: [
             ...hikResponse.warnings,
-            `Reintento para fecha historica con ${fallbackMaxPages} paginas sin resultados para ${range.date}.`,
+            `Reintento para fecha historica con ${fallbackMaxPages} paginas sin mejorar cobertura para ${range.date}.`,
             ...retryResponse.warnings,
           ],
         }
@@ -629,6 +638,10 @@ export async function obtenerHorariosHoyDesdeHikAction(fecha?: string): Promise<
         registros,
         warnings: [...hikResponse.warnings, ...warnings],
         sincronizados,
+        consulta_incompleta: !hikResponse.pagination.complete,
+        consulta_incompleta_motivo: hikResponse.pagination.complete
+          ? undefined
+          : `La consulta de Hik-Connect alcanzo el limite de ${hikResponse.pagination.maxPages} paginas desde la pagina ${hikResponse.pagination.startPage}.`,
       },
       message: `Horarios obtenidos. ${sincronizados} registros sincronizados con Asistencia.`,
     }

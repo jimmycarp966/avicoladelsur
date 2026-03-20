@@ -125,7 +125,7 @@ async function fetchHikEvents(date) {
   const apiKey = String(process.env.HIK_CONNECT_API_KEY || "").trim();
   const apiSecret = String(process.env.HIK_CONNECT_API_SECRET || "").trim();
   const authMode = String(process.env.HIK_CONNECT_AUTH_MODE || "hcc_token").toLowerCase() === "bearer" ? "bearer" : "hcc_token";
-  const maxPages = Math.min(Math.max(Number(process.env.HIK_CONNECT_MAX_PAGES || "10"), 1), 50);
+  const maxPages = Math.min(Math.max(Number(process.env.HIK_CONNECT_MAX_PAGES || "50"), 1), 100);
   const pageSize = Math.min(Math.max(Number(process.env.HIK_CONNECT_PAGE_SIZE || "200"), 1), 200);
   const start = `${date}T00:00:00-03:00`;
   const end = `${date}T23:59:59-03:00`;
@@ -141,6 +141,7 @@ async function fetchHikEvents(date) {
   const events = [];
   let page = 1;
   let totalPages = 1;
+  let stoppedByDate = false;
 
   while (page <= totalPages && page <= maxPages) {
     const body = authMode === "hcc_token"
@@ -155,9 +156,27 @@ async function fetchHikEvents(date) {
     if (!res.ok) throw new Error(`events ${res.status}: ${JSON.stringify(payload)}`);
     const rows = payload?.data?.reportDataList || payload?.data?.recordList || payload?.data?.events || payload?.data?.list || payload?.events || payload?.list || [];
     if (Array.isArray(rows)) events.push(...rows.filter((x) => x && typeof x === "object"));
+
+    let pageMaxDate = "";
+    if (Array.isArray(rows)) {
+      for (const row of rows) {
+        const ts = parseTimestamp(row);
+        const d = ts ? dateAR(ts) : "";
+        if (d && d > pageMaxDate) pageMaxDate = d;
+      }
+    }
+    if (pageMaxDate && pageMaxDate < date) {
+      stoppedByDate = true;
+      break;
+    }
+
     const total = Number(payload?.data?.totalNum || payload?.data?.total || payload?.totalNum || payload?.total || 0);
     totalPages = total > 0 ? Math.ceil(total / pageSize) : page;
     page += 1;
+  }
+
+  if (!stoppedByDate && page > maxPages) {
+    console.warn(`[WARN] RRHH Hik backfill alcanzo el limite de ${maxPages} paginas para ${date}.`);
   }
 
   return events;
