@@ -1818,6 +1818,74 @@ export async function upsertLiquidacionJornadaAction(
   }
 }
 
+export async function eliminarLiquidacionJornadaAction(
+  liquidacionId: string,
+  jornadaId: string,
+): Promise<
+  ApiResponse<{
+    liquidacionId: string
+    jornadaId: string
+    descansoCancelado: boolean
+    asistenciaEliminada: boolean
+  }>
+> {
+  try {
+    const adminUserId = await getAuthenticatedAdminUserId()
+    if (!adminUserId) {
+      return {
+        success: false,
+        error: 'No autorizado',
+      }
+    }
+
+    const supabase = createAdminClient()
+
+    const { data, error } = await supabase.rpc('fn_rrhh_eliminar_liquidacion_jornada', {
+      p_liquidacion_id: liquidacionId,
+      p_jornada_id: jornadaId,
+      p_actor: adminUserId,
+    })
+
+    if (error) {
+      devError('Error eliminando jornada de liquidacion:', error)
+      return {
+        success: false,
+        error: error.message || 'No se pudo eliminar la jornada',
+      }
+    }
+
+    const resultRow = Array.isArray(data) ? data[0] : data
+    if (!resultRow?.jornada_id) {
+      return {
+        success: false,
+        error: 'No se pudo eliminar la jornada',
+      }
+    }
+
+    revalidatePath('/rrhh/liquidaciones')
+    revalidatePath(`/rrhh/liquidaciones/${liquidacionId}`)
+
+    return {
+      success: true,
+      data: {
+        liquidacionId,
+        jornadaId,
+        descansoCancelado: Boolean(resultRow.descanso_cancelado),
+        asistenciaEliminada: Boolean(resultRow.asistencia_eliminada),
+      },
+      message: resultRow.descanso_cancelado
+        ? 'Descanso eliminado completamente y liquidacion recalculada'
+        : 'Jornada eliminada y liquidacion recalculada',
+    }
+  } catch (error) {
+    devError('Error en eliminarLiquidacionJornadaAction:', error)
+    return {
+      success: false,
+      error: 'Error interno del servidor',
+    }
+  }
+}
+
 export async function obtenerConfiguracionLiquidacionAction(
   periodoMes: number,
   periodoAnio: number

@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useNotificationStore } from '@/store/notificationStore'
-import { upsertLiquidacionJornadaAction } from '@/actions/rrhh.actions'
+import { eliminarLiquidacionJornadaAction, upsertLiquidacionJornadaAction } from '@/actions/rrhh.actions'
 import { JornadaEditSheet } from './jornada-edit-sheet'
 import { JornadaAddSheet } from './jornada-add-sheet'
 import { JornadasCalendario } from './jornadas-calendario'
@@ -282,6 +282,28 @@ export function LiquidacionJornadasTab({
       router.refresh()
     } catch {
       showToast('error', 'Error inesperado al guardar jornada', 'Error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDeleteRow = async (row: LiquidacionJornada) => {
+    setLoading(true)
+    try {
+      const result = await eliminarLiquidacionJornadaAction(liquidacion.id, row.id)
+
+      if (!result.success) {
+        showToast('error', result.error || 'No se pudo eliminar la jornada', 'Error')
+        return
+      }
+
+      setRows((prev) => prev.filter((current) => current.id !== row.id))
+      setEditSheetOpen(false)
+      setEditingRow(null)
+      showToast('success', result.message || 'Jornada eliminada y liquidacion recalculada', 'Eliminado')
+      router.refresh()
+    } catch {
+      showToast('error', 'Error inesperado al eliminar la jornada', 'Error')
     } finally {
       setLoading(false)
     }
@@ -731,6 +753,7 @@ export function LiquidacionJornadasTab({
 
       {/* Sheets */}
       <JornadaEditSheet
+        key={`jornada-edit-sheet-${editingRow?.id || 'empty'}`}
         open={editSheetOpen}
         onOpenChange={(open) => {
           setEditSheetOpen(open)
@@ -746,6 +769,7 @@ export function LiquidacionJornadasTab({
         onUpdateRow={(patch) => {
           setEditingRow((prev) => (prev ? { ...prev, ...patch } : prev))
         }}
+        onDelete={(row) => void handleDeleteRow(row)}
         breakdown={editingRowBreakdown}
       />
 

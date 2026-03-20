@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -8,6 +8,17 @@ import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { Trash2 } from 'lucide-react'
 import type { LiquidacionJornada } from '@/types/domain.types'
 import { TURNO_OPTIONS, getTurnoSelectValue, toNum, formatMoney, sanitizeTaskValue } from './liquidacion-utils'
 
@@ -19,6 +30,7 @@ type JornadaEditSheetProps = {
   loading: boolean
   onSave: (row: LiquidacionJornada) => void
   onUpdateRow: (patch: Partial<LiquidacionJornada>) => void
+  onDelete?: (row: LiquidacionJornada) => void | Promise<void>
   breakdown: { base: number; extra: number; extraAplicado: number; especial: number; total: number } | null
 }
 
@@ -30,21 +42,19 @@ export function JornadaEditSheet({
   loading,
   onSave,
   onUpdateRow,
+  onDelete,
   breakdown,
 }: JornadaEditSheetProps) {
   const [showAdvancedTarifas, setShowAdvancedTarifas] = useState(false)
   const editingTurnoSelectValue = getTurnoSelectValue(editingRow?.turno)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const isDescansoAutomatico = editingRow?.origen === 'auto_licencia_descanso'
+  const deleteButtonLabel = isDescansoAutomatico ? 'Quitar descanso' : 'Eliminar jornada'
 
   // Estados locales string para inputs numéricos — evita que el campo se fuerce a "0" al borrar
   const [hsInput, setHsInput] = useState(String(editingRow?.horas_mensuales ?? ''))
   const [hsAdicInput, setHsAdicInput] = useState(String(editingRow?.horas_adicionales ?? ''))
   const [turnoEspInput, setTurnoEspInput] = useState(String(editingRow?.turno_especial_unidades ?? ''))
-
-  useEffect(() => {
-    setHsInput(String(editingRow?.horas_mensuales ?? ''))
-    setHsAdicInput(String(editingRow?.horas_adicionales ?? ''))
-    setTurnoEspInput(String(editingRow?.turno_especial_unidades ?? ''))
-  }, [editingRow?.id])
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -221,25 +231,65 @@ export function JornadaEditSheet({
               </div>
             </div>
 
-            <div className="flex gap-2 pt-2">
-              <Button
-                onClick={() => onSave(editingRow)}
-                disabled={loading}
-                className="flex-1"
-              >
-                Guardar y recalcular
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={loading}
-              >
-                Cancelar
-              </Button>
+            <div className="flex flex-col gap-2 pt-2">
+              {onDelete && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => setDeleteConfirmOpen(true)}
+                  disabled={loading}
+                  className="w-full"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  {deleteButtonLabel}
+                </Button>
+              )}
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => onSave(editingRow)}
+                  disabled={loading}
+                  className="flex-1"
+                >
+                  Guardar y recalcular
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                  disabled={loading}
+                >
+                  Cancelar
+                </Button>
+              </div>
             </div>
           </div>
         )}
       </SheetContent>
+
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{deleteButtonLabel}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {isDescansoAutomatico
+                ? 'Se eliminara la jornada de esta liquidacion y tambien el descanso de origen para que no vuelva a aparecer al recalcular.'
+                : 'Se eliminara la jornada de esta liquidacion. Esta accion no se puede deshacer.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loading}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={loading}
+              onClick={() => {
+                if (!editingRow || !onDelete) return
+                setDeleteConfirmOpen(false)
+                void onDelete(editingRow)
+              }}
+            >
+              {loading ? 'Eliminando...' : deleteButtonLabel}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sheet>
   )
 }
