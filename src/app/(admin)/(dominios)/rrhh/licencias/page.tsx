@@ -142,7 +142,7 @@ export default async function LicenciasPage() {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Pendientes</p>
               <p className="text-2xl font-bold text-gray-900">{pendientes}</p>
-              <p className="text-xs text-muted-foreground">{pendientesRevision} en revision RRHH</p>
+              <p className="text-xs text-muted-foreground">{pendientesRevision} en revision de administrador</p>
             </div>
           </div>
         </div>
@@ -195,11 +195,12 @@ export default async function LicenciasPage() {
           </div>
           <div>
             <h3 className="font-semibold text-blue-900">Sistema de Licencias</h3>
-            <p className="text-blue-700 text-sm mt-1">
-              Vacaciones se cargan sin certificado ni auditoria IA. Las licencias medicas mantienen la
-              revision manual de RRHH y el control de plazo de presentacion dentro de 24 horas
-              (con excepciones autorizadas).
-            </p>
+            <ul className="mt-2 space-y-2 text-sm text-blue-700">
+              <li>Vacaciones se cargan sin certificado ni auditoria IA.</li>
+              <li>Las licencias medicas exigen certificado en imagen y control de presentacion dentro de 24 horas.</li>
+              <li>Si el plazo ya vencio, la carga requiere excepcion justificada.</li>
+              <li>Todas las solicitudes quedan visibles para revision manual del administrador.</li>
+            </ul>
           </div>
         </div>
       </div>

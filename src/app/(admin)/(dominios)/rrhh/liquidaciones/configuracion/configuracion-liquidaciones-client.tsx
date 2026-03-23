@@ -142,6 +142,7 @@ export function ConfiguracionLiquidacionesClient() {
   const [savingPuestoId, setSavingPuestoId] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [modoPersonalizado, setModoPersonalizado] = useState(false)
+  const [reglaPeriodoPersistida, setReglaPeriodoPersistida] = useState(false)
   const [reglaPeriodo, setReglaPeriodo] = useState<ReglaPeriodoEditable>(
     defaultReglaPeriodo(now.getMonth() + 1, now.getFullYear()),
   )
@@ -189,6 +190,7 @@ export function ConfiguracionLiquidacionesClient() {
       }
 
       if (result.data.reglaPeriodo) {
+        setReglaPeriodoPersistida(true)
         setReglaPeriodo({
           periodo_mes: result.data.reglaPeriodo.periodo_mes,
           periodo_anio: result.data.reglaPeriodo.periodo_anio,
@@ -198,6 +200,7 @@ export function ConfiguracionLiquidacionesClient() {
           activo: !!result.data.reglaPeriodo.activo,
         })
       } else {
+        setReglaPeriodoPersistida(false)
         setReglaPeriodo(defaultReglaPeriodo(mes, anio))
       }
 
@@ -430,6 +433,29 @@ export function ConfiguracionLiquidacionesClient() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {!reglaPeriodoPersistida && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+              Este periodo todavia no tiene una regla guardada. Estas viendo los valores recomendados para{' '}
+              <strong>
+                {meses.find((mes) => mes.value === periodoMes)?.label} {periodoAnio}
+              </strong>
+              : galpon {reglaPeriodo.dias_base_galpon}, sucursales {getDaysInMonth(periodoMes, periodoAnio)} y rrhh{' '}
+              {reglaPeriodo.dias_base_rrhh}. Guarda esta configuracion para dejar fijo el valor hora del mes.
+            </div>
+          )}
+
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-800">
+            <div className="font-medium text-slate-950">
+              Reglas visibles para {meses.find((mes) => mes.value === periodoMes)?.label} {periodoAnio}
+            </div>
+            <ul className="mt-2 space-y-2">
+              <li>`Galpon` usa dias habiles configurables; si no hay regla guardada, el valor recomendado es 27.</li>
+              <li>`Sucursales` siempre usa dias calendario del mes seleccionado; para este periodo son {getDaysInMonth(periodoMes, periodoAnio)}.</li>
+              <li>`RRHH / Oficina` usa dias habiles configurables; si no hay regla guardada, el valor recomendado es 22.</li>
+              <li>El valor hora se calcula con esta base: `valor_jornal = sueldo / dias_base` y `valor_hora = valor_jornal / horas_jornada`.</li>
+            </ul>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {(
               [

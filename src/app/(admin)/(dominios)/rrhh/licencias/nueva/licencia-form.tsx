@@ -27,7 +27,7 @@ import { licenciaSchema, type LicenciaFormData } from '@/lib/schemas/rrhh.schema
 import { crearLicenciaAction, obtenerEmpleadosActivosAction } from '@/actions/rrhh.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 import type { Empleado } from '@/types/domain.types'
-import { getEmpleadoNombre } from '@/lib/utils/empleado-display'
+import { getEmpleadoDropdownLabel, getEmpleadoLegajoDni, getEmpleadoNombre } from '@/lib/utils/empleado-display'
 
 type NuevaLicenciaFormProps = {
   defaultTipo?: LicenciaFormData['tipo']
@@ -183,6 +183,34 @@ export function NuevaLicenciaForm({ defaultTipo }: NuevaLicenciaFormProps) {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <Card className={esVacaciones ? 'border-emerald-200 bg-emerald-50/60' : 'border-blue-200 bg-blue-50/60'}>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <AlertCircle className={`w-4 h-4 ${esVacaciones ? 'text-emerald-700' : 'text-blue-700'}`} />
+              Reglas de esta carga
+            </CardTitle>
+            <CardDescription>
+              Estas reglas se aplican automaticamente al guardar la solicitud.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {esVacaciones ? (
+              <ul className="space-y-2 text-sm text-emerald-950">
+                <li>Se cargan solo fechas y observaciones; no hace falta certificado ni diagnostico.</li>
+                <li>Los dias se calculan como corridos entre fecha de inicio y fecha de fin.</li>
+                <li>La solicitud queda registrada para revision y seguimiento del administrador.</li>
+              </ul>
+            ) : (
+              <ul className="space-y-2 text-sm text-blue-950">
+                <li>El certificado debe adjuntarse como imagen `JPG`, `PNG` o `WEBP`.</li>
+                <li>El plazo de presentacion es de 24 horas desde la fecha declarada; si no se informa, se toma la fecha de inicio.</li>
+                <li>Si el plazo vencio, solo se puede continuar marcando excepcion y explicando el motivo.</li>
+                <li>La IA audita el certificado y el administrador mantiene la revision manual antes de resolverlo.</li>
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -201,16 +229,12 @@ export function NuevaLicenciaForm({ defaultTipo }: NuevaLicenciaFormProps) {
                   <SelectValue placeholder="Seleccionar empleado" />
                 </SelectTrigger>
                 <SelectContent>
-                  {empleados.map((empleado) => {
-                    const nombreCompleto = getEmpleadoNombre(empleado)
-                    return (
-                      <SelectItem key={empleado.id} value={empleado.id}>
-                        {nombreCompleto}
-                        {empleado.legajo ? ` - Legajo ${empleado.legajo}` : ''}
-                        {empleado.sucursal?.nombre ? ` (${empleado.sucursal.nombre})` : ''}
-                      </SelectItem>
-                    )
-                  })}
+                  {empleados.map((empleado) => (
+                    <SelectItem key={empleado.id} value={empleado.id}>
+                      {getEmpleadoDropdownLabel(empleado)}
+                      {empleado.sucursal?.nombre ? ` (${empleado.sucursal.nombre})` : ''}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               {errors.empleado_id && <p className="text-sm text-red-600">{errors.empleado_id.message}</p>}
@@ -246,7 +270,7 @@ export function NuevaLicenciaForm({ defaultTipo }: NuevaLicenciaFormProps) {
                   <div>
                     Nombre: {getEmpleadoNombre(empleadoSeleccionado)}
                   </div>
-                  <div>Legajo: {empleadoSeleccionado.legajo || 'Sin asignar'}</div>
+                  <div>Identificacion: {getEmpleadoLegajoDni(empleadoSeleccionado)}</div>
                   <div>Sucursal: {empleadoSeleccionado.sucursal?.nombre || 'Sin asignar'}</div>
                 </div>
               </div>
@@ -361,7 +385,7 @@ export function NuevaLicenciaForm({ defaultTipo }: NuevaLicenciaFormProps) {
                     <Textarea
                       id="motivo_excepcion"
                       rows={2}
-                      placeholder="Detalle de la excepcion autorizada por RRHH"
+                      placeholder="Detalle de la excepcion autorizada por administrador"
                       {...register('motivo_excepcion')}
                     />
                     {errors.motivo_excepcion && (
@@ -387,7 +411,7 @@ export function NuevaLicenciaForm({ defaultTipo }: NuevaLicenciaFormProps) {
             <CardDescription>
               {esVacaciones
                 ? 'Usá este espacio para aclarar cobertura, viaje, fechas especiales o cualquier nota interna.'
-                : 'Sin certificado no se valida. La IA analiza imagen y RRHH revisa manualmente en estado pendiente.'}
+                : 'Sin certificado no se valida. La IA analiza la imagen y el administrador revisa manualmente el caso pendiente.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -396,7 +420,7 @@ export function NuevaLicenciaForm({ defaultTipo }: NuevaLicenciaFormProps) {
                 <Label htmlFor="observaciones">Observaciones</Label>
                 <Textarea
                   id="observaciones"
-                  placeholder="Notas internas para RRHH..."
+                  placeholder="Notas internas para administrador..."
                   rows={3}
                   {...register('observaciones')}
                 />
@@ -426,7 +450,7 @@ export function NuevaLicenciaForm({ defaultTipo }: NuevaLicenciaFormProps) {
                   <Label htmlFor="observaciones">Observaciones</Label>
                   <Textarea
                     id="observaciones"
-                    placeholder="Notas internas para RRHH..."
+                    placeholder="Notas internas para administrador..."
                     rows={3}
                     {...register('observaciones')}
                   />
@@ -454,8 +478,8 @@ export function NuevaLicenciaForm({ defaultTipo }: NuevaLicenciaFormProps) {
               </h3>
               <p className={`mt-1 text-sm ${esVacaciones ? 'text-emerald-800' : 'text-yellow-800'}`}>
                 {esVacaciones
-                  ? '1) Se guardan fechas y observaciones. 2) RRHH revisa la solicitud y mantiene el seguimiento hasta resolverla.'
-                  : '1) Se valida carga del certificado. 2) IA audita nombre/diagnostico de la imagen. 3) RRHH realiza revision manual y mantiene estado pendiente hasta resolucion.'}
+                  ? '1) Se guardan fechas y observaciones. 2) El administrador revisa la solicitud y mantiene el seguimiento hasta resolverla.'
+                  : '1) Se valida la carga del certificado. 2) La IA audita nombre y diagnostico de la imagen. 3) El administrador realiza la revision manual y mantiene el estado pendiente hasta resolverlo.'}
               </p>
             </div>
           </div>

@@ -344,6 +344,28 @@ export const licenciaSchema = z.object({
   }
 })
 
+export const legajoIncidenciaSchema = z.object({
+  empleado_id: z
+    .string()
+    .uuid('ID de empleado invalido'),
+
+  titulo: z
+    .string()
+    .min(1, 'El titulo es requerido')
+    .max(120, 'El titulo debe tener maximo 120 caracteres'),
+
+  descripcion: z
+    .string()
+    .max(1000, 'La descripcion debe tener maximo 1000 caracteres')
+    .optional(),
+
+  fecha_evento: z
+    .string()
+    .refine((val) => !isNaN(Date.parse(val)), {
+      message: 'Fecha de incidencia invalida',
+    }),
+})
+
 // Esquema para adelantos
 export const adelantoSchema = z.object({
   empleado_id: z
@@ -533,6 +555,7 @@ export type NovedadRRHHFormData = z.input<typeof novedadRRHHSchema>
 // como `estado`, puedan ser opcionales al enviar y compatibles con React Hook Form.
 export type AsistenciaFormData = z.input<typeof asistenciaSchema>
 export type LicenciaFormData = z.input<typeof licenciaSchema>
+export type LegajoIncidenciaFormData = z.input<typeof legajoIncidenciaSchema>
 export type AdelantoFormData = z.infer<typeof adelantoSchema>
 export type DescuentoFormData = z.infer<typeof descuentoSchema>
 export type EvaluacionFormData = z.input<typeof evaluacionSchema>

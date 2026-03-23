@@ -50,7 +50,7 @@ export function LicenciasTable({ licencias, onView, onApprove, onReject }: Licen
       if (licencia.estado_revision === 'rechazado') {
         return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">Rechazada</Badge>
       }
-      return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Pendiente RRHH</Badge>
+      return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Pendiente administrador</Badge>
     }
 
     if (hoy < inicio) {
@@ -67,11 +67,11 @@ export function LicenciasTable({ licencias, onView, onApprove, onReject }: Licen
   const getRevisionBadge = (licencia: Licencia) => {
     switch (licencia.estado_revision) {
       case 'aprobado':
-        return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Aprobado RRHH</Badge>
+        return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Aprobado por administrador</Badge>
       case 'rechazado':
-        return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Rechazado RRHH</Badge>
+        return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Rechazado por administrador</Badge>
       default:
-        return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Pendiente RRHH</Badge>
+        return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Pendiente administrador</Badge>
     }
   }
 
@@ -176,7 +176,7 @@ export function LicenciasTable({ licencias, onView, onApprove, onReject }: Licen
     },
     {
       id: 'revision_rrhh',
-      header: 'Revision RRHH',
+      header: 'Revision administrador',
       cell: ({ row }) => getRevisionBadge(row.original),
     },
     {

@@ -20,7 +20,7 @@ import {
 } from '@/actions/rrhh.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 import type { Empleado } from '@/types/domain.types'
-import { getEmpleadoNombre } from '@/lib/utils/empleado-display'
+import { getEmpleadoDropdownLabel } from '@/lib/utils/empleado-display'
 
 type ProductoAdelantoOption = {
   id: string
@@ -204,15 +204,11 @@ export function NuevoAdelantoForm() {
                     <SelectValue placeholder="Seleccionar empleado" />
                   </SelectTrigger>
                   <SelectContent>
-                    {empleados.map((empleado) => {
-                      const nombreCompleto = getEmpleadoNombre(empleado)
-                      return (
-                        <SelectItem key={empleado.id} value={empleado.id}>
-                          {nombreCompleto}
-                          {empleado.legajo ? ` - Legajo ${empleado.legajo}` : ''}
-                        </SelectItem>
-                      )
-                    })}
+                    {empleados.map((empleado) => (
+                      <SelectItem key={empleado.id} value={empleado.id}>
+                        {getEmpleadoDropdownLabel(empleado)}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 {errors.empleado_id && (

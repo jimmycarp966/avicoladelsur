@@ -23,7 +23,7 @@ import {
 import { MetricasSoportePanel } from '@/components/rrhh/MetricasSoportePanel'
 import { useNotificationStore } from '@/store/notificationStore'
 import type { Empleado, Sucursal } from '@/types/domain.types'
-import { getEmpleadoNombre } from '@/lib/utils/empleado-display'
+import { getEmpleadoDropdownLabel, getEmpleadoLegajoDni, getEmpleadoNombre } from '@/lib/utils/empleado-display'
 
 interface EvaluacionCriteria {
   name: keyof Pick<EvaluacionFormData, 'puntualidad' | 'rendimiento' | 'actitud' | 'responsabilidad' | 'trabajo_equipo'>
@@ -206,16 +206,12 @@ export function NuevaEvaluacionForm() {
                     <SelectValue placeholder="Seleccionar empleado" />
                   </SelectTrigger>
                   <SelectContent>
-                    {empleados.map((empleado) => {
-                      const nombreCompleto = getEmpleadoNombre(empleado)
-                      return (
-                        <SelectItem key={empleado.id} value={empleado.id}>
-                          {nombreCompleto}
-                          {empleado.legajo ? ` - Legajo ${empleado.legajo}` : ''}
-                          {empleado.sucursal?.nombre ? ` (${empleado.sucursal.nombre})` : ''}
-                        </SelectItem>
-                      )
-                    })}
+                    {empleados.map((empleado) => (
+                      <SelectItem key={empleado.id} value={empleado.id}>
+                        {getEmpleadoDropdownLabel(empleado)}
+                        {empleado.sucursal?.nombre ? ` (${empleado.sucursal.nombre})` : ''}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 {errors.empleado_id && (
@@ -318,7 +314,7 @@ export function NuevaEvaluacionForm() {
                     <span className="font-medium">Nombre:</span> {getEmpleadoNombre(empleadoSeleccionado)}
                   </div>
                   <div>
-                    <span className="font-medium">Legajo:</span> {empleadoSeleccionado.legajo || 'Sin asignar'}
+                    <span className="font-medium">Nro. de legajo + DNI:</span> {getEmpleadoLegajoDni(empleadoSeleccionado)}
                   </div>
                   <div>
                     <span className="font-medium">Categoría:</span> {empleadoSeleccionado.categoria?.nombre || 'Sin asignar'}

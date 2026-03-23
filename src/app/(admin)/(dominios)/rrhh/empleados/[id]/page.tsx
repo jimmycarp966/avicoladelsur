@@ -1,11 +1,12 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, Edit } from "lucide-react"
+import { ArrowLeft, Edit, Plus } from "lucide-react"
 import { createAdminClient, createClient } from "@/lib/supabase/server"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { formatDate } from "@/lib/utils"
+import { getEmpleadoLegajoDni } from "@/lib/utils/empleado-display"
 import type { Empleado } from "@/types/domain.types"
 
 interface PageProps {
@@ -70,7 +71,7 @@ type LiquidacionLegajo = {
 type TimelineItem = {
   key: string
   fecha: string
-  categoria: "legajo" | "adelanto" | "licencia" | "evaluacion"
+  categoria: "legajo" | "adelanto" | "licencia" | "evaluacion" | "incidencia"
   titulo: string
   descripcion?: string
 }
@@ -222,12 +223,13 @@ export default async function EmpleadoLegajoPage({ params }: PageProps) {
   const nombreCompleto =
     `${empleado.usuario?.nombre || empleado.nombre || ""} ${empleado.usuario?.apellido || empleado.apellido || ""}`.trim() ||
     "Sin nombre"
+  const identificacionEmpleado = getEmpleadoLegajoDni(empleado)
 
   const timeline: TimelineItem[] = [
     ...eventos.map((evento) => ({
       key: `evento-${evento.id}`,
       fecha: evento.fecha_evento || "",
-      categoria: "legajo" as const,
+      categoria: evento.categoria === "incidencias" ? "incidencia" as const : "legajo" as const,
       titulo: evento.titulo || "Evento RRHH",
       descripcion: evento.descripcion || `${evento.tipo} (${evento.categoria})`,
     })),
@@ -270,17 +272,25 @@ export default async function EmpleadoLegajoPage({ params }: PageProps) {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Legajo de {nombreCompleto}</h1>
             <p className="text-gray-600 mt-1">
-              {empleado.legajo ? `Legajo ${empleado.legajo}` : "Sin legajo"}
+              {identificacionEmpleado}
               {empleado.usuario?.email ? ` • ${empleado.usuario.email}` : ""}
             </p>
           </div>
         </div>
-        <Button asChild>
-          <Link href={`/rrhh/empleados/${id}/editar`}>
-            <Edit className="w-4 h-4 mr-2" />
-            Editar
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" asChild>
+            <Link href={`/rrhh/empleados/${id}/incidencias/nueva`}>
+              <Plus className="w-4 h-4 mr-2" />
+              Nueva incidencia
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link href={`/rrhh/empleados/${id}/editar`}>
+              <Edit className="w-4 h-4 mr-2" />
+              Editar
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -317,7 +327,7 @@ export default async function EmpleadoLegajoPage({ params }: PageProps) {
       <Card>
         <CardHeader>
           <CardTitle>Historial RRHH (Legajo)</CardTitle>
-          <CardDescription>Timeline unificado de eventos, licencias, adelantos y evaluaciones</CardDescription>
+          <CardDescription>Timeline unificado de eventos, incidencias, licencias, adelantos y evaluaciones</CardDescription>
         </CardHeader>
         <CardContent>
           {timeline.length === 0 ? (

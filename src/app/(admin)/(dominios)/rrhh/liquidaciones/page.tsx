@@ -14,6 +14,7 @@ import { LiquidacionesTableWrapper } from './_components/LiquidacionesTableWrapp
 import { PeriodFilterBar } from './_components/PeriodFilterBar'
 import { RecalcularLiquidacionesButton } from './_components/RecalcularLiquidacionesButton'
 import { formatCurrency } from '@/lib/utils'
+import { getEmpleadoDropdownLabel } from '@/lib/utils/empleado-display'
 
 type AmbitoFilter = 'todos' | 'sucursal' | 'galpon'
 
@@ -156,17 +157,21 @@ async function getEmpleadosActivosParaRecalculo() {
 
   const { data } = await db
     .from('rrhh_empleados')
-    .select('id, legajo, nombre, apellido, usuario:usuarios(nombre, apellido, email)')
+    .select('id, legajo, dni, nombre, apellido, usuario:usuarios(nombre, apellido, email)')
     .eq('activo', true)
+    .order('legajo', { ascending: true, nullsFirst: false })
 
   return (data || [])
-    .map((row) => {
-      const usuario = row.usuario as { nombre?: string | null; apellido?: string | null; email?: string | null } | null
-      const nombreUsuario = `${usuario?.nombre || ''} ${usuario?.apellido || ''}`.trim()
-      const nombreEmpleado = `${row.nombre || ''} ${row.apellido || ''}`.trim()
-      const nombre = nombreUsuario || nombreEmpleado || usuario?.email || (row.legajo ? `Legajo ${row.legajo}` : 'Sin nombre')
-      return { id: String(row.id), nombre }
-    })
+    .map((row) => ({
+      id: String(row.id),
+      nombre: getEmpleadoDropdownLabel({
+        nombre: row.nombre || undefined,
+        apellido: row.apellido || undefined,
+        legajo: row.legajo || undefined,
+        dni: row.dni || undefined,
+        usuario: row.usuario as { nombre?: string | undefined; apellido?: string | undefined; email?: string | undefined } | null,
+      }),
+    }))
     .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
 }
 

@@ -23,6 +23,46 @@ type LegajoEventoInput = {
   fechaEvento?: string
 }
 
+const RRHH_LICENCIAS_BUCKET = 'rrhh-licencias'
+const RRHH_LICENCIAS_ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+const RRHH_LICENCIAS_FILE_SIZE_LIMIT = 10 * 1024 * 1024
+
+async function ensureRrhhLicenciasBucket(db: any): Promise<boolean> {
+  try {
+    const { data: buckets, error: bucketsError } = await db.storage.listBuckets()
+
+    if (bucketsError) {
+      devError('Error obteniendo buckets RRHH:', bucketsError)
+      return false
+    }
+
+    const bucketExists = (buckets || []).some(
+      (bucket: { id?: string; name?: string }) =>
+        bucket.id === RRHH_LICENCIAS_BUCKET || bucket.name === RRHH_LICENCIAS_BUCKET,
+    )
+
+    if (bucketExists) {
+      return true
+    }
+
+    const { error: createBucketError } = await db.storage.createBucket(RRHH_LICENCIAS_BUCKET, {
+      public: true,
+      fileSizeLimit: RRHH_LICENCIAS_FILE_SIZE_LIMIT,
+      allowedMimeTypes: RRHH_LICENCIAS_ALLOWED_MIME_TYPES,
+    })
+
+    if (createBucketError && !String(createBucketError.message || '').toLowerCase().includes('already exists')) {
+      devError('Error creando bucket RRHH de licencias:', createBucketError)
+      return false
+    }
+
+    return true
+  } catch (error) {
+    devError('Error inesperado asegurando bucket RRHH de licencias:', error)
+    return false
+  }
+}
+
 async function registrarEventoLegajo(db: any, input: LegajoEventoInput): Promise<void> {
   try {
     const { error } = await db
@@ -513,6 +553,7 @@ export async function obtenerEmpleadosActivosAction(): Promise<ApiResponse<Emple
         categoria:rrhh_categorias(id, nombre, sueldo_basico)
       `)
       .eq('activo', true)
+      .order('legajo', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -572,6 +613,96 @@ export async function obtenerEmpleadoPorIdAction(empleadoId: string): Promise<Ap
     }
   } catch (error) {
     devError('Error en obtenerEmpleadoPorId:', error)
+    return {
+      success: false,
+      error: 'Error interno del servidor',
+    }
+  }
+}
+
+export async function crearIncidenciaLegajoAction(payload: {
+  empleado_id: string
+  titulo: string
+  descripcion?: string
+  fecha_evento: string
+}): Promise<ApiResponse<{ eventoId: string }>> {
+  try {
+    const adminUserId = await getAuthenticatedAdminUserId()
+    if (!adminUserId) {
+      return {
+        success: false,
+        error: 'No autorizado',
+      }
+    }
+
+    const titulo = payload.titulo.trim()
+    const descripcion = payload.descripcion?.trim()
+    const fechaEvento = new Date(payload.fecha_evento)
+
+    if (!titulo) {
+      return {
+        success: false,
+        error: 'El titulo de la incidencia es obligatorio',
+      }
+    }
+
+    if (Number.isNaN(fechaEvento.getTime())) {
+      return {
+        success: false,
+        error: 'La fecha de la incidencia no es valida',
+      }
+    }
+
+    const supabase = createAdminClient()
+
+    const { data: empleado, error: empleadoError } = await supabase
+      .from('rrhh_empleados')
+      .select('id')
+      .eq('id', payload.empleado_id)
+      .maybeSingle()
+
+    if (empleadoError || !empleado) {
+      return {
+        success: false,
+        error: 'Empleado no encontrado',
+      }
+    }
+
+    const { data, error } = await supabase
+      .from('rrhh_legajo_eventos')
+      .insert({
+        empleado_id: payload.empleado_id,
+        tipo: 'incidencia_manual',
+        categoria: 'incidencias',
+        titulo,
+        descripcion: descripcion || null,
+        metadata: {
+          origen: 'manual',
+        },
+        created_by: adminUserId,
+        fecha_evento: fechaEvento.toISOString(),
+      })
+      .select('id')
+      .single()
+
+    if (error || !data?.id) {
+      devError('Error creando incidencia de legajo:', error)
+      return {
+        success: false,
+        error: 'No se pudo registrar la incidencia en el legajo',
+      }
+    }
+
+    revalidatePath(`/rrhh/empleados/${payload.empleado_id}`)
+    revalidatePath('/rrhh/empleados')
+
+    return {
+      success: true,
+      data: { eventoId: data.id },
+      message: 'Incidencia registrada en el legajo',
+    }
+  } catch (error) {
+    devError('Error en crearIncidenciaLegajoAction:', error)
     return {
       success: false,
       error: 'Error interno del servidor',
@@ -2433,7 +2564,7 @@ async function auditarCertificadoConIA(
   if (!model) {
     return {
       ...fallback,
-      observaciones: 'IA no configurada. Queda pendiente de revision manual RRHH.',
+      observaciones: 'IA no configurada. Queda pendiente de revision manual por administrador.',
     }
   }
 
@@ -2608,11 +2739,19 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
     let auditoriaIA: AuditoriaCertificadoIA | null = null
 
     if (!esVacaciones && certificado) {
+      const bucketReady = await ensureRrhhLicenciasBucket(db)
+      if (!bucketReady) {
+        return {
+          success: false,
+          error: 'No se pudo preparar el almacenamiento del certificado. Intenta nuevamente.',
+        }
+      }
+
       const safeFileName = certificado.name.replace(/[^a-zA-Z0-9._-]/g, '_')
       storagePath = `rrhh/licencias/${empleado_id}/${Date.now()}-${safeFileName}`
       const certBuffer = Buffer.from(await certificado.arrayBuffer())
 
-      const { error: uploadError } = await db.storage.from('documentos').upload(storagePath, certBuffer, {
+      const { error: uploadError } = await db.storage.from(RRHH_LICENCIAS_BUCKET).upload(storagePath, certBuffer, {
         contentType: certificado.type || 'image/jpeg',
         upsert: false,
       })
@@ -2622,7 +2761,7 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
         return { success: false, error: 'No se pudo subir el certificado. Intenta nuevamente.' }
       }
 
-      const { data: urlData } = db.storage.from('documentos').getPublicUrl(storagePath)
+      const { data: urlData } = db.storage.from(RRHH_LICENCIAS_BUCKET).getPublicUrl(storagePath)
       certificadoUrl = urlData.publicUrl
       certificadoNombreArchivo = certificado.name
       certificadoMimeType = certificado.type || 'image/jpeg'
@@ -2703,8 +2842,8 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
       success: true,
       data: { licenciaId: data.id },
       message: esVacaciones
-        ? 'Vacaciones programadas correctamente. Quedan pendientes de revision manual por RRHH.'
-        : 'Licencia creada con certificado. Queda pendiente de revision manual por RRHH.',
+        ? 'Vacaciones programadas correctamente. Quedan pendientes de revision manual por administrador.'
+        : 'Licencia creada con certificado. Queda pendiente de revision manual por administrador.',
     }
   } catch (error) {
     devError('Error en crearLicencia:', error)
