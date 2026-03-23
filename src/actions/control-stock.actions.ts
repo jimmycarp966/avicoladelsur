@@ -46,7 +46,7 @@ export interface ConteoStockItem {
         id: string
         codigo: string
         nombre: string
-        unidad: string
+        unidad_medida: string
         precio_costo?: number
     }
 }
@@ -104,6 +104,14 @@ function ocultarResumenConteos(conteos: ConteoStock[]): ConteoStock[] {
         total_diferencias: 0,
         monto_diferencia_estimado: 0,
     }))
+}
+
+function ordenarItemsConteo(items: ConteoStockItem[]): ConteoStockItem[] {
+    return [...items].sort((a, b) => {
+        const nombreA = a.producto?.nombre || ''
+        const nombreB = b.producto?.nombre || ''
+        return nombreA.localeCompare(nombreB, 'es', { sensitivity: 'base' })
+    })
 }
 
 // ===========================================
@@ -223,10 +231,9 @@ export async function obtenerItemsConteoAction(
             .from('conteos_stock_turno_items')
             .select(`
                 *,
-                producto:productos(id, codigo, nombre, unidad, precio_costo)
+                producto:productos(id, codigo, nombre, unidad_medida, precio_costo)
             `)
             .eq('conteo_id', conteoId)
-            .order('producto(nombre)')
 
         if (soloConDiferencia) {
             query = query.neq('diferencia', 0)
@@ -239,7 +246,10 @@ export async function obtenerItemsConteoAction(
             return { success: false, message: error.message }
         }
 
-        return { success: true, data: ocultarValoresSistema(data as ConteoStockItem[]) }
+        return {
+            success: true,
+            data: ordenarItemsConteo(ocultarValoresSistema(data as ConteoStockItem[]))
+        }
     } catch (error) {
         console.error('Error en obtenerItemsConteoAction:', error)
         return { success: false, message: 'Error al obtener items del conteo' }
@@ -426,10 +436,9 @@ export async function obtenerConteoDetalleAction(
             .from('conteos_stock_turno_items')
             .select(`
                 *,
-                producto:productos(id, codigo, nombre, unidad, precio_costo)
+                producto:productos(id, codigo, nombre, unidad_medida, precio_costo)
             `)
             .eq('conteo_id', conteoId)
-            .order('producto(nombre)')
 
         if (errorItems) {
             console.error('Error obteniendo items:', errorItems)
@@ -440,7 +449,7 @@ export async function obtenerConteoDetalleAction(
             success: true,
             data: {
                 ...(conteo as ConteoStock),
-                items: items as ConteoStockItem[]
+                items: ordenarItemsConteo(items as ConteoStockItem[])
             }
         }
     } catch (error) {

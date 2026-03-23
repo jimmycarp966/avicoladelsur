@@ -482,7 +482,7 @@ export default function ControlStockPage() {
                             </Badge>
                           </div>
                           <div className="text-sm text-muted-foreground">
-                            Registra el conteo fisico en <strong>{item.producto?.unidad}</strong>
+                            Registra el conteo fisico en <strong>{item.producto?.unidad_medida}</strong>
                           </div>
                         </div>
 
