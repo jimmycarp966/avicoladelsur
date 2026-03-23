@@ -56,6 +56,17 @@ export function JornadaEditSheet({
   const editingTurnoSelectValue = getTurnoSelectValue(editingRow?.turno)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const licenciaLabel = getAutoLicenciaLabel(editingRow)
+  const esDescansoProgramado = Boolean(licenciaLabel?.toLowerCase().includes('descanso'))
+  const sheetTitle = licenciaLabel
+    ? esDescansoProgramado
+      ? 'Editar descanso'
+      : `Editar ${licenciaLabel.toLowerCase()}`
+    : 'Editar Jornada'
+  const sheetDescription = licenciaLabel
+    ? esDescansoProgramado
+      ? 'Ajusta la fecha y los valores de este registro especial. Si cambias la fecha, el descanso asociado se sincroniza automaticamente.'
+      : 'Ajusta la fecha y los valores de este registro especial.'
+    : 'General es el turno habitual del dia cuando no aplica una clasificacion especial.'
   const deleteButtonLabel = licenciaLabel ? `Quitar ${licenciaLabel.toLowerCase()}` : 'Eliminar jornada'
 
   // Estados locales string para inputs numéricos — evita que el campo se fuerce a "0" al borrar
@@ -67,14 +78,17 @@ export function JornadaEditSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>Editar Jornada</SheetTitle>
-          <SheetDescription>
-            General es el turno habitual del dia cuando no aplica una clasificacion especial.
-          </SheetDescription>
+          <SheetTitle>{sheetTitle}</SheetTitle>
+          <SheetDescription>{sheetDescription}</SheetDescription>
         </SheetHeader>
 
         {editingRow && (
           <div className="mt-6 space-y-4">
+            {esDescansoProgramado && (
+              <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+                Este registro proviene de un descanso automatico. Si cambias la fecha, se actualiza el descanso mensual asociado.
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1 col-span-2">
                 <Label>Fecha</Label>

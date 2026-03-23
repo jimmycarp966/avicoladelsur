@@ -37,6 +37,14 @@ import {
 } from './liquidacion-utils'
 
 function getOrigenBadge(origen: string | null | undefined) {
+  if (origen === 'auto_licencia_descanso') {
+    return (
+      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+        Descanso
+      </Badge>
+    )
+  }
+
   switch (normalizeOrigen(origen)) {
     case 'hik':
       return (
@@ -562,7 +570,7 @@ export function LiquidacionJornadasTab({
                   <TableHead className="text-right">T. Especial</TableHead>
                   <TableHead className="text-right">Total aplicado</TableHead>
                   <TableHead>Origen</TableHead>
-                  <TableHead className="w-10" />
+                  <TableHead className="w-[150px]" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -582,6 +590,12 @@ export function LiquidacionJornadasTab({
                     const licenciaLabel = getAutoLicenciaLabel(row)
                     const esAusenciaRegistrada = isAusenciaObservacion(row.observaciones)
                     const placeholderTipo = isPlaceholder ? getPlaceholderTipo(fechaIso) : null
+                    const esLicenciaAutomatica = Boolean(licenciaLabel)
+                    const editActionLabel = licenciaLabel
+                      ? licenciaLabel.toLowerCase().includes('descanso')
+                        ? 'Editar descanso'
+                        : `Editar ${licenciaLabel.toLowerCase()}`
+                      : 'Editar jornada'
                     const hasDiferencia =
                       (row.horas_adicionales || 0) > 0 ||
                       (row.turno_especial_unidades || 0) > 0 ||
@@ -710,15 +724,29 @@ export function LiquidacionJornadasTab({
                         {formatMoney(rowTotal(row))}
                       </TableCell>
                       <TableCell>{getOrigenBadge(row.origen)}</TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => openEditSheet(row)}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
+                      <TableCell className="whitespace-nowrap">
+                        {esLicenciaAutomatica ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 px-2 gap-1.5 border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800"
+                            onClick={() => openEditSheet(row)}
+                            aria-label={`${editActionLabel} del dia ${formatDateDMY(row.fecha)}`}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            <span className="text-xs font-medium">{editActionLabel}</span>
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => openEditSheet(row)}
+                            aria-label={`Editar jornada del dia ${formatDateDMY(row.fecha)}`}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                     )
