@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Bell, Package, User, MapPin, CheckCircle2, X, Loader2 } from 'lucide-react'
+import { Bell, Package, User, MapPin, CheckCircle2, Loader2, Scale } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -11,19 +12,64 @@ import {
   marcarPreparacionListoAction,
   desmarcarPreparacionListoAction,
 } from '@/actions/en-preparacion.actions'
+import { PresupuestoIndividualAccion } from '@/components/almacen/PresupuestosDiaAcciones'
+import { esVentaMayorista } from '@/lib/utils'
+import { esItemPesable } from '@/lib/utils/pesaje'
 import type { PresupuestoEnPreparacion } from '@/types/domain.types'
 
+type PresupuestoEnPreparacionVisible = PresupuestoEnPreparacion & {
+  pedido_convertido_id?: string | null
+  lista_precio?: {
+    tipo?: string | null
+  } | null
+  items?: Array<{
+    id: string
+    peso_final?: number | null
+    cantidad_solicitada: number
+    pesable: boolean
+    producto?: {
+      nombre?: string
+      categoria?: string
+      codigo?: string
+      requiere_pesaje?: boolean
+      venta_mayor_habilitada?: boolean
+      kg_por_unidad_mayor?: number | null
+      unidad_mayor_nombre?: string | null
+      unidad_medida?: string | null
+    }
+    lista_precio?: {
+      tipo?: string | null
+    } | null
+  }>
+}
+
 interface EnPreparacionContentProps {
-  presupuestos: PresupuestoEnPreparacion[]
+  presupuestos: PresupuestoEnPreparacionVisible[]
 }
 
 export function EnPreparacionContent({ presupuestos }: EnPreparacionContentProps) {
   const router = useRouter()
   const [loading, setLoading] = useState<string | null>(null)
 
-  // Filtrar: mostrar pendientes primero, luego completados
-  const pendientes = presupuestos.filter((p) => !p.preparacion_completada)
-  const completados = presupuestos.filter((p) => p.preparacion_completada)
+  const calcularItemsPesables = (presupuesto: PresupuestoEnPreparacionVisible) =>
+    (presupuesto.items || []).filter((item) => esItemPesable(item, esVentaMayorista(presupuesto, item)))
+
+  const presupuestosVisibles = presupuestos.filter((presupuesto) => {
+    if (presupuesto.pedido_convertido_id) {
+      return false
+    }
+
+    const itemsPesables = calcularItemsPesables(presupuesto)
+
+    if (itemsPesables.length === 0) {
+      return true
+    }
+
+    return itemsPesables.some((item) => !item.peso_final)
+  })
+
+  const pendientes = presupuestosVisibles.filter((p) => !p.preparacion_completada)
+  const completados = presupuestosVisibles.filter((p) => p.preparacion_completada)
 
   const handleMarcarListo = async (presupuestoId: string) => {
     setLoading(presupuestoId)
@@ -35,7 +81,7 @@ export function EnPreparacionContent({ presupuestos }: EnPreparacionContentProps
       } else {
         toast.error(result.error || 'Error al marcar como listo')
       }
-    } catch (error) {
+    } catch {
       toast.error('Error al marcar como listo')
     } finally {
       setLoading(null)
@@ -52,7 +98,7 @@ export function EnPreparacionContent({ presupuestos }: EnPreparacionContentProps
       } else {
         toast.error(result.error || 'Error al desmarcar')
       }
-    } catch (error) {
+    } catch {
       toast.error('Error al desmarcar')
     } finally {
       setLoading(null)
@@ -69,7 +115,7 @@ export function EnPreparacionContent({ presupuestos }: EnPreparacionContentProps
             En Preparación
           </h1>
           <p className="text-muted-foreground">
-            Presupuestos listos para preparar en cámara frigorífica
+            Presupuestos pendientes de pesaje o listos para pasar a pedido
           </p>
         </div>
         <div className="flex items-center gap-4">
@@ -135,7 +181,7 @@ export function EnPreparacionContent({ presupuestos }: EnPreparacionContentProps
             <Bell className="mx-auto h-12 w-12 mb-4 opacity-50" />
             <p className="text-lg">No hay presupuestos en preparación</p>
             <p className="text-sm mt-2">
-              Los nuevos presupuestos en estado <span className="font-mono bg-muted px-1 rounded">en_almacen</span> aparecerán aquí automáticamente
+              Los presupuestos en estado <span className="font-mono bg-muted px-1 rounded">en_almacen</span> aparecerán aquí mientras tengan pesables pendientes
             </p>
           </CardContent>
         </Card>
@@ -145,13 +191,20 @@ export function EnPreparacionContent({ presupuestos }: EnPreparacionContentProps
 }
 
 interface PresupuestoCardProps {
-  presupuesto: PresupuestoEnPreparacion
+  presupuesto: PresupuestoEnPreparacionVisible
   loading: boolean
   onMarcarListo: () => void
   onDesmarcar: () => void
 }
 
 function PresupuestoCard({ presupuesto, loading, onMarcarListo, onDesmarcar }: PresupuestoCardProps) {
+  const itemsPesables = (presupuesto.items || []).filter((item) =>
+    esItemPesable(item, esVentaMayorista(presupuesto, item))
+  )
+  const itemsPesados = itemsPesables.filter((item) => item.peso_final)
+  const itemsPendientes = Math.max(itemsPesables.length - itemsPesados.length, 0)
+  const tienePesables = itemsPesables.length > 0
+  const listoParaConvertir = !tienePesables || itemsPendientes === 0
   const isCompletado = presupuesto.preparacion_completada
 
   return (
@@ -163,13 +216,19 @@ function PresupuestoCard({ presupuesto, loading, onMarcarListo, onDesmarcar }: P
       }`}
     >
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <CardTitle className="text-lg flex items-center gap-2">
             #{presupuesto.numero_presupuesto}
             {isCompletado && (
               <Badge variant="success" className="text-xs">
                 <CheckCircle2 className="h-3 w-3 mr-1" />
                 Listo para pesaje
+              </Badge>
+            )}
+            {listoParaConvertir && (
+              <Badge variant="outline" className="text-xs border-green-200 bg-green-50 text-green-700">
+                <Scale className="h-3 w-3 mr-1" />
+                Listo para pedido
               </Badge>
             )}
           </CardTitle>
@@ -186,7 +245,7 @@ function PresupuestoCard({ presupuesto, loading, onMarcarListo, onDesmarcar }: P
               </>
             ) : isCompletado ? (
               <>
-                <X className="h-4 w-4 mr-2" />
+                <CheckCircle2 className="h-4 w-4 mr-2" />
                 Desmarcar
               </>
             ) : (
@@ -212,14 +271,13 @@ function PresupuestoCard({ presupuesto, loading, onMarcarListo, onDesmarcar }: P
             <Badge variant={presupuesto.turno === 'mañana' ? 'default' : 'secondary'}>
               {presupuesto.turno || 'Sin turno'}
             </Badge>
-            {isCompletado && presupuesto.preparado_por_obj && (
-              <Badge variant="outline" className="text-xs">
-                Por {presupuesto.preparado_por_obj.nombre}
-              </Badge>
-            )}
+            <Badge variant="outline">
+              {itemsPesados.length}/{itemsPesables.length} pesados
+            </Badge>
           </div>
-          <div className="border-t pt-3">
-            <p className="text-xs text-muted-foreground mb-2">
+
+          <div className="border-t pt-3 space-y-3">
+            <p className="text-xs text-muted-foreground">
               Productos ({presupuesto.items?.length || 0}):
             </p>
             <div className="flex flex-wrap gap-2">
@@ -230,6 +288,19 @@ function PresupuestoCard({ presupuesto, loading, onMarcarListo, onDesmarcar }: P
                 </Badge>
               ))}
             </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 border-t pt-4">
+            {tienePesables && itemsPendientes > 0 ? (
+              <Button asChild size="sm" className="bg-blue-600 hover:bg-blue-700">
+                <Link href={`/almacen/presupuesto/${presupuesto.id}/pesaje`}>
+                  <Scale className="mr-2 h-4 w-4" />
+                  Pesaje ({itemsPendientes})
+                </Link>
+              </Button>
+            ) : (
+              <PresupuestoIndividualAccion presupuesto={presupuesto as any} />
+            )}
           </div>
         </div>
       </CardContent>

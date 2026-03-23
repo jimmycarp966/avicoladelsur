@@ -2,6 +2,8 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { esVentaMayorista } from '@/lib/utils'
+import { esItemPesable } from '@/lib/utils/pesaje'
 import { devLog, devError } from '@/lib/utils/logger'
 
 /**
@@ -16,13 +18,28 @@ export async function obtenerPresupuestosEnPreparacionAction() {
       .from('presupuestos')
       .select(`
         *,
+        pedido_convertido_id,
         cliente:clientes(nombre, telefono),
         zona:zonas(nombre),
+        lista_precio:listas_precios(tipo),
         items:presupuesto_items(
           id,
-          producto:productos(nombre, categoria),
+          producto_id,
+          pesable,
+          peso_final,
+          producto:productos(
+            nombre,
+            codigo,
+            categoria,
+            requiere_pesaje,
+            venta_mayor_habilitada,
+            kg_por_unidad_mayor,
+            unidad_mayor_nombre,
+            unidad_medida
+          ),
+          lista_precio:listas_precios(tipo),
           cantidad_solicitada,
-          pesable
+          cantidad_reservada
         )
       `)
       .eq('estado', 'en_almacen')
@@ -37,11 +54,27 @@ export async function obtenerPresupuestosEnPreparacionAction() {
       }
     }
 
-    devLog('[en-preparacion] Presupuestos obtenidos:', data?.length || 0)
+    const presupuestos = (data || []).filter((presupuesto: any) => {
+      if (presupuesto.pedido_convertido_id) {
+        return false
+      }
+
+      const itemsPesables = (presupuesto.items || []).filter((item: any) =>
+        esItemPesable(item, esVentaMayorista(presupuesto, item))
+      )
+
+      if (itemsPesables.length === 0) {
+        return true
+      }
+
+      return itemsPesables.some((item: any) => !item.peso_final)
+    })
+
+    devLog('[en-preparacion] Presupuestos obtenidos:', presupuestos.length)
 
     return {
       success: true,
-      data: data || []
+      data: presupuestos
     }
   } catch (error) {
     devError('[en-preparacion] Excepción obteniendo presupuestos:', error)
@@ -102,6 +135,7 @@ export async function marcarPreparacionListoAction(presupuestoId: string) {
     // Revalidar paths
     revalidatePath('/almacen/en-preparacion')
     revalidatePath('/almacen/presupuestos-dia')
+    revalidatePath(`/almacen/presupuesto/${presupuestoId}/pesaje`)
 
     return {
       success: true,
@@ -157,6 +191,7 @@ export async function desmarcarPreparacionListoAction(presupuestoId: string) {
     // Revalidar paths
     revalidatePath('/almacen/en-preparacion')
     revalidatePath('/almacen/presupuestos-dia')
+    revalidatePath(`/almacen/presupuesto/${presupuestoId}/pesaje`)
 
     return {
       success: true,
@@ -180,18 +215,47 @@ export async function obtenerConteoPendientesPreparacionAction(): Promise<{
   try {
     const supabase = await createClient()
 
-    const { count, error } = await supabase
+    const { data, error } = await supabase
       .from('presupuestos')
-      .select('*', { count: 'exact', head: true })
+      .select(`
+        *,
+        pedido_convertido_id,
+        lista_precio:listas_precios(tipo),
+        items:presupuesto_items(
+          pesable,
+          peso_final,
+          producto:productos(
+            categoria,
+            requiere_pesaje,
+            venta_mayor_habilitada
+          ),
+          lista_precio:listas_precios(tipo)
+        )
+      `)
       .eq('estado', 'en_almacen')
-      .eq('preparacion_completada', false)
 
     if (error) {
       devError('[en-preparacion] Error obteniendo conteo:', error)
       return { success: false, error: error.message }
     }
 
-    return { success: true, data: count || 0 }
+    const presupuestos = (data || []).filter((presupuesto: any) => {
+      if (presupuesto.pedido_convertido_id) {
+        return false
+      }
+
+      const itemsPesables = (presupuesto.items || []).filter((item: any) =>
+        esItemPesable(item, esVentaMayorista(presupuesto, item))
+      )
+
+      if (itemsPesables.length === 0) {
+        return true
+      }
+
+      return itemsPesables.some((item: any) => !item.peso_final)
+    })
+
+    return { success: true, data: presupuestos.length }
   } catch (error) {
     devError('[en-preparacion] Excepción obteniendo conteo:', error)
     return { success: false, error: 'Error interno del servidor' }

@@ -35,11 +35,11 @@ export interface ConteoStockItem {
     id: string
     conteo_id: string
     producto_id: string
-    cantidad_sistema: number
-    cantidad_fisica?: number
-    diferencia: number
-    diferencia_porcentaje: number
-    diferencia_valor?: number
+    cantidad_sistema?: number | null
+    cantidad_fisica?: number | null
+    diferencia?: number | null
+    diferencia_porcentaje?: number | null
+    diferencia_valor?: number | null
     observacion?: string
     hora_conteo?: string
     producto?: {
@@ -56,6 +56,54 @@ export interface ProduccionEnCurso {
     ordenes_ids: string[]
     cantidad_ordenes: number
     cajones_faltantes: number
+}
+
+export interface ConteoStockResultadoFinal {
+    estado: string
+    duracion_minutos: number
+    excedio_tiempo: boolean
+    total_productos_contados: number
+    total_diferencias?: number | null
+    monto_diferencia_estimado?: number | null
+    resumen_visible: boolean
+}
+
+async function obtenerContextoUsuarioControlStock(supabase: Awaited<ReturnType<typeof createClient>>) {
+    const { data: authData, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !authData.user) {
+        return { userId: null, rol: null, esAdmin: false }
+    }
+
+    const { data: usuario } = await supabase
+        .from('usuarios')
+        .select('rol')
+        .eq('id', authData.user.id)
+        .maybeSingle()
+
+    return {
+        userId: authData.user.id,
+        rol: usuario?.rol ?? null,
+        esAdmin: usuario?.rol === 'admin'
+    }
+}
+
+function ocultarValoresSistema(items: ConteoStockItem[]): ConteoStockItem[] {
+    return items.map((item) => ({
+        ...item,
+        cantidad_sistema: null,
+        diferencia: null,
+        diferencia_porcentaje: null,
+        diferencia_valor: null,
+    }))
+}
+
+function ocultarResumenConteos(conteos: ConteoStock[]): ConteoStock[] {
+    return conteos.map((conteo) => ({
+        ...conteo,
+        total_diferencias: 0,
+        monto_diferencia_estimado: 0,
+    }))
 }
 
 // ===========================================
@@ -191,7 +239,7 @@ export async function obtenerItemsConteoAction(
             return { success: false, message: error.message }
         }
 
-        return { success: true, data: data as ConteoStockItem[] }
+        return { success: true, data: ocultarValoresSistema(data as ConteoStockItem[]) }
     } catch (error) {
         console.error('Error en obtenerItemsConteoAction:', error)
         return { success: false, message: 'Error al obtener items del conteo' }
@@ -210,7 +258,7 @@ export async function registrarConteoItemAction(
     productoId: string,
     cantidadFisica: number,
     observacion?: string
-): Promise<FormResponse<{ diferencia: number; diferencia_valor: number }>> {
+): Promise<FormResponse<void>> {
     try {
         const supabase = await createClient()
 
@@ -232,13 +280,7 @@ export async function registrarConteoItemAction(
 
         revalidatePath('/almacen/control-stock')
 
-        return {
-            success: true,
-            data: {
-                diferencia: data.diferencia,
-                diferencia_valor: data.diferencia_valor
-            }
-        }
+        return { success: true }
     } catch (error) {
         console.error('Error en registrarConteoItemAction:', error)
         return { success: false, message: 'Error al registrar conteo del item' }
@@ -256,16 +298,10 @@ export async function finalizarConteoStockAction(
     conteoId: string,
     observaciones?: string,
     forzar?: boolean
-): Promise<FormResponse<{
-    estado: string
-    duracion_minutos: number
-    excedio_tiempo: boolean
-    total_productos_contados: number
-    total_diferencias: number
-    monto_diferencia_estimado: number
-}>> {
+): Promise<FormResponse<ConteoStockResultadoFinal>> {
     try {
         const supabase = await createClient()
+        const { esAdmin } = await obtenerContextoUsuarioControlStock(supabase)
 
         const { data, error } = await supabase.rpc('fn_finalizar_conteo_stock', {
             p_conteo_id: conteoId,
@@ -285,7 +321,21 @@ export async function finalizarConteoStockAction(
         revalidatePath('/almacen/control-stock')
         revalidatePath('/almacen')
 
-        return { success: true, data }
+        return {
+            success: true,
+            data: esAdmin
+                ? {
+                    ...data,
+                    resumen_visible: true,
+                }
+                : {
+                    estado: data.estado,
+                    duracion_minutos: data.duracion_minutos,
+                    excedio_tiempo: data.excedio_tiempo,
+                    total_productos_contados: data.total_productos_contados,
+                    resumen_visible: false,
+                }
+        }
     } catch (error) {
         console.error('Error en finalizarConteoStockAction:', error)
         return { success: false, message: 'Error al finalizar conteo de stock' }
@@ -304,6 +354,7 @@ export async function obtenerHistorialConteosAction(
 ): Promise<FormResponse<ConteoStock[]>> {
     try {
         const supabase = await createClient()
+        const { esAdmin } = await obtenerContextoUsuarioControlStock(supabase)
 
         let query = supabase
             .from('conteos_stock_turno')
@@ -325,7 +376,12 @@ export async function obtenerHistorialConteosAction(
             return { success: false, message: error.message }
         }
 
-        return { success: true, data: data as ConteoStock[] }
+        const conteos = data as ConteoStock[]
+
+        return {
+            success: true,
+            data: esAdmin ? conteos : ocultarResumenConteos(conteos)
+        }
     } catch (error) {
         console.error('Error en obtenerHistorialConteosAction:', error)
         return { success: false, message: 'Error al obtener historial de conteos' }
@@ -344,6 +400,11 @@ export async function obtenerConteoDetalleAction(
 ): Promise<FormResponse<ConteoStock & { items: ConteoStockItem[] }>> {
     try {
         const supabase = await createClient()
+        const { esAdmin } = await obtenerContextoUsuarioControlStock(supabase)
+
+        if (!esAdmin) {
+            return { success: false, message: 'Solo administraci\u00f3n puede ver el resultado detallado del conteo' }
+        }
 
         // Obtener conteo
         const { data: conteo, error: errorConteo } = await supabase

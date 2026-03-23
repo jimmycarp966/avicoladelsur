@@ -616,6 +616,8 @@ export async function confirmarPresupuestoAction(formData: FormData) {
     revalidatePath('/almacen/pedidos')
     revalidatePath('/tesoreria/cajas')
     revalidatePath('/almacen/presupuestos-dia')
+    revalidatePath('/almacen/en-preparacion')
+    revalidatePath(`/almacen/presupuesto/${data.presupuesto_id}/pesaje`)
 
     return {
       success: true,
@@ -693,7 +695,8 @@ export async function finalizarPesajeAction(formData: FormData) {
     }
 
     revalidatePath('/almacen/presupuestos-dia')
-    revalidatePath('/almacen/presupuesto/*')
+    revalidatePath('/almacen/en-preparacion')
+    revalidatePath(`/almacen/presupuesto/${presupuestoId}/pesaje`)
 
     return {
       success: true,
@@ -806,6 +809,7 @@ export async function confirmarPresupuestosAgrupadosAction(formData: FormData) {
     revalidatePath('/almacen/pedidos')
     revalidatePath('/tesoreria/cajas')
     revalidatePath('/almacen/presupuestos-dia')
+    revalidatePath('/almacen/en-preparacion')
 
     if (exitosos === 0) {
       return {
@@ -1330,6 +1334,7 @@ export async function enviarPresupuestoAlmacenAction(presupuestoId: string) {
     revalidatePath('/ventas/presupuestos')
     revalidatePath(`/ventas/presupuestos/${presupuestoId}`)
     revalidatePath('/almacen/presupuestos-dia')
+    revalidatePath('/almacen/en-preparacion')
 
     return { success: true, message: 'Presupuesto enviado a almacén exitosamente' }
 

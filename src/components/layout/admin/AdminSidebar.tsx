@@ -41,6 +41,7 @@ interface NavigationItem {
   roles: string[]
   badge?: string
   children?: NavigationChild[]
+  section: 'general' | 'operacion' | 'administracion' | 'ia'
 }
 
 type SidebarBadges = {
@@ -55,6 +56,7 @@ const navigation: NavigationItem[] = [
     href: '/dashboard',
     icon: LayoutDashboard,
     roles: ['admin', 'vendedor', 'almacenista'],
+    section: 'general',
   },
   {
     name: 'Notificaciones',
@@ -62,6 +64,7 @@ const navigation: NavigationItem[] = [
     icon: Bell,
     roles: ['admin', 'vendedor', 'almacenista', 'repartidor', 'tesorero'],
     badge: 'notificaciones_unread',
+    section: 'general',
     children: [
       { name: 'Todas', href: '/notificaciones' },
       { name: 'Configuración', href: '/notificaciones/configuracion' },
@@ -72,6 +75,7 @@ const navigation: NavigationItem[] = [
     href: '/almacen/presupuestos-dia',
     icon: Package,
     roles: ['admin', 'almacenista'],
+    section: 'operacion',
     children: [
       { name: 'En Preparación', href: '/almacen/en-preparacion', icon: Bell },
       { name: 'Productos', href: '/almacen/productos' },
@@ -90,6 +94,7 @@ const navigation: NavigationItem[] = [
     href: '/ventas/presupuestos',
     icon: ShoppingCart,
     roles: ['admin', 'vendedor'],
+    section: 'operacion',
     children: [
       { name: 'Presupuestos', href: '/ventas/presupuestos' },
       { name: 'Clientes', href: '/ventas/clientes' },
@@ -104,6 +109,7 @@ const navigation: NavigationItem[] = [
     href: '/reparto/rutas',
     icon: Truck,
     roles: ['admin', 'vendedor', 'almacenista'],
+    section: 'operacion',
     children: [
       { name: 'Rutas', href: '/reparto/rutas' },
       { name: 'Monitor GPS', href: '/reparto/monitor' },
@@ -115,6 +121,7 @@ const navigation: NavigationItem[] = [
     href: '/tesoreria',
     icon: DollarSign,
     roles: ['admin', 'tesorero'],
+    section: 'administracion',
     children: [
       { name: 'Cajas', href: '/tesoreria/cajas' },
       { name: 'Movimientos', href: '/tesoreria/movimientos' },
@@ -133,6 +140,7 @@ const navigation: NavigationItem[] = [
     href: '/dashboard/predicciones',
     icon: Sparkles,
     roles: ['admin'],
+    section: 'ia',
     children: [
       { name: 'Predicciones', href: '/dashboard/predicciones' },
       { name: 'Capacidades IA', href: '/dashboard/ia-capacidades' },
@@ -146,6 +154,7 @@ const navigation: NavigationItem[] = [
     icon: Building2,
     roles: ['admin'],
     badge: 'sucursales_alerts',
+    section: 'administracion',
     children: [
       { name: 'Gestión de Sucursales', href: '/sucursales' },
       { name: 'Dashboard Sucursal', href: '/sucursal/dashboard' },
@@ -160,6 +169,7 @@ const navigation: NavigationItem[] = [
     href: '/rrhh/empleados',
     icon: UserCheck,
     roles: ['admin'],
+    section: 'administracion',
     children: [
       { name: 'Empleados', href: '/rrhh/empleados' },
       { name: 'Mensajes', href: '/rrhh/mensajes' },
@@ -177,6 +187,7 @@ const navigation: NavigationItem[] = [
     href: '/reportes',
     icon: FileText,
     roles: ['admin'],
+    section: 'administracion',
     children: [
       { name: 'Ventas', href: '/reportes/ventas' },
       { name: 'Pedidos', href: '/reportes/pedidos' },
@@ -192,6 +203,13 @@ const navigation: NavigationItem[] = [
     badge: 'bot_mensajes_hoy',
   },
 ]
+
+const sectionLabels: Record<NavigationItem['section'], string> = {
+  general: 'General',
+  operacion: 'Operación',
+  administracion: 'Administración',
+  ia: 'Inteligencia',
+}
 
 function hasAccess(user: Usuario | null, requiredRoles: string[]): boolean {
   if (!user) return false
@@ -285,6 +303,7 @@ function NavigationItem({ item, pathname, user, onClose, badges }: NavigationIte
 export function AdminSidebar({ onClose, user }: AdminSidebarProps) {
   const pathname = usePathname()
   const [badges, setBadges] = useState<Record<string, number>>({})
+  const navigationSections = ['general', 'operacion', 'administracion', 'ia'] as const
 
   useEffect(() => {
     const loadBadges = async () => {
@@ -332,23 +351,39 @@ export function AdminSidebar({ onClose, user }: AdminSidebarProps) {
       </div>
 
       <nav className="flex flex-1 flex-col px-3 py-4 sm:px-4 sm:py-6">
-        <ul role="list" className="flex flex-1 flex-col space-y-2">
-          <li>
-            <ul role="list" className="space-y-1">
-              {navigation.map((item) => (
-                <li key={item.name}>
-                  <NavigationItem
-                    item={item}
-                    pathname={pathname}
-                    user={user}
-                    onClose={onClose}
-                    badges={badges}
-                  />
-                </li>
-              ))}
-            </ul>
-          </li>
-        </ul>
+        <div className="flex flex-1 flex-col gap-5">
+          {navigationSections.map((section) => {
+            const sectionItems = navigation.filter((item) => item.section === section)
+            const visibleItems = sectionItems.filter((item) => hasAccess(user, item.roles))
+
+            if (visibleItems.length === 0) return null
+
+            return (
+              <section key={section} className="space-y-2">
+                <div className="flex items-center gap-3 px-1">
+                  <div className="h-px flex-1 bg-white/10" />
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/40">
+                    {sectionLabels[section]}
+                  </span>
+                  <div className="h-px flex-1 bg-white/10" />
+                </div>
+                <ul role="list" className="space-y-1">
+                  {visibleItems.map((item) => (
+                    <li key={item.name}>
+                      <NavigationItem
+                        item={item}
+                        pathname={pathname}
+                        user={user}
+                        onClose={onClose}
+                        badges={badges}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )
+          })}
+        </div>
       </nav>
 
       {user && (
