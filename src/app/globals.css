@@ -330,6 +330,34 @@ body:has(.login-page) .login-page {
   box-shadow: 4px 0 24px -2px rgba(47, 112, 88, 0.2) !important;
 }
 
+.admin-sidebar-scroll {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(252, 222, 141, 0.72) rgba(255, 255, 255, 0.08);
+}
+
+.admin-sidebar-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.admin-sidebar-scroll::-webkit-scrollbar-track {
+  margin-block: 0.5rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.admin-sidebar-scroll::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(252, 222, 141, 0.9) 0%, rgba(217, 235, 198, 0.8) 100%);
+  background-clip: padding-box;
+}
+
+.admin-sidebar-scroll:hover::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(252, 222, 141, 0.98) 0%, rgba(217, 235, 198, 0.9) 100%);
+  background-clip: padding-box;
+}
+
 /* Cards - Estilo Profesional Corporativo */
 [data-slot="card"] {
   box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.03),

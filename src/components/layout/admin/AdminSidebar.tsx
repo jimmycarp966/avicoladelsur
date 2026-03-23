@@ -343,7 +343,7 @@ export function AdminSidebar({ onClose, user }: AdminSidebarProps) {
   }, [])
 
   return (
-    <div className="relative flex h-full grow flex-col overflow-y-auto bg-gradient-sidebar">
+    <div className="admin-sidebar-scroll relative flex h-full grow flex-col overflow-y-auto bg-gradient-sidebar">
       <div className="flex h-16 shrink-0 items-center justify-between border-b border-white/10 px-4 sm:h-20 sm:px-6">
         <div className="flex items-center gap-3">
           <Logo size="lg" variant="full" light />
