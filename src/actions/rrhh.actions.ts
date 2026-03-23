@@ -57,11 +57,22 @@ async function ensureRrhhLicenciasBucket(db: any): Promise<boolean> {
     )
 
     if (bucketExists) {
+      const { error: updateBucketError } = await db.storage.updateBucket(RRHH_LICENCIAS_BUCKET, {
+        public: false,
+        fileSizeLimit: RRHH_LICENCIAS_FILE_SIZE_LIMIT,
+        allowedMimeTypes: RRHH_LICENCIAS_ALLOWED_MIME_TYPES,
+      })
+
+      if (updateBucketError) {
+        devError('Error actualizando bucket RRHH de licencias:', updateBucketError)
+        return false
+      }
+
       return true
     }
 
     const { error: createBucketError } = await db.storage.createBucket(RRHH_LICENCIAS_BUCKET, {
-      public: true,
+      public: false,
       fileSizeLimit: RRHH_LICENCIAS_FILE_SIZE_LIMIT,
       allowedMimeTypes: RRHH_LICENCIAS_ALLOWED_MIME_TYPES,
     })
@@ -244,7 +255,14 @@ export async function crearEmpleadoAction(
   }
 ): Promise<ApiResponse<{ empleadoId: string }>> {
   try {
-    const supabase = await createClient()
+    if (!(await getAuthenticatedAdminUserId())) {
+      return {
+        success: false,
+        error: 'No autorizado',
+      }
+    }
+
+    const supabase = createAdminClient()
 
     // Validar unicidad del legajo si se proporciona
     if (empleadoData.legajo) {
@@ -435,7 +453,14 @@ export async function actualizarEmpleadoAction(
   }
 ): Promise<ApiResponse<{ empleadoId: string }>> {
   try {
-    const supabase = await createClient()
+    if (!(await getAuthenticatedAdminUserId())) {
+      return {
+        success: false,
+        error: 'No autorizado',
+      }
+    }
+
+    const supabase = createAdminClient()
 
     // Validar unicidad del legajo si se proporciona
     if (empleadoData.legajo) {
@@ -567,7 +592,14 @@ export async function actualizarEmpleadoAction(
 
 export async function eliminarEmpleadoAction(empleadoId: string): Promise<ApiResponse<void>> {
   try {
-    const supabase = await createClient()
+    if (!(await getAuthenticatedAdminUserId())) {
+      return {
+        success: false,
+        error: 'No autorizado',
+      }
+    }
+
+    const supabase = createAdminClient()
 
     // Verificar si el empleado tiene dependencias
     const { data: asistencias, error: checkAsistencias } = await supabase
@@ -2381,7 +2413,7 @@ export async function autorizarPagoLiquidacionAction(
 
     const updatePayload: Record<string, unknown> = {
       pago_autorizado: autorizado,
-      motivo_no_autorizado: autorizado ? null : (motivo?.trim() || 'No autorizado por RRHH'),
+      motivo_no_autorizado: autorizado ? null : (motivo?.trim() || 'No autorizado por Administrador'),
     }
 
     const { data, error } = await supabase
@@ -2836,7 +2868,7 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
       `${(empleado as any).usuario?.nombre || (empleado as any).nombre || ''} ${(empleado as any).usuario?.apellido || (empleado as any).apellido || ''}`.trim() ||
       'Empleado'
 
-    let certificadoUrl: string | null = null
+    const certificadoUrl: string | null = null
     let storagePath: string | null = null
     let certificadoNombreArchivo: string | null = null
     let certificadoMimeType: string | null = null
@@ -2883,8 +2915,6 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
         return { success: false, error: 'No se pudo subir el certificado. Intenta nuevamente.' }
       }
 
-      const { data: urlData } = db.storage.from(RRHH_LICENCIAS_BUCKET).getPublicUrl(storagePath)
-      certificadoUrl = urlData.publicUrl
       certificadoNombreArchivo = certificadoPreparado.originalName
       certificadoMimeType = certificadoPreparado.mimeType
       certificadoTamanoBytes = certificadoPreparado.sizeBytes

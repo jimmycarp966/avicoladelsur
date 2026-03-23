@@ -80,7 +80,7 @@ export function LicenciasTable({ licencias, onView, onApprove, onReject }: Licen
       return <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">No aplica</Badge>
     }
 
-    return licencia.certificado_url ? (
+    return licencia.certificado_storage_path || licencia.certificado_url ? (
       <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">Cargado</Badge>
     ) : (
       <Badge variant="destructive">Falta</Badge>
