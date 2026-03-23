@@ -202,7 +202,7 @@ export function NuevaLicenciaForm({ defaultTipo }: NuevaLicenciaFormProps) {
               </ul>
             ) : (
               <ul className="space-y-2 text-sm text-blue-950">
-                <li>El certificado debe adjuntarse como imagen `JPG`, `PNG` o `WEBP`.</li>
+                <li>El certificado puede adjuntarse como `JPG`, `PNG`, `WEBP`, `HEIC` o `HEIF`.</li>
                 <li>El plazo de presentacion es de 24 horas desde la fecha declarada; si no se informa, se toma la fecha de inicio.</li>
                 <li>Si el plazo vencio, solo se puede continuar marcando excepcion y explicando el motivo.</li>
                 <li>La IA audita el certificado y el administrador mantiene la revision manual antes de resolverlo.</li>
@@ -433,7 +433,7 @@ export function NuevaLicenciaForm({ defaultTipo }: NuevaLicenciaFormProps) {
                   <Input
                     id="certificado"
                     type="file"
-                    accept="image/png,image/jpeg,image/webp"
+                    accept="image/png,image/jpeg,image/webp,image/heic,image/heif"
                     onChange={(event) => setCertificadoFile(event.target.files?.[0] || null)}
                   />
                   {certificadoFile ? (

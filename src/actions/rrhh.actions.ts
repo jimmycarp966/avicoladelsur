@@ -25,7 +25,22 @@ type LegajoEventoInput = {
 
 const RRHH_LICENCIAS_BUCKET = 'rrhh-licencias'
 const RRHH_LICENCIAS_ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+const RRHH_LICENCIAS_ALLOWED_INPUT_MIME_TYPES = [
+  ...RRHH_LICENCIAS_ALLOWED_MIME_TYPES,
+  'image/jpg',
+  'image/heic',
+  'image/heif',
+] as const
 const RRHH_LICENCIAS_FILE_SIZE_LIMIT = 10 * 1024 * 1024
+
+type CertificadoLicenciaPreparado = {
+  file: File
+  buffer: Buffer
+  mimeType: string
+  originalName: string
+  storedFileName: string
+  sizeBytes: number
+}
 
 async function ensureRrhhLicenciasBucket(db: any): Promise<boolean> {
   try {
@@ -60,6 +75,93 @@ async function ensureRrhhLicenciasBucket(db: any): Promise<boolean> {
   } catch (error) {
     devError('Error inesperado asegurando bucket RRHH de licencias:', error)
     return false
+  }
+}
+
+function getCertificadoMimeLabel() {
+  return 'JPG, PNG, WEBP, HEIC o HEIF'
+}
+
+function buildStoredFileName(fileName: string, mimeType: string) {
+  const sanitized = fileName.replace(/[^a-zA-Z0-9._-]/g, '_')
+  const extensionByMime: Record<string, string> = {
+    'image/jpeg': '.jpg',
+    'image/png': '.png',
+    'image/webp': '.webp',
+  }
+
+  const targetExtension = extensionByMime[mimeType] || ''
+  if (!targetExtension) return sanitized
+
+  const withoutExtension = sanitized.replace(/\.[^.]+$/, '')
+  return withoutExtension.endsWith(targetExtension) ? withoutExtension : `${withoutExtension}${targetExtension}`
+}
+
+async function prepararCertificadoLicencia(
+  file: File
+): Promise<ApiResponse<CertificadoLicenciaPreparado>> {
+  if (!file || file.size <= 0) {
+    return { success: false, error: 'Debe adjuntar el certificado en imagen para validar la licencia' }
+  }
+
+  const inputMimeType = (file.type || '').toLowerCase()
+  if (!RRHH_LICENCIAS_ALLOWED_INPUT_MIME_TYPES.includes(inputMimeType as (typeof RRHH_LICENCIAS_ALLOWED_INPUT_MIME_TYPES)[number])) {
+    return {
+      success: false,
+      error: `El certificado debe estar en formato ${getCertificadoMimeLabel()}.`,
+    }
+  }
+
+  let outputBuffer = Buffer.from(await file.arrayBuffer())
+  let outputMimeType = inputMimeType === 'image/jpg' ? 'image/jpeg' : inputMimeType
+  let outputFileName = buildStoredFileName(file.name, outputMimeType)
+
+  // iPhone suele subir HEIC/HEIF; lo normalizamos a JPEG antes de guardar/auditar.
+  if (outputMimeType === 'image/heic' || outputMimeType === 'image/heif') {
+    try {
+      const sharpModule = await import('sharp')
+      const sharp = sharpModule.default
+      outputBuffer = await sharp(outputBuffer, { failOn: 'none' }).rotate().jpeg({ quality: 90 }).toBuffer()
+      outputMimeType = 'image/jpeg'
+      outputFileName = buildStoredFileName(file.name, outputMimeType)
+    } catch (error) {
+      devError('Error convirtiendo certificado HEIC/HEIF:', error)
+      return {
+        success: false,
+        error: 'No se pudo procesar el certificado HEIC/HEIF. Intente con JPG, PNG o WEBP.',
+      }
+    }
+  }
+
+  if (!RRHH_LICENCIAS_ALLOWED_MIME_TYPES.includes(outputMimeType)) {
+    return {
+      success: false,
+      error: `El certificado debe estar en formato ${getCertificadoMimeLabel()}.`,
+    }
+  }
+
+  if (outputBuffer.length > RRHH_LICENCIAS_FILE_SIZE_LIMIT) {
+    return {
+      success: false,
+      error: 'El certificado excede el limite de 10 MB. Reduzca el archivo e intente nuevamente.',
+    }
+  }
+
+  const preparedFile =
+    outputMimeType === file.type && outputFileName === file.name
+      ? file
+      : new File([outputBuffer], outputFileName, { type: outputMimeType })
+
+  return {
+    success: true,
+    data: {
+      file: preparedFile,
+      buffer: outputBuffer,
+      mimeType: outputMimeType,
+      originalName: file.name,
+      storedFileName: outputFileName,
+      sizeBytes: outputBuffer.length,
+    },
   }
 }
 
@@ -2623,7 +2725,7 @@ Analiza esta imagen de certificado medico laboral y responde SOLO JSON valido:
 
 export async function crearLicenciaAction(formData: FormData): Promise<ApiResponse<{ licenciaId: string }>> {
   try {
-    const { db, user } = await getDbForCurrentUser()
+    const { db, user, isAdmin } = await getDbForCurrentUser()
     const actorId = user?.id || null
 
     const empleado_id = String(formData.get('empleado_id') || '')
@@ -2650,14 +2752,17 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
       return { success: false, error: 'Faltan campos obligatorios de la licencia' }
     }
 
-    if (!esVacaciones) {
-      if (!certificado || certificado.size <= 0) {
-        return { success: false, error: 'Debe adjuntar el certificado en imagen para validar la licencia' }
-      }
+    if (!user || !isAdmin) {
+      return { success: false, error: 'Solo un administrador puede registrar licencias.' }
+    }
 
-      if (!certificado.type.startsWith('image/')) {
-        return { success: false, error: 'El certificado debe ser una imagen valida (JPG, PNG o WEBP)' }
+    let certificadoPreparado: CertificadoLicenciaPreparado | null = null
+    if (!esVacaciones) {
+      const certificadoResult = await prepararCertificadoLicencia(certificado as File)
+      if (!certificadoResult.success || !certificadoResult.data) {
+        return { success: false, error: certificadoResult.error || 'No se pudo procesar el certificado.' }
       }
+      certificadoPreparado = certificadoResult.data
     }
 
     const fechaInicio = new Date(fecha_inicio)
@@ -2738,7 +2843,7 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
     let certificadoTamanoBytes: number | null = null
     let auditoriaIA: AuditoriaCertificadoIA | null = null
 
-    if (!esVacaciones && certificado) {
+    if (!esVacaciones && certificadoPreparado) {
       const bucketReady = await ensureRrhhLicenciasBucket(db)
       if (!bucketReady) {
         return {
@@ -2747,27 +2852,44 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
         }
       }
 
-      const safeFileName = certificado.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-      storagePath = `rrhh/licencias/${empleado_id}/${Date.now()}-${safeFileName}`
-      const certBuffer = Buffer.from(await certificado.arrayBuffer())
+      storagePath = `rrhh/licencias/${empleado_id}/${Date.now()}-${certificadoPreparado.storedFileName}`
 
-      const { error: uploadError } = await db.storage.from(RRHH_LICENCIAS_BUCKET).upload(storagePath, certBuffer, {
-        contentType: certificado.type || 'image/jpeg',
+      const { error: uploadError } = await db.storage.from(RRHH_LICENCIAS_BUCKET).upload(storagePath, certificadoPreparado.buffer, {
+        contentType: certificadoPreparado.mimeType,
         upsert: false,
       })
 
       if (uploadError) {
         devError('Error subiendo certificado de licencia:', uploadError)
+        const uploadMessage = String(uploadError.message || '').toLowerCase()
+        if (uploadMessage.includes('mime type')) {
+          return {
+            success: false,
+            error: `El certificado debe estar en formato ${getCertificadoMimeLabel()}.`,
+          }
+        }
+        if (uploadMessage.includes('row-level security')) {
+          return {
+            success: false,
+            error: 'No se pudo guardar el certificado por permisos de almacenamiento. Intente nuevamente.',
+          }
+        }
+        if (uploadMessage.includes('maximum allowed size')) {
+          return {
+            success: false,
+            error: 'El certificado excede el limite de 10 MB. Reduzca el archivo e intente nuevamente.',
+          }
+        }
         return { success: false, error: 'No se pudo subir el certificado. Intenta nuevamente.' }
       }
 
       const { data: urlData } = db.storage.from(RRHH_LICENCIAS_BUCKET).getPublicUrl(storagePath)
       certificadoUrl = urlData.publicUrl
-      certificadoNombreArchivo = certificado.name
-      certificadoMimeType = certificado.type || 'image/jpeg'
-      certificadoTamanoBytes = certificado.size
+      certificadoNombreArchivo = certificadoPreparado.originalName
+      certificadoMimeType = certificadoPreparado.mimeType
+      certificadoTamanoBytes = certificadoPreparado.sizeBytes
 
-      auditoriaIA = await auditarCertificadoConIA(certificado, {
+      auditoriaIA = await auditarCertificadoConIA(certificadoPreparado.file, {
         nombreEmpleado,
         diagnosticoReportado: diagnostico_reportado,
       })
