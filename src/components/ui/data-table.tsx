@@ -305,7 +305,7 @@ export function DataTable<TData, TValue>({
       {/* Table - Responsive */}
       <div className="rounded-md border overflow-hidden">
         {/* Vista móvil - Cards */}
-        <div className="md:hidden">
+        <div className="lg:hidden">
           {table.getRowModel().rows?.length ? (
             <div className="divide-y divide-border">
               {table.getRowModel().rows.map((row) => (
@@ -389,7 +389,7 @@ export function DataTable<TData, TValue>({
         </div>
 
         {/* Vista desktop - Table */}
-        <div className="hidden md:block overflow-x-auto">
+        <div className="hidden lg:block overflow-x-auto">
           <Table>
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (
