@@ -1,4 +1,3 @@
-import { WhatsAppClient } from '@kapso/whatsapp-cloud-api'
 import type { SendMessageOptions, SendMessageResult } from '@/types/whatsapp-meta'
 
 const DEFAULT_KAPSO_BASE_URL = 'https://api.kapso.ai/meta/whatsapp'
@@ -14,7 +13,7 @@ interface KapsoClientCache {
   apiKey: string
   phoneNumberId: string
   baseUrl: string
-  client: WhatsAppClient
+  client: any
 }
 
 let kapsoClientCache: KapsoClientCache | null = null
@@ -64,7 +63,7 @@ function getKapsoConfig(): KapsoConfig | null {
   }
 }
 
-function getKapsoClient(config: KapsoConfig): WhatsAppClient {
+async function getKapsoClient(config: KapsoConfig): Promise<any> {
   if (
     kapsoClientCache &&
     kapsoClientCache.apiKey === config.apiKey &&
@@ -74,6 +73,15 @@ function getKapsoClient(config: KapsoConfig): WhatsAppClient {
     return kapsoClientCache.client
   }
 
+  let WhatsAppClientModule: any
+
+  try {
+    WhatsAppClientModule = await import('@kapso/whatsapp-cloud-api')
+  } catch (error) {
+    throw new Error('Kapso SDK no instalado en este entorno')
+  }
+
+  const WhatsAppClient = WhatsAppClientModule.WhatsAppClient
   const client = new WhatsAppClient({
     kapsoApiKey: config.apiKey,
     baseUrl: config.baseUrl,
@@ -90,7 +98,7 @@ function getKapsoClient(config: KapsoConfig): WhatsAppClient {
 }
 
 async function sendKapsoTextMessage(
-  client: WhatsAppClient,
+  client: any,
   config: KapsoConfig,
   to: string,
   text: string,
@@ -119,7 +127,7 @@ async function sendKapsoTextMessage(
 }
 
 async function sendKapsoButtonMessage(
-  client: WhatsAppClient,
+  client: any,
   config: KapsoConfig,
   to: string,
   text: string,
@@ -154,7 +162,7 @@ async function sendKapsoButtonMessage(
 }
 
 async function sendKapsoListMessage(
-  client: WhatsAppClient,
+  client: any,
   config: KapsoConfig,
   to: string,
   buttonText: string,
@@ -206,20 +214,20 @@ export async function sendWhatsAppKapsoMessage(
     }
   }
 
-  const client = getKapsoClient(config)
-
-  if (!config.enableButtons && (options.buttons || options.list)) {
-    if (options.text) {
-      return sendKapsoTextMessage(client, config, options.to, options.text, options.previewUrl)
-    }
-
-    return {
-      success: false,
-      error: 'Botones deshabilitados y no hay texto',
-    }
-  }
-
   try {
+    const client = await getKapsoClient(config)
+
+    if (!config.enableButtons && (options.buttons || options.list)) {
+      if (options.text) {
+        return sendKapsoTextMessage(client, config, options.to, options.text, options.previewUrl)
+      }
+
+      return {
+        success: false,
+        error: 'Botones deshabilitados y no hay texto',
+      }
+    }
+
     if (options.location) {
       const locationText = `\ud83d\udccd ${options.location.name || 'Ubicacion'}\n${options.location.address || ''}\nLat: ${options.location.latitude}, Lng: ${options.location.longitude}`.trim()
       return sendKapsoTextMessage(client, config, options.to, locationText, options.previewUrl)
