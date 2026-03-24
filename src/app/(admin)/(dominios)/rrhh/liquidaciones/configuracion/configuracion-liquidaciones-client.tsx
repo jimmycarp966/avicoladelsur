@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Building2, ChevronDown, ChevronUp, Info, Loader2, Plus, RefreshCw, Save, Store, Users } from 'lucide-react'
+import { ArrowLeft, Building2, CalendarDays, ChevronDown, ChevronUp, Info, Loader2, Plus, RefreshCw, Save, Store, Users } from 'lucide-react'
 import {
   guardarReglaPeriodoAction,
   guardarReglaPuestoAction,
@@ -29,7 +29,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useNotificationStore } from '@/store/notificationStore'
 import type { LiquidacionReglaPuesto } from '@/types/domain.types'
 
-type GrupoBaseDias = 'galpon' | 'sucursales' | 'rrhh'
+type GrupoBaseDias = 'galpon' | 'sucursales' | 'rrhh' | 'lun_sab'
 
 type ReglaPuestoEditable = {
   id?: string
@@ -52,6 +52,7 @@ type ReglaPeriodoEditable = {
   dias_base_galpon: number
   dias_base_sucursales: number
   dias_base_rrhh: number
+  dias_base_lun_sab: number
   activo: boolean
 }
 
@@ -71,6 +72,7 @@ function defaultReglaPeriodo(periodoMes: number, periodoAnio: number): ReglaPeri
     dias_base_galpon: 27,
     dias_base_sucursales: getDaysInMonth(periodoMes, periodoAnio),
     dias_base_rrhh: 22,
+    dias_base_lun_sab: 26,
     activo: true,
   }
 }
@@ -128,6 +130,13 @@ const GRUPO_INFO = {
     icon: Users,
     colorClass: 'bg-green-50 border-green-200 text-green-800',
     iconClass: 'text-green-600',
+  },
+  lun_sab: {
+    label: 'Lunes a sabado',
+    description: 'Administrativos con jornada de lunes a sabado',
+    icon: CalendarDays,
+    colorClass: 'bg-violet-50 border-violet-200 text-violet-800',
+    iconClass: 'text-violet-600',
   },
 } as const
 
@@ -197,6 +206,7 @@ export function ConfiguracionLiquidacionesClient() {
           dias_base_galpon: Number(result.data.reglaPeriodo.dias_base_galpon || 0),
           dias_base_sucursales: getDaysInMonth(mes, anio),
           dias_base_rrhh: Number(result.data.reglaPeriodo.dias_base_rrhh || 0),
+          dias_base_lun_sab: Number(result.data.reglaPeriodo.dias_base_lun_sab || 0),
           activo: !!result.data.reglaPeriodo.activo,
         })
       } else {
@@ -226,6 +236,7 @@ export function ConfiguracionLiquidacionesClient() {
         dias_base_galpon: reglaPeriodo.dias_base_galpon,
         dias_base_sucursales: diasBaseSucursales,
         dias_base_rrhh: reglaPeriodo.dias_base_rrhh,
+        dias_base_lun_sab: reglaPeriodo.dias_base_lun_sab,
         activo: reglaPeriodo.activo,
       })
 
@@ -363,10 +374,11 @@ export function ConfiguracionLiquidacionesClient() {
                 <ul className="list-disc list-inside text-blue-800/80 space-y-1 text-xs">
                   <li><strong>Galpón:</strong> empleados de producción y campo (ej: 27 días)</li>
                   <li><strong>Sucursales:</strong> personal de tiendas (auto-calculado por mes calendario)</li>
-                  <li><strong>RRHH / Oficina:</strong> administrativos (ej: 22 días hábiles)</li>
+                  <li><strong>RRHH / Oficina:</strong> administrativos lun-vie (ej: 22 días hábiles)</li>
+                  <li><strong>Lunes a sábado:</strong> administrativos con atención los sábados (ej: 26 días)</li>
                 </ul>
                 <p className="text-xs text-blue-700">
-                  Si no existe regla para el período, el sistema usa los valores por defecto (27 / calendario / 22).
+                  Si no existe regla para el período, el sistema usa los valores por defecto (27 / calendario / 22 / 26).
                 </p>
               </div>
 
@@ -439,8 +451,8 @@ export function ConfiguracionLiquidacionesClient() {
               <strong>
                 {meses.find((mes) => mes.value === periodoMes)?.label} {periodoAnio}
               </strong>
-              : galpon {reglaPeriodo.dias_base_galpon}, sucursales {getDaysInMonth(periodoMes, periodoAnio)} y rrhh{' '}
-              {reglaPeriodo.dias_base_rrhh}. Guarda esta configuracion para dejar fijo el valor hora del mes.
+              : galpon {reglaPeriodo.dias_base_galpon}, sucursales {getDaysInMonth(periodoMes, periodoAnio)}, rrhh{' '}
+              {reglaPeriodo.dias_base_rrhh} y lunes a sabado {reglaPeriodo.dias_base_lun_sab}. Guarda esta configuracion para dejar fijo el valor hora del mes.
             </div>
           )}
 
@@ -452,11 +464,12 @@ export function ConfiguracionLiquidacionesClient() {
               <li>`Galpon` usa dias habiles configurables; si no hay regla guardada, el valor recomendado es 27.</li>
               <li>`Sucursales` siempre usa dias calendario del mes seleccionado; para este periodo son {getDaysInMonth(periodoMes, periodoAnio)}.</li>
               <li>`RRHH / Oficina` usa dias habiles configurables; si no hay regla guardada, el valor recomendado es 22.</li>
+              <li>`Lunes a sabado` usa dias habiles configurables; si no hay regla guardada, el valor recomendado es 26.</li>
               <li>El valor hora se calcula con esta base: `valor_jornal = sueldo / dias_base` y `valor_hora = valor_jornal / horas_jornada`.</li>
             </ul>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             {(
               [
                 {
@@ -475,6 +488,12 @@ export function ConfiguracionLiquidacionesClient() {
                   key: 'dias_base_rrhh' as const,
                   grupo: 'rrhh',
                   value: reglaPeriodo.dias_base_rrhh,
+                  autoCalculated: false,
+                },
+                {
+                  key: 'dias_base_lun_sab' as const,
+                  grupo: 'lun_sab',
+                  value: reglaPeriodo.dias_base_lun_sab,
                   autoCalculated: false,
                 },
               ] as const

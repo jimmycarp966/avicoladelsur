@@ -670,7 +670,7 @@ export interface Liquidacion extends BaseEntity {
   presentismo_teorico?: number
   presentismo_perdido?: number
   presentismo_pagado?: number
-  grupo_base_snapshot?: 'galpon' | 'sucursales' | 'rrhh' | string
+  grupo_base_snapshot?: 'galpon' | 'sucursales' | 'rrhh' | 'lun_sab' | string
   sucursal_snapshot_id?: string | null
   sucursal_snapshot_nombre?: string | null
   control_30_limite?: number
@@ -702,13 +702,14 @@ export interface LiquidacionReglaPeriodo extends BaseEntity {
   dias_base_galpon: number
   dias_base_sucursales: number
   dias_base_rrhh: number
+  dias_base_lun_sab: number
   activo: boolean
 }
 
 export interface LiquidacionReglaPuesto extends BaseEntity {
   puesto_codigo: string
   categoria_id?: string
-  grupo_base_dias: 'galpon' | 'sucursales' | 'rrhh'
+  grupo_base_dias: 'galpon' | 'sucursales' | 'rrhh' | 'lun_sab'
   horas_jornada: number
   tarifa_turno_trabajado: number
   tarifa_turno_especial: number

@@ -1435,6 +1435,7 @@ type GuardarReglaPeriodoInput = {
   dias_base_galpon: number
   dias_base_sucursales: number
   dias_base_rrhh: number
+  dias_base_lun_sab: number
   activo?: boolean
 }
 
@@ -1535,7 +1536,7 @@ type GuardarReglaPuestoInput = {
   id?: string
   puesto_codigo: string
   categoria_id?: string | null
-  grupo_base_dias: 'galpon' | 'sucursales' | 'rrhh'
+  grupo_base_dias: 'galpon' | 'sucursales' | 'rrhh' | 'lun_sab'
   horas_jornada: number
   tarifa_turno_trabajado: number
   tarifa_turno_especial: number
@@ -2236,7 +2237,7 @@ export async function guardarReglaPeriodoAction(
       }
     }
 
-    if (payload.dias_base_galpon <= 0 || payload.dias_base_rrhh <= 0) {
+    if (payload.dias_base_galpon <= 0 || payload.dias_base_rrhh <= 0 || payload.dias_base_lun_sab <= 0) {
       return {
         success: false,
         error: 'Los dias base deben ser mayores a cero',
@@ -2255,6 +2256,7 @@ export async function guardarReglaPeriodoAction(
           dias_base_galpon: payload.dias_base_galpon,
           dias_base_sucursales: diasBaseSucursales,
           dias_base_rrhh: payload.dias_base_rrhh,
+          dias_base_lun_sab: payload.dias_base_lun_sab,
           activo: payload.activo ?? true,
         },
         { onConflict: 'periodo_mes,periodo_anio' }
