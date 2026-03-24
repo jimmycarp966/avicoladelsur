@@ -1259,6 +1259,20 @@ function extractInboundWhatsAppMessages(payload: any): WhatsAppInboundMessage[] 
     return payload.flatMap((item) => extractInboundWhatsAppMessages(item))
   }
 
+  const batchCandidates = [
+    payload.data,
+    payload.events,
+    payload.messages,
+    payload.records,
+    payload.items,
+  ]
+
+  for (const candidate of batchCandidates) {
+    if (Array.isArray(candidate)) {
+      return candidate.flatMap((item) => extractInboundWhatsAppMessages(item))
+    }
+  }
+
   if (isMetaWebhookPayload(payload)) {
     const normalized = normalizeWebhook(payload)
     const messages = Array.isArray(normalized.messages) ? normalized.messages : []
@@ -1286,7 +1300,15 @@ function extractInboundWhatsAppMessages(payload: any): WhatsAppInboundMessage[] 
   }
 
   const event = typeof payload.event === 'string' ? payload.event : ''
-  if (event && event !== 'whatsapp.message.received' && event !== 'message.received') {
+  const normalizedEvent = event.toLowerCase()
+  const isInboundMessageEvent =
+    !normalizedEvent ||
+    normalizedEvent === 'whatsapp.message.received' ||
+    normalizedEvent === 'message.received' ||
+    normalizedEvent === 'whatsapp.message_received' ||
+    normalizedEvent === 'message_received'
+
+  if (!isInboundMessageEvent) {
     return []
   }
 
