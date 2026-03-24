@@ -1438,6 +1438,7 @@ async function handleTwilioWebhook(formData: FormData, source: 'twilio' | 'kapso
       const v = (raw || '').trim()
       if (!v) return v
       const vLower = v.toLowerCase()
+      const saludoPuroRegex = /^(hola+|buenas?|buen dia|buen día|buenos dias|buenos días|buenas tardes|buenas noches|que tal|qué tal)[!. ]*$/i
 
       // Manejar respuesta a upselling (Tarea 9)
       if (vLower === 'si' || vLower === 'sí' || vLower === 'dale' || vLower === 'bueno' || vLower === 'agregalo' || vLower === 'sumalo') {
@@ -1465,12 +1466,24 @@ async function handleTwilioWebhook(formData: FormData, source: 'twilio' | 'kapso
       if (v === 'btn_confirmar_no') return 'No, cancelo el presupuesto'
 
       // Comandos de menú y ayuda
-      if (vLower.includes('hola') || vLower.includes('ayuda') || vLower.includes('menu') || vLower.includes('inicio')) {
+      if (saludoPuroRegex.test(v) || vLower === 'ayuda' || vLower === 'menu' || vLower === 'inicio') {
         return 'Muéstrame el menú principal con todas las opciones disponibles'
       }
 
+      // Consultas de precios explícitas: conservar la intención real
+      if (
+        vLower.includes('precio') ||
+        vLower.includes('precios') ||
+        vLower.includes('cuanto') ||
+        vLower.includes('cuánto') ||
+        vLower.includes('cuesta') ||
+        vLower.includes('sale')
+      ) {
+        return v
+      }
+
       // Comandos de productos/catálogo
-      if (vLower.includes('productos') || vLower.includes('catalogo') || vLower.includes('lista')) {
+      if (vLower.includes('productos') || vLower.includes('catalogo') || vLower.includes('catálogo')) {
         return 'Quiero ver el catálogo completo de productos disponibles'
       }
 

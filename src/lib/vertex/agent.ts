@@ -47,6 +47,57 @@ function extractTextFromResponse(resp: any): string {
   )
 }
 
+function detectIntentHeuristically(message: string): string | null {
+  const normalized = (message || '').trim().toLowerCase()
+
+  if (!normalized) {
+    return null
+  }
+
+  const saludoRegex = /^(hola+|buenas?|buen día|buenos días|buenas tardes|buenas noches|qué tal|que tal)[!. ]*$/i
+  const consultaPrecioRegex = /\b(precio|precios|cu[aá]nto|cu[aá]ntos|cuesta|sale|valor)\b/i
+  const consultaSaldoRegex = /\b(saldo pendiente|cu[aá]nto debo|cuanto debo|deuda|debo)\b/i
+  const consultaEstadoRegex = /\b(estado|seguimiento|d[oó]nde est[aá] mi pedido|donde esta mi pedido)\b/i
+  const consultaStockRegex = /\b(stock|hay|ten[eé]s|tenes|disponible|disponibles)\b/i
+  const catalogoRegex = /\b(cat[aá]logo|catalogo|ver productos|qu[eé] tienen|que tienen)\b/i
+  const pedidoRegex = /\b(pedido|presupuesto|quiero|llevar|comprar)\b/i
+  const reclamoRegex = /\b(reclamo|queja|problema|vino mal|lleg[oó] mal)\b/i
+
+  if (consultaPrecioRegex.test(normalized)) {
+    return 'consulta_precio'
+  }
+
+  if (consultaSaldoRegex.test(normalized)) {
+    return 'consulta_saldo'
+  }
+
+  if (consultaEstadoRegex.test(normalized)) {
+    return 'consulta_estado'
+  }
+
+  if (consultaStockRegex.test(normalized) && !pedidoRegex.test(normalized)) {
+    return 'consulta_stock'
+  }
+
+  if (reclamoRegex.test(normalized)) {
+    return 'reclamo'
+  }
+
+  if (catalogoRegex.test(normalized)) {
+    return 'catalogo'
+  }
+
+  if (pedidoRegex.test(normalized)) {
+    return 'pedido'
+  }
+
+  if (saludoRegex.test(normalized)) {
+    return 'saludo'
+  }
+
+  return null
+}
+
 /**
  * Procesa un mensaje del usuario y genera una respuesta
  */
@@ -129,6 +180,8 @@ export async function processMessageWithTools(
       : ''
 
     // Prompt para detectar intención CON contexto conversacional
+    const heuristicIntent = detectIntentHeuristically(message)
+
     const intentPrompt = `Analiza el siguiente mensaje de WhatsApp y determina la intención del usuario.
  ${historialReciente ? `\nContexto de la conversación:\n${historialReciente}\n` : ''}
  Mensaje actual: "${message}"
@@ -150,8 +203,18 @@ export async function processMessageWithTools(
 
  Responde SOLO con el nombre de la intención (ej: "pedido", "carrito", "consulta_precio", "consulta_stock", etc.)`
 
-    const intentResult = await model.generateContent(intentPrompt)
-    const intent = extractTextFromResponse(intentResult.response).trim().toLowerCase()
+    let intent = heuristicIntent
+
+    if (!intent) {
+      const intentResult = await model.generateContent(intentPrompt)
+      intent = extractTextFromResponse(intentResult.response).trim().toLowerCase()
+    }
+
+    console.log('[Vertex AI Agent] Intencion detectada:', {
+      intent,
+      heuristic: Boolean(heuristicIntent),
+      message,
+    })
 
     // Ejecutar tool según intención
     switch (intent) {
