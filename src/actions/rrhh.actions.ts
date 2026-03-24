@@ -4,6 +4,15 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { getGeminiModel } from '@/lib/ai/runtime'
 import { GEMINI_MODEL_FLASH } from '@/lib/constants/gemini-models'
+import {
+  RRHH_DISCIPLINA_BUCKET,
+  generarDocumentoIncidenciaDisciplinaria,
+} from '@/lib/services/documents/rrhh-incidencia-disciplinaria-service'
+import {
+  buildDisciplinaTitulo,
+  type DisciplinaEtapa,
+  type LegajoDisciplinaMetadata,
+} from '@/lib/utils/rrhh-disciplinario'
 import { devError } from '@/lib/utils/logger'
 import type { ApiResponse } from '@/types/api.types'
 import type { Empleado, LiquidacionReglaPeriodo, LiquidacionReglaPuesto } from '@/types/domain.types'
@@ -32,6 +41,8 @@ const RRHH_LICENCIAS_ALLOWED_INPUT_MIME_TYPES = [
   'image/heif',
 ] as const
 const RRHH_LICENCIAS_FILE_SIZE_LIMIT = 10 * 1024 * 1024
+const RRHH_DISCIPLINA_ALLOWED_MIME_TYPES = ['application/pdf']
+const RRHH_DISCIPLINA_FILE_SIZE_LIMIT = 5 * 1024 * 1024
 
 type CertificadoLicenciaPreparado = {
   file: File
@@ -89,6 +100,53 @@ async function ensureRrhhLicenciasBucket(db: any): Promise<boolean> {
   }
 }
 
+async function ensureRrhhDisciplinaBucket(db: any): Promise<boolean> {
+  try {
+    const { data: buckets, error: bucketsError } = await db.storage.listBuckets()
+
+    if (bucketsError) {
+      devError('Error obteniendo bucket RRHH disciplinario:', bucketsError)
+      return false
+    }
+
+    const bucketExists = (buckets || []).some(
+      (bucket: { id?: string; name?: string }) =>
+        bucket.id === RRHH_DISCIPLINA_BUCKET || bucket.name === RRHH_DISCIPLINA_BUCKET,
+    )
+
+    if (bucketExists) {
+      const { error: updateBucketError } = await db.storage.updateBucket(RRHH_DISCIPLINA_BUCKET, {
+        public: false,
+        fileSizeLimit: RRHH_DISCIPLINA_FILE_SIZE_LIMIT,
+        allowedMimeTypes: RRHH_DISCIPLINA_ALLOWED_MIME_TYPES,
+      })
+
+      if (updateBucketError) {
+        devError('Error actualizando bucket RRHH disciplinario:', updateBucketError)
+        return false
+      }
+
+      return true
+    }
+
+    const { error: createBucketError } = await db.storage.createBucket(RRHH_DISCIPLINA_BUCKET, {
+      public: false,
+      fileSizeLimit: RRHH_DISCIPLINA_FILE_SIZE_LIMIT,
+      allowedMimeTypes: RRHH_DISCIPLINA_ALLOWED_MIME_TYPES,
+    })
+
+    if (createBucketError && !String(createBucketError.message || '').toLowerCase().includes('already exists')) {
+      devError('Error creando bucket RRHH disciplinario:', createBucketError)
+      return false
+    }
+
+    return true
+  } catch (error) {
+    devError('Error inesperado asegurando bucket RRHH disciplinario:', error)
+    return false
+  }
+}
+
 function getCertificadoMimeLabel() {
   return 'JPG, PNG, WEBP, HEIC o HEIF'
 }
@@ -123,7 +181,7 @@ async function prepararCertificadoLicencia(
     }
   }
 
-  let outputBuffer = Buffer.from(await file.arrayBuffer())
+  let outputBuffer: Buffer = Buffer.from(await file.arrayBuffer())
   let outputMimeType = inputMimeType === 'image/jpg' ? 'image/jpeg' : inputMimeType
   let outputFileName = buildStoredFileName(file.name, outputMimeType)
 
@@ -756,10 +814,15 @@ export async function obtenerEmpleadoPorIdAction(empleadoId: string): Promise<Ap
 
 export async function crearIncidenciaLegajoAction(payload: {
   empleado_id: string
+  etapa: DisciplinaEtapa
+  motivo: string
   titulo: string
   descripcion?: string
   fecha_evento: string
+  suspension_dias?: number
 }): Promise<ApiResponse<{ eventoId: string }>> {
+  let eventoIdCreado: string | null = null
+
   try {
     const adminUserId = await getAuthenticatedAdminUserId()
     if (!adminUserId) {
@@ -769,14 +832,27 @@ export async function crearIncidenciaLegajoAction(payload: {
       }
     }
 
-    const titulo = payload.titulo.trim()
+    const etapa = payload.etapa
+    const motivo = payload.motivo.trim()
+    const titulo = payload.titulo.trim() || buildDisciplinaTitulo(etapa, motivo)
     const descripcion = payload.descripcion?.trim()
     const fechaEvento = new Date(payload.fecha_evento)
+    const suspensionDias =
+      etapa === 'suspension' && payload.suspension_dias
+        ? Number(payload.suspension_dias)
+        : undefined
 
     if (!titulo) {
       return {
         success: false,
         error: 'El titulo de la incidencia es obligatorio',
+      }
+    }
+
+    if (!motivo) {
+      return {
+        success: false,
+        error: 'El motivo de la incidencia es obligatorio',
       }
     }
 
@@ -787,11 +863,26 @@ export async function crearIncidenciaLegajoAction(payload: {
       }
     }
 
+    if (etapa === 'suspension' && (!suspensionDias || Number.isNaN(suspensionDias) || suspensionDias < 1)) {
+      return {
+        success: false,
+        error: 'Debe indicar la cantidad de dias de suspension',
+      }
+    }
+
     const supabase = createAdminClient()
 
     const { data: empleado, error: empleadoError } = await supabase
       .from('rrhh_empleados')
-      .select('id')
+      .select(`
+        id,
+        legajo,
+        dni,
+        cuil,
+        nombre,
+        apellido,
+        usuario:usuarios(nombre, apellido)
+      `)
       .eq('id', payload.empleado_id)
       .maybeSingle()
 
@@ -802,6 +893,22 @@ export async function crearIncidenciaLegajoAction(payload: {
       }
     }
 
+    const usuarioEmpleado = Array.isArray(empleado.usuario) ? empleado.usuario[0] : empleado.usuario
+    const empleadoNombre =
+      `${usuarioEmpleado?.nombre || empleado.nombre || ''} ${usuarioEmpleado?.apellido || empleado.apellido || ''}`.trim() ||
+      'Empleado sin nombre'
+
+    const metadataBase: LegajoDisciplinaMetadata = {
+      flujo: 'disciplinario',
+      origen: 'manual',
+      etapa,
+      motivo,
+      documento: {
+        estado: 'pendiente_firma',
+      },
+      suspension: etapa === 'suspension' ? { dias: suspensionDias || null } : undefined,
+    }
+
     const { data, error } = await supabase
       .from('rrhh_legajo_eventos')
       .insert({
@@ -810,9 +917,7 @@ export async function crearIncidenciaLegajoAction(payload: {
         categoria: 'incidencias',
         titulo,
         descripcion: descripcion || null,
-        metadata: {
-          origen: 'manual',
-        },
+        metadata: metadataBase,
         created_by: adminUserId,
         fecha_evento: fechaEvento.toISOString(),
       })
@@ -827,16 +932,82 @@ export async function crearIncidenciaLegajoAction(payload: {
       }
     }
 
+    eventoIdCreado = data.id
+
+    const bucketReady = await ensureRrhhDisciplinaBucket(supabase)
+    if (!bucketReady) {
+      await supabase.from('rrhh_legajo_eventos').delete().eq('id', data.id)
+
+      return {
+        success: false,
+        error: 'No se pudo preparar el almacenamiento del documento disciplinario',
+      }
+    }
+
+    const documento = await generarDocumentoIncidenciaDisciplinaria({
+      eventoId: data.id,
+      empleado: {
+        id: empleado.id,
+        legajo: empleado.legajo,
+        dni: empleado.dni,
+        cuil: empleado.cuil,
+        nombreCompleto: empleadoNombre,
+      },
+      fechaEventoIso: fechaEvento.toISOString(),
+      etapa,
+      motivo,
+      descripcion,
+      suspensionDias,
+    })
+
+    const metadataActualizada: LegajoDisciplinaMetadata = {
+      ...metadataBase,
+      documento: {
+        bucket: documento.bucket,
+        path: documento.path,
+        estado: 'pendiente_firma',
+        generado_at: new Date().toISOString(),
+      },
+    }
+
+    const { error: updateError } = await supabase
+      .from('rrhh_legajo_eventos')
+      .update({
+        metadata: metadataActualizada,
+      })
+      .eq('id', data.id)
+
+    if (updateError) {
+      devError('Error actualizando documento de incidencia de legajo:', updateError)
+      await supabase.from('rrhh_legajo_eventos').delete().eq('id', data.id)
+
+      return {
+        success: false,
+        error: 'No se pudo guardar el documento de la medida disciplinaria',
+      }
+    }
+
     revalidatePath(`/rrhh/empleados/${payload.empleado_id}`)
     revalidatePath('/rrhh/empleados')
+    revalidatePath(`/rrhh/empleados/${payload.empleado_id}/incidencias/${data.id}/documento`)
 
     return {
       success: true,
       data: { eventoId: data.id },
-      message: 'Incidencia registrada en el legajo',
+      message: 'Medida disciplinaria registrada en el legajo con su documento',
     }
   } catch (error) {
     devError('Error en crearIncidenciaLegajoAction:', error)
+
+    if (eventoIdCreado) {
+      try {
+        const supabase = createAdminClient()
+        await supabase.from('rrhh_legajo_eventos').delete().eq('id', eventoIdCreado)
+      } catch (cleanupError) {
+        devError('Error limpiando incidencia disciplinaria incompleta:', cleanupError)
+      }
+    }
+
     return {
       success: false,
       error: 'Error interno del servidor',

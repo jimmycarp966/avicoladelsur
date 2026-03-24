@@ -60,6 +60,7 @@ export function getGeminiModel(
     maxOutputTokens?: number
     topP?: number
     topK?: number
+    responseMimeType?: string
   }
 ) {
   const client = getGeminiClient()

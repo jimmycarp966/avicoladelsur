@@ -349,6 +349,13 @@ export const legajoIncidenciaSchema = z.object({
     .string()
     .uuid('ID de empleado invalido'),
 
+  etapa: z.enum(['verbal', 'advertencia_escrita', 'suspension']),
+
+  motivo: z
+    .string()
+    .min(1, 'El motivo es requerido')
+    .max(160, 'El motivo debe tener maximo 160 caracteres'),
+
   titulo: z
     .string()
     .min(1, 'El titulo es requerido')
@@ -364,6 +371,25 @@ export const legajoIncidenciaSchema = z.object({
     .refine((val) => !isNaN(Date.parse(val)), {
       message: 'Fecha de incidencia invalida',
     }),
+
+  suspension_dias: z.preprocess(
+    (value) => (value === '' || value === null || value === undefined ? undefined : value),
+    z
+      .coerce
+      .number()
+      .int('Los dias de suspension deben ser un numero entero')
+      .min(1, 'La suspension debe ser de al menos 1 dia')
+      .max(365, 'La suspension no puede superar 365 dias')
+      .optional(),
+  ),
+}).superRefine((data, ctx) => {
+  if (data.etapa === 'suspension' && !data.suspension_dias) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['suspension_dias'],
+      message: 'Debe indicar cuantos dias dura la suspension',
+    })
+  }
 })
 
 // Esquema para adelantos
@@ -555,7 +581,8 @@ export type NovedadRRHHFormData = z.input<typeof novedadRRHHSchema>
 // como `estado`, puedan ser opcionales al enviar y compatibles con React Hook Form.
 export type AsistenciaFormData = z.input<typeof asistenciaSchema>
 export type LicenciaFormData = z.input<typeof licenciaSchema>
-export type LegajoIncidenciaFormData = z.input<typeof legajoIncidenciaSchema>
+export type LegajoIncidenciaFormInput = z.input<typeof legajoIncidenciaSchema>
+export type LegajoIncidenciaFormData = z.output<typeof legajoIncidenciaSchema>
 export type AdelantoFormData = z.infer<typeof adelantoSchema>
 export type DescuentoFormData = z.infer<typeof descuentoSchema>
 export type EvaluacionFormData = z.input<typeof evaluacionSchema>

@@ -1,24 +1,26 @@
 /**
- * Servicio para WhatsApp Business API de Meta
- * Maneja envío de mensajes con botones interactivos
+ * Servicio principal para WhatsApp.
+ * Mantiene compatibilidad con Meta, Kapso y Twilio durante la migracion.
  */
 
+import { sendWhatsAppKapsoMessage, isWhatsAppKapsoAvailable } from '@/lib/services/whatsapp-kapso'
+import { sendWhatsAppTwilioMessage } from '@/lib/services/whatsapp-twilio'
 import type {
-  MetaMessage,
   MetaApiResponse,
-  WhatsAppMetaConfig,
+  MetaInteractiveButton,
+  MetaInteractiveMessage,
+  MetaListSection,
+  MetaMessage,
   SendMessageOptions,
   SendMessageResult,
-  MetaInteractiveMessage,
-  MetaInteractiveButton,
-  MetaListSection,
+  WhatsAppMetaConfig,
 } from '@/types/whatsapp-meta'
 
 const META_API_BASE_URL = 'https://graph.facebook.com/v21.0'
 
-/**
- * Obtiene la configuración de WhatsApp Meta desde variables de entorno
- */
+type WhatsAppProviderPreference = 'auto' | 'meta' | 'twilio' | 'kapso'
+type WhatsAppProvider = 'meta' | 'twilio' | 'kapso'
+
 function getMetaConfig(): WhatsAppMetaConfig | null {
   const accessToken = process.env.WHATSAPP_META_ACCESS_TOKEN
   const phoneNumberId = process.env.WHATSAPP_META_PHONE_NUMBER_ID
@@ -43,29 +45,50 @@ function getMetaConfig(): WhatsAppMetaConfig | null {
   }
 }
 
-/**
- * Normaliza número de teléfono al formato internacional
- */
+function getWhatsAppProviderPreference(): WhatsAppProviderPreference {
+  const provider = (process.env.WHATSAPP_PROVIDER || 'auto').toLowerCase()
+
+  if (provider === 'meta' || provider === 'twilio' || provider === 'kapso') {
+    return provider
+  }
+
+  return 'auto'
+}
+
+function isMetaConfigured(): boolean {
+  return getMetaConfig() !== null
+}
+
+function isMetaButtonsAvailable(): boolean {
+  const config = getMetaConfig()
+  return config !== null && config.enableButtons !== false
+}
+
+function isTwilioConfigured(): boolean {
+  return Boolean(
+    process.env.TWILIO_ACCOUNT_SID &&
+      process.env.TWILIO_AUTH_TOKEN &&
+      process.env.TWILIO_WHATSAPP_NUMBER
+  )
+}
+
 function normalizePhoneNumber(phone: string): string {
-  // Remover caracteres no numéricos excepto +
   let normalized = phone.replace(/[^\d+]/g, '')
 
-  // Si no empieza con +, asumir código de país de Argentina (+54)
+  if (!normalized) {
+    return ''
+  }
+
   if (!normalized.startsWith('+')) {
-    // Si empieza con 0, removerlo
     if (normalized.startsWith('0')) {
       normalized = normalized.substring(1)
     }
-    // Agregar código de país
-    normalized = '+54' + normalized
+    normalized = `+${normalized}`
   }
 
   return normalized
 }
 
-/**
- * Envía un mensaje de texto simple
- */
 async function sendTextMessage(
   config: WhatsAppMetaConfig,
   to: string,
@@ -87,9 +110,6 @@ async function sendTextMessage(
   return sendMessage(config, message)
 }
 
-/**
- * Envía un mensaje con botones de respuesta (Reply Buttons)
- */
 async function sendButtonMessage(
   config: WhatsAppMetaConfig,
   to: string,
@@ -102,7 +122,6 @@ async function sendButtonMessage(
   }
 
   const normalizedPhone = normalizePhoneNumber(to)
-
   const interactiveButtons: MetaInteractiveButton[] = buttons.map((btn) => ({
     type: 'reply',
     reply: {
@@ -118,7 +137,7 @@ async function sendButtonMessage(
     interactive: {
       type: 'button',
       body: {
-        text: text,
+        text,
       },
       action: {
         buttons: interactiveButtons,
@@ -128,15 +147,12 @@ async function sendButtonMessage(
           text: footer,
         },
       }),
-    },
+    } as MetaInteractiveMessage,
   }
 
   return sendMessage(config, message)
 }
 
-/**
- * Envía un mensaje con lista desplegable (List Message)
- */
 async function sendListMessage(
   config: WhatsAppMetaConfig,
   to: string,
@@ -146,13 +162,12 @@ async function sendListMessage(
   footer?: string
 ): Promise<SendMessageResult> {
   if (sections.length === 0) {
-    throw new Error('Debes proporcionar al menos una sección')
+    throw new Error('Debes proporcionar al menos una seccion')
   }
 
-  // Validar que no haya más de 10 opciones en total
   const totalOptions = sections.reduce((sum, section) => sum + section.rows.length, 0)
   if (totalOptions > 10) {
-    throw new Error('No puedes tener más de 10 opciones en total')
+    throw new Error('No puedes tener mas de 10 opciones en total')
   }
 
   const normalizedPhone = normalizePhoneNumber(to)
@@ -164,35 +179,31 @@ async function sendListMessage(
     interactive: {
       type: 'list',
       body: {
-        text: text,
+        text,
       },
       action: {
         button: buttonText,
-        sections: sections,
+        sections,
       },
       ...(footer && {
         footer: {
           text: footer,
         },
       }),
-    },
+    } as MetaInteractiveMessage,
   }
 
   return sendMessage(config, message)
 }
 
-/**
- * Envía un mensaje con botón de compartir ubicación
- */
 async function sendLocationRequestMessage(
   config: WhatsAppMetaConfig,
   to: string,
   text: string,
-  buttonText = '📍 Compartir Ubicación'
+  buttonText = '📍 Compartir Ubicacion'
 ): Promise<SendMessageResult> {
   const normalizedPhone = normalizePhoneNumber(to)
 
-  // Para solicitar ubicación, usamos un botón que abre el selector de ubicación
   const message: MetaMessage = {
     messaging_product: 'whatsapp',
     to: normalizedPhone,
@@ -200,7 +211,7 @@ async function sendLocationRequestMessage(
     interactive: {
       type: 'button',
       body: {
-        text: text,
+        text,
       },
       action: {
         buttons: [
@@ -213,15 +224,12 @@ async function sendLocationRequestMessage(
           },
         ],
       },
-    },
+    } as MetaInteractiveMessage,
   }
 
   return sendMessage(config, message)
 }
 
-/**
- * Envía un mensaje con botón para llamar
- */
 async function sendPhoneButtonMessage(
   config: WhatsAppMetaConfig,
   to: string,
@@ -239,7 +247,7 @@ async function sendPhoneButtonMessage(
     interactive: {
       type: 'button',
       body: {
-        text: text,
+        text,
       },
       action: {
         buttons: [
@@ -249,15 +257,12 @@ async function sendPhoneButtonMessage(
           },
         ],
       },
-    },
+    } as MetaInteractiveMessage,
   }
 
   return sendMessage(config, message)
 }
 
-/**
- * Envía un mensaje a la API de Meta
- */
 async function sendMessage(
   config: WhatsAppMetaConfig,
   message: MetaMessage
@@ -283,13 +288,13 @@ async function sendMessage(
       console.error('[WhatsApp Meta] Error enviando mensaje:', {
         error: errorMessage,
         code: errorCode,
-        message: message,
+        message,
       })
 
       return {
         success: false,
         error: errorMessage,
-        errorCode: errorCode,
+        errorCode,
       }
     }
 
@@ -303,7 +308,7 @@ async function sendMessage(
 
     return {
       success: true,
-      messageId: messageId,
+      messageId,
     }
   } catch (error: any) {
     console.error('[WhatsApp Meta] Error de red:', error)
@@ -314,119 +319,182 @@ async function sendMessage(
   }
 }
 
-/**
- * Función principal para enviar mensajes con detección automática
- */
-export async function sendWhatsAppMessage(
-  options: SendMessageOptions
-): Promise<SendMessageResult> {
+async function sendWhatsAppViaMeta(options: SendMessageOptions): Promise<SendMessageResult> {
   const config = getMetaConfig()
 
   if (!config) {
-    console.warn('[WhatsApp Meta] Configuración no disponible, usando fallback a texto')
-    // Fallback: retornar error para que el sistema use otro método
     return {
       success: false,
       error: 'WhatsApp Meta no configurado',
     }
   }
 
-  // Si los botones están deshabilitados, enviar solo texto
   if (!config.enableButtons && (options.buttons || options.list)) {
-    console.log('[WhatsApp Meta] Botones deshabilitados, enviando solo texto')
     if (options.text) {
       return sendTextMessage(config, options.to, options.text, options.previewUrl)
     }
+
     return {
       success: false,
       error: 'Botones deshabilitados y no hay texto',
     }
   }
 
-  try {
-    // Prioridad: ubicación > lista > botones > texto
-    if (options.location) {
-      return sendTextMessage(
-        config,
-        options.to,
-        `📍 ${options.location.name || 'Ubicación'}\n${options.location.address || ''}\nLat: ${options.location.latitude}, Lng: ${options.location.longitude}`,
-        options.previewUrl
-      )
-    }
+  if (options.location) {
+    return sendTextMessage(
+      config,
+      options.to,
+      `📍 ${options.location.name || 'Ubicacion'}\n${options.location.address || ''}\nLat: ${options.location.latitude}, Lng: ${options.location.longitude}`,
+      options.previewUrl
+    )
+  }
 
-    if (options.list) {
-      return sendListMessage(
-        config,
-        options.to,
-        options.list.buttonText,
-        options.text || '',
-        options.list.sections,
-        options.footer
-      )
-    }
+  if (options.list) {
+    return sendListMessage(
+      config,
+      options.to,
+      options.list.buttonText,
+      options.text || '',
+      options.list.sections,
+      options.footer
+    )
+  }
 
-    if (options.buttons && options.buttons.length > 0) {
-      return sendButtonMessage(config, options.to, options.text || '', options.buttons, options.footer)
-    }
+  if (options.buttons && options.buttons.length > 0) {
+    return sendButtonMessage(config, options.to, options.text || '', options.buttons, options.footer)
+  }
 
+  if (options.text) {
+    return sendTextMessage(config, options.to, options.text, options.previewUrl)
+  }
+
+  return {
+    success: false,
+    error: 'No se proporciono contenido para el mensaje',
+  }
+}
+
+async function sendWhatsAppViaTwilio(options: SendMessageOptions): Promise<SendMessageResult> {
+  if (!isTwilioConfigured()) {
+    return {
+      success: false,
+      error: 'Twilio no configurado',
+    }
+  }
+
+  if (options.location) {
+    const locationText = `📍 ${options.location.name || 'Ubicacion'}\n${options.location.address || ''}\nLat: ${options.location.latitude}, Lng: ${options.location.longitude}`
+    return sendWhatsAppTwilioMessage(options.to, locationText)
+  }
+
+  if (options.buttons || options.list) {
     if (options.text) {
-      return sendTextMessage(config, options.to, options.text, options.previewUrl)
+      return sendWhatsAppTwilioMessage(options.to, options.text)
     }
 
     return {
       success: false,
-      error: 'No se proporcionó contenido para el mensaje',
+      error: 'Twilio no soporta mensajes interactivos sin texto',
     }
-  } catch (error: any) {
-    console.error('[WhatsApp Meta] Error enviando mensaje:', error)
-    return {
-      success: false,
-      error: error.message || 'Error desconocido',
-    }
+  }
+
+  if (options.text) {
+    return sendWhatsAppTwilioMessage(options.to, options.text)
+  }
+
+  return {
+    success: false,
+    error: 'No se proporciono contenido para el mensaje',
   }
 }
 
 /**
- * Verifica si WhatsApp Meta está configurado y disponible
+ * Envia mensajes usando el proveedor activo de WhatsApp.
+ */
+export async function sendWhatsAppMessage(
+  options: SendMessageOptions
+): Promise<SendMessageResult> {
+  const preference = getWhatsAppProviderPreference()
+
+  if (preference === 'kapso') {
+    return sendWhatsAppKapsoMessage(options)
+  }
+
+  if (preference === 'meta') {
+    return sendWhatsAppViaMeta(options)
+  }
+
+  if (preference === 'twilio') {
+    return sendWhatsAppViaTwilio(options)
+  }
+
+  if (isWhatsAppKapsoAvailable()) {
+    return sendWhatsAppKapsoMessage(options)
+  }
+
+  if (isMetaConfigured()) {
+    return sendWhatsAppViaMeta(options)
+  }
+
+  if (isTwilioConfigured()) {
+    return sendWhatsAppViaTwilio(options)
+  }
+
+  return {
+    success: false,
+    error: 'WhatsApp no configurado',
+  }
+}
+
+/**
+ * Verifica si WhatsApp interactivo esta disponible.
  */
 export function isWhatsAppMetaAvailable(): boolean {
-  const provider = process.env.WHATSAPP_PROVIDER
-  if (provider === 'twilio') {
+  const provider = getWhatsAppProvider()
+  if (provider !== 'kapso' && provider !== 'meta') {
     return false
   }
 
-  const config = getMetaConfig()
-  return config !== null && config.enableButtons !== false
+  return process.env.WHATSAPP_ENABLE_BUTTONS !== 'false'
 }
 
 /**
- * Obtiene el proveedor activo de WhatsApp
+ * Obtiene el proveedor activo de WhatsApp.
  */
-export function getWhatsAppProvider(): 'meta' | 'twilio' | null {
-  const provider = process.env.WHATSAPP_PROVIDER
-  if (provider === 'meta' || provider === 'twilio') {
-    return provider
+export function getWhatsAppProvider(): WhatsAppProvider | null {
+  const preference = getWhatsAppProviderPreference()
+
+  if (preference === 'kapso') {
+    return isWhatsAppKapsoAvailable() ? 'kapso' : null
   }
 
-  // Auto-detección: si Meta está configurado, usarlo; sino Twilio
-  if (isWhatsAppMetaAvailable()) {
+  if (preference === 'meta') {
+    return isMetaConfigured() ? 'meta' : null
+  }
+
+  if (preference === 'twilio') {
+    return isTwilioConfigured() ? 'twilio' : null
+  }
+
+  if (isWhatsAppKapsoAvailable()) {
+    return 'kapso'
+  }
+
+  if (isMetaConfigured()) {
     return 'meta'
   }
 
-  // Verificar si Twilio está configurado
-  const twilioConfig = {
-    accountSid: process.env.TWILIO_ACCOUNT_SID,
-    authToken: process.env.TWILIO_AUTH_TOKEN,
-    whatsappNumber: process.env.TWILIO_WHATSAPP_NUMBER,
-  }
-
-  if (twilioConfig.accountSid && twilioConfig.authToken) {
+  if (isTwilioConfigured()) {
     return 'twilio'
   }
 
   return null
 }
 
-// Exportar funciones específicas para uso directo si es necesario
-export { sendTextMessage, sendButtonMessage, sendListMessage, sendLocationRequestMessage, sendPhoneButtonMessage }
-
+export {
+  sendTextMessage,
+  sendButtonMessage,
+  sendListMessage,
+  sendLocationRequestMessage,
+  sendPhoneButtonMessage,
+}

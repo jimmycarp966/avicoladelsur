@@ -2,10 +2,16 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft, Edit, Plus } from "lucide-react"
 import { createAdminClient, createClient } from "@/lib/supabase/server"
+import { createSignedStorageUrlServer } from "@/lib/supabase/storage-server"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { formatDate } from "@/lib/utils"
+import {
+  buildDisciplinaDescripcion,
+  getDisciplinaEtapaShortLabel,
+  parseLegajoDisciplinaMetadata,
+} from "@/lib/utils/rrhh-disciplinario"
 import { getEmpleadoLegajoDni } from "@/lib/utils/empleado-display"
 import type { Empleado } from "@/types/domain.types"
 
@@ -74,6 +80,18 @@ type TimelineItem = {
   categoria: "legajo" | "adelanto" | "licencia" | "evaluacion" | "incidencia"
   titulo: string
   descripcion?: string
+}
+
+type MedidaDisciplinariaView = {
+  id: string
+  fecha: string
+  titulo: string
+  descripcion?: string
+  etapaLabel: string
+  motivo: string
+  suspensionDias?: number | null
+  documentoEstado: string
+  documentoSignedUrl: string | null
 }
 
 function formatMoney(value?: number | null) {
@@ -200,10 +218,52 @@ async function getEmpleadoLegajoData(empleadoId: string) {
   }
 
   const eventos = eventosError?.code === "42P01" ? [] : (eventosResult.data || [])
+  const medidasDisciplinarias = await Promise.all(
+    ((eventos || []) as LegajoEvento[])
+      .map((evento) => {
+        const metadata = parseLegajoDisciplinaMetadata(evento.metadata)
+        if (!metadata) return null
+
+        return {
+          evento,
+          metadata,
+        }
+      })
+      .filter(Boolean)
+      .map(async (item) => {
+        const typedItem = item as { evento: LegajoEvento; metadata: NonNullable<ReturnType<typeof parseLegajoDisciplinaMetadata>> }
+        let documentoSignedUrl: string | null = null
+
+        if (typedItem.metadata.documento?.bucket && typedItem.metadata.documento?.path) {
+          try {
+            documentoSignedUrl = await createSignedStorageUrlServer(
+              typedItem.metadata.documento.bucket,
+              typedItem.metadata.documento.path,
+              60 * 30,
+            )
+          } catch (error) {
+            console.error("Error creando URL firmada de documento disciplinario:", error)
+          }
+        }
+
+        return {
+          id: typedItem.evento.id,
+          fecha: typedItem.evento.fecha_evento || "",
+          titulo: typedItem.evento.titulo || "Medida disciplinaria",
+          descripcion: buildDisciplinaDescripcion(typedItem.metadata, typedItem.evento.descripcion),
+          etapaLabel: getDisciplinaEtapaShortLabel(typedItem.metadata.etapa),
+          motivo: typedItem.metadata.motivo,
+          suspensionDias: typedItem.metadata.suspension?.dias,
+          documentoEstado: typedItem.metadata.documento?.estado || "pendiente_firma",
+          documentoSignedUrl,
+        } satisfies MedidaDisciplinariaView
+      }),
+  )
 
   return {
     empleado: empleado as Empleado,
     eventos: (eventos || []) as LegajoEvento[],
+    medidasDisciplinarias,
     adelantos: (adelantosResult.data || []) as AdelantoLegajo[],
     licencias: (licenciasResult.data || []) as LicenciaLegajo[],
     evaluaciones: (evaluacionesResult.data || []) as EvaluacionLegajo[],
@@ -219,20 +279,28 @@ export default async function EmpleadoLegajoPage({ params }: PageProps) {
     notFound()
   }
 
-  const { empleado, eventos, adelantos, licencias, evaluaciones, liquidaciones } = data
+  const { empleado, eventos, medidasDisciplinarias, adelantos, licencias, evaluaciones, liquidaciones } = data
   const nombreCompleto =
     `${empleado.usuario?.nombre || empleado.nombre || ""} ${empleado.usuario?.apellido || empleado.apellido || ""}`.trim() ||
     "Sin nombre"
   const identificacionEmpleado = getEmpleadoLegajoDni(empleado)
+  const medidasOrdenadas = [...medidasDisciplinarias].sort(
+    (a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime(),
+  )
 
   const timeline: TimelineItem[] = [
-    ...eventos.map((evento) => ({
-      key: `evento-${evento.id}`,
-      fecha: evento.fecha_evento || "",
-      categoria: evento.categoria === "incidencias" ? "incidencia" as const : "legajo" as const,
-      titulo: evento.titulo || "Evento RRHH",
-      descripcion: evento.descripcion || `${evento.tipo} (${evento.categoria})`,
-    })),
+    ...eventos.map((evento) => {
+      const metadata = parseLegajoDisciplinaMetadata(evento.metadata)
+      return {
+        key: `evento-${evento.id}`,
+        fecha: evento.fecha_evento || "",
+        categoria: evento.categoria === "incidencias" ? "incidencia" as const : "legajo" as const,
+        titulo: evento.titulo || "Evento RRHH",
+        descripcion: metadata
+          ? buildDisciplinaDescripcion(metadata, evento.descripcion)
+          : evento.descripcion || `${evento.tipo} (${evento.categoria})`,
+      }
+    }),
     ...adelantos.map((adelanto) => ({
       key: `adelanto-${adelanto.id}`,
       fecha: adelanto.fecha_aprobacion || adelanto.fecha_solicitud || "",
@@ -281,7 +349,7 @@ export default async function EmpleadoLegajoPage({ params }: PageProps) {
           <Button variant="outline" asChild>
             <Link href={`/rrhh/empleados/${id}/incidencias/nueva`}>
               <Plus className="w-4 h-4 mr-2" />
-              Nueva incidencia
+              Nueva medida
             </Link>
           </Button>
           <Button asChild>
@@ -323,6 +391,66 @@ export default async function EmpleadoLegajoPage({ params }: PageProps) {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Medidas disciplinarias</CardTitle>
+          <CardDescription>
+            Cada medida queda guardada en el legajo con su motivo y documento listo para firma.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {medidasOrdenadas.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Todavia no hay medidas disciplinarias registradas.</p>
+          ) : (
+            <div className="space-y-3">
+              {medidasOrdenadas.map((medida) => (
+                <div key={medida.id} className="rounded-lg border p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline">{medida.etapaLabel}</Badge>
+                        <Badge variant="secondary" className="capitalize">
+                          {medida.documentoEstado.replace("_", " ")}
+                        </Badge>
+                      </div>
+                      <div>
+                        <p className="font-medium">{medida.titulo}</p>
+                        <p className="text-sm text-muted-foreground">Motivo: {medida.motivo}</p>
+                        {medida.suspensionDias ? (
+                          <p className="text-sm text-muted-foreground">
+                            Suspension informada: {medida.suspensionDias} dia(s)
+                          </p>
+                        ) : null}
+                        {medida.descripcion ? (
+                          <p className="text-sm text-muted-foreground mt-1">{medida.descripcion}</p>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-start gap-2 sm:items-end">
+                      <p className="text-xs text-muted-foreground">{formatDateTime(medida.fecha)}</p>
+                      <div className="flex flex-wrap gap-2">
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/rrhh/empleados/${id}/incidencias/${medida.id}/documento`} target="_blank">
+                            Ver documento
+                          </Link>
+                        </Button>
+                        {medida.documentoSignedUrl ? (
+                          <Button variant="secondary" size="sm" asChild>
+                            <a href={medida.documentoSignedUrl} target="_blank" rel="noreferrer">
+                              Descargar PDF
+                            </a>
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

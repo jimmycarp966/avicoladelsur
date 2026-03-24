@@ -5,8 +5,8 @@ import { NuevaIncidenciaForm } from './incidencia-form'
 
 export const dynamic = 'force-dynamic'
 export const metadata = {
-  title: 'Nueva incidencia de legajo - Avicola del Sur ERP',
-  description: 'Registrar incidencia manual dentro del legajo del empleado',
+  title: 'Nueva medida disciplinaria - Avicola del Sur ERP',
+  description: 'Registrar medida disciplinaria con documento dentro del legajo del empleado',
 }
 
 type PageProps = {
@@ -34,8 +34,13 @@ export default async function NuevaIncidenciaPage({ params }: PageProps) {
     notFound()
   }
 
-  const empleadoNombre = getEmpleadoNombre(empleado)
-  const empleadoIdentificacion = getEmpleadoLegajoDni(empleado)
+  const empleadoDisplay = {
+    ...empleado,
+    usuario: Array.isArray(empleado.usuario) ? empleado.usuario[0] : empleado.usuario,
+  }
+
+  const empleadoNombre = getEmpleadoNombre(empleadoDisplay)
+  const empleadoIdentificacion = getEmpleadoLegajoDni(empleadoDisplay)
 
   return (
     <div className="space-y-6">
@@ -44,9 +49,9 @@ export default async function NuevaIncidenciaPage({ params }: PageProps) {
           <div className="inline-flex items-center rounded-full border border-amber-200 bg-white/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">
             Legajo
           </div>
-          <h1 className="text-3xl font-bold tracking-tight">Registrar incidencia</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Registrar medida disciplinaria</h1>
           <p className="text-muted-foreground">
-            Vas a registrar una incidencia manual para {empleadoNombre}. Se sincroniza directo con su legajo.
+            Vas a registrar una medida para {empleadoNombre}. Se guarda en su legajo y genera el documento para firma.
           </p>
         </div>
       </div>
