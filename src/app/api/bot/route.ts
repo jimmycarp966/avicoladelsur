@@ -11,6 +11,7 @@ import { crearPresupuestoTool } from '@/lib/vertex/tools/crear-presupuesto'
 import type { MetaListSection } from '@/types/whatsapp-meta'
 import { getPendingState, setPendingState, deletePendingState } from '@/lib/bot/state-manager'
 import type { ConfirmacionEstado as ConfirmacionEstadoImport } from '@/lib/bot/state-manager'
+import { normalizeWebhook, verifySignature } from '@kapso/whatsapp-cloud-api/server'
 
 // Tipos para las llamadas de Botpress
 interface BotpressWebhookPayload {
@@ -1075,6 +1076,237 @@ function getBaseUrl(): string {
   return 'https://avicoladelsur.vercel.app'
 }
 
+type WhatsAppInboundMessage = {
+  phoneNumber: string
+  body: string
+}
+
+function normalizeInboundPhoneNumber(phone: string): string {
+  let normalized = (phone || '').trim()
+
+  if (!normalized) {
+    return ''
+  }
+
+  if (normalized.startsWith('whatsapp:')) {
+    normalized = normalized.replace(/^whatsapp:/, '')
+  }
+
+  normalized = normalized.replace(/[^\d+]/g, '')
+
+  if (!normalized) {
+    return ''
+  }
+
+  if (normalized.startsWith('+')) {
+    return normalized
+  }
+
+  if (normalized.startsWith('0')) {
+    normalized = normalized.substring(1)
+  }
+
+  return `+${normalized}`
+}
+
+function createWhatsAppFormData(phoneNumber: string, body: string): FormData {
+  const formData = new FormData()
+  formData.set('Body', body)
+  formData.set('From', phoneNumber.startsWith('whatsapp:') ? phoneNumber : `whatsapp:${phoneNumber}`)
+  return formData
+}
+
+function extractInboundMessageText(message: any): string | null {
+  if (!message || typeof message !== 'object') {
+    return null
+  }
+
+  if (message.type === 'reaction') {
+    return null
+  }
+
+  const textBody = message.text?.body
+  if (typeof textBody === 'string' && textBody.trim()) {
+    return textBody.trim()
+  }
+
+  const content = message.content
+  if (typeof content === 'string' && content.trim()) {
+    return content.trim()
+  }
+
+  const buttonReply = message.interactive?.button_reply
+  if (typeof buttonReply?.title === 'string' && buttonReply.title.trim()) {
+    return buttonReply.title.trim()
+  }
+
+  const listReply = message.interactive?.list_reply
+  if (typeof listReply?.title === 'string' && listReply.title.trim()) {
+    return listReply.title.trim()
+  }
+
+  const transcript = message.kapso?.transcript?.text
+  if (typeof transcript === 'string' && transcript.trim()) {
+    return transcript.trim()
+  }
+
+  const kapsoContent = message.kapso?.content
+  if (typeof kapsoContent === 'string' && kapsoContent.trim()) {
+    return kapsoContent.trim()
+  }
+
+  const location = message.location
+  if (location && typeof location === 'object') {
+    const parts = [
+      location.name,
+      location.address,
+      location.latitude !== undefined ? `Lat: ${location.latitude}` : null,
+      location.longitude !== undefined ? `Lng: ${location.longitude}` : null,
+    ].filter(Boolean)
+
+    if (parts.length > 0) {
+      return parts.join(' | ')
+    }
+  }
+
+  return null
+}
+
+function isMetaWebhookPayload(payload: any): boolean {
+  return Boolean(
+    payload &&
+      typeof payload === 'object' &&
+      (payload.object === 'whatsapp_business_account' || Array.isArray(payload.entry))
+  )
+}
+
+function isKapsoWhatsAppPayload(payload: any): boolean {
+  return Boolean(
+    payload &&
+      typeof payload === 'object' &&
+      (typeof payload.event === 'string' ||
+        payload.message ||
+        payload.data ||
+        payload.phone_number_id ||
+        payload.conversation)
+  )
+}
+
+function getWebhookSecretForPayload(_payload: any): string | null {
+  return (
+    process.env.KAPSO_WHATSAPP_WEBHOOK_SECRET ||
+    process.env.KAPSO_WEBHOOK_SECRET ||
+    process.env.WHATSAPP_META_APP_SECRET ||
+    null
+  )
+}
+
+function getWebhookSignatureHeader(headers: Headers): string | null {
+  return (
+    headers.get('x-webhook-signature') ||
+    headers.get('x-hub-signature-256') ||
+    headers.get('X-Webhook-Signature') ||
+    headers.get('X-Hub-Signature-256')
+  )
+}
+
+function verifyWhatsAppWebhookSignature(rawBody: string, headers: Headers, payload: any): boolean {
+  const secret = getWebhookSecretForPayload(payload)
+  const signatureHeader = getWebhookSignatureHeader(headers)
+
+  if (!secret || !signatureHeader) {
+    return true
+  }
+
+  return verifySignature({
+    appSecret: secret,
+    rawBody,
+    signatureHeader,
+  })
+}
+
+function extractInboundWhatsAppMessages(payload: any): WhatsAppInboundMessage[] {
+  if (!payload) {
+    return []
+  }
+
+  if (Array.isArray(payload)) {
+    return payload.flatMap((item) => extractInboundWhatsAppMessages(item))
+  }
+
+  if (isMetaWebhookPayload(payload)) {
+    const normalized = normalizeWebhook(payload)
+    const messages = Array.isArray(normalized.messages) ? normalized.messages : []
+
+    return messages.flatMap((message: any) => {
+      if (message?.kapso?.direction === 'outbound') {
+        return []
+      }
+
+      const body = extractInboundMessageText(message)
+      const phoneNumber = normalizeInboundPhoneNumber(
+        message?.from || message?.phone_number || normalized.displayPhoneNumber || ''
+      )
+
+      if (!body || !phoneNumber) {
+        return []
+      }
+
+      return [{ phoneNumber, body }]
+    })
+  }
+
+  if (!isKapsoWhatsAppPayload(payload)) {
+    return []
+  }
+
+  const event = typeof payload.event === 'string' ? payload.event : ''
+  if (event && event !== 'whatsapp.message.received' && event !== 'message.received') {
+    return []
+  }
+
+  const data = payload.data && typeof payload.data === 'object' ? payload.data : payload
+  const message = data.message || data
+  const conversation = data.conversation || payload.conversation || {}
+
+  if (message?.kapso?.direction === 'outbound' || message?.direction === 'outbound') {
+    return []
+  }
+
+  const body = extractInboundMessageText(message)
+  const phoneNumber = normalizeInboundPhoneNumber(
+    conversation.phone_number ||
+      conversation.phoneNumber ||
+      message?.from ||
+      data.phone_number ||
+      payload.phone_number ||
+      ''
+  )
+
+  if (!body || !phoneNumber) {
+    return []
+  }
+
+  return [{ phoneNumber, body }]
+}
+
+async function handleKapsoWebhookPayload(
+  payload: any,
+  source: 'kapso' | 'meta'
+): Promise<NextResponse> {
+  const inboundMessages = extractInboundWhatsAppMessages(payload)
+
+  if (inboundMessages.length === 0) {
+    return new NextResponse('OK', { status: 200 })
+  }
+
+  for (const inboundMessage of inboundMessages) {
+    await handleTwilioWebhook(createWhatsAppFormData(inboundMessage.phoneNumber, inboundMessage.body), source)
+  }
+
+  return new NextResponse('OK', { status: 200 })
+}
+
 /**
  * Función auxiliar para enviar mensajes con detección automática de proveedor
  * Intenta usar botones si Meta está disponible, sino usa texto simple
@@ -1085,10 +1317,9 @@ async function sendBotResponse(phoneNumber: string, message: string, options?: {
   footer?: string
 }): Promise<void> {
   const provider = getWhatsAppProvider()
-  const useButtons = isWhatsAppMetaAvailable() && (options?.buttons || options?.list)
+  const useButtons = provider !== 'twilio' && isWhatsAppMetaAvailable() && (options?.buttons || options?.list)
 
-  if (useButtons && provider === 'meta') {
-    // Usar WhatsApp Meta con botones
+  if (useButtons) {
     const result = await sendWhatsAppMessage({
       to: phoneNumber,
       text: message,
@@ -1103,7 +1334,6 @@ async function sendBotResponse(phoneNumber: string, message: string, options?: {
       await sendBotResponseText(phoneNumber, message)
     }
   } else {
-    // Usar método tradicional (Twilio o texto simple)
     await sendBotResponseText(phoneNumber, message)
   }
 }
@@ -1117,9 +1347,7 @@ async function sendBotResponseText(phoneNumber: string, message: string): Promis
   // Guardar mensaje outgoing en Supabase
   await saveBotMessage(phoneNumber, message, 'outgoing')
 
-  // Si es Twilio, la respuesta se envía en el XML de Twilio
-  // Si es Meta sin botones, usar el servicio de Meta
-  if (provider === 'meta') {
+  if (provider !== 'twilio') {
     const result = await sendWhatsAppMessage({
       to: phoneNumber,
       text: message,
@@ -1128,7 +1356,6 @@ async function sendBotResponseText(phoneNumber: string, message: string): Promis
       console.error('[Bot] Error enviando mensaje de texto:', result.error)
     }
   }
-  // Si es Twilio, el mensaje se retorna en el XML (manejado en el código existente)
 }
 
 // ===========================================
@@ -1138,14 +1365,14 @@ async function sendBotResponseText(phoneNumber: string, message: string): Promis
 // Una vez que Meta esté completamente funcional, se puede deshabilitar cambiando WHATSAPP_PROVIDER
 
 // Función para manejar mensajes directos de Twilio
-async function handleTwilioWebhook(formData: FormData) {
+async function handleTwilioWebhook(formData: FormData, source: 'twilio' | 'kapso' | 'meta' = 'twilio') {
   const body = formData.get('Body')?.toString().trim() || ''
   const from = formData.get('From')?.toString() || ''
 
   // Extraer el número de teléfono (Twilio envía: whatsapp:+1234567890)
   const phoneNumber = from.replace('whatsapp:', '')
 
-  console.log('[Bot] Mensaje recibido (Twilio):', { from: phoneNumber, body })
+  console.log(`[Bot] Mensaje recibido (${source}):`, { from: phoneNumber, body })
 
   // Buscar cliente para personalizar mensajes
   const cliente = await findClienteByPhone(phoneNumber)
@@ -2468,22 +2695,13 @@ Responde *SÍ* para confirmar o *NO* para cancelar.`
     responseMessage = 'Error al procesar tu mensaje. Intenta de nuevo.'
   }
 
-  // Determinar proveedor y enviar respuesta apropiadamente
-  const provider = getWhatsAppProvider()
-
-  // Si el mensaje ya se envió con botones (responseMessage vacío), solo retornar OK
-  if (!responseMessage && provider === 'meta') {
+  if (source !== 'twilio') {
+    if (responseMessage) {
+      await sendBotResponseText(phoneNumber, responseMessage)
+    }
     return new NextResponse('OK', { status: 200 })
   }
 
-  // Si es Meta pero aún hay mensaje de texto, enviarlo
-  if (provider === 'meta' && responseMessage) {
-    await sendBotResponseText(phoneNumber, responseMessage)
-    return new NextResponse('OK', { status: 200 })
-  }
-
-  // Si es Twilio, retornar XML tradicional
-  // NOTA: Este código se mantiene como respaldo durante la migración gradual
   return new Response(
     `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
@@ -2505,8 +2723,75 @@ export async function POST(request: NextRequest) {
     // Detectar si es una petición de Twilio (form-urlencoded)
     if (contentType.includes('application/x-www-form-urlencoded')) {
       const formData = await request.formData()
-      return handleTwilioWebhook(formData)
+      return handleTwilioWebhook(formData, 'twilio')
     }
+
+    if (contentType.includes('multipart/form-data')) {
+      const formData = await request.formData()
+      return handleTwilioWebhook(formData, 'twilio')
+    }
+
+    if (contentType.includes('application/json')) {
+      const rawBody = await request.text()
+
+      let payload: any
+      try {
+        payload = rawBody ? JSON.parse(rawBody) : {}
+      } catch {
+        return NextResponse.json(
+          { success: false, error: 'Payload JSON invalido' },
+          { status: 400 }
+        )
+      }
+
+      if (isMetaWebhookPayload(payload) || isKapsoWhatsAppPayload(payload)) {
+        if (!verifyWhatsAppWebhookSignature(rawBody, request.headers, payload)) {
+          return NextResponse.json(
+            { success: false, error: 'Firma de webhook invalida' },
+            { status: 401 }
+          )
+        }
+
+        const source: 'kapso' | 'meta' = isMetaWebhookPayload(payload) ? 'meta' : 'kapso'
+        return handleKapsoWebhookPayload(payload, source)
+      }
+
+      const authHeader = request.headers.get('authorization')
+      const expectedToken = process.env.BOTPRESS_WEBHOOK_TOKEN
+
+      if (expectedToken && authHeader !== `Bearer ${expectedToken}`) {
+        return NextResponse.json(
+          { success: false, error: 'Token de autenticacion invalido' },
+          { status: 401 }
+        )
+      }
+
+      const payloadBotpress: BotpressWebhookPayload = payload
+
+      if (!payloadBotpress.intent) {
+        return NextResponse.json(
+          { success: false, error: 'Intencion es requerida' },
+          { status: 400 }
+        )
+      }
+
+      const response = await handleBotpressWebhook(payloadBotpress)
+
+      if (payloadBotpress.session?.userId) {
+        extractAndSaveFactsInBackground(payloadBotpress.session.userId).catch(() => {
+          // Silenciar errores - ya se logean internamente
+        })
+      }
+
+      return NextResponse.json(response, {
+        status: response.success ? 200 : 400,
+      })
+    }
+
+    return NextResponse.json(
+      { success: false, error: 'Content-Type no soportado' },
+      { status: 415 }
+    )
 
     // Si es JSON, asumimos que es de Botpress
     const authHeader = request.headers.get('authorization')

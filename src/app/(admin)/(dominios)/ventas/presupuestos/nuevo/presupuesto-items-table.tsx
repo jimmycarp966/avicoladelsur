@@ -19,6 +19,7 @@ interface Producto {
   unidad_mayor_nombre?: string
   kg_por_unidad_mayor?: number
   stock_real?: number
+  stock_reservado?: number
   stock_disponible?: number
 }
 

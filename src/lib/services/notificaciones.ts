@@ -2,7 +2,6 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { getWhatsAppProvider, isWhatsAppMetaAvailable, sendWhatsAppMessage } from '@/lib/services/whatsapp-meta'
-import { sendWhatsAppTwilioMessage } from '@/lib/services/whatsapp-twilio'
 
 /**
  * Envía notificación de estado por WhatsApp al cliente
@@ -111,9 +110,9 @@ Disculpá las molestias. Podés hacer un nuevo pedido cuando quieras.`
                 break
         }
 
-        // Enviar notificación usando WhatsApp Meta o Twilio según configuración
+        // Enviar notificación usando el proveedor activo de WhatsApp
         const provider = getWhatsAppProvider()
-        const useButtons = provider === 'meta' && isWhatsAppMetaAvailable()
+        const useButtons = provider !== 'twilio' && isWhatsAppMetaAvailable()
 
         let buttons: Array<{ id: string; title: string }> | undefined
         let footer: string | undefined
@@ -159,15 +158,11 @@ Disculpá las molestias. Podés hacer un nuevo pedido cuando quieras.`
         }
 
         // Enviar mensaje según proveedor
-        const result =
-          provider === 'meta'
-            ? await sendWhatsAppMessage({
-                to: cliente.whatsapp,
-                text: mensaje,
-                buttons,
-                footer,
-              })
-            : await sendWhatsAppTwilioMessage(cliente.whatsapp, mensaje)
+        const result = await sendWhatsAppMessage({
+          to: cliente.whatsapp,
+          text: mensaje,
+          ...(useButtons && buttons ? { buttons, footer } : {}),
+        })
 
         if (result.success) {
           console.log(`[WhatsApp Notification] Enviada exitosamente a ${cliente.whatsapp}, Tipo: ${tipo}`)

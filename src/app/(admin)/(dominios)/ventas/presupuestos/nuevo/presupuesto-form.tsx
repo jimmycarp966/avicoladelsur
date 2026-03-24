@@ -19,7 +19,7 @@ import { obtenerClientePorIdAction } from '@/actions/ventas.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 import { formatCurrency } from '@/lib/utils'
 import { useDebounce } from '@/lib/hooks/useDebounce'
-import { useFormContextShortcuts } from '@/lib/hooks/useFormContextShortcuts'
+import { useFormContextShortcuts, type FormFieldShortcut } from '@/lib/hooks/useFormContextShortcuts'
 import { KeyboardHintCompact } from '@/components/ui/keyboard-hint'
 import { PresupuestoItemsTable } from './presupuesto-items-table'
 import { useEffect, useRef } from 'react'
@@ -115,35 +115,16 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
   const watchedItems = useWatch({ control, name: 'items' })
   const watchedCliente = useWatch({ control, name: 'cliente_id' })
 
-  // Estado para forzar actualizacion del total cuando cambia precio
-  const [totalUpdateKey, setTotalUpdateKey] = useState(0)
-
-  // Suscribirse a cambios en items usando watch con callback para detectar cambios profundos
-  useEffect(() => {
-    const subscription = watch((value, { name, type }) => {
-      // Si cambió algún precio o cantidad, forzar actualización del total
-      if (name && (name.includes('precio_unit_est') || name.includes('cantidad_solicitada'))) {
-        setTotalUpdateKey(prev => prev + 1)
-      }
-    })
-    return () => subscription.unsubscribe()
-  }, [watch, setTotalUpdateKey])
-
-
   // Ref para rastrear la cantidad de items y detectar cuando se agregan nuevos
   const cantidadItemsRef = useRef(watchedItems?.length || 0)
 
-  // Ref para forzar actualizacion cuando se agregan productos nuevos
-  const [triggerActualizacion, setTriggerActualizacion] = useState(0)
-
-  // Efecto separado para detectar cuando se agregan productos nuevos
+  // Efecto separado para detectar cuando se agregan nuevos productos
   useEffect(() => {
     const cantidadActual = watchedItems?.length || 0
     if (cantidadActual > cantidadItemsRef.current) {
-      // Se agregaron nuevos productos, limpiar cache y forzar actualizacion
+      // Se agregaron nuevos productos, limpiar cache de precios procesados
       productosProcesadosRef.current.clear()
       cantidadItemsRef.current = cantidadActual
-      setTriggerActualizacion(prev => prev + 1)
     }
   }, [watchedItems?.length])
 
@@ -155,165 +136,121 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
   // Usar watch('items') directamente para obtener valores actuales en cada render
   const itemsParaTotal = watch('items')
 
-  // Crear una clave única basada en los valores de los items para detectar cambios profundos
-  const itemsKey = useMemo(() => {
-    if (!itemsParaTotal || itemsParaTotal.length === 0) return 'empty'
-    return JSON.stringify(itemsParaTotal.map(item => ({
-      producto_id: item?.producto_id,
-      cantidad_solicitada: item?.cantidad_solicitada,
-      precio_unit_est: item?.precio_unit_est
-    })))
-  }, [itemsParaTotal])
+  // Calcular el total directamente desde los items actuales
+  let totalEstimado = 0
+  for (const item of itemsParaTotal || []) {
+    totalEstimado += (item?.cantidad_solicitada || 0) * (item?.precio_unit_est || 0)
+  }
 
-  // Estado local para el total que se actualiza cuando cambian los items
-  const [totalEstimadoState, setTotalEstimadoState] = useState(0)
+  // Calcular cliente seleccionado sin usar Array.find para evitar un bug interno de TypeScript
+  const clienteSeleccionado = (() => {
+    if (!watchedCliente) return null
 
-  // Calcular total cuando cambian los items (detectado por itemsKey) o totalUpdateKey
-  useEffect(() => {
-    if (!itemsParaTotal || itemsParaTotal.length === 0) {
-      setTotalEstimadoState(0)
-      return
-    }
-    const total = itemsParaTotal.reduce((sum: number, item: any) => {
-      const cantidad = item?.cantidad_solicitada || 0
-      const precio = item?.precio_unit_est || 0
-      return sum + (cantidad * precio)
-    }, 0)
-    setTotalEstimadoState(total)
-  }, [itemsKey, totalUpdateKey, itemsParaTotal])
-
-  // Usar el estado local para el total
-  const totalEstimado = totalEstimadoState
-
-  // Memoizar cliente seleccionado
-  const clienteSeleccionado = useMemo(() => {
-    return clientes.find(c => c.id === watchedCliente)
-  }, [clientes, watchedCliente])
-
-  const focusClienteSearchInput = useCallback(() => {
-    let attempts = 0
-    const maxAttempts = 12
-
-    const tryFocus = () => {
-      if (clienteSearchInputRef.current) {
-        clienteSearchInputRef.current.focus()
-        clienteSearchInputRef.current.select()
-        return
-      }
-
-      const searchInput = document.querySelector(
-        '[data-slot="select-content"] input[placeholder*="Buscar por código"], ' +
-        '[data-radix-popper-content-wrapper] input[placeholder*="Buscar por código"]'
-      ) as HTMLInputElement | null
-
-      if (searchInput) {
-        searchInput.focus()
-        searchInput.select()
-        return
-      }
-
-      attempts += 1
-      if (attempts < maxAttempts) {
-        window.setTimeout(tryFocus, 50)
+    for (const cliente of clientes) {
+      if (cliente.id === watchedCliente) {
+        return cliente
       }
     }
 
-    tryFocus()
-  }, [])
+    return null
+  })()
 
-  const openClienteSelector = useCallback(() => {
-    const clienteTrigger = document.getElementById('cliente_id') as HTMLButtonElement | null
-    if (clienteTrigger) {
-      clienteTrigger.focus()
-    }
+  const focusClienteSearchInput = () => {
     setClienteDropdownOpen(true)
-    window.setTimeout(focusClienteSearchInput, 50)
-  }, [focusClienteSearchInput])
+  }
+
+  const openClienteSelector = () => {
+    setClienteDropdownOpen(true)
+  }
+
+  const formShortcuts: FormFieldShortcut[] = [
+    {
+      key: 'c',
+      fieldId: 'cliente_id',
+      description: 'Enfocar Cliente',
+    },
+    {
+      key: 'p',
+      description: 'Enfocar primer Producto',
+      action: () => {
+        // Buscar el SelectTrigger del primer producto por su ID
+        const firstProductSelect = document.getElementById('producto_0')
+        if (firstProductSelect) {
+          firstProductSelect.click()
+          // El hook mejorado manejará el focus del input de búsqueda
+        }
+      },
+    },
+    {
+      key: 'a',
+      description: 'Agregar Producto',
+      action: () => {
+        agregarProductoButtonRef.current?.click()
+      },
+    },
+    {
+      key: 'l',
+      fieldId: 'lista_precio_id',
+      description: 'Enfocar Lista de Precios',
+    },
+    {
+      key: 'f',
+      fieldId: 'fecha_entrega_estimada',
+      description: 'Enfocar Fecha de Entrega',
+    },
+    {
+      key: 't',
+      fieldId: 'turno_entrega',
+      description: 'Enfocar Turno de Entrega',
+    },
+    {
+      key: 'o',
+      fieldId: 'observaciones',
+      description: 'Enfocar Observaciones',
+    },
+    {
+      key: 'q',
+      ctrl: true,
+      description: 'Enfocar Cantidad del primer producto (Ctrl+Q)',
+      action: () => {
+        const cantidadInput = document.getElementById('cantidad-0')
+        if (cantidadInput instanceof HTMLInputElement) {
+          cantidadInput.focus()
+          cantidadInput.select()
+        }
+      },
+    },
+    {
+      key: 'w',
+      ctrl: true,
+      description: 'Enfocar Precio del primer producto (Ctrl+W)',
+      action: () => {
+        const precioInput = document.getElementById('precio-0')
+        if (precioInput instanceof HTMLInputElement) {
+          precioInput.focus()
+          precioInput.select()
+        }
+      },
+    },
+  ]
 
   // Atajos contextuales para el formulario
+  for (let i = 0; i < 9; i++) {
+    formShortcuts.push({
+      key: String(i + 1),
+      ctrl: true,
+      description: `Enfocar Producto ${i + 1} (Ctrl+${i + 1})`,
+      action: () => {
+        const productSelect = document.getElementById(`producto_${i}`)
+        if (productSelect) {
+          productSelect.click()
+        }
+      },
+    })
+  }
+
   useFormContextShortcuts({
-    shortcuts: [
-      {
-        key: 'c',
-        fieldId: 'cliente_id',
-        description: 'Enfocar Cliente',
-      },
-      {
-        key: 'p',
-        description: 'Enfocar primer Producto',
-        action: () => {
-          // Buscar el SelectTrigger del primer producto por su ID
-          const firstProductSelect = document.getElementById('producto_0')
-          if (firstProductSelect) {
-            firstProductSelect.click()
-            // El hook mejorado manejará el focus del input de búsqueda
-          }
-        },
-      },
-      {
-        key: 'a',
-        description: 'Agregar Producto',
-        action: () => {
-          agregarProductoButtonRef.current?.click()
-        },
-      },
-      {
-        key: 'l',
-        fieldId: 'lista_precio_id',
-        description: 'Enfocar Lista de Precios',
-      },
-      {
-        key: 'f',
-        fieldId: 'fecha_entrega_estimada',
-        description: 'Enfocar Fecha de Entrega',
-      },
-      {
-        key: 't',
-        fieldId: 'turno_entrega',
-        description: 'Enfocar Turno de Entrega',
-      },
-      {
-        key: 'o',
-        fieldId: 'observaciones',
-        description: 'Enfocar Observaciones',
-      },
-      {
-        key: 'q',
-        ctrlKey: true,
-        description: 'Enfocar Cantidad del primer producto (Ctrl+Q)',
-        action: () => {
-          const cantidadInput = document.getElementById('cantidad-0')
-          if (cantidadInput instanceof HTMLInputElement) {
-            cantidadInput.focus()
-            cantidadInput.select()
-          }
-        },
-      },
-      {
-        key: 'w',
-        ctrlKey: true,
-        description: 'Enfocar Precio del primer producto (Ctrl+W)',
-        action: () => {
-          const precioInput = document.getElementById('precio-0')
-          if (precioInput instanceof HTMLInputElement) {
-            precioInput.focus()
-            precioInput.select()
-          }
-        },
-      },
-      // Atajos numéricos para enfocar productos por índice (Ctrl+1-9)
-      ...Array.from({ length: 9 }, (_, i) => ({
-        key: String(i + 1),
-        ctrlKey: true,
-        description: `Enfocar Producto ${i + 1} (Ctrl+${i + 1})`,
-        action: () => {
-          const productSelect = document.getElementById(`producto_${i}`)
-          if (productSelect) {
-            productSelect.click()
-          }
-        },
-      })),
-    ],
+    shortcuts: formShortcuts,
   })
 
 
@@ -532,7 +469,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
     actualizarPrecios()
     // Solo ejecutar cuando cambien las listas o cuando se agreguen productos nuevos
     // NO cuando cambian los items para evitar loops infinitos
-  }, [watchedListaPrecioGlobal, listasPorProducto, setValue, getValues, triggerActualizacion, todasListas, productos])
+  }, [watchedListaPrecioGlobal, listasPorProducto, setValue, getValues, fields.length, todasListas, productos])
 
   // Memoizar handleProductoChange
   const handleProductoChange = useCallback(async (index: number, productoId: string) => {
@@ -776,10 +713,6 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
           })
           // Forzar actualizacion del formulario y validacion
           await trigger(`items.${index}.precio_unit_est`)
-          // Forzar actualizacion del total estimado - usar setTimeout para asegurar que React procese el cambio
-          setTimeout(() => {
-            setTotalUpdateKey(prev => prev + 1)
-          }, 0)
         }
       }
     }
@@ -1020,7 +953,6 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
         setClienteSearch('')
         setListasPorProducto({})
         preciosModificadosManualmenteRef.current.clear()
-        setTotalUpdateKey(prev => prev + 1)
 
         // Enfocar cliente nuevamente para empezar otro presupuesto
         window.setTimeout(openClienteSelector, 150)

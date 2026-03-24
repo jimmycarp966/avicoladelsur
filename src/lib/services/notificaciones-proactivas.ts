@@ -1,12 +1,12 @@
 'use server'
 
 import { createAdminClient } from '@/lib/supabase/server'
-import { sendWhatsAppTwilioMessage } from '@/lib/services/whatsapp-twilio'
+import { sendWhatsAppMessage } from '@/lib/services/whatsapp-meta'
 import { generarMensajeOptOut } from '@/lib/vertex/tools/gestionar-notificaciones'
 
 /**
  * Servicio de Notificaciones Proactivas
- * Maneja envío programado de notificaciones a clientes por WhatsApp (Twilio)
+ * Maneja envío programado de notificaciones a clientes por WhatsApp
  */
 
 /**
@@ -54,7 +54,7 @@ interface NotificacionesPendientesPayload {
  * 2. Verificar que tiene WhatsApp
  * 3. Verificar preferencias del cliente
  * 4. Verificar rate limiting (frecuencia máxima del día)
- * 5. Enviar por Twilio
+ * 5. Enviar por WhatsApp
  * 6. Marcar como enviada en BD
  */
 export async function enviarNotificacionProgramada(
@@ -138,7 +138,7 @@ export async function enviarNotificacionProgramada(
       return { success: false, error: 'Límite diario de notificaciones alcanzado' }
     }
 
-    // 5. Enviar mensaje por Twilio
+    // 5. Enviar mensaje por WhatsApp
     console.log(`[Notificación Proactiva] Enviando a ${cliente.whatsapp}:`, {
       tipo: notificacion.tipo,
       cliente: cliente.nombre,
@@ -147,10 +147,13 @@ export async function enviarNotificacionProgramada(
 
     // Agregar mensaje de opt-out
     const mensajeFinal = notificacion.mensaje + generarMensajeOptOut()
-    const result = await sendWhatsAppTwilioMessage(cliente.whatsapp, mensajeFinal)
+    const result = await sendWhatsAppMessage({
+      to: cliente.whatsapp,
+      text: mensajeFinal,
+    })
 
     if (!result.success) {
-      console.error(`[Notificación Proactiva] Error Twilio: ${result.error}`)
+      console.error(`[Notificación Proactiva] Error WhatsApp: ${result.error}`)
       await marcarNotificacionEnviada(notificacionId, false, result.error)
       return { success: false, error: result.error }
     }

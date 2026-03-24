@@ -60,7 +60,7 @@ supabase/
 | 2026-01-13 | Routing ORS: Usar `ors-directions.ts` con fallback ORS → Google → Local; vehicle debe ser 'driving-car' (no 'car') |
 | 2026-01-13 | Merma Líquida Proporcional: `fn_completar_orden_produccion` reparte merma líquida por producto usando `merma_real_kg` (factor = merma_total / peso_productos) |
 | 2026-01-13 | Cajones en Producción: Usar `venta_mayor_habilitada` + `kg_por_unidad_mayor` para autocalcular peso de salidas (cantidad × kg_unidad) |
-| 2026-01-13 | WhatsApp Twilio-only: setear `WHATSAPP_PROVIDER=twilio`; `isWhatsAppMetaAvailable()` debe respetarlo (no habilitar botones Meta) |
+| 2026-01-13 | WhatsApp multi-proveedor: `WHATSAPP_PROVIDER` puede ser `auto`, `kapso`, `meta` o `twilio`; `isWhatsAppMetaAvailable()` debe reflejar Kapso/Meta para botones |
 | 2026-01-13 | Unificación de zonas: "Valles" fue migrada a "Tafi del valle" (actualizando FKs). Usar zonas como dominio (no `localidades`) |
 | 2026-01-13 | Vertex AI Bot: Llamar directamente a RPC `fn_crear_presupuesto_desde_bot` con `createAdminClient()` bypass validación de usuario |
 | 2026-01-13 | Vertex AI: Usar `GOOGLE_CLOUD_CREDENTIALS_BASE64` en Vercel (service account key en base64) |

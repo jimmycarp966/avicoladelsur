@@ -180,7 +180,7 @@
 - **Frontend**: React 19, Tailwind CSS, Shadcn UI.
 - **Mapas**: Google Maps JavaScript API (TMS) + Leaflet (Reportes Heatmap)
 - **Routing**: OpenRouteService (ORS) con datos OSM actualizados + fallback a Google/local
-- **Bot**: WhatsApp por **Twilio** (Twilio-only por `WHATSAPP_PROVIDER=twilio`; integración Meta opcional)
+- **Bot**: WhatsApp por **Twilio, Kapso o Meta** segun `WHATSAPP_PROVIDER`
 - **Reportes**: Generación de PDF y Excel en servidor.
 - **Estado**: Zustand (solo estado global: sesión, notificaciones)
 - **Formularios**: React Hook Form + Zod validation
@@ -806,7 +806,7 @@ Sistema mejorado con validaciones críticas y automatizaciones para mayor confia
   - `cancelado`: Notificación de cancelación con motivo
 - **Integración**: Automática en `crearPresupuestoAction()` y `confirmarPresupuestoAction()`
 - **Historial**: Nueva tabla `notificaciones_clientes` para auditoría completa
-- **Proveedor**: Envío por Twilio (Twilio-only) o Meta según `WHATSAPP_PROVIDER`
+- **Proveedor**: Envío por Twilio, Kapso o Meta según `WHATSAPP_PROVIDER`
 
 #### 6. ✅ Cálculo de Tiempos de Entrega
 - **Función**: `calcularTiempoEntrega(zonaId, turno, fechaEntrega)`
@@ -1519,7 +1519,7 @@ SUPABASE_SERVICE_ROLE_KEY=your-prod-service-key
 TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 TWILIO_AUTH_TOKEN=your-twilio-auth-token
 TWILIO_WHATSAPP_NUMBER=whatsapp:+14155238886
-WHATSAPP_PROVIDER=twilio
+WHATSAPP_PROVIDER=auto
 BOTPRESS_WEBHOOK_TOKEN=your-random-secure-token
 
 # Google Maps (Rutas Optimizadas - Opcional)

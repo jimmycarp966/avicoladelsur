@@ -19,6 +19,12 @@ export const config = {
     authToken: process.env.TWILIO_AUTH_TOKEN,
     whatsappNumber: process.env.TWILIO_WHATSAPP_NUMBER,
   },
+  kapso: {
+    apiKey: process.env.KAPSO_API_KEY,
+    phoneNumberId: process.env.KAPSO_WHATSAPP_PHONE_NUMBER_ID,
+    webhookSecret: process.env.KAPSO_WHATSAPP_WEBHOOK_SECRET || process.env.KAPSO_WEBHOOK_SECRET,
+    baseUrl: process.env.KAPSO_WHATSAPP_BASE_URL || 'https://api.kapso.ai/meta/whatsapp',
+  },
   whatsappMeta: {
     accessToken: process.env.WHATSAPP_META_ACCESS_TOKEN,
     phoneNumberId: process.env.WHATSAPP_META_PHONE_NUMBER_ID,

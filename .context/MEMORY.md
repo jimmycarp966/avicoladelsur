@@ -49,11 +49,11 @@ Este documento registra la evolución del sistema, decisiones críticas y leccio
 - **Archivos**: `supabase/migrations/20260113_merma_liquida_proporcional.sql`, `src/app/(admin)/(dominios)/almacen/produccion/nueva/page.tsx`
 - **Aprendizaje**: Reutilizar campos existentes (`kg_por_unidad_mayor`) en lugar de crear nuevos; autocalcular con toggle manual mejora UX sin perder flexibilidad
 
-### Sesión: Twilio-only + Unificación de Zonas + Bot Vertex-first
+### Sesión: WhatsApp multi-proveedor + Unificación de Zonas + Bot Vertex-first
 - **Fecha**: 2026-01-13
 - **Zonas**: Unificación en Supabase de "Valles" → "Tafi del valle" (actualización de FKs y eliminación de duplicado)
-- **WhatsApp**: Modo Twilio-only por `WHATSAPP_PROVIDER=twilio` (Meta opcional)
-- **Notificaciones**: Envío por Twilio REST cuando el provider es Twilio
+- **WhatsApp**: `WHATSAPP_PROVIDER` admite `auto`, `kapso`, `meta` o `twilio`
+- **Notificaciones**: Envío por el proveedor activo de WhatsApp
 - **Bot**: Webhook `/api/bot` prioriza Vertex AI (incluye saludos/ayuda), con venta consultiva no invasiva en prompt
 - **Pruebas**: `npm run build` + `npm run dev` + `npm run test:bot:webhook`
 
