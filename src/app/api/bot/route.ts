@@ -1,3 +1,4 @@
+import crypto from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { crearPresupuestoAction } from '@/actions/presupuestos.actions'
@@ -1210,12 +1211,36 @@ function getWebhookSignatureHeader(headers: Headers): string | null {
   )
 }
 
+function verifyKapsoWebhookSignature(rawBody: string, signatureHeader: string, secret: string): boolean {
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(rawBody, 'utf8')
+    .digest('hex')
+
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(signatureHeader.trim(), 'utf8'),
+      Buffer.from(expectedSignature, 'utf8')
+    )
+  } catch {
+    return false
+  }
+}
+
 function verifyWhatsAppWebhookSignature(rawBody: string, headers: Headers, payload: any): boolean {
   const secret = getWebhookSecretForPayload(payload)
   const signatureHeader = getWebhookSignatureHeader(headers)
 
   if (!secret || !signatureHeader) {
     return true
+  }
+
+  const isKapsoSignature = Boolean(
+    headers.get('x-webhook-signature') || headers.get('X-Webhook-Signature')
+  )
+
+  if (isKapsoSignature) {
+    return verifyKapsoWebhookSignature(rawBody, signatureHeader, secret)
   }
 
   return verifySignature({
