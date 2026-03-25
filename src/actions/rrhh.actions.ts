@@ -2312,7 +2312,8 @@ export async function upsertLiquidacionJornadaAction(
     }
 
     const horasAdicionales = Number(jornadaData.horas_adicionales ?? 0)
-    const esSucursal = liquidacion.grupo_base_snapshot === 'sucursales'
+    const esSucursal =
+      liquidacion.grupo_base_snapshot === 'sucursales' || liquidacion.grupo_base_snapshot === 'lun_sab'
     payload.horas_extra_aprobadas =
       horasAdicionales <= 0
         ? true
@@ -2435,10 +2436,10 @@ export async function actualizarAprobacionHorasExtraJornadaAction(
       }
     }
 
-    if (liquidacion.grupo_base_snapshot === 'sucursales') {
+    if (liquidacion.grupo_base_snapshot === 'sucursales' || liquidacion.grupo_base_snapshot === 'lun_sab') {
       return {
         success: false,
-        error: 'Las sucursales no requieren aprobacion de horas extra',
+        error: 'Este ambito no requiere aprobacion de horas extra',
       }
     }
 

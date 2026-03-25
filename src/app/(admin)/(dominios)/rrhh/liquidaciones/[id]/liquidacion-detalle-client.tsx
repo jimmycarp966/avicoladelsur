@@ -46,9 +46,12 @@ export function LiquidacionDetalleClient({
   const router = useRouter()
 
   const isSucursalEmployee = useMemo(() => {
+    if (liquidacion.grupo_base_snapshot === 'sucursales' || liquidacion.grupo_base_snapshot === 'lun_sab') {
+      return true
+    }
     const categoriaNombre = liquidacion.empleado?.categoria?.nombre?.toLowerCase() || ''
     return Boolean(liquidacion.empleado?.sucursal_id) || categoriaNombre.includes('sucursal')
-  }, [liquidacion.empleado?.categoria?.nombre, liquidacion.empleado?.sucursal_id])
+  }, [liquidacion.empleado?.categoria?.nombre, liquidacion.empleado?.sucursal_id, liquidacion.grupo_base_snapshot])
 
   const cuotasPeriodoCount = useMemo(
     () =>

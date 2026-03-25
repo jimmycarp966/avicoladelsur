@@ -116,8 +116,7 @@ export function LiquidacionJornadasTab({
   const [loading, setLoading] = useState(false)
   const [savingTramos, setSavingTramos] = useState(false)
   const [vistaCalendario, setVistaCalendario] = useState(false)
-  const permiteAprobacionHorasExtra =
-    liquidacion.grupo_base_snapshot === 'galpon' || liquidacion.grupo_base_snapshot === 'lun_sab'
+  const permiteAprobacionHorasExtra = liquidacion.grupo_base_snapshot === 'galpon'
   const periodoDesde = `${liquidacion.periodo_anio}-${String(liquidacion.periodo_mes).padStart(2, '0')}-01`
   const periodoHasta = `${liquidacion.periodo_anio}-${String(liquidacion.periodo_mes).padStart(2, '0')}-${String(new Date(liquidacion.periodo_anio, liquidacion.periodo_mes, 0).getDate()).padStart(2, '0')}`
 
