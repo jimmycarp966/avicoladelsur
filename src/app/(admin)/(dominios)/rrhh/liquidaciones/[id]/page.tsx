@@ -9,6 +9,7 @@ import type {
   Liquidacion,
   LiquidacionJornada,
   AdelantoCuota,
+  LiquidacionReglaPeriodo,
   LiquidacionReglaPuesto,
   LiquidacionTramoPuesto,
 } from '@/types/domain.types'
@@ -84,9 +85,19 @@ async function getLiquidacionDetalle(liquidacionId: string) {
 
   const { data: puestos } = await adminSupabase
     .from('rrhh_liquidacion_reglas_puesto')
-    .select('puesto_codigo')
+    .select('puesto_codigo, grupo_base_dias, horas_jornada, tipo_calculo, tarifa_turno_trabajado')
     .eq('activo', true)
     .order('puesto_codigo', { ascending: true })
+
+  const { data: reglaPeriodo } = await adminSupabase
+    .from('rrhh_liquidacion_reglas_periodo')
+    .select('periodo_mes, periodo_anio, dias_base_galpon, dias_base_sucursales, dias_base_rrhh, dias_base_lun_sab, activo')
+    .eq('periodo_mes', periodoMes)
+    .eq('periodo_anio', periodoAnio)
+    .eq('activo', true)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
 
   const { data: tramosPuesto } = await adminSupabase
     .from('rrhh_liquidacion_tramos_puesto')
@@ -100,7 +111,11 @@ async function getLiquidacionDetalle(liquidacionId: string) {
     jornadas: (jornadas || []) as LiquidacionJornada[],
     cuotas: (cuotas || []) as AdelantoCuota[],
     feriados: (feriados || []) as Array<{ fecha: string; descripcion?: string | null }>,
-    puestosDisponibles: (puestos || []) as Pick<LiquidacionReglaPuesto, 'puesto_codigo'>[],
+    puestosDisponibles: (puestos || []) as Pick<
+      LiquidacionReglaPuesto,
+      'puesto_codigo' | 'grupo_base_dias' | 'horas_jornada' | 'tipo_calculo' | 'tarifa_turno_trabajado'
+    >[],
+    reglaPeriodo: (reglaPeriodo || null) as LiquidacionReglaPeriodo | null,
     tramosPuesto: (tramosPuesto || []) as LiquidacionTramoPuesto[],
   }
 }
@@ -213,6 +228,7 @@ export default async function LiquidacionDetallePage({
         cuotas={data.cuotas}
         feriados={data.feriados}
         puestosDisponibles={data.puestosDisponibles}
+        reglaPeriodo={data.reglaPeriodo}
         tramosPuesto={data.tramosPuesto}
       />
     </div>

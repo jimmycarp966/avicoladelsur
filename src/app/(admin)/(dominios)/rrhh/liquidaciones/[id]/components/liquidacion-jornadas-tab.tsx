@@ -27,6 +27,7 @@ import { JornadasCalendario } from './jornadas-calendario'
 import type {
   Liquidacion,
   LiquidacionJornada,
+  LiquidacionReglaPeriodo,
   LiquidacionReglaPuesto,
   LiquidacionTramoPuesto,
 } from '@/types/domain.types'
@@ -92,7 +93,11 @@ type LiquidacionJornadasTabProps = {
   jornadas: LiquidacionJornada[]
   feriados: Array<{ fecha: string; descripcion?: string | null }>
   isSucursalEmployee: boolean
-  puestosDisponibles: Pick<LiquidacionReglaPuesto, 'puesto_codigo'>[]
+  puestosDisponibles: Pick<
+    LiquidacionReglaPuesto,
+    'puesto_codigo' | 'grupo_base_dias' | 'horas_jornada' | 'tipo_calculo' | 'tarifa_turno_trabajado'
+  >[]
+  reglaPeriodo: LiquidacionReglaPeriodo | null
   tramosPuesto: LiquidacionTramoPuesto[]
 }
 
@@ -106,6 +111,7 @@ export function LiquidacionJornadasTab({
   feriados,
   isSucursalEmployee,
   puestosDisponibles,
+  reglaPeriodo,
   tramosPuesto,
 }: LiquidacionJornadasTabProps) {
   const router = useRouter()
@@ -161,6 +167,49 @@ export function LiquidacionJornadasTab({
       ),
     ).sort((a, b) => a.localeCompare(b, 'es'))
   }, [puestosDisponibles, tramosDraft])
+  const puestosTramoMap = useMemo(
+    () =>
+      new Map(
+        puestosDisponibles.map((puesto) => [puesto.puesto_codigo.trim().toLowerCase(), puesto] as const),
+      ),
+    [puestosDisponibles],
+  )
+  const diasEnMes = new Date(liquidacion.periodo_anio, liquidacion.periodo_mes, 0).getDate()
+  const sueldoBaseTramo = Number(liquidacion.sueldo_basico || liquidacion.empleado?.sueldo_actual || 0)
+
+  const getDiasBaseForGrupo = (grupo?: LiquidacionReglaPuesto['grupo_base_dias']) => {
+    switch (grupo) {
+      case 'sucursales':
+        return diasEnMes
+      case 'rrhh':
+        return Number(reglaPeriodo?.dias_base_rrhh || 22)
+      case 'lun_sab':
+        return Number(reglaPeriodo?.dias_base_lun_sab || 26)
+      case 'galpon':
+      default:
+        return Number(reglaPeriodo?.dias_base_galpon || 27)
+    }
+  }
+
+  const getTramoTarifaInfo = (puestoCodigo: string) => {
+    const puesto = puestosTramoMap.get(puestoCodigo.trim().toLowerCase())
+    if (!puesto) return null
+
+    const diasBase = getDiasBaseForGrupo(puesto.grupo_base_dias)
+    const horasJornada = Math.max(Number(puesto.horas_jornada || liquidacion.horas_jornada || 9), 1)
+    const valorJornal = diasBase > 0 ? Number((sueldoBaseTramo / diasBase).toFixed(2)) : 0
+    const valorHora = horasJornada > 0 ? Number((valorJornal / horasJornada).toFixed(2)) : 0
+
+    return {
+      grupoBaseDias: puesto.grupo_base_dias,
+      diasBase,
+      horasJornada,
+      valorJornal,
+      valorHora,
+      tipoCalculo: puesto.tipo_calculo,
+      tarifaTurnoTrabajado: Number(puesto.tarifa_turno_trabajado || 0),
+    }
+  }
 
   const editingRowBreakdown = editingRow ? getRowBreakdown(editingRow, isSucursalEmployee) : null
   const feriadosMap = useMemo(
@@ -614,78 +663,96 @@ export function LiquidacionJornadasTab({
                 {tramosDraft
                   .slice()
                   .sort((a, b) => a.orden - b.orden)
-                  .map((tramo, index) => (
-                    <div key={`${tramo.id || 'new'}-${index}`} className="grid grid-cols-1 gap-2 rounded-md border p-3 md:grid-cols-[1fr_1fr_2fr_auto]">
-                      <div className="space-y-1">
-                        <Label className="text-xs">Desde</Label>
-                        <Input
-                          type="date"
-                          min={periodoDesde}
-                          max={periodoHasta}
-                          value={tramo.fecha_desde}
-                          onChange={(event) =>
-                            setTramosDraft((prev) =>
-                              prev.map((current, currentIndex) =>
-                                currentIndex === index ? { ...current, fecha_desde: event.target.value } : current,
-                              ),
-                            )
-                          }
-                        />
+                  .map((tramo, index) => {
+                    const tramoTarifa = getTramoTarifaInfo(tramo.puesto_codigo)
+
+                    return (
+                      <div
+                        key={`${tramo.id || 'new'}-${index}`}
+                        className="grid grid-cols-1 gap-2 rounded-md border p-3 md:grid-cols-[1fr_1fr_2fr_auto]"
+                      >
+                        <div className="space-y-1">
+                          <Label className="text-xs">Desde</Label>
+                          <Input
+                            type="date"
+                            min={periodoDesde}
+                            max={periodoHasta}
+                            value={tramo.fecha_desde}
+                            onChange={(event) =>
+                              setTramosDraft((prev) =>
+                                prev.map((current, currentIndex) =>
+                                  currentIndex === index ? { ...current, fecha_desde: event.target.value } : current,
+                                ),
+                              )
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Hasta</Label>
+                          <Input
+                            type="date"
+                            min={periodoDesde}
+                            max={periodoHasta}
+                            value={tramo.fecha_hasta}
+                            onChange={(event) =>
+                              setTramosDraft((prev) =>
+                                prev.map((current, currentIndex) =>
+                                  currentIndex === index ? { ...current, fecha_hasta: event.target.value } : current,
+                                ),
+                              )
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Puesto del tramo</Label>
+                          <Select
+                            value={tramo.puesto_codigo}
+                            onValueChange={(value) =>
+                              setTramosDraft((prev) =>
+                                prev.map((current, currentIndex) =>
+                                  currentIndex === index ? { ...current, puesto_codigo: value } : current,
+                                ),
+                              )
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Seleccionar puesto" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {puestosTramoOptions.map((puestoCodigo) => (
+                                <SelectItem key={puestoCodigo} value={puestoCodigo}>
+                                  {puestoCodigo}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <div className="text-[11px] text-muted-foreground">
+                            {tramoTarifa ? (
+                              tramoTarifa.tipoCalculo === 'turno' ? (
+                                `Valor jornal ${formatMoney(tramoTarifa.valorJornal)} | Base ${tramoTarifa.diasBase} dias | ${tramoTarifa.horasJornada} hs`
+                              ) : (
+                                `Valor hora ${formatMoney(tramoTarifa.valorHora)} | Jornal ${formatMoney(tramoTarifa.valorJornal)} | Base ${tramoTarifa.diasBase} dias`
+                              )
+                            ) : (
+                              'Sin regla activa para ese puesto'
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-end">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="text-red-600 hover:text-red-700"
+                            onClick={() => setTramosDraft((prev) => prev.filter((_, currentIndex) => currentIndex !== index))}
+                            disabled={savingTramos}
+                          >
+                            Quitar
+                          </Button>
+                        </div>
                       </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Hasta</Label>
-                        <Input
-                          type="date"
-                          min={periodoDesde}
-                          max={periodoHasta}
-                          value={tramo.fecha_hasta}
-                          onChange={(event) =>
-                            setTramosDraft((prev) =>
-                              prev.map((current, currentIndex) =>
-                                currentIndex === index ? { ...current, fecha_hasta: event.target.value } : current,
-                              ),
-                            )
-                          }
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Puesto del tramo</Label>
-                        <Select
-                          value={tramo.puesto_codigo}
-                          onValueChange={(value) =>
-                            setTramosDraft((prev) =>
-                              prev.map((current, currentIndex) =>
-                                currentIndex === index ? { ...current, puesto_codigo: value } : current,
-                              ),
-                            )
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Seleccionar puesto" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {puestosTramoOptions.map((puestoCodigo) => (
-                              <SelectItem key={puestoCodigo} value={puestoCodigo}>
-                                {puestoCodigo}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex items-end">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          className="text-red-600 hover:text-red-700"
-                          onClick={() => setTramosDraft((prev) => prev.filter((_, currentIndex) => currentIndex !== index))}
-                          disabled={savingTramos}
-                        >
-                          Quitar
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
               </div>
             )}
           </div>

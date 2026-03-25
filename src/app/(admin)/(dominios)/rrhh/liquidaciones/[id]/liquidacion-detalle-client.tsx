@@ -8,6 +8,7 @@ import type {
   AdelantoCuota,
   Liquidacion,
   LiquidacionJornada,
+  LiquidacionReglaPeriodo,
   LiquidacionReglaPuesto,
   LiquidacionTramoPuesto,
 } from '@/types/domain.types'
@@ -31,7 +32,11 @@ type Props = {
   jornadas: LiquidacionJornada[]
   cuotas: CuotaWithPlan[]
   feriados: Array<{ fecha: string; descripcion?: string | null }>
-  puestosDisponibles: Pick<LiquidacionReglaPuesto, 'puesto_codigo'>[]
+  puestosDisponibles: Pick<
+    LiquidacionReglaPuesto,
+    'puesto_codigo' | 'grupo_base_dias' | 'horas_jornada' | 'tipo_calculo' | 'tarifa_turno_trabajado'
+  >[]
+  reglaPeriodo: LiquidacionReglaPeriodo | null
   tramosPuesto: LiquidacionTramoPuesto[]
 }
 
@@ -41,6 +46,7 @@ export function LiquidacionDetalleClient({
   cuotas,
   feriados,
   puestosDisponibles,
+  reglaPeriodo,
   tramosPuesto,
 }: Props) {
   const router = useRouter()
@@ -102,6 +108,7 @@ export function LiquidacionDetalleClient({
             feriados={feriados}
             isSucursalEmployee={isSucursalEmployee}
             puestosDisponibles={puestosDisponibles}
+            reglaPeriodo={reglaPeriodo}
             tramosPuesto={tramosPuesto}
           />
         </TabsContent>
