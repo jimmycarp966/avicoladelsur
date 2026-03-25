@@ -1,7 +1,7 @@
 'use client'
 
 import { ColumnDef } from '@tanstack/react-table'
-import { DataTable, SortableHeader, StatusBadge } from '@/components/ui/data-table'
+import { DataTable, SortableHeader } from '@/components/ui/data-table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Edit, Eye, Send, Star, MoreHorizontal } from 'lucide-react'
@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { formatDate, formatFixed } from '@/lib/utils'
+import { getEmpleadoNombre } from '@/lib/utils/empleado-display'
 import type { Evaluacion } from '@/types/domain.types'
 
 interface EvaluacionesTableProps {
@@ -57,17 +58,16 @@ export function EvaluacionesTable({ evaluaciones, onView, onEdit, onSend }: Eval
 
   const columns: ColumnDef<Evaluacion>[] = [
     {
-      accessorKey: 'empleado.usuario.nombre',
-      header: ({ column }) => (
-        <SortableHeader column={column}>Empleado</SortableHeader>
-      ),
+      id: 'empleado',
+      accessorFn: (row) => {
+        const empleado = row.empleado || { nombre: '', apellido: '', legajo: '', dni: '', usuario: null }
+        return `${getEmpleadoNombre(empleado)} ${row.empleado?.legajo || ''}`.trim().toLowerCase()
+      },
+      header: ({ column }) => <SortableHeader column={column}>Empleado</SortableHeader>,
       cell: ({ row }) => {
         const empleado = row.original.empleado
-        // Usar nombre/apellido de usuario si existe, sino usar campos directos de empleado
-        const nombre = empleado?.usuario?.nombre || empleado?.nombre || ''
-        const apellido = empleado?.usuario?.apellido || empleado?.apellido || ''
         const legajo = empleado?.legajo || ''
-        const nombreCompleto = `${nombre} ${apellido}`.trim()
+        const nombreCompleto = empleado ? getEmpleadoNombre(empleado) : 'Sin nombre'
 
         return (
           <div>
@@ -213,7 +213,7 @@ export function EvaluacionesTable({ evaluaciones, onView, onEdit, onSend }: Eval
     <DataTable
       columns={columns}
       data={evaluaciones}
-      searchKey="empleado.usuario.nombre"
+      searchKey="empleado"
       searchPlaceholder="Buscar evaluaciones..."
     />
   )

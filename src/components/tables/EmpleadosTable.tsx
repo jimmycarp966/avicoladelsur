@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Edit, Trash2, Eye, Phone, Mail, MoreHorizontal } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
+import { getEmpleadoNombre } from '@/lib/utils/empleado-display'
 import type { Empleado } from '@/types/domain.types'
 
 interface EmpleadosTableProps {
@@ -43,16 +44,14 @@ export function EmpleadosTable({ empleados, onView, onEdit, onDelete, onCall, on
       ),
     },
     {
-      accessorKey: 'usuario.nombre',
+      id: 'empleado',
+      accessorFn: (row) => `${getEmpleadoNombre(row)} ${row.legajo || ''}`.trim().toLowerCase(),
       header: ({ column }) => (
         <SortableHeader column={column}>Empleado</SortableHeader>
       ),
       cell: ({ row }) => {
         const empleado = row.original
-        // Usar nombre/apellido de usuario si existe, sino usar campos directos de empleado
-        const nombre = empleado.usuario?.nombre || empleado.nombre || ''
-        const apellido = empleado.usuario?.apellido || empleado.apellido || ''
-        const nombreCompleto = `${nombre} ${apellido}`.trim()
+        const nombreCompleto = getEmpleadoNombre(empleado)
         const email = empleado.usuario?.email || ''
 
         return (
@@ -200,7 +199,7 @@ export function EmpleadosTable({ empleados, onView, onEdit, onDelete, onCall, on
   ]
 
   return (
-    <div className="space-y-4 p-6">
+    <div className="space-y-4 p-0 sm:p-6">
       <div className="flex justify-end">
         <span className="text-sm text-muted-foreground">{totalEmpleados} empleados</span>
       </div>
@@ -208,6 +207,8 @@ export function EmpleadosTable({ empleados, onView, onEdit, onDelete, onCall, on
       <DataTable
         columns={columns}
         data={empleados}
+        searchKey="empleado"
+        searchPlaceholder="Buscar empleados por nombre o legajo..."
       />
     </div>
   )

@@ -14,7 +14,7 @@ type JornadasCalendarioProps = {
 }
 
 type DiaCalendario = {
-  fecha: string // YYYY-MM-DD
+  fecha: string
   dia: number
   jornada: LiquidacionJornada | null
   esFeriado: boolean
@@ -22,13 +22,20 @@ type DiaCalendario = {
   esSabado: boolean
   esDomingo: boolean
   esFuturo: boolean
-  tipo: 'presente' | 'media_falta' | 'descanso' | 'ausente' | 'no_laboral'
+  tipo: 'presente' | 'media_falta' | 'descanso' | 'ausente' | 'suspension' | 'no_laboral'
 }
 
 function getTodayArgentina(): string {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Argentina/Buenos_Aires',
   }).format(new Date())
+}
+
+function getJornadaPriority(jornada: LiquidacionJornada): number {
+  if (jornada.origen === 'auto_suspension') return 4
+  if (isAusenciaObservacion(jornada.observaciones)) return 3
+  if (jornada.origen === 'auto_licencia_descanso') return 2
+  return 1
 }
 
 function clasificarDia(dia: DiaCalendario): DiaCalendario['tipo'] {
@@ -43,6 +50,7 @@ function clasificarDia(dia: DiaCalendario): DiaCalendario['tipo'] {
 
   const { jornada } = dia
   if (isAusenciaObservacion(jornada.observaciones)) return 'ausente'
+  if (jornada.origen === 'auto_suspension') return 'suspension'
   if (jornada.origen === 'auto_licencia_descanso') return 'descanso'
 
   const hs = jornada.horas_mensuales ?? 0
@@ -64,13 +72,13 @@ const TIPO_CONFIG: Record<
     bg: 'bg-green-50 border-green-200',
     text: 'text-green-700',
     label: 'Presente',
-    icon: '✓',
+    icon: 'OK',
   },
   media_falta: {
     bg: 'bg-amber-50 border-amber-200',
     text: 'text-amber-700',
     label: 'Media falta',
-    icon: '½',
+    icon: '1/2',
   },
   descanso: {
     bg: 'bg-blue-50 border-blue-200',
@@ -78,11 +86,17 @@ const TIPO_CONFIG: Record<
     label: 'Licencia',
     icon: '~',
   },
+  suspension: {
+    bg: 'bg-rose-50 border-rose-200',
+    text: 'text-rose-700',
+    label: 'Suspension',
+    icon: '!',
+  },
   ausente: {
     bg: 'bg-red-50 border-red-200',
     text: 'text-red-700',
     label: 'Ausente',
-    icon: '✗',
+    icon: 'X',
   },
   no_laboral: {
     bg: 'bg-gray-50 border-gray-100',
@@ -92,7 +106,7 @@ const TIPO_CONFIG: Record<
   },
 }
 
-const DIAS_SEMANA = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+const DIAS_SEMANA = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab']
 
 export function JornadasCalendario({
   jornadas,
@@ -113,15 +127,19 @@ export function JornadasCalendario({
     [feriados],
   )
 
-  const jornadasMap = useMemo(
-    () =>
-      new Map<string, LiquidacionJornada>(
-        jornadas
-          .filter((j) => Boolean(j.fecha))
-          .map((j) => [String(j.fecha).slice(0, 10), j]),
-      ),
-    [jornadas],
-  )
+  const jornadasMap = useMemo(() => {
+    const map = new Map<string, LiquidacionJornada>()
+
+    for (const jornada of jornadas.filter((j) => Boolean(j.fecha))) {
+      const fecha = String(jornada.fecha).slice(0, 10)
+      const current = map.get(fecha)
+      if (!current || getJornadaPriority(jornada) >= getJornadaPriority(current)) {
+        map.set(fecha, jornada)
+      }
+    }
+
+    return map
+  }, [jornadas])
 
   const dias = useMemo<DiaCalendario[]>(() => {
     const ultimoDia = new Date(periodoAnio, periodoMes, 0).getDate()
@@ -155,11 +173,9 @@ export function JornadasCalendario({
     return result
   }, [periodoMes, periodoAnio, feriadosMap, jornadasMap, today])
 
-  // Calcular offset del primer día del mes para alinear grid
   const primerDia = new Date(`${periodoAnio}-${String(periodoMes).padStart(2, '0')}-01T12:00:00`)
-  const offsetInicio = primerDia.getDay() // 0=Dom
+  const offsetInicio = primerDia.getDay()
 
-  // Contadores
   const contadores = useMemo(
     () =>
       dias.reduce(
@@ -174,9 +190,8 @@ export function JornadasCalendario({
 
   return (
     <div className="space-y-3">
-      {/* Leyenda */}
       <div className="flex flex-wrap gap-2 text-xs">
-        {(['presente', 'media_falta', 'descanso', 'ausente'] as DiaCalendario['tipo'][]).map((tipo) => {
+        {(['presente', 'media_falta', 'descanso', 'suspension', 'ausente'] as DiaCalendario['tipo'][]).map((tipo) => {
           const cfg = TIPO_CONFIG[tipo]
           const count = contadores[tipo] ?? 0
           return (
@@ -191,9 +206,7 @@ export function JornadasCalendario({
         })}
       </div>
 
-      {/* Grid */}
       <div className="rounded-md border overflow-hidden">
-        {/* Cabecera días de la semana */}
         <div className="grid grid-cols-7 bg-muted/40 border-b">
           {DIAS_SEMANA.map((d) => (
             <div key={d} className="text-center text-xs font-medium text-muted-foreground py-1.5">
@@ -202,9 +215,7 @@ export function JornadasCalendario({
           ))}
         </div>
 
-        {/* Días */}
         <div className="grid grid-cols-7">
-          {/* Celdas vacías de offset */}
           {Array.from({ length: offsetInicio }).map((_, i) => (
             <div key={`empty-${i}`} className="min-h-[60px] border-r border-b bg-gray-50/50" />
           ))}
@@ -235,14 +246,10 @@ export function JornadasCalendario({
                 aria-label={esClicable ? `Cargar jornada para el dia ${dia.fecha}` : undefined}
               >
                 <div className="flex items-start justify-between">
-                  <span
-                    className={`text-[11px] font-semibold leading-none ${esHoy ? 'text-blue-600' : cfg.text}`}
-                  >
+                  <span className={`text-[11px] font-semibold leading-none ${esHoy ? 'text-blue-600' : cfg.text}`}>
                     {dia.dia}
                   </span>
-                  {cfg.icon && (
-                    <span className={`text-[13px] leading-none ${cfg.text}`}>{cfg.icon}</span>
-                  )}
+                  {cfg.icon && <span className={`text-[11px] leading-none ${cfg.text}`}>{cfg.icon}</span>}
                 </div>
 
                 {dia.esFeriado && dia.feriadoLabel && (
@@ -253,13 +260,13 @@ export function JornadasCalendario({
 
                 {dia.jornada && (
                   <p className={`text-[9px] leading-tight mt-0.5 truncate ${cfg.text} opacity-80`}>
-                    {dia.jornada.horas_mensuales ?? 0}hs
+                    {dia.jornada.horas_mensuales ?? 0} hs
                   </p>
                 )}
 
                 {dia.tipo !== 'no_laboral' && cfg.label && (
                   <p className={`text-[9px] leading-tight mt-0.5 ${cfg.text} opacity-70`}>
-                    {licenciaLabel || cfg.label}
+                    {dia.tipo === 'suspension' ? 'Suspension' : licenciaLabel || cfg.label}
                   </p>
                 )}
               </div>

@@ -61,9 +61,10 @@ export function sanitizeTaskValue(value?: string | null): string {
   return raw
 }
 
-export function normalizeOrigen(origen?: string | null): 'hik' | 'asistencia' | 'manual' {
+export function normalizeOrigen(origen?: string | null): 'hik' | 'asistencia' | 'manual' | 'suspension' {
   const value = (origen || '').toLowerCase().trim()
   if (value.includes('hik')) return 'hik'
+  if (value.includes('suspension')) return 'suspension'
   if (value.includes('asistencia') || value.includes('licencia') || value.includes('descanso')) return 'asistencia'
   return 'manual'
 }
@@ -107,6 +108,7 @@ export type JornadaCalculoInput = Pick<
   LiquidacionJornada,
   | 'horas_mensuales'
   | 'horas_adicionales'
+  | 'horas_extra_aprobadas'
   | 'turno_especial_unidades'
   | 'tarifa_hora_base'
   | 'tarifa_hora_extra'
@@ -117,7 +119,10 @@ export function getRowBreakdown(row: JornadaCalculoInput, isSucursalEmployee: bo
   const base = (row.horas_mensuales || 0) * (row.tarifa_hora_base || 0)
   const extra = (row.horas_adicionales || 0) * (row.tarifa_hora_extra || 0)
   const especial = (row.turno_especial_unidades || 0) * (row.tarifa_turno_especial || 0)
-  const extraAplicado = isSucursalEmployee ? 0 : extra
+  const extraAplicado =
+    isSucursalEmployee || row.horas_extra_aprobadas === false
+      ? 0
+      : extra
 
   return {
     base,
@@ -157,7 +162,7 @@ export function validateJornada(
   if (!row.fecha) return 'La fecha es obligatoria.'
 
   const checks: Array<[string, number]> = [
-    ['hs mensuales', row.horas_mensuales || 0],
+    ['horas diarias', row.horas_mensuales || 0],
     ['hs adicionales', row.horas_adicionales || 0],
     ['turno especial', row.turno_especial_unidades || 0],
     ['tarifa base', row.tarifa_hora_base || 0],
@@ -172,11 +177,11 @@ export function validateJornada(
     (row.horas_mensuales || 0) + (row.horas_adicionales || 0) + (row.turno_especial_unidades || 0)
   const esAusencia = isAusenciaObservacion(row.observaciones)
   if (unidades <= 0 && !esAusencia) {
-    return 'Debe cargar al menos hs mensuales, hs adicionales o turno especial mayor a 0.'
+    return 'Debe cargar al menos horas diarias, hs adicionales o turno especial mayor a 0.'
   }
 
   if ((row.horas_mensuales || 0) > 0 && (row.tarifa_hora_base || 0) <= 0) {
-    return 'Si carga hs mensuales, la tarifa base debe ser mayor a 0.'
+    return 'Si carga horas diarias, la tarifa base debe ser mayor a 0.'
   }
 
   if (!isSucursalEmployee && (row.horas_adicionales || 0) > 0 && (row.tarifa_hora_extra || 0) <= 0) {
@@ -188,4 +193,43 @@ export function validateJornada(
   }
 
   return null
+}
+
+export function getTurnoEstadoClasses(
+  row?: Pick<LiquidacionJornada, 'turno' | 'origen' | 'observaciones'> | null,
+): string {
+  if (!row) return 'bg-slate-100 text-slate-700 border-slate-200'
+
+  if (normalizeOrigen(row.origen) === 'suspension') {
+    return 'bg-rose-50 text-rose-700 border-rose-200'
+  }
+
+  if (isAusenciaObservacion(row.observaciones)) {
+    return 'bg-red-50 text-red-700 border-red-200'
+  }
+
+  const turno = normalizeTurno(row.turno)
+  if (turno === 'turno_completo') return 'bg-green-50 text-green-700 border-green-200'
+  if (turno.startsWith('medio_turno') || turno === 'manana' || turno === 'tarde') {
+    return 'bg-amber-50 text-amber-700 border-amber-200'
+  }
+  if (turno === 'vacaciones' || turno === 'descanso' || turno === 'feriado' || turno === 'domingo') {
+    return 'bg-blue-50 text-blue-700 border-blue-200'
+  }
+  if (turno === 'noche') return 'bg-indigo-50 text-indigo-700 border-indigo-200'
+  return 'bg-slate-100 text-slate-700 border-slate-200'
+}
+
+export function getHorasExtraBadgeClasses(options: {
+  horasAdicionales?: number | null
+  horasExtraAprobadas?: boolean | null
+  isSucursalEmployee: boolean
+  permiteAprobacion: boolean
+}): string {
+  if ((options.horasAdicionales || 0) <= 0) return 'bg-slate-100 text-slate-700 border-slate-200'
+  if (options.isSucursalEmployee) return 'bg-sky-50 text-sky-700 border-sky-200'
+  if (!options.permiteAprobacion || options.horasExtraAprobadas !== false) {
+    return 'bg-green-50 text-green-700 border-green-200'
+  }
+  return 'bg-amber-50 text-amber-700 border-amber-200'
 }

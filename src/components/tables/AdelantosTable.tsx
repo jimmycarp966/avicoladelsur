@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { formatCurrency, formatDate, formatFixed } from '@/lib/utils'
+import { getEmpleadoNombre } from '@/lib/utils/empleado-display'
 import type { Adelanto } from '@/types/domain.types'
 
 interface AdelantosTableProps {
@@ -23,9 +24,15 @@ interface AdelantosTableProps {
   onReject?: (adelanto: Adelanto) => void
 }
 
+type AdelantoConPlan = Adelanto & {
+  plan?: {
+    cantidad_cuotas?: number | null
+  } | null
+}
+
 export function AdelantosTable({ adelantos, onView, onApprove, onReject }: AdelantosTableProps) {
   const getCuotas = (adelanto: Adelanto): number => {
-    const planCuotas = Number((adelanto as any)?.plan?.cantidad_cuotas || 0)
+    const planCuotas = Number((adelanto as AdelantoConPlan).plan?.cantidad_cuotas || 0)
     if (planCuotas > 0) return planCuotas
 
     const observaciones = String(adelanto.observaciones || '')
@@ -56,17 +63,16 @@ export function AdelantosTable({ adelantos, onView, onApprove, onReject }: Adela
 
   const columns: ColumnDef<Adelanto>[] = [
     {
-      accessorKey: 'empleado.usuario.nombre',
-      header: ({ column }) => (
-        <SortableHeader column={column}>Empleado</SortableHeader>
-      ),
+      id: 'empleado',
+      accessorFn: (row) => {
+        const empleado = row.empleado || { nombre: '', apellido: '', legajo: '', dni: '', usuario: null }
+        return `${getEmpleadoNombre(empleado)} ${row.empleado?.legajo || ''}`.trim().toLowerCase()
+      },
+      header: ({ column }) => <SortableHeader column={column}>Empleado</SortableHeader>,
       cell: ({ row }) => {
         const empleado = row.original.empleado
-        // Usar nombre/apellido de usuario si existe, sino usar campos directos de empleado
-        const nombre = empleado?.usuario?.nombre || empleado?.nombre || ''
-        const apellido = empleado?.usuario?.apellido || empleado?.apellido || ''
         const legajo = empleado?.legajo || ''
-        const nombreCompleto = `${nombre} ${apellido}`.trim()
+        const nombreCompleto = empleado ? getEmpleadoNombre(empleado) : 'Sin nombre'
 
         return (
           <div>
@@ -262,7 +268,7 @@ export function AdelantosTable({ adelantos, onView, onApprove, onReject }: Adela
     <DataTable
       columns={columns}
       data={adelantos}
-      searchKey="empleado.usuario.nombre"
+      searchKey="empleado"
       searchPlaceholder="Buscar adelantos..."
     />
   )

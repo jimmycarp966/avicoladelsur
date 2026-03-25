@@ -259,7 +259,7 @@ export function LiquidacionControlTab({
               <InfoItem label="Valor jornal" value={formatMoney(liquidacion.valor_jornal)} />
               <InfoItem label="Valor hora" value={formatMoney(liquidacion.valor_hora)} />
               <InfoItem label="Dias base" value={String(liquidacion.dias_base ?? '-')} />
-              <InfoItem label="Horas jornada" value={String(liquidacion.horas_jornada ?? '-')} />
+              <InfoItem label="Horas diarias" value={String(liquidacion.horas_jornada ?? '-')} />
               <InfoItem label="Puesto resuelto" value={liquidacion.puesto_override || 'Por defecto'} />
             </div>
           </CardContent>

@@ -382,12 +382,55 @@ export const legajoIncidenciaSchema = z.object({
       .max(365, 'La suspension no puede superar 365 dias')
       .optional(),
   ),
+  fecha_inicio_suspension: z
+    .string()
+    .optional()
+    .refine((val) => !val || !Number.isNaN(Date.parse(val)), {
+      message: 'Fecha de inicio de suspension invalida',
+    }),
+  turno_inicio: z.enum(['manana', 'tarde', 'turno_completo']).optional(),
+  fecha_reintegro: z
+    .string()
+    .optional()
+    .refine((val) => !val || !Number.isNaN(Date.parse(val)), {
+      message: 'Fecha de reintegro invalida',
+    }),
+  turno_reintegro: z.enum(['manana', 'tarde', 'turno_completo']).optional(),
 }).superRefine((data, ctx) => {
   if (data.etapa === 'suspension' && !data.suspension_dias) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['suspension_dias'],
       message: 'Debe indicar cuantos dias dura la suspension',
+    })
+  }
+
+  if (data.etapa === 'suspension' && !data.fecha_inicio_suspension) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['fecha_inicio_suspension'],
+      message: 'Debe indicar cuando inicia la suspension',
+    })
+  }
+
+  if (data.etapa === 'suspension' && !data.turno_inicio) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['turno_inicio'],
+      message: 'Debe indicar el turno en que inicia la suspension',
+    })
+  }
+
+  if (
+    data.etapa === 'suspension' &&
+    data.fecha_inicio_suspension &&
+    data.fecha_reintegro &&
+    new Date(data.fecha_reintegro).getTime() < new Date(data.fecha_inicio_suspension).getTime()
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['fecha_reintegro'],
+      message: 'La fecha de reintegro no puede ser anterior al inicio de la suspension',
     })
   }
 })

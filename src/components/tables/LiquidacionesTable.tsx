@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { getEmpleadoNombre } from '@/lib/utils/empleado-display'
 import type { Liquidacion } from '@/types/domain.types'
 import Link from 'next/link'
 
@@ -78,17 +79,18 @@ export function LiquidacionesTable({ liquidaciones, onView, onEdit, onApprove, o
 
   const columns: ColumnDef<Liquidacion>[] = [
     {
-      accessorKey: 'empleado.usuario.nombre',
+      id: 'empleado',
+      accessorFn: (row) => {
+        const empleado = row.empleado || { nombre: '', apellido: '', legajo: '', dni: '', usuario: null }
+        return `${getEmpleadoNombre(empleado)} ${row.empleado?.legajo || ''}`.trim().toLowerCase()
+      },
       header: ({ column }) => <SortableHeader column={column}>Empleado</SortableHeader>,
       cell: ({ row }) => {
         const empleado = row.original.empleado
-        const nombre = empleado?.usuario?.nombre || empleado?.nombre || ''
-        const apellido = empleado?.usuario?.apellido || empleado?.apellido || ''
         const email = empleado?.usuario?.email || ''
         const legajo = empleado?.legajo || ''
         const puesto = row.original.puesto_override?.trim() || empleado?.categoria?.nombre?.trim() || 'Sin puesto'
-        const nombreCompleto = `${nombre} ${apellido}`.trim()
-        const etiquetaEmpleado = nombreCompleto || email || 'Sin nombre'
+        const etiquetaEmpleado = empleado ? getEmpleadoNombre(empleado) : email || 'Sin nombre'
 
         return (
           <div>
@@ -278,6 +280,8 @@ export function LiquidacionesTable({ liquidaciones, onView, onEdit, onApprove, o
       <DataTable
         columns={columns}
         data={liquidaciones}
+        searchKey="empleado"
+        searchPlaceholder="Buscar por empleado, legajo o puesto..."
         enablePagination={true}
         pageSize={50}
       />

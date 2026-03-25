@@ -4,7 +4,14 @@ import { ArrowLeft, Check } from 'lucide-react'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import type { Liquidacion, LiquidacionJornada, AdelantoCuota, LiquidacionReglaPuesto } from '@/types/domain.types'
+import { getEmpleadoNombre } from '@/lib/utils/empleado-display'
+import type {
+  Liquidacion,
+  LiquidacionJornada,
+  AdelantoCuota,
+  LiquidacionReglaPuesto,
+  LiquidacionTramoPuesto,
+} from '@/types/domain.types'
 import { LiquidacionDetalleClient } from './liquidacion-detalle-client'
 
 async function getLiquidacionDetalle(liquidacionId: string) {
@@ -81,12 +88,20 @@ async function getLiquidacionDetalle(liquidacionId: string) {
     .eq('activo', true)
     .order('puesto_codigo', { ascending: true })
 
+  const { data: tramosPuesto } = await adminSupabase
+    .from('rrhh_liquidacion_tramos_puesto')
+    .select('*')
+    .eq('liquidacion_id', liquidacionId)
+    .order('orden', { ascending: true })
+    .order('fecha_desde', { ascending: true })
+
   return {
     liquidacion: liquidacion as Liquidacion,
     jornadas: (jornadas || []) as LiquidacionJornada[],
     cuotas: (cuotas || []) as AdelantoCuota[],
     feriados: (feriados || []) as Array<{ fecha: string; descripcion?: string | null }>,
     puestosDisponibles: (puestos || []) as Pick<LiquidacionReglaPuesto, 'puesto_codigo'>[],
+    tramosPuesto: (tramosPuesto || []) as LiquidacionTramoPuesto[],
   }
 }
 
@@ -122,8 +137,7 @@ export default async function LiquidacionDetallePage({
   }
 
   const empleado = data.liquidacion.empleado
-  const nombreEmpleado =
-    `${empleado?.usuario?.nombre || empleado?.nombre || ''} ${empleado?.usuario?.apellido || empleado?.apellido || ''}`.trim()
+  const nombreEmpleado = empleado ? getEmpleadoNombre(empleado) : 'Sin nombre'
   const legajo = empleado?.legajo ? `Legajo ${empleado.legajo}` : ''
 
   const estado = (data.liquidacion.estado ?? 'borrador') as EstadoType
@@ -199,6 +213,7 @@ export default async function LiquidacionDetallePage({
         cuotas={data.cuotas}
         feriados={data.feriados}
         puestosDisponibles={data.puestosDisponibles}
+        tramosPuesto={data.tramosPuesto}
       />
     </div>
   )

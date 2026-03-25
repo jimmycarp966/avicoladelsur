@@ -156,7 +156,7 @@ export default async function DocumentoIncidenciaPage({ params }: PageProps) {
               <p className="font-semibold uppercase">Constancia</p>
               <p className="mt-1 text-justify">
                 Se deja constancia de que el empleado recibe notificacion formal de la medida indicada.
-                La firma acredita recepcion del documento y no implica conformidad con el contenido.
+                La firma acredita recepcion del documento e implica conformidad con el contenido.
               </p>
             </div>
           </div>

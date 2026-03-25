@@ -73,6 +73,10 @@ export function JornadaEditSheet({
   const [hsInput, setHsInput] = useState(String(editingRow?.horas_mensuales ?? ''))
   const [hsAdicInput, setHsAdicInput] = useState(String(editingRow?.horas_adicionales ?? ''))
   const [turnoEspInput, setTurnoEspInput] = useState(String(editingRow?.turno_especial_unidades ?? ''))
+  const horasExtraPendientes =
+    !isSucursalEmployee &&
+    (editingRow?.horas_adicionales || 0) > 0 &&
+    editingRow?.horas_extra_aprobadas === false
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -103,7 +107,14 @@ export function JornadaEditSheet({
                 <Select
                   value={editingTurnoSelectValue}
                   onValueChange={(value) =>
-                    onUpdateRow({ turno: value === 'otro' ? '' : value })
+                    onUpdateRow({
+                      turno:
+                        value === 'otro'
+                          ? (editingRow?.turno?.trim() && editingTurnoSelectValue === 'otro'
+                              ? editingRow.turno
+                              : 'otro')
+                          : value,
+                    })
                   }
                 >
                   <SelectTrigger>
@@ -143,7 +154,7 @@ export function JornadaEditSheet({
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <Label>Hs mensuales</Label>
+                <Label>Horas diarias</Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -239,7 +250,14 @@ export function JornadaEditSheet({
                 <span>{formatMoney(breakdown?.base)}</span>
               </div>
               <div className={`flex justify-between ${isSucursalEmployee ? 'text-muted-foreground' : ''}`}>
-                <span>Extra {isSucursalEmployee ? '(informativo)' : ''}</span>
+                <span>
+                  Extra{' '}
+                  {isSucursalEmployee
+                    ? '(informativo)'
+                    : horasExtraPendientes
+                      ? '(pendiente)'
+                      : ''}
+                </span>
                 <span>{formatMoney(breakdown?.extra)}</span>
               </div>
               <div className="flex justify-between text-muted-foreground">

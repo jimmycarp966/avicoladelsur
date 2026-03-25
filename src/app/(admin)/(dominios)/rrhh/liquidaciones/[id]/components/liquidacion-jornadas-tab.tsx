@@ -15,19 +15,31 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useNotificationStore } from '@/store/notificationStore'
-import { eliminarLiquidacionJornadaAction, upsertLiquidacionJornadaAction } from '@/actions/rrhh.actions'
+import {
+  actualizarAprobacionHorasExtraJornadaAction,
+  eliminarLiquidacionJornadaAction,
+  guardarLiquidacionTramosPuestoAction,
+  upsertLiquidacionJornadaAction,
+} from '@/actions/rrhh.actions'
 import { JornadaEditSheet } from './jornada-edit-sheet'
 import { JornadaAddSheet } from './jornada-add-sheet'
 import { JornadasCalendario } from './jornadas-calendario'
-import type { Liquidacion, LiquidacionJornada } from '@/types/domain.types'
+import type {
+  Liquidacion,
+  LiquidacionJornada,
+  LiquidacionReglaPuesto,
+  LiquidacionTramoPuesto,
+} from '@/types/domain.types'
 import {
   TURNO_OPTIONS,
   getTurnoLabel,
   getAutoLicenciaLabel,
+  getHorasExtraBadgeClasses,
   normalizeOrigen,
   normalizeTurno,
   sanitizeTaskValue,
   formatMoney,
+  getTurnoEstadoClasses,
   getRowBreakdown,
   getAusenciaMotivo,
   buildAusenciaObservacion,
@@ -41,6 +53,14 @@ function getOrigenBadge(origen: string | null | undefined) {
     return (
       <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
         Descanso
+      </Badge>
+    )
+  }
+
+  if (origen === 'auto_suspension') {
+    return (
+      <Badge variant="outline" className="bg-rose-50 text-rose-700 border-rose-200 text-xs">
+        Suspension
       </Badge>
     )
   }
@@ -72,6 +92,8 @@ type LiquidacionJornadasTabProps = {
   jornadas: LiquidacionJornada[]
   feriados: Array<{ fecha: string; descripcion?: string | null }>
   isSucursalEmployee: boolean
+  puestosDisponibles: Pick<LiquidacionReglaPuesto, 'puesto_codigo'>[]
+  tramosPuesto: LiquidacionTramoPuesto[]
 }
 
 type JornadaRowView = LiquidacionJornada & {
@@ -83,17 +105,28 @@ export function LiquidacionJornadasTab({
   jornadas,
   feriados,
   isSucursalEmployee,
+  puestosDisponibles,
+  tramosPuesto,
 }: LiquidacionJornadasTabProps) {
   const router = useRouter()
   const { showToast } = useNotificationStore()
 
   const [rows, setRows] = useState<LiquidacionJornada[]>(jornadas)
+  const [tramosDraft, setTramosDraft] = useState<LiquidacionTramoPuesto[]>(tramosPuesto)
   const [loading, setLoading] = useState(false)
+  const [savingTramos, setSavingTramos] = useState(false)
   const [vistaCalendario, setVistaCalendario] = useState(false)
+  const permiteAprobacionHorasExtra = liquidacion.grupo_base_snapshot === 'galpon'
+  const periodoDesde = `${liquidacion.periodo_anio}-${String(liquidacion.periodo_mes).padStart(2, '0')}-01`
+  const periodoHasta = `${liquidacion.periodo_anio}-${String(liquidacion.periodo_mes).padStart(2, '0')}-${String(new Date(liquidacion.periodo_anio, liquidacion.periodo_mes, 0).getDate()).padStart(2, '0')}`
 
   useEffect(() => {
     setRows(jornadas)
   }, [jornadas])
+
+  useEffect(() => {
+    setTramosDraft(tramosPuesto)
+  }, [tramosPuesto])
 
   // Edit sheet state
   const [editSheetOpen, setEditSheetOpen] = useState(false)
@@ -156,6 +189,32 @@ export function LiquidacionJornadasTab({
     return 'ausente'
   }
 
+  const getHorasExtraEstado = (row: LiquidacionJornada) => {
+    if ((row.horas_adicionales || 0) <= 0) return 'Sin extras'
+    if (isSucursalEmployee) return 'Informativas'
+    if (!permiteAprobacionHorasExtra) return 'Aplicadas'
+    return row.horas_extra_aprobadas === false ? 'Pendientes' : 'Aprobadas'
+  }
+
+  const buildNuevoTramo = (): LiquidacionTramoPuesto => {
+    const ultimo = [...tramosDraft].sort((a, b) => a.orden - b.orden).at(-1)
+    const fechaDesde =
+      ultimo?.fecha_hasta && ultimo.fecha_hasta < periodoHasta
+        ? new Date(new Date(`${ultimo.fecha_hasta}T12:00:00`).getTime() + 24 * 60 * 60 * 1000)
+            .toISOString()
+            .slice(0, 10)
+        : periodoDesde
+    return {
+      id: '',
+      liquidacion_id: liquidacion.id,
+      fecha_desde: fechaDesde,
+      fecha_hasta: fechaDesde,
+      puesto_codigo: ultimo?.puesto_codigo || liquidacion.puesto_override || liquidacion.empleado?.categoria?.nombre || '',
+      orden: tramosDraft.length + 1,
+      created_at: new Date().toISOString(),
+    }
+  }
+
   const filteredRows = useMemo(() => {
     const rowsConTodosLosDias: JornadaRowView[] = (() => {
       const diasDelMes = new Date(liquidacion.periodo_anio, liquidacion.periodo_mes, 0).getDate()
@@ -190,7 +249,8 @@ export function LiquidacionJornadasTab({
         }
       }
 
-      return [...rows, ...faltantes].sort((a, b) => {
+      const rowsCompletos: JornadaRowView[] = [...rows, ...faltantes]
+      return rowsCompletos.sort((a, b) => {
         const dateDiff = String(a.fecha || '').localeCompare(String(b.fecha || ''))
         if (dateDiff !== 0) return dateDiff
         if (a.__placeholder && !b.__placeholder) return 1
@@ -269,9 +329,10 @@ export function LiquidacionJornadasTab({
         id: row.id?.startsWith('placeholder-') ? undefined : row.id,
         fecha: row.fecha,
         turno: row.turno?.trim() || 'general',
-        tarea: sanitizeTaskValue(row.tarea) || null,
+        tarea: sanitizeTaskValue(row.tarea) || undefined,
         horas_mensuales: row.horas_mensuales,
         horas_adicionales: row.horas_adicionales,
+        horas_extra_aprobadas: row.horas_extra_aprobadas,
         turno_especial_unidades: row.turno_especial_unidades,
         tarifa_hora_base: row.tarifa_hora_base,
         tarifa_hora_extra: row.tarifa_hora_extra,
@@ -324,7 +385,7 @@ export function LiquidacionJornadasTab({
       const result = await upsertLiquidacionJornadaAction(liquidacion.id, {
         fecha: draft.fecha,
         turno: draft.turno.trim() || 'general',
-        tarea: sanitizeTaskValue(draft.tarea) || null,
+        tarea: sanitizeTaskValue(draft.tarea) || undefined,
         horas_mensuales: draft.horas_mensuales,
         horas_adicionales: draft.horas_adicionales,
         turno_especial_unidades: draft.turno_especial_unidades,
@@ -373,9 +434,10 @@ export function LiquidacionJornadasTab({
         id: ausenciaRow?.id,
         fecha: ausenciaFecha,
         turno: ausenciaRow?.turno?.trim() || 'general',
-        tarea: sanitizeTaskValue(ausenciaRow?.tarea) || null,
+        tarea: sanitizeTaskValue(ausenciaRow?.tarea) || undefined,
         horas_mensuales: 0,
         horas_adicionales: 0,
+        horas_extra_aprobadas: true,
         turno_especial_unidades: 0,
         tarifa_hora_base: ausenciaRow?.tarifa_hora_base ?? liquidacion.valor_hora ?? 0,
         tarifa_hora_extra: ausenciaRow?.tarifa_hora_extra ?? liquidacion.valor_hora ?? 0,
@@ -402,6 +464,53 @@ export function LiquidacionJornadasTab({
     }
   }
 
+  const handleGuardarTramos = async () => {
+    setSavingTramos(true)
+    try {
+      const result = await guardarLiquidacionTramosPuestoAction(
+        liquidacion.id,
+        tramosDraft.map((tramo, index) => ({
+          id: tramo.id || undefined,
+          fecha_desde: tramo.fecha_desde,
+          fecha_hasta: tramo.fecha_hasta,
+          puesto_codigo: tramo.puesto_codigo,
+          orden: index + 1,
+        })),
+      )
+
+      if (!result.success) {
+        showToast('error', result.error || 'No se pudieron guardar los tramos', 'Error')
+        return
+      }
+
+      showToast('success', 'Tramos guardados y liquidacion recalculada', 'Guardado')
+      router.refresh()
+    } catch {
+      showToast('error', 'Error inesperado al guardar los tramos', 'Error')
+    } finally {
+      setSavingTramos(false)
+    }
+  }
+
+  const handleToggleHorasExtra = async (row: LiquidacionJornada, aprobadas: boolean) => {
+    setLoading(true)
+    try {
+      const result = await actualizarAprobacionHorasExtraJornadaAction(liquidacion.id, row.id, aprobadas)
+
+      if (!result.success) {
+        showToast('error', result.error || 'No se pudo actualizar la aprobacion de extras', 'Error')
+        return
+      }
+
+      showToast('success', result.message || 'Horas extra actualizadas', 'Guardado')
+      router.refresh()
+    } catch {
+      showToast('error', 'Error inesperado al actualizar las horas extra', 'Error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <>
       <Card>
@@ -415,6 +524,11 @@ export function LiquidacionJornadasTab({
               {isSucursalEmployee && (
                 <p className="text-xs text-muted-foreground mt-1">
                   En empleados de sucursal, las hs adicionales son informativas y no impactan el total pagable.
+                </p>
+              )}
+              {permiteAprobacionHorasExtra && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  En galpon, las horas por encima de 9 quedan visibles pero solo se imputan al sueldo cuando se aprueban por dia.
                 </p>
               )}
             </div>
@@ -455,10 +569,116 @@ export function LiquidacionJornadasTab({
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="rounded-md border bg-white p-4 space-y-3">
+            <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+              <div>
+                <p className="text-sm font-semibold">Tramos de puesto del periodo</p>
+                <p className="text-xs text-muted-foreground">
+                  Si hay vacaciones o cambios de puesto dentro del mes, puede dividir la liquidacion en rangos para aplicar la tarifa correcta por tramo.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setTramosDraft((prev) => [...prev, buildNuevoTramo()])}
+                  disabled={savingTramos}
+                >
+                  <Plus className="mr-1 h-4 w-4" />
+                  Agregar tramo
+                </Button>
+                <Button type="button" size="sm" onClick={() => void handleGuardarTramos()} disabled={savingTramos}>
+                  {savingTramos ? 'Guardando...' : 'Guardar tramos'}
+                </Button>
+              </div>
+            </div>
+
+            {tramosDraft.length === 0 ? (
+              <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs text-muted-foreground">
+                Sin tramos cargados. En ese caso se usa el puesto resuelto general de la liquidacion.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {tramosDraft
+                  .slice()
+                  .sort((a, b) => a.orden - b.orden)
+                  .map((tramo, index) => (
+                    <div key={`${tramo.id || 'new'}-${index}`} className="grid grid-cols-1 gap-2 rounded-md border p-3 md:grid-cols-[1fr_1fr_2fr_auto]">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Desde</Label>
+                        <Input
+                          type="date"
+                          min={periodoDesde}
+                          max={periodoHasta}
+                          value={tramo.fecha_desde}
+                          onChange={(event) =>
+                            setTramosDraft((prev) =>
+                              prev.map((current, currentIndex) =>
+                                currentIndex === index ? { ...current, fecha_desde: event.target.value } : current,
+                              ),
+                            )
+                          }
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Hasta</Label>
+                        <Input
+                          type="date"
+                          min={periodoDesde}
+                          max={periodoHasta}
+                          value={tramo.fecha_hasta}
+                          onChange={(event) =>
+                            setTramosDraft((prev) =>
+                              prev.map((current, currentIndex) =>
+                                currentIndex === index ? { ...current, fecha_hasta: event.target.value } : current,
+                              ),
+                            )
+                          }
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Puesto del tramo</Label>
+                        <Input
+                          list="puestos-tramo-liquidacion"
+                          value={tramo.puesto_codigo}
+                          onChange={(event) =>
+                            setTramosDraft((prev) =>
+                              prev.map((current, currentIndex) =>
+                                currentIndex === index ? { ...current, puesto_codigo: event.target.value } : current,
+                              ),
+                            )
+                          }
+                          placeholder="Ej: caja, reposicion, reparto"
+                        />
+                      </div>
+                      <div className="flex items-end">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-600 hover:text-red-700"
+                          onClick={() => setTramosDraft((prev) => prev.filter((_, currentIndex) => currentIndex !== index))}
+                          disabled={savingTramos}
+                        >
+                          Quitar
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                <datalist id="puestos-tramo-liquidacion">
+                  {puestosDisponibles.map((puesto) => (
+                    <option key={puesto.puesto_codigo} value={puesto.puesto_codigo} />
+                  ))}
+                </datalist>
+              </div>
+            )}
+          </div>
+
           {/* Resumen */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
             <div className="rounded-md border bg-slate-50 p-3">
-              <p className="text-xs text-muted-foreground">Hs mensuales</p>
+              <p className="text-xs text-muted-foreground">Horas diarias</p>
               <p className="font-semibold tabular-nums">{jornadasResumen.horasMensuales.toFixed(2)}</p>
             </div>
             <div className="rounded-md border bg-slate-50 p-3">
@@ -514,6 +734,7 @@ export function LiquidacionJornadasTab({
                     <SelectItem value="todos">Todos</SelectItem>
                     <SelectItem value="hik">HIK</SelectItem>
                     <SelectItem value="asistencia">Asistencia</SelectItem>
+                    <SelectItem value="suspension">Suspension</SelectItem>
                     <SelectItem value="manual">Manual</SelectItem>
                   </SelectContent>
                 </Select>
@@ -565,8 +786,9 @@ export function LiquidacionJornadasTab({
                   <TableHead>Fecha</TableHead>
                   <TableHead>Turno</TableHead>
                   <TableHead>Puesto del dia</TableHead>
-                  <TableHead className="text-right">Hs Mens.</TableHead>
+                  <TableHead className="text-right">Hs diarias</TableHead>
                   <TableHead className="text-right">Hs Adic.</TableHead>
+                  <TableHead>Estado extra</TableHead>
                   <TableHead className="text-right">T. Especial</TableHead>
                   <TableHead className="text-right">Total aplicado</TableHead>
                   <TableHead>Origen</TableHead>
@@ -576,7 +798,7 @@ export function LiquidacionJornadasTab({
               <TableBody>
                 {filteredRows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center text-muted-foreground py-6">
+                    <TableCell colSpan={10} className="text-center text-muted-foreground py-6">
                       No hay jornadas que coincidan con los filtros
                     </TableCell>
                   </TableRow>
@@ -600,12 +822,21 @@ export function LiquidacionJornadasTab({
                       (row.horas_adicionales || 0) > 0 ||
                       (row.turno_especial_unidades || 0) > 0 ||
                       (row.tarifa_hora_base || 0) !== (liquidacion.valor_hora || 0)
+                    const turnoClasses = getTurnoEstadoClasses(row)
+                    const extraStatusClasses = getHorasExtraBadgeClasses({
+                      horasAdicionales: row.horas_adicionales,
+                      horasExtraAprobadas: row.horas_extra_aprobadas,
+                      isSucursalEmployee,
+                      permiteAprobacion: permiteAprobacionHorasExtra,
+                    })
                     const rowClass = isPlaceholder
                       ? placeholderTipo === 'ausente'
                         ? 'bg-red-50/70'
                         : 'bg-slate-50/90'
                       : esAusenciaRegistrada
                       ? 'bg-red-50/70'
+                      : row.origen === 'auto_suspension'
+                      ? 'bg-rose-50/60'
                       : esFeriado || esDomingo
                       ? 'bg-rose-50/60'
                       : hasDiferencia
@@ -700,7 +931,9 @@ export function LiquidacionJornadasTab({
                               </Tooltip>
                             </TooltipProvider>
                           ) : (
-                            getTurnoLabel(row.turno)
+                            <Badge variant="outline" className={`text-xs ${turnoClasses}`}>
+                              {getTurnoLabel(row.turno)}
+                            </Badge>
                           )
                         })()}
                       </TableCell>
@@ -716,6 +949,29 @@ export function LiquidacionJornadasTab({
                       </TableCell>
                       <TableCell className="text-right text-sm tabular-nums">
                         {row.horas_adicionales ?? 0}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {isPlaceholder ? (
+                          <span className="text-muted-foreground">-</span>
+                        ) : (
+                          <div className="flex flex-col items-start gap-1">
+                            <Badge variant="outline" className={`text-[10px] ${extraStatusClasses}`}>
+                              {getHorasExtraEstado(row)}
+                            </Badge>
+                            {permiteAprobacionHorasExtra && (row.horas_adicionales || 0) > 0 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-0 text-xs text-primary hover:bg-transparent"
+                                onClick={() => void handleToggleHorasExtra(row, row.horas_extra_aprobadas === false)}
+                                disabled={loading}
+                              >
+                                {row.horas_extra_aprobadas === false ? 'Aprobar' : 'Revocar'}
+                              </Button>
+                            )}
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell className="text-right text-sm tabular-nums">
                         {row.turno_especial_unidades ?? 0}
@@ -765,6 +1021,7 @@ export function LiquidacionJornadasTab({
                     <TableCell className="text-right text-sm tabular-nums">
                       {jornadasResumen.horasAdicionales.toFixed(2)}
                     </TableCell>
+                    <TableCell />
                     <TableCell className="text-right text-sm tabular-nums">
                       {jornadasResumen.turnosEspeciales.toFixed(2)}
                     </TableCell>

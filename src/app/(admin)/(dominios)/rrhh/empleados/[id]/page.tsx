@@ -12,7 +12,7 @@ import {
   getDisciplinaEtapaShortLabel,
   parseLegajoDisciplinaMetadata,
 } from "@/lib/utils/rrhh-disciplinario"
-import { getEmpleadoLegajoDni } from "@/lib/utils/empleado-display"
+import { getEmpleadoLegajoDni, getEmpleadoNombre } from "@/lib/utils/empleado-display"
 import type { Empleado } from "@/types/domain.types"
 
 interface PageProps {
@@ -90,6 +90,10 @@ type MedidaDisciplinariaView = {
   etapaLabel: string
   motivo: string
   suspensionDias?: number | null
+  suspensionFechaInicio?: string | null
+  suspensionTurnoInicio?: string | null
+  suspensionFechaReintegro?: string | null
+  suspensionTurnoReintegro?: string | null
   documentoEstado: string
   documentoSignedUrl: string | null
 }
@@ -106,6 +110,7 @@ function formatDateTime(value?: string | null) {
   return date.toLocaleString("es-AR", {
     dateStyle: "short",
     timeStyle: "short",
+    timeZone: "America/Argentina/Buenos_Aires",
   })
 }
 
@@ -254,6 +259,10 @@ async function getEmpleadoLegajoData(empleadoId: string) {
           etapaLabel: getDisciplinaEtapaShortLabel(typedItem.metadata.etapa),
           motivo: typedItem.metadata.motivo,
           suspensionDias: typedItem.metadata.suspension?.dias,
+          suspensionFechaInicio: typedItem.metadata.suspension?.fecha_inicio || null,
+          suspensionTurnoInicio: typedItem.metadata.suspension?.turno_inicio || null,
+          suspensionFechaReintegro: typedItem.metadata.suspension?.fecha_reintegro || null,
+          suspensionTurnoReintegro: typedItem.metadata.suspension?.turno_reintegro || null,
           documentoEstado: typedItem.metadata.documento?.estado || "pendiente_firma",
           documentoSignedUrl,
         } satisfies MedidaDisciplinariaView
@@ -280,16 +289,16 @@ export default async function EmpleadoLegajoPage({ params }: PageProps) {
   }
 
   const { empleado, eventos, medidasDisciplinarias, adelantos, licencias, evaluaciones, liquidaciones } = data
-  const nombreCompleto =
-    `${empleado.usuario?.nombre || empleado.nombre || ""} ${empleado.usuario?.apellido || empleado.apellido || ""}`.trim() ||
-    "Sin nombre"
+  const nombreCompleto = getEmpleadoNombre(empleado)
   const identificacionEmpleado = getEmpleadoLegajoDni(empleado)
   const medidasOrdenadas = [...medidasDisciplinarias].sort(
     (a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime(),
   )
 
-  const timeline: TimelineItem[] = [
-    ...eventos.map((evento) => {
+  const timelineItems: TimelineItem[] = [
+    ...eventos
+      .filter((evento) => !String(evento.categoria || "").toLowerCase().includes("licenc"))
+      .map((evento) => {
       const metadata = parseLegajoDisciplinaMetadata(evento.metadata)
       return {
         key: `evento-${evento.id}`,
@@ -325,7 +334,9 @@ export default async function EmpleadoLegajoPage({ params }: PageProps) {
       titulo: "Evaluacion de desempeno",
       descripcion: `Periodo ${evaluacion.periodo_mes || "-"} / ${evaluacion.periodo_anio || "-"}`,
     })),
-  ].sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
+  ]
+
+  const timeline: TimelineItem[] = [...timelineItems].sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
 
   return (
     <div className="space-y-6">
@@ -420,6 +431,18 @@ export default async function EmpleadoLegajoPage({ params }: PageProps) {
                         {medida.suspensionDias ? (
                           <p className="text-sm text-muted-foreground">
                             Suspension informada: {medida.suspensionDias} dia(s)
+                          </p>
+                        ) : null}
+                        {medida.suspensionFechaInicio ? (
+                          <p className="text-sm text-muted-foreground">
+                            Inicia: {formatDateTime(medida.suspensionFechaInicio)}
+                            {medida.suspensionTurnoInicio ? ` (${medida.suspensionTurnoInicio})` : ""}
+                          </p>
+                        ) : null}
+                        {medida.suspensionFechaReintegro ? (
+                          <p className="text-sm text-muted-foreground">
+                            Reintegro: {formatDateTime(medida.suspensionFechaReintegro)}
+                            {medida.suspensionTurnoReintegro ? ` (${medida.suspensionTurnoReintegro})` : ""}
                           </p>
                         ) : null}
                         {medida.descripcion ? (

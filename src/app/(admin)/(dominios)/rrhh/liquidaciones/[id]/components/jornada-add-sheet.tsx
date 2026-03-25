@@ -147,7 +147,12 @@ export function JornadaAddSheet({
               <Select
                 value={turnoSelectValue}
                 onValueChange={(value) =>
-                  updateNewRow({ turno: value === 'otro' ? '' : value })
+                  updateNewRow({
+                    turno:
+                      value === 'otro'
+                        ? (turnoSelectValue === 'otro' && newRow.turno.trim() ? newRow.turno : 'otro')
+                        : value,
+                  })
                 }
               >
                 <SelectTrigger>
@@ -206,7 +211,7 @@ export function JornadaAddSheet({
 
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
-              <Label className="text-xs">Hs mensuales</Label>
+              <Label className="text-xs">Horas diarias</Label>
               <Input
                 type="number"
                 step="0.01"

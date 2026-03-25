@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { formatDate } from '@/lib/utils'
+import { getEmpleadoNombre } from '@/lib/utils/empleado-display'
 import type { Licencia } from '@/types/domain.types'
 
 interface LicenciasTableProps {
@@ -103,14 +104,16 @@ export function LicenciasTable({ licencias, onView, onApprove, onReject }: Licen
 
   const columns: ColumnDef<Licencia>[] = [
     {
-      accessorKey: 'empleado.usuario.nombre',
+      id: 'empleado',
+      accessorFn: (row) => {
+        const empleado = row.empleado || { nombre: '', apellido: '', legajo: '', dni: '', usuario: null }
+        return `${getEmpleadoNombre(empleado)} ${row.empleado?.legajo || ''}`.trim().toLowerCase()
+      },
       header: ({ column }) => <SortableHeader column={column}>Empleado</SortableHeader>,
       cell: ({ row }) => {
         const empleado = row.original.empleado
-        const nombre = empleado?.usuario?.nombre || empleado?.nombre || ''
-        const apellido = empleado?.usuario?.apellido || empleado?.apellido || ''
         const legajo = empleado?.legajo || ''
-        const nombreCompleto = `${nombre} ${apellido}`.trim()
+        const nombreCompleto = empleado ? getEmpleadoNombre(empleado) : 'Sin nombre'
 
         return (
           <div>
@@ -258,7 +261,7 @@ export function LicenciasTable({ licencias, onView, onApprove, onReject }: Licen
     <DataTable
       columns={columns}
       data={licencias}
-      searchKey="empleado.usuario.nombre"
+      searchKey="empleado"
       searchPlaceholder="Buscar licencias..."
     />
   )

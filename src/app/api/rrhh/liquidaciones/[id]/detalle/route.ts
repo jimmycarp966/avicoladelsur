@@ -14,11 +14,12 @@ const jornadaSchema = z.object({
   tarea: z.string().optional(),
   horas_mensuales: z.number().min(0).optional(),
   horas_adicionales: z.number().min(0).optional(),
+  horas_extra_aprobadas: z.boolean().optional(),
   turno_especial_unidades: z.number().min(0).optional(),
   tarifa_hora_base: z.number().min(0).optional(),
   tarifa_hora_extra: z.number().min(0).optional(),
   tarifa_turno_especial: z.number().min(0).optional(),
-  origen: z.enum(["auto_hik", "auto_asistencia", "manual"]).optional(),
+  origen: z.enum(["auto_hik", "auto_asistencia", "auto_licencia_descanso", "auto_suspension", "manual"]).optional(),
   observaciones: z.string().optional(),
 })
 

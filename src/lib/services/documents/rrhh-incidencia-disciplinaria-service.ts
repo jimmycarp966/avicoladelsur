@@ -22,6 +22,10 @@ type IncidenciaDocumentoInput = {
   motivo: string
   descripcion?: string | null
   suspensionDias?: number | null
+  fechaInicioSuspension?: string | null
+  turnoInicio?: string | null
+  fechaReintegro?: string | null
+  turnoReintegro?: string | null
 }
 
 function formatDateTime(value: string) {
@@ -85,6 +89,18 @@ async function buildPdfBuffer(input: IncidenciaDocumentoInput): Promise<Buffer> 
       doc.text(`Duracion informada: ${input.suspensionDias} dia(s)`)
     }
 
+    if (input.etapa === 'suspension' && input.fechaInicioSuspension) {
+      doc.text(
+        `Inicio de suspension: ${formatDateTime(input.fechaInicioSuspension)}${input.turnoInicio ? ` (${input.turnoInicio})` : ''}`,
+      )
+    }
+
+    if (input.etapa === 'suspension' && input.fechaReintegro) {
+      doc.text(
+        `Reintegro previsto: ${formatDateTime(input.fechaReintegro)}${input.turnoReintegro ? ` (${input.turnoReintegro})` : ''}`,
+      )
+    }
+
     if (input.descripcion?.trim()) {
       doc.moveDown(0.6)
       doc.font('Helvetica-Bold').text('Detalle')
@@ -98,7 +114,7 @@ async function buildPdfBuffer(input: IncidenciaDocumentoInput): Promise<Buffer> 
     doc.font('Helvetica-Bold').text('Constancia')
     doc.moveDown(0.3)
     doc.font('Helvetica').text(
-      'Se deja constancia de que el empleado recibe notificacion formal de la medida disciplinaria indicada. La firma acredita recepcion del documento y no implica conformidad con su contenido.',
+      'Se deja constancia de que el empleado recibe notificacion formal de la medida disciplinaria indicada. La firma acredita recepcion del documento e implica conformidad con el contenido.',
       { align: 'justify' },
     )
 

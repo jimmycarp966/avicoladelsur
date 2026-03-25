@@ -4,7 +4,13 @@ import { useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
-import type { AdelantoCuota, Liquidacion, LiquidacionJornada, LiquidacionReglaPuesto } from '@/types/domain.types'
+import type {
+  AdelantoCuota,
+  Liquidacion,
+  LiquidacionJornada,
+  LiquidacionReglaPuesto,
+  LiquidacionTramoPuesto,
+} from '@/types/domain.types'
 import { LiquidacionStatCards } from './components/liquidacion-stat-cards'
 import { LiquidacionResumenTab } from './components/liquidacion-resumen-tab'
 import { LiquidacionJornadasTab } from './components/liquidacion-jornadas-tab'
@@ -26,6 +32,7 @@ type Props = {
   cuotas: CuotaWithPlan[]
   feriados: Array<{ fecha: string; descripcion?: string | null }>
   puestosDisponibles: Pick<LiquidacionReglaPuesto, 'puesto_codigo'>[]
+  tramosPuesto: LiquidacionTramoPuesto[]
 }
 
 export function LiquidacionDetalleClient({
@@ -34,6 +41,7 @@ export function LiquidacionDetalleClient({
   cuotas,
   feriados,
   puestosDisponibles,
+  tramosPuesto,
 }: Props) {
   const router = useRouter()
 
@@ -61,7 +69,7 @@ export function LiquidacionDetalleClient({
 
       {/* Tabs */}
       <Tabs defaultValue="resumen" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid h-auto w-full grid-cols-2 gap-2 sm:grid-cols-4">
           <TabsTrigger value="resumen">Resumen</TabsTrigger>
           <TabsTrigger value="jornadas" className="flex items-center gap-2">
             Detalle de Horas
@@ -90,6 +98,8 @@ export function LiquidacionDetalleClient({
             jornadas={jornadas}
             feriados={feriados}
             isSucursalEmployee={isSucursalEmployee}
+            puestosDisponibles={puestosDisponibles}
+            tramosPuesto={tramosPuesto}
           />
         </TabsContent>
 

@@ -29,7 +29,7 @@ export function LiquidacionResumenTab({ liquidacion }: LiquidacionResumenTabProp
             <InfoItem label="Valor jornal" value={formatMoney(liquidacion.valor_jornal)} />
             <InfoItem label="Valor hora" value={formatMoney(liquidacion.valor_hora)} />
             <InfoItem label="Dias base" value={String(liquidacion.dias_base ?? '-')} />
-            <InfoItem label="Horas jornada" value={String(liquidacion.horas_jornada ?? '-')} />
+            <InfoItem label="Horas diarias" value={String(liquidacion.horas_jornada ?? '-')} />
           </div>
 
           {/* Card de presentismo fijo */}

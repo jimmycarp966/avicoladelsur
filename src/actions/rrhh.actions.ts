@@ -219,7 +219,7 @@ async function prepararCertificadoLicencia(
   const preparedFile =
     outputMimeType === file.type && outputFileName === file.name
       ? file
-      : new File([outputBuffer], outputFileName, { type: outputMimeType })
+      : new File([new Uint8Array(outputBuffer)], outputFileName, { type: outputMimeType })
 
   return {
     success: true,
@@ -820,6 +820,10 @@ export async function crearIncidenciaLegajoAction(payload: {
   descripcion?: string
   fecha_evento: string
   suspension_dias?: number
+  fecha_inicio_suspension?: string
+  turno_inicio?: 'manana' | 'tarde' | 'turno_completo'
+  fecha_reintegro?: string
+  turno_reintegro?: 'manana' | 'tarde' | 'turno_completo'
 }): Promise<ApiResponse<{ eventoId: string }>> {
   let eventoIdCreado: string | null = null
 
@@ -841,6 +845,9 @@ export async function crearIncidenciaLegajoAction(payload: {
       etapa === 'suspension' && payload.suspension_dias
         ? Number(payload.suspension_dias)
         : undefined
+    const fechaInicioSuspension =
+      etapa === 'suspension' ? toIsoDateOnly(payload.fecha_inicio_suspension || payload.fecha_evento) : null
+    const fechaReintegro = etapa === 'suspension' ? toIsoDateOnly(payload.fecha_reintegro) : null
 
     if (!titulo) {
       return {
@@ -867,6 +874,32 @@ export async function crearIncidenciaLegajoAction(payload: {
       return {
         success: false,
         error: 'Debe indicar la cantidad de dias de suspension',
+      }
+    }
+
+    if (etapa === 'suspension' && !fechaInicioSuspension) {
+      return {
+        success: false,
+        error: 'Debe indicar la fecha de inicio de la suspension',
+      }
+    }
+
+    if (etapa === 'suspension' && !payload.turno_inicio) {
+      return {
+        success: false,
+        error: 'Debe indicar el turno en que inicia la suspension',
+      }
+    }
+
+    if (
+      etapa === 'suspension' &&
+      fechaInicioSuspension &&
+      fechaReintegro &&
+      new Date(`${fechaReintegro}T00:00:00`).getTime() < new Date(`${fechaInicioSuspension}T00:00:00`).getTime()
+    ) {
+      return {
+        success: false,
+        error: 'La fecha de reintegro no puede ser anterior al inicio de la suspension',
       }
     }
 
@@ -906,7 +939,16 @@ export async function crearIncidenciaLegajoAction(payload: {
       documento: {
         estado: 'pendiente_firma',
       },
-      suspension: etapa === 'suspension' ? { dias: suspensionDias || null } : undefined,
+      suspension:
+        etapa === 'suspension'
+          ? {
+              dias: suspensionDias || null,
+              fecha_inicio: fechaInicioSuspension,
+              turno_inicio: payload.turno_inicio || 'turno_completo',
+              fecha_reintegro: fechaReintegro,
+              turno_reintegro: payload.turno_reintegro || null,
+            }
+          : undefined,
     }
 
     const { data, error } = await supabase
@@ -958,6 +1000,10 @@ export async function crearIncidenciaLegajoAction(payload: {
       motivo,
       descripcion,
       suspensionDias,
+      fechaInicioSuspension,
+      turnoInicio: payload.turno_inicio,
+      fechaReintegro,
+      turnoReintegro: payload.turno_reintegro,
     })
 
     const metadataActualizada: LegajoDisciplinaMetadata = {
@@ -990,6 +1036,15 @@ export async function crearIncidenciaLegajoAction(payload: {
     revalidatePath(`/rrhh/empleados/${payload.empleado_id}`)
     revalidatePath('/rrhh/empleados')
     revalidatePath(`/rrhh/empleados/${payload.empleado_id}/incidencias/${data.id}/documento`)
+
+    if (etapa === 'suspension' && fechaInicioSuspension) {
+      const periodos = buildMonthRange(fechaInicioSuspension, fechaReintegro || fechaInicioSuspension)
+      await recalcularLiquidacionesEmpleadoPorPeriodos(supabase, {
+        empleadoId: payload.empleado_id,
+        actorId: adminUserId,
+        periodos,
+      })
+    }
 
     return {
       success: true,
@@ -1590,7 +1645,8 @@ type UpsertLiquidacionJornadaInput = {
   tarifa_hora_base?: number
   tarifa_hora_extra?: number
   tarifa_turno_especial?: number
-  origen?: 'auto_hik' | 'auto_asistencia' | 'auto_licencia_descanso' | 'manual'
+  horas_extra_aprobadas?: boolean
+  origen?: 'auto_hik' | 'auto_asistencia' | 'auto_licencia_descanso' | 'auto_suspension' | 'manual'
   observaciones?: string
 }
 
@@ -1614,12 +1670,63 @@ function getDaysInMonth(periodoMes: number, periodoAnio: number): number {
   return new Date(periodoAnio, periodoMes, 0).getDate()
 }
 
+function toIsoDateOnly(value?: string | null): string | null {
+  if (!value) return null
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed.toISOString().slice(0, 10)
+}
+
+function buildMonthRange(fromIso?: string | null, toIso?: string | null): Array<{ mes: number; anio: number }> {
+  const fromDate = fromIso ? new Date(fromIso) : null
+  const toDate = toIso ? new Date(toIso) : null
+  if (!fromDate || !toDate || Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+    return []
+  }
+
+  const start = new Date(Date.UTC(fromDate.getUTCFullYear(), fromDate.getUTCMonth(), 1))
+  const end = new Date(Date.UTC(toDate.getUTCFullYear(), toDate.getUTCMonth(), 1))
+  const result: Array<{ mes: number; anio: number }> = []
+
+  for (const cursor = new Date(start); cursor <= end; cursor.setUTCMonth(cursor.getUTCMonth() + 1)) {
+    result.push({
+      mes: cursor.getUTCMonth() + 1,
+      anio: cursor.getUTCFullYear(),
+    })
+  }
+
+  return result
+}
+
 function normalizeText(value?: string | null): string {
   return (value || '')
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .trim()
+}
+
+function normalizePuestoCode(value?: string | null): string {
+  return normalizeText(value)
+    .replace(/\bsucursales?\b/g, 'suc')
+    .replace(/\basistente\b/g, 'asist')
+    .replace(/\badministracion\b/g, 'admin')
+    .replace(/[^a-z0-9]+/g, '')
+}
+
+function puestoMatchesCategoria(puestoCodigo?: string | null, categoriaNombre?: string | null): boolean {
+  const puestoNorm = normalizePuestoCode(puestoCodigo)
+  const categoriaNorm = normalizePuestoCode(categoriaNombre)
+
+  if (!puestoNorm || !categoriaNorm) {
+    return false
+  }
+
+  return (
+    puestoNorm === categoriaNorm ||
+    puestoNorm.startsWith(categoriaNorm) ||
+    categoriaNorm.startsWith(puestoNorm)
+  )
 }
 
 function priorizarSucursalesHorqueta<T extends { nombre?: string }>(sucursales: T[]): T[] {
@@ -1707,6 +1814,8 @@ type GuardarReglaPuestoInput = {
   id?: string
   puesto_codigo: string
   categoria_id?: string | null
+  periodo_mes?: number
+  periodo_anio?: number
   grupo_base_dias: 'galpon' | 'sucursales' | 'rrhh' | 'lun_sab'
   horas_jornada: number
   tarifa_turno_trabajado: number
@@ -1784,6 +1893,31 @@ export async function prepararLiquidacionMensualAction(
     return {
       success: false,
       error: 'Error interno del servidor',
+    }
+  }
+}
+
+async function recalcularLiquidacionesEmpleadoPorPeriodos(
+  db: any,
+  input: {
+    empleadoId: string
+    actorId: string
+    periodos: Array<{ mes: number; anio: number }>
+  }
+) {
+  for (const periodo of input.periodos) {
+    const { error } = await db.rpc('fn_rrhh_preparar_liquidacion_mensual', {
+      p_empleado_id: input.empleadoId,
+      p_mes: periodo.mes,
+      p_anio: periodo.anio,
+      p_created_by: input.actorId,
+    })
+
+    if (error && !String(error.message || '').toLowerCase().includes('fn_rrhh_preparar_liquidacion_mensual')) {
+      devError(
+        `Error recalculando liquidacion de ${input.empleadoId} para ${periodo.mes}/${periodo.anio}:`,
+        error,
+      )
     }
   }
 }
@@ -2130,7 +2264,7 @@ export async function upsertLiquidacionJornadaAction(
 
     const { data: liquidacion, error: liqError } = await supabase
       .from('rrhh_liquidaciones')
-      .select('id, empleado_id, periodo_mes, periodo_anio')
+      .select('id, empleado_id, periodo_mes, periodo_anio, grupo_base_snapshot')
       .eq('id', liquidacionId)
       .maybeSingle()
 
@@ -2153,23 +2287,40 @@ export async function upsertLiquidacionJornadaAction(
       tarifa_hora_base: jornadaData.tarifa_hora_base ?? 0,
       tarifa_hora_extra: jornadaData.tarifa_hora_extra ?? 0,
       tarifa_turno_especial: jornadaData.tarifa_turno_especial ?? 0,
+      horas_extra_aprobadas: true,
       origen: jornadaData.origen || 'manual',
       observaciones: jornadaData.observaciones || null,
     }
 
     let jornadaId = jornadaData.id
-    let jornadaOriginal: { fecha?: string | null; origen?: string | null; empleado_id?: string | null } | null = null
+    let jornadaOriginal: {
+      fecha?: string | null
+      origen?: string | null
+      empleado_id?: string | null
+      horas_extra_aprobadas?: boolean | null
+    } | null = null
 
     if (jornadaData.id) {
       const { data: currentRow } = await supabase
         .from('rrhh_liquidacion_jornadas')
-        .select('fecha, origen, empleado_id')
+        .select('fecha, origen, empleado_id, horas_extra_aprobadas')
         .eq('id', jornadaData.id)
         .eq('liquidacion_id', liquidacionId)
         .maybeSingle()
 
       jornadaOriginal = (currentRow as any) || null
     }
+
+    const horasAdicionales = Number(jornadaData.horas_adicionales ?? 0)
+    const esSucursal = liquidacion.grupo_base_snapshot === 'sucursales'
+    payload.horas_extra_aprobadas =
+      horasAdicionales <= 0
+        ? true
+        : typeof jornadaData.horas_extra_aprobadas === 'boolean'
+          ? jornadaData.horas_extra_aprobadas
+          : esSucursal
+            ? true
+            : Boolean(jornadaOriginal?.horas_extra_aprobadas ?? false)
 
     if (jornadaData.id) {
       const { data, error } = await supabase
@@ -2248,6 +2399,218 @@ export async function upsertLiquidacionJornadaAction(
     }
   } catch (error) {
     devError('Error en upsertLiquidacionJornadaAction:', error)
+    return {
+      success: false,
+      error: 'Error interno del servidor',
+    }
+  }
+}
+
+export async function actualizarAprobacionHorasExtraJornadaAction(
+  liquidacionId: string,
+  jornadaId: string,
+  aprobadas: boolean,
+): Promise<ApiResponse<{ jornadaId: string; liquidacionId: string }>> {
+  try {
+    const adminUserId = await getAuthenticatedAdminUserId()
+    if (!adminUserId) {
+      return {
+        success: false,
+        error: 'No autorizado',
+      }
+    }
+
+    const supabase = createAdminClient()
+
+    const { data: liquidacion } = await supabase
+      .from('rrhh_liquidaciones')
+      .select('id, grupo_base_snapshot')
+      .eq('id', liquidacionId)
+      .maybeSingle()
+
+    if (!liquidacion?.id) {
+      return {
+        success: false,
+        error: 'Liquidacion no encontrada',
+      }
+    }
+
+    if (liquidacion.grupo_base_snapshot === 'sucursales') {
+      return {
+        success: false,
+        error: 'Las sucursales no requieren aprobacion de horas extra',
+      }
+    }
+
+    const { error } = await supabase
+      .from('rrhh_liquidacion_jornadas')
+      .update({
+        horas_extra_aprobadas: aprobadas,
+        horas_extra_aprobadas_por: aprobadas ? adminUserId : null,
+        horas_extra_aprobadas_at: aprobadas ? new Date().toISOString() : null,
+      })
+      .eq('id', jornadaId)
+      .eq('liquidacion_id', liquidacionId)
+
+    if (error) {
+      devError('Error actualizando aprobacion de horas extra:', error)
+      return {
+        success: false,
+        error: 'No se pudo actualizar la aprobacion de horas extra',
+      }
+    }
+
+    const recalcResult = await recalcularLiquidacionAction(liquidacionId)
+    if (!recalcResult.success) {
+      return {
+        success: false,
+        error: recalcResult.error || 'No se pudo recalcular la liquidacion luego de aprobar las horas extra',
+      }
+    }
+
+    revalidatePath(`/rrhh/liquidaciones/${liquidacionId}`)
+
+    return {
+      success: true,
+      data: { jornadaId, liquidacionId },
+      message: aprobadas ? 'Horas extra aprobadas' : 'Aprobacion de horas extra revocada',
+    }
+  } catch (error) {
+    devError('Error en actualizarAprobacionHorasExtraJornadaAction:', error)
+    return {
+      success: false,
+      error: 'Error interno del servidor',
+    }
+  }
+}
+
+export async function guardarLiquidacionTramosPuestoAction(
+  liquidacionId: string,
+  tramos: Array<{
+    id?: string
+    fecha_desde: string
+    fecha_hasta: string
+    puesto_codigo: string
+    orden: number
+  }>,
+): Promise<ApiResponse<{ liquidacionId: string }>> {
+  try {
+    const adminUserId = await getAuthenticatedAdminUserId()
+    if (!adminUserId) {
+      return {
+        success: false,
+        error: 'No autorizado',
+      }
+    }
+
+    const supabase = createAdminClient()
+    const { data: liquidacion } = await supabase
+      .from('rrhh_liquidaciones')
+      .select('id, periodo_mes, periodo_anio')
+      .eq('id', liquidacionId)
+      .maybeSingle()
+
+    if (!liquidacion?.id) {
+      return {
+        success: false,
+        error: 'Liquidacion no encontrada',
+      }
+    }
+
+    const desdePeriodo = `${liquidacion.periodo_anio}-${String(liquidacion.periodo_mes).padStart(2, '0')}-01`
+    const hastaPeriodo = `${liquidacion.periodo_anio}-${String(liquidacion.periodo_mes).padStart(2, '0')}-${String(getDaysInMonth(liquidacion.periodo_mes, liquidacion.periodo_anio)).padStart(2, '0')}`
+
+    const normalizados = tramos
+      .map((tramo, index) => ({
+        id: tramo.id,
+        fecha_desde: tramo.fecha_desde,
+        fecha_hasta: tramo.fecha_hasta,
+        puesto_codigo: tramo.puesto_codigo.trim(),
+        orden: Number.isFinite(Number(tramo.orden)) ? Number(tramo.orden) : index + 1,
+      }))
+      .filter((tramo) => tramo.fecha_desde && tramo.fecha_hasta && tramo.puesto_codigo)
+      .sort((a, b) => a.fecha_desde.localeCompare(b.fecha_desde, 'es'))
+
+    for (let index = 0; index < normalizados.length; index++) {
+      const actual = normalizados[index]
+      if (actual.fecha_desde < desdePeriodo || actual.fecha_hasta > hastaPeriodo) {
+        return {
+          success: false,
+          error: 'Los tramos deben quedar dentro del periodo de la liquidacion',
+        }
+      }
+      if (actual.fecha_hasta < actual.fecha_desde) {
+        return {
+          success: false,
+          error: 'Cada tramo debe tener una fecha hasta posterior o igual a la fecha desde',
+        }
+      }
+
+      const siguiente = normalizados[index + 1]
+      if (siguiente && actual.fecha_hasta >= siguiente.fecha_desde) {
+        return {
+          success: false,
+          error: 'Los tramos no pueden superponerse',
+        }
+      }
+
+      if (siguiente) {
+        const siguienteEsperado = new Date(new Date(`${actual.fecha_hasta}T12:00:00`).getTime() + 24 * 60 * 60 * 1000)
+          .toISOString()
+          .slice(0, 10)
+        if (siguiente.fecha_desde !== siguienteEsperado) {
+          return {
+            success: false,
+            error: 'Los tramos deben cubrir todo el periodo sin huecos entre fechas',
+          }
+        }
+      }
+    }
+
+    if (normalizados.length > 0) {
+      if (normalizados[0].fecha_desde !== desdePeriodo || normalizados[normalizados.length - 1].fecha_hasta !== hastaPeriodo) {
+        return {
+          success: false,
+          error: 'Los tramos deben cubrir el periodo completo de la liquidacion',
+        }
+      }
+    }
+
+    const { error: replaceError } = await supabase.rpc('fn_rrhh_reemplazar_tramos_puesto', {
+      p_liquidacion_id: liquidacionId,
+      p_actor: adminUserId,
+      p_tramos: normalizados.map((tramo, index) => ({
+        fecha_desde: tramo.fecha_desde,
+        fecha_hasta: tramo.fecha_hasta,
+        puesto_codigo: tramo.puesto_codigo,
+        orden: index + 1,
+      })),
+    })
+    if (replaceError) {
+      devError('Error reemplazando tramos de liquidacion:', replaceError)
+      return {
+        success: false,
+        error: 'No se pudieron actualizar los tramos de puesto',
+      }
+    }
+
+    const recalcResult = await recalcularLiquidacionAction(liquidacionId)
+    if (!recalcResult.success) {
+      return {
+        success: false,
+        error: recalcResult.error || 'No se pudo recalcular la liquidacion luego de guardar los tramos',
+      }
+    }
+
+    revalidatePath(`/rrhh/liquidaciones/${liquidacionId}`)
+
+    return {
+      success: true,
+      data: { liquidacionId },
+      message: 'Tramos de puesto actualizados',
+    }
+  } catch (error) {
+    devError('Error en guardarLiquidacionTramosPuestoAction:', error)
     return {
       success: false,
       error: 'Error interno del servidor',
@@ -2506,9 +2869,31 @@ export async function guardarReglaPuestoAction(
     }
 
     const supabase = createAdminClient()
+    let categoriaId = payload.categoria_id || null
+
+    if (!categoriaId) {
+      const { data: categorias, error: categoriasError } = await supabase
+        .from('rrhh_categorias')
+        .select('id, nombre')
+        .eq('activo', true)
+        .order('nombre')
+
+      if (categoriasError) {
+        devError('Error buscando categoria para regla de puesto:', categoriasError)
+      } else {
+        const matches = (categorias || []).filter((categoria) =>
+          puestoMatchesCategoria(puestoCodigo, categoria.nombre),
+        )
+
+        if (matches.length === 1) {
+          categoriaId = matches[0].id
+        }
+      }
+    }
+
     const insertPayload = {
       puesto_codigo: puestoCodigo,
-      categoria_id: payload.categoria_id || null,
+      categoria_id: categoriaId,
       grupo_base_dias: payload.grupo_base_dias,
       horas_jornada: payload.horas_jornada,
       tarifa_turno_trabajado: payload.tarifa_turno_trabajado,
@@ -2548,6 +2933,83 @@ export async function guardarReglaPuestoAction(
       return {
         success: false,
         error: 'No se pudo guardar la regla de puesto',
+      }
+    }
+
+    if (
+      Number.isInteger(payload.periodo_mes) &&
+      Number.isInteger(payload.periodo_anio) &&
+      (payload.periodo_mes as number) >= 1 &&
+      (payload.periodo_mes as number) <= 12 &&
+      (payload.periodo_anio as number) >= 2000
+    ) {
+      const periodoMes = Number(payload.periodo_mes)
+      const periodoAnio = Number(payload.periodo_anio)
+      const fromDate = `${periodoAnio}-${String(periodoMes).padStart(2, '0')}-01`
+      const toDate = `${periodoAnio}-${String(periodoMes).padStart(2, '0')}-${String(getDaysInMonth(periodoMes, periodoAnio)).padStart(2, '0')}`
+
+      const { data: empleadosActivos, error: empleadosError } = await supabase
+        .from('rrhh_empleados')
+        .select('id, categoria_id, rrhh_categorias(nombre)')
+        .eq('activo', true)
+
+      if (empleadosError) {
+        devError('Error obteniendo empleados para recalcular regla de puesto:', empleadosError)
+      } else {
+        const empleadosImpactados = (empleadosActivos || [])
+          .filter((empleado) => {
+            if (categoriaId && empleado.categoria_id === categoriaId) {
+              return true
+            }
+
+            const categoriaNombre =
+              empleado.rrhh_categorias && typeof empleado.rrhh_categorias === 'object' && 'nombre' in empleado.rrhh_categorias
+                ? String(empleado.rrhh_categorias.nombre || '')
+                : ''
+
+            return puestoMatchesCategoria(puestoCodigo, categoriaNombre)
+          })
+          .map((empleado) => String(empleado.id))
+          .filter(Boolean)
+
+        if (empleadosImpactados.length > 0) {
+          const [liqRows, asistenciaRows] = await Promise.all([
+            supabase
+              .from('rrhh_liquidaciones')
+              .select('empleado_id')
+              .in('empleado_id', empleadosImpactados)
+              .eq('periodo_mes', periodoMes)
+              .eq('periodo_anio', periodoAnio),
+            supabase
+              .from('rrhh_asistencia')
+              .select('empleado_id')
+              .in('empleado_id', empleadosImpactados)
+              .gte('fecha', fromDate)
+              .lte('fecha', toDate)
+              .gt('horas_trabajadas', 0),
+          ])
+
+          const empleadosParaRecalculo = new Set<string>()
+          for (const row of liqRows.data || []) {
+            if (row.empleado_id) empleadosParaRecalculo.add(String(row.empleado_id))
+          }
+          for (const row of asistenciaRows.data || []) {
+            if (row.empleado_id) empleadosParaRecalculo.add(String(row.empleado_id))
+          }
+
+          for (const empleadoId of empleadosParaRecalculo) {
+            const { error: recalcError } = await supabase.rpc('fn_rrhh_preparar_liquidacion_mensual', {
+              p_empleado_id: empleadoId,
+              p_mes: periodoMes,
+              p_anio: periodoAnio,
+              p_created_by: adminUserId,
+            })
+
+            if (recalcError) {
+              devError(`Error recalculando liquidacion de ${empleadoId} tras guardar regla de puesto:`, recalcError)
+            }
+          }
+        }
       }
     }
 
@@ -2862,10 +3324,8 @@ async function auditarCertificadoConIA(
   }
 
   const model = getGeminiModel(GEMINI_MODEL_FLASH, {
-    generationConfig: {
-      responseMimeType: 'application/json',
-      temperature: 0.1,
-    },
+    responseMimeType: 'application/json',
+    temperature: 0.1,
   })
 
   if (!model) {
@@ -3235,6 +3695,13 @@ export async function aprobarLicenciaAction(licenciaId: string): Promise<ApiResp
         },
         createdBy: user.id,
       })
+
+      const periodos = buildMonthRange(licenciaSnapshot.fecha_inicio, licenciaSnapshot.fecha_fin)
+      await recalcularLiquidacionesEmpleadoPorPeriodos(db, {
+        empleadoId: licenciaSnapshot.empleado_id,
+        actorId: user.id,
+        periodos,
+      })
     }
 
     revalidatePath('/rrhh/licencias')
@@ -3245,6 +3712,76 @@ export async function aprobarLicenciaAction(licenciaId: string): Promise<ApiResp
     }
   } catch (error) {
     devError('Error en aprobarLicencia:', error)
+    return {
+      success: false,
+      error: 'Error interno del servidor',
+    }
+  }
+}
+
+export async function rechazarLicenciaAction(licenciaId: string): Promise<ApiResponse<void>> {
+  try {
+    const { db, user, isAdmin } = await getDbForCurrentUser()
+    if (!isAdmin || !user) {
+      return {
+        success: false,
+        error: 'No autorizado',
+      }
+    }
+
+    const { data: licenciaSnapshot } = await db
+      .from('rrhh_licencias')
+      .select('id, empleado_id, tipo, fecha_inicio, fecha_fin, dias_total')
+      .eq('id', licenciaId)
+      .maybeSingle()
+
+    const { error } = await db
+      .from('rrhh_licencias')
+      .update({
+        aprobado: false,
+        aprobado_por: null,
+        fecha_aprobacion: null,
+        estado_revision: 'rechazado',
+        revision_manual_required: false,
+        revisado_por: user.id,
+        fecha_revision: new Date().toISOString(),
+      })
+      .eq('id', licenciaId)
+
+    if (error) {
+      devError('Error al rechazar licencia:', error)
+      return {
+        success: false,
+        error: 'Error al rechazar licencia: ' + error.message,
+      }
+    }
+
+    if (licenciaSnapshot?.empleado_id) {
+      await registrarEventoLegajo(db, {
+        empleadoId: licenciaSnapshot.empleado_id,
+        tipo: 'licencia_rechazada',
+        categoria: 'licencias',
+        titulo: 'Licencia rechazada',
+        descripcion: `${licenciaSnapshot.tipo} del ${licenciaSnapshot.fecha_inicio} al ${licenciaSnapshot.fecha_fin}`,
+        metadata: {
+          licencia_id: licenciaId,
+          tipo: licenciaSnapshot.tipo,
+          fecha_inicio: licenciaSnapshot.fecha_inicio,
+          fecha_fin: licenciaSnapshot.fecha_fin,
+          dias_total: licenciaSnapshot.dias_total,
+        },
+        createdBy: user.id,
+      })
+    }
+
+    revalidatePath('/rrhh/licencias')
+
+    return {
+      success: true,
+      message: 'Licencia rechazada exitosamente',
+    }
+  } catch (error) {
+    devError('Error en rechazarLicenciaAction:', error)
     return {
       success: false,
       error: 'Error interno del servidor',

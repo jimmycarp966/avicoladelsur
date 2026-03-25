@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useNotificationStore } from '@/store/notificationStore'
-import { aprobarLicenciaAction } from '@/actions/rrhh.actions'
+import { aprobarLicenciaAction, rechazarLicenciaAction } from '@/actions/rrhh.actions'
 import { LicenciasTable } from '@/components/tables/LicenciasTable'
 import type { Licencia } from '@/types/domain.types'
 
@@ -27,10 +27,23 @@ export function LicenciasTableWrapper({ licencias, canApprove }: LicenciasTableW
     showToast('error', result.error || 'No se pudo aprobar la licencia', 'Error')
   }
 
+  const handleReject = async (licencia: Licencia) => {
+    const result = await rechazarLicenciaAction(licencia.id)
+
+    if (result.success) {
+      showToast('success', result.message || 'Licencia rechazada exitosamente', 'Licencia rechazada')
+      router.refresh()
+      return
+    }
+
+    showToast('error', result.error || 'No se pudo rechazar la licencia', 'Error')
+  }
+
   return (
     <LicenciasTable
       licencias={licencias}
       onApprove={canApprove ? handleApprove : undefined}
+      onReject={canApprove ? handleReject : undefined}
     />
   )
 }

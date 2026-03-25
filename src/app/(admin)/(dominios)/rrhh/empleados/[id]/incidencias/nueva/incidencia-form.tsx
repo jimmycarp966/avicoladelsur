@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Controller, useForm } from 'react-hook-form'
+import { useEffect } from 'react'
+import { Controller, useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AlertTriangle, ArrowLeft, Loader2, Save } from 'lucide-react'
 import { crearIncidenciaLegajoAction } from '@/actions/rrhh.actions'
@@ -45,7 +46,6 @@ export function NuevaIncidenciaForm({
     register,
     handleSubmit,
     setValue,
-    watch,
     formState: { errors, isSubmitting },
   } = useForm<LegajoIncidenciaFormInput, unknown, LegajoIncidenciaFormData>({
     resolver: zodResolver(legajoIncidenciaSchema),
@@ -57,11 +57,30 @@ export function NuevaIncidenciaForm({
       titulo: buildDisciplinaTitulo('verbal', ''),
       descripcion: '',
       suspension_dias: undefined,
+      fecha_inicio_suspension: '',
+      turno_inicio: undefined,
+      fecha_reintegro: '',
+      turno_reintegro: undefined,
     },
   })
 
-  const etapa = watch('etapa')
-  const motivo = watch('motivo')
+  const etapa = useWatch({ control, name: 'etapa' })
+  const motivo = useWatch({ control, name: 'motivo' })
+  const suspensionDias = useWatch({ control, name: 'suspension_dias' })
+  const fechaInicioSuspension = useWatch({ control, name: 'fecha_inicio_suspension' })
+
+  useEffect(() => {
+    if (etapa !== 'suspension' || !fechaInicioSuspension || !suspensionDias) return
+
+    const inicio = new Date(`${fechaInicioSuspension}T12:00:00`)
+    if (Number.isNaN(inicio.getTime())) return
+
+    const reintegro = new Date(inicio.getTime() + Number(suspensionDias) * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10)
+
+    setValue('fecha_reintegro', reintegro, { shouldDirty: true, shouldValidate: true })
+  }, [etapa, fechaInicioSuspension, suspensionDias, setValue])
 
   const onSubmit = async (data: LegajoIncidenciaFormData) => {
     const result = await crearIncidenciaLegajoAction(data)
@@ -172,17 +191,80 @@ export function NuevaIncidenciaForm({
             </div>
 
             {etapa === 'suspension' && (
-              <div className="space-y-2">
-                <Label htmlFor="suspension_dias">Dias de suspension *</Label>
-                <Input
-                  id="suspension_dias"
-                  type="number"
-                  min={1}
-                  max={365}
-                  placeholder="Ej: 3"
-                  {...register('suspension_dias')}
-                />
-                {errors.suspension_dias && <p className="text-sm text-red-600">{errors.suspension_dias.message}</p>}
+              <div className="grid gap-4 rounded-lg border border-amber-200 bg-amber-50/40 p-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="suspension_dias">Dias de suspension *</Label>
+                  <Input
+                    id="suspension_dias"
+                    type="number"
+                    min={1}
+                    max={365}
+                    placeholder="Ej: 3"
+                    {...register('suspension_dias')}
+                  />
+                  {errors.suspension_dias && <p className="text-sm text-red-600">{errors.suspension_dias.message}</p>}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="fecha_inicio_suspension">Inicio de suspension *</Label>
+                  <Input id="fecha_inicio_suspension" type="date" {...register('fecha_inicio_suspension')} />
+                  {errors.fecha_inicio_suspension && (
+                    <p className="text-sm text-red-600">{errors.fecha_inicio_suspension.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="turno_inicio">Turno de inicio *</Label>
+                  <Controller
+                    control={control}
+                    name="turno_inicio"
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger id="turno_inicio" className="w-full">
+                          <SelectValue placeholder="Selecciona un turno" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="manana">Manana</SelectItem>
+                          <SelectItem value="tarde">Tarde</SelectItem>
+                          <SelectItem value="turno_completo">Turno completo</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  {errors.turno_inicio && <p className="text-sm text-red-600">{errors.turno_inicio.message}</p>}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="fecha_reintegro">Reintegro previsto</Label>
+                  <Input id="fecha_reintegro" type="date" {...register('fecha_reintegro')} />
+                  {errors.fecha_reintegro && <p className="text-sm text-red-600">{errors.fecha_reintegro.message}</p>}
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="turno_reintegro">Turno de reintegro</Label>
+                  <Controller
+                    control={control}
+                    name="turno_reintegro"
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger id="turno_reintegro" className="w-full md:max-w-xs">
+                          <SelectValue placeholder="Selecciona un turno" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="manana">Manana</SelectItem>
+                          <SelectItem value="tarde">Tarde</SelectItem>
+                          <SelectItem value="turno_completo">Turno completo</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  {errors.turno_reintegro && (
+                    <p className="text-sm text-red-600">{errors.turno_reintegro.message}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Estos datos se imprimen en el documento y tambien se usan para impactar la liquidacion del periodo.
+                  </p>
+                </div>
               </div>
             )}
 

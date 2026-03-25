@@ -694,6 +694,7 @@ export interface Liquidacion extends BaseEntity {
   detalles?: LiquidacionDetalle[]
   jornadas?: LiquidacionJornada[]
   cuotas?: AdelantoCuota[]
+  tramos_puesto?: LiquidacionTramoPuesto[]
 }
 
 export interface LiquidacionReglaPeriodo extends BaseEntity {
@@ -734,10 +735,23 @@ export interface LiquidacionJornada extends BaseEntity {
   monto_mensual?: number
   monto_extra?: number
   monto_turno_especial?: number
-  origen: 'auto_hik' | 'auto_asistencia' | 'auto_licencia_descanso' | 'manual'
+  horas_extra_aprobadas?: boolean
+  horas_extra_aprobadas_por?: string | null
+  horas_extra_aprobadas_at?: string | null
+  origen: 'auto_hik' | 'auto_asistencia' | 'auto_licencia_descanso' | 'auto_suspension' | 'manual'
   observaciones?: string
   liquidacion?: Liquidacion
   empleado?: Empleado
+}
+
+export interface LiquidacionTramoPuesto extends BaseEntity {
+  liquidacion_id: string
+  fecha_desde: string
+  fecha_hasta: string
+  puesto_codigo: string
+  orden: number
+  created_by?: string | null
+  liquidacion?: Liquidacion
 }
 
 // Feriados RRHH

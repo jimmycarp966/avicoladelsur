@@ -16,6 +16,10 @@ export type LegajoDisciplinaMetadata = {
   }
   suspension?: {
     dias?: number | null
+    fecha_inicio?: string | null
+    turno_inicio?: string | null
+    fecha_reintegro?: string | null
+    turno_reintegro?: string | null
   }
   origen?: string
 }
@@ -52,6 +56,16 @@ export function buildDisciplinaDescripcion(metadata: LegajoDisciplinaMetadata, f
 
   if (metadata.etapa === 'suspension' && metadata.suspension?.dias) {
     partes.push(`${metadata.suspension.dias} dia(s) de suspension`)
+  }
+
+  if (metadata.suspension?.fecha_inicio) {
+    const inicioTurno = metadata.suspension.turno_inicio ? ` (${metadata.suspension.turno_inicio})` : ''
+    partes.push(`Inicia ${metadata.suspension.fecha_inicio}${inicioTurno}`)
+  }
+
+  if (metadata.suspension?.fecha_reintegro) {
+    const reintegroTurno = metadata.suspension.turno_reintegro ? ` (${metadata.suspension.turno_reintegro})` : ''
+    partes.push(`Reintegro ${metadata.suspension.fecha_reintegro}${reintegroTurno}`)
   }
 
   if (fallback) {
@@ -103,6 +117,10 @@ export function parseLegajoDisciplinaMetadata(value: unknown): LegajoDisciplinaM
     suspension: suspensionRaw
       ? {
           dias: typeof suspensionRaw.dias === 'number' ? suspensionRaw.dias : null,
+          fecha_inicio: typeof suspensionRaw.fecha_inicio === 'string' ? suspensionRaw.fecha_inicio : null,
+          turno_inicio: typeof suspensionRaw.turno_inicio === 'string' ? suspensionRaw.turno_inicio : null,
+          fecha_reintegro: typeof suspensionRaw.fecha_reintegro === 'string' ? suspensionRaw.fecha_reintegro : null,
+          turno_reintegro: typeof suspensionRaw.turno_reintegro === 'string' ? suspensionRaw.turno_reintegro : null,
         }
       : undefined,
   }

@@ -260,6 +260,8 @@ export function ConfiguracionLiquidacionesClient() {
         id: regla.id,
         puesto_codigo: regla.puesto_codigo,
         categoria_id: regla.categoria_id || null,
+        periodo_mes: periodoMes,
+        periodo_anio: periodoAnio,
         grupo_base_dias: regla.grupo_base_dias,
         horas_jornada: regla.horas_jornada,
         tarifa_turno_trabajado: regla.tarifa_turno_trabajado,
@@ -399,7 +401,7 @@ export function ConfiguracionLiquidacionesClient() {
                     (usar para repartidores y puestos similares)
                   </li>
                   <li>
-                    <strong>Horas jornada:</strong> tope diario de horas normales (solo aplica a
+                    <strong>Horas diarias:</strong> tope diario de horas normales (solo aplica a
                     tipo <em>por hora</em>). Las horas que superen este tope se pagan por separado
                   </li>
                   <li>
@@ -577,7 +579,7 @@ export function ConfiguracionLiquidacionesClient() {
                     <TableHead>Puesto</TableHead>
                     <TableHead>Grupo días</TableHead>
                     <TableHead>Tipo cálculo</TableHead>
-                    <TableHead className="text-right">Hs jornada</TableHead>
+                    <TableHead className="text-right">Hs diarias</TableHead>
                     <TableHead className="text-right">Tarifa turno comp.</TableHead>
                     <TableHead className="text-right">Tarifa especial</TableHead>
                     <TableHead>Cajero</TableHead>
@@ -866,7 +868,7 @@ export function ConfiguracionLiquidacionesClient() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-sm font-medium">Horas jornada</label>
+                <label className="text-sm font-medium">Horas diarias</label>
                 <Input
                   type="number"
                   min={0}
