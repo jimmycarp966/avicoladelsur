@@ -35,6 +35,15 @@ interface EmpleadoLookup {
 
 type TurnoAsistencia = 'turno_completo' | 'medio_turno_manana' | 'medio_turno_tarde' | 'general'
 
+function getTodayArgentina(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date())
+}
+
 function normalizeIdentity(value: string): string {
   return value.replace(/[^0-9A-Za-z]+/g, '').toUpperCase()
 }
@@ -721,11 +730,15 @@ export async function sincronizarMesDesdeHikAction(
     }
 
     const lastDay = new Date(anio, mes, 0).getDate()
+    const todayArgentina = getTodayArgentina()
+    const [todayYearRaw, todayMonthRaw, todayDayRaw] = todayArgentina.split('-')
+    const isCurrentArgentinaMonth = Number(todayYearRaw) === anio && Number(todayMonthRaw) === mes
+    const maxDay = isCurrentArgentinaMonth ? Math.min(lastDay, Number(todayDayRaw)) : lastDay
     let diasProcesados = 0
     let registrosSincronizados = 0
     let diasConError = 0
 
-    for (let dia = 1; dia <= lastDay; dia++) {
+    for (let dia = 1; dia <= maxDay; dia++) {
       const fechaStr = `${anio}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
       try {
         const baseDate = new Date(`${fechaStr}T12:00:00-03:00`)

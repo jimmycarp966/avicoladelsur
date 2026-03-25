@@ -126,6 +126,25 @@ function getArgentinaYearMonth(baseDate = new Date()): { year: number; month: nu
   return { year, month }
 }
 
+function getArgentinaTodayParts(baseDate = new Date()): { year: number; month: number; day: number } {
+  const formatted = getArgentinaDate(baseDate)
+  const [yearRaw, monthRaw, dayRaw] = formatted.split('-')
+  const year = Number(yearRaw)
+  const month = Number(monthRaw)
+  const day = Number(dayRaw)
+
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+    const fallback = baseDate
+    return {
+      year: fallback.getFullYear(),
+      month: fallback.getMonth() + 1,
+      day: fallback.getDate(),
+    }
+  }
+
+  return { year, month, day }
+}
+
 function getMonthLastDay(year: number, month: number): number {
   return new Date(year, month, 0).getDate()
 }
@@ -598,13 +617,16 @@ async function sincronizarMesRelojAsistencia(
   const { employeeMap, employeeByName } = await getEmployeeMaps(adminSupabase)
 
   const lastDay = getMonthLastDay(periodo.anio, periodo.mes)
+  const todayArgentina = getArgentinaTodayParts()
+  const isCurrentArgentinaMonth = todayArgentina.year === periodo.anio && todayArgentina.month === periodo.mes
+  const maxDay = isCurrentArgentinaMonth ? Math.min(lastDay, todayArgentina.day) : lastDay
   const summary: SyncSummary = {
     dias_procesados: 0,
     registros_sincronizados: 0,
     dias_con_error: 0,
   }
 
-  for (let dia = 1; dia <= lastDay; dia++) {
+  for (let dia = 1; dia <= maxDay; dia++) {
     const fechaStr = buildDate(periodo.anio, periodo.mes, dia)
     try {
       const baseDate = new Date(`${fechaStr}T12:00:00-03:00`)
