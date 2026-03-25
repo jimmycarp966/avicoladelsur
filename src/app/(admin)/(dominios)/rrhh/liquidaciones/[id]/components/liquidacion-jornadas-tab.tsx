@@ -150,6 +150,17 @@ export function LiquidacionJornadasTab({
     liquidacion.puesto_override?.trim() ||
     liquidacion.empleado?.categoria?.nombre?.trim() ||
     'Sin puesto asignado'
+  const puestosTramoOptions = useMemo(() => {
+    const dynamicOptions = tramosDraft
+      .map((tramo) => tramo.puesto_codigo?.trim())
+      .filter((puesto): puesto is string => Boolean(puesto))
+
+    return Array.from(
+      new Set(
+        [...puestosDisponibles.map((puesto) => puesto.puesto_codigo.trim()), ...dynamicOptions].filter(Boolean),
+      ),
+    ).sort((a, b) => a.localeCompare(b, 'es'))
+  }, [puestosDisponibles, tramosDraft])
 
   const editingRowBreakdown = editingRow ? getRowBreakdown(editingRow, isSucursalEmployee) : null
   const feriadosMap = useMemo(
@@ -639,18 +650,27 @@ export function LiquidacionJornadasTab({
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs">Puesto del tramo</Label>
-                        <Input
-                          list="puestos-tramo-liquidacion"
+                        <Select
                           value={tramo.puesto_codigo}
-                          onChange={(event) =>
+                          onValueChange={(value) =>
                             setTramosDraft((prev) =>
                               prev.map((current, currentIndex) =>
-                                currentIndex === index ? { ...current, puesto_codigo: event.target.value } : current,
+                                currentIndex === index ? { ...current, puesto_codigo: value } : current,
                               ),
                             )
                           }
-                          placeholder="Ej: caja, reposicion, reparto"
-                        />
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar puesto" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {puestosTramoOptions.map((puestoCodigo) => (
+                              <SelectItem key={puestoCodigo} value={puestoCodigo}>
+                                {puestoCodigo}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                       <div className="flex items-end">
                         <Button
@@ -666,11 +686,6 @@ export function LiquidacionJornadasTab({
                       </div>
                     </div>
                   ))}
-                <datalist id="puestos-tramo-liquidacion">
-                  {puestosDisponibles.map((puesto) => (
-                    <option key={puesto.puesto_codigo} value={puesto.puesto_codigo} />
-                  ))}
-                </datalist>
               </div>
             )}
           </div>
