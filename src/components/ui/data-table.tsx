@@ -50,6 +50,7 @@ interface DataTableProps<TData, TValue> {
   pageSize?: number
   pageSizeOptions?: number[]
   actions?: (row: TData) => React.ReactNode
+  initialColumnVisibility?: VisibilityState
   // Server-side pagination callbacks
   onPaginationChange?: (pagination: { pageIndex: number; pageSize: number }) => void
   onSearchChange?: (search: string) => void
@@ -82,6 +83,7 @@ export function DataTable<TData, TValue>({
   pageSize = 50,
   pageSizeOptions = [50, 100, 200],
   actions,
+  initialColumnVisibility,
   onPaginationChange,
   onSearchChange,
   serverPagination,
@@ -99,7 +101,7 @@ export function DataTable<TData, TValue>({
 
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(initialColumnVisibility ?? {})
   const [rowSelection, setRowSelection] = React.useState({})
   const [globalFilter, setGlobalFilter] = React.useState('')
   const [pagination, setPagination] = React.useState({
@@ -304,7 +306,7 @@ export function DataTable<TData, TValue>({
 
       {/* Table - Responsive */}
       <div className="rounded-md border overflow-hidden">
-        {/* Vista móvil - Cards */}
+        {/* Vista móvil - Cards (sin scroll horizontal) */}
         <div className="lg:hidden">
           {table.getRowModel().rows?.length ? (
             <div className="divide-y divide-border">
@@ -388,8 +390,8 @@ export function DataTable<TData, TValue>({
           )}
         </div>
 
-        {/* Vista desktop - Table */}
-        <div className="hidden lg:block overflow-x-auto">
+        {/* Vista desktop - Table (el componente Table maneja su propio overflow-x-auto) */}
+        <div className="hidden lg:block">
           <Table>
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (

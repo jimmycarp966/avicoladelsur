@@ -270,6 +270,7 @@ export function AdelantosTable({ adelantos, onView, onApprove, onReject }: Adela
       data={adelantos}
       searchKey="empleado"
       searchPlaceholder="Buscar adelantos..."
+      initialColumnVisibility={{ fecha_solicitud: false, 'aprobador.nombre': false }}
     />
   )
 }

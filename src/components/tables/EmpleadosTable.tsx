@@ -209,6 +209,7 @@ export function EmpleadosTable({ empleados, onView, onEdit, onDelete, onCall, on
         data={empleados}
         searchKey="empleado"
         searchPlaceholder="Buscar empleados por nombre o legajo..."
+        initialColumnVisibility={{ fecha_ingreso: false }}
       />
     </div>
   )

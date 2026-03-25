@@ -284,6 +284,7 @@ export function LiquidacionesTable({ liquidaciones, onView, onEdit, onApprove, o
         searchPlaceholder="Buscar por empleado, legajo o puesto..."
         enablePagination={true}
         pageSize={50}
+        initialColumnVisibility={{ fecha_liquidacion: false, pago_autorizado: false }}
       />
     </div>
   )

@@ -196,6 +196,7 @@ export function ReclamosTable({ data, onView, onUpdateStatus }: ReclamosTablePro
       enableColumnVisibility={true}
       enablePagination={true}
       pageSize={50}
+      initialColumnVisibility={{ created_at: false, usuario_asignado_obj: false }}
     />
   )
 }

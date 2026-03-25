@@ -228,6 +228,7 @@ export function ClientesTable({
       onPaginationChange={onPaginationChange}
       onSearchChange={onSearchChange}
       serverPagination={serverPagination}
+      initialColumnVisibility={{ created_at: false }}
     />
   )
 }

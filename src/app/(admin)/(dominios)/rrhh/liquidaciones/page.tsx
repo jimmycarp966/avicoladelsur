@@ -23,15 +23,39 @@ type SucursalOption = {
   nombre: string
 }
 
-function resolveAmbitoLiquidacion(liquidacion: Liquidacion): 'sucursal' | 'galpon' | 'rrhh' {
-  const snapshot = (liquidacion.grupo_base_snapshot || '').toLowerCase().trim()
-  if (liquidacion.sucursal_snapshot_id || liquidacion.empleado?.sucursal_id) return 'sucursal'
-  if (snapshot === 'sucursales') return 'sucursal'
-  if (snapshot === 'rrhh') return 'rrhh'
-  if (snapshot === 'galpon') return 'galpon'
+function normalizeAmbitoName(value?: string | null): string {
+  return (value || '').toLowerCase().trim().replace(/\s+/g, ' ')
+}
+
+function isCasaCentral(nombre?: string | null): boolean {
+  const normalized = normalizeAmbitoName(nombre)
+  return normalized.includes('casa central')
+}
+
+function hasSucursalOperativa(liquidacion: Liquidacion): boolean {
+  const sucursalNombre =
+    liquidacion.sucursal_snapshot_nombre || liquidacion.empleado?.sucursal?.nombre || null
+  const sucursalId = liquidacion.sucursal_snapshot_id || liquidacion.empleado?.sucursal_id || null
+
+  return !!sucursalId && !isCasaCentral(sucursalNombre)
+}
+
+function resolveAmbitoLiquidacion(liquidacion: Liquidacion): 'sucursal' | 'galpon' {
+  const snapshot = normalizeAmbitoName(liquidacion.grupo_base_snapshot)
+  const sucursalNombre =
+    liquidacion.sucursal_snapshot_nombre || liquidacion.empleado?.sucursal?.nombre || null
+
+  if (snapshot === 'sucursales' && hasSucursalOperativa(liquidacion)) return 'sucursal'
+  if (snapshot === 'rrhh' || snapshot === 'galpon') return 'galpon'
+  if (hasSucursalOperativa(liquidacion)) return 'sucursal'
 
   const categoriaNombre = liquidacion.empleado?.categoria?.nombre?.toLowerCase() || ''
-  if (categoriaNombre.includes('sucursal') || categoriaNombre.includes('encargad')) return 'sucursal'
+  if (
+    (categoriaNombre.includes('sucursal') || categoriaNombre.includes('encargad')) &&
+    !isCasaCentral(sucursalNombre)
+  ) {
+    return 'sucursal'
+  }
 
   return 'galpon'
 }
@@ -136,7 +160,7 @@ async function getSucursalesOptions(): Promise<SucursalOption[]> {
     return []
   }
 
-  return (data || []) as SucursalOption[]
+  return ((data || []) as SucursalOption[]).filter((sucursal) => !isCasaCentral(sucursal.nombre))
 }
 
 async function getEmpleadosActivosParaRecalculo() {
@@ -261,12 +285,12 @@ export default async function LiquidacionesPage({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Liquidaciones de Sueldos</h1>
           <p className="text-gray-600 mt-1">Cálculo y gestión de sueldos mensuales del personal</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" asChild>
             <Link href="/rrhh/liquidaciones/calcular">
               <Calculator className="w-4 h-4 mr-2" />
