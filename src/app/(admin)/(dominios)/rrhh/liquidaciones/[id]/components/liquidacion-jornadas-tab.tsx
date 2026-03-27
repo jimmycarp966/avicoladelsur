@@ -896,6 +896,12 @@ export function LiquidacionJornadasTab({
                     const esAusenciaRegistrada = isAusenciaObservacion(row.observaciones)
                     const placeholderTipo = isPlaceholder ? getPlaceholderTipo(fechaIso) : null
                     const esLicenciaAutomatica = Boolean(licenciaLabel)
+                    const esDiaCompletoEspecial =
+                      !isPlaceholder &&
+                      !esAusenciaRegistrada &&
+                      !esLicenciaAutomatica &&
+                      (esDomingo || esFeriado) &&
+                      (row.horas_mensuales ?? 0) > 0
                     const editActionLabel = licenciaLabel
                       ? licenciaLabel.toLowerCase().includes('descanso')
                         ? 'Editar descanso'
@@ -992,6 +998,15 @@ export function LiquidacionJornadasTab({
                           </span>
                         ) : esAusenciaRegistrada ? (
                           <span className="text-red-700 font-medium">Ausente</span>
+                        ) : esDiaCompletoEspecial ? (
+                          <div className="flex flex-col items-start gap-1">
+                            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs">
+                              Dia completo
+                            </Badge>
+                            <span className="text-[11px] text-muted-foreground">
+                              {getTurnoLabel(row.turno)}
+                            </span>
+                          </div>
                         ) : (() => {
                           const horasInsuf =
                             (row.horas_mensuales ?? 0) > 0 &&
