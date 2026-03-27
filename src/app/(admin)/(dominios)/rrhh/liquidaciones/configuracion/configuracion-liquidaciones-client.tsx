@@ -37,6 +37,7 @@ type ReglaPuestoEditable = {
   categoria_id?: string | null
   grupo_base_dias: GrupoBaseDias
   horas_jornada: number
+  valor_hora_override?: number | null
   tarifa_turno_trabajado: number
   tarifa_turno_especial: number
   habilita_cajero: boolean
@@ -65,6 +66,15 @@ type CategoriaLiquidacion = {
 function toNumber(value: string): number {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : 0
+}
+
+function toNullableNumber(value: string): number | null {
+  if (!value.trim()) {
+    return null
+  }
+
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
 }
 
 function normalizeText(value: string): string {
@@ -101,6 +111,7 @@ function defaultReglaPuesto(): ReglaPuestoEditable {
     categoria_id: null,
     grupo_base_dias: 'galpon',
     horas_jornada: 9,
+    valor_hora_override: null,
     tarifa_turno_trabajado: 0,
     tarifa_turno_especial: 0,
     habilita_cajero: false,
@@ -117,6 +128,7 @@ function mapReglaPuesto(regla: LiquidacionReglaPuesto): ReglaPuestoEditable {
     categoria_id: regla.categoria_id || null,
     grupo_base_dias: regla.grupo_base_dias,
     horas_jornada: Number(regla.horas_jornada || 0),
+    valor_hora_override: regla.valor_hora_override ?? null,
     tarifa_turno_trabajado: Number((regla as unknown as { tarifa_turno_trabajado?: number }).tarifa_turno_trabajado || 0),
     tarifa_turno_especial: Number(regla.tarifa_turno_especial || 0),
     habilita_cajero: !!regla.habilita_cajero,
@@ -290,6 +302,7 @@ export function ConfiguracionLiquidacionesClient() {
         periodo_anio: periodoAnio,
         grupo_base_dias: regla.grupo_base_dias,
         horas_jornada: regla.horas_jornada,
+        valor_hora_override: regla.valor_hora_override ?? null,
         tarifa_turno_trabajado: regla.tarifa_turno_trabajado,
         tarifa_turno_especial: regla.tarifa_turno_especial,
         habilita_cajero: regla.habilita_cajero,
@@ -640,7 +653,7 @@ export function ConfiguracionLiquidacionesClient() {
                     <TableHead>Grupo días</TableHead>
                     <TableHead>Tipo cálculo</TableHead>
                     <TableHead className="text-right">Hs diarias</TableHead>
-                    <TableHead className="text-right">Valor base mes</TableHead>
+                    <TableHead className="text-right">Valor hora / turno</TableHead>
                     <TableHead className="text-right">Tarifa especial</TableHead>
                     <TableHead>Cajero</TableHead>
                     <TableHead className="text-right">Tarifa cajero</TableHead>
@@ -739,13 +752,25 @@ export function ConfiguracionLiquidacionesClient() {
                             />
                           ) : (
                             <div className="text-right space-y-0.5">
-                              <div className="font-medium tabular-nums">
-                                {valorHoraCalculado !== null ? valorHoraCalculado.toFixed(2) : '0.00'}
-                              </div>
+                              <Input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                value={regla.valor_hora_override ?? ''}
+                                placeholder={valorHoraCalculado !== null ? valorHoraCalculado.toFixed(2) : 'Auto'}
+                                className="h-8 w-28 text-sm text-right ml-auto"
+                                onChange={(e) =>
+                                  updateReglaPuesto(index, {
+                                    valor_hora_override: toNullableNumber(e.target.value),
+                                  })
+                                }
+                              />
                               <div className="text-[11px] text-muted-foreground">
-                                {categoriaRegla
-                                  ? `Auto: sueldo ${Number(categoriaRegla.sueldo_basico || 0).toFixed(0)} / ${diasBaseRegla} dias`
-                                  : 'Auto segun sueldo de categoria'}
+                                {regla.valor_hora_override != null
+                                  ? 'Manual. Guardar para recalcular el periodo.'
+                                  : categoriaRegla
+                                    ? `Auto: sueldo ${Number(categoriaRegla.sueldo_basico || 0).toFixed(0)} / ${diasBaseRegla} dias = ${(valorHoraCalculado ?? 0).toFixed(2)}`
+                                    : 'Vacio = usa el valor automatico de la categoria'}
                               </div>
                             </div>
                           )}
@@ -960,16 +985,20 @@ export function ConfiguracionLiquidacionesClient() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-sm font-medium">Tarifa turno trabajado (completo)</label>
+                <label className="text-sm font-medium">
+                  {nuevaRegla.tipo_calculo === 'turno' ? 'Tarifa turno trabajado (completo)' : 'Valor hora editable (opcional)'}
+                </label>
                 <Input
                   type="number"
                   min={0}
                   step="0.01"
-                  value={nuevaRegla.tarifa_turno_trabajado}
+                  value={nuevaRegla.tipo_calculo === 'turno' ? nuevaRegla.tarifa_turno_trabajado : nuevaRegla.valor_hora_override ?? ''}
                   onChange={(e) =>
                     setNuevaRegla((prev) => ({
                       ...prev,
-                      tarifa_turno_trabajado: Math.max(0, toNumber(e.target.value)),
+                      ...(prev.tipo_calculo === 'turno'
+                        ? { tarifa_turno_trabajado: Math.max(0, toNumber(e.target.value)) }
+                        : { valor_hora_override: toNullableNumber(e.target.value) }),
                     }))
                   }
                 />

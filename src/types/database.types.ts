@@ -697,6 +697,7 @@ export type Database = {
           categoria_id: string | null;
           grupo_base_dias: string;
           horas_jornada: number;
+          valor_hora_override: number | null;
           tarifa_turno_trabajado: number;
           tarifa_turno_especial: number;
           habilita_cajero: boolean;
@@ -712,6 +713,7 @@ export type Database = {
           categoria_id?: string | null;
           grupo_base_dias?: string;
           horas_jornada?: number;
+          valor_hora_override?: number | null;
           tarifa_turno_trabajado?: number;
           tarifa_turno_especial?: number;
           habilita_cajero?: boolean;
@@ -727,6 +729,7 @@ export type Database = {
           categoria_id?: string | null;
           grupo_base_dias?: string;
           horas_jornada?: number;
+          valor_hora_override?: number | null;
           tarifa_turno_trabajado?: number;
           tarifa_turno_especial?: number;
           habilita_cajero?: boolean;

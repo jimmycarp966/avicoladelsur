@@ -713,6 +713,7 @@ export interface LiquidacionReglaPuesto extends BaseEntity {
   categoria_id?: string
   grupo_base_dias: 'galpon' | 'sucursales' | 'rrhh' | 'lun_sab'
   horas_jornada: number
+  valor_hora_override?: number | null
   tarifa_turno_trabajado: number
   tarifa_turno_especial: number
   habilita_cajero: boolean

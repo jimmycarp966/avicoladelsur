@@ -1859,7 +1859,7 @@ async function sincronizarDescansosMensualesSucursal(
     sincronizados = Number(sincronizadosData || 0)
     return { generados, sincronizados, soportado: true }
   } catch (error) {
-    devError('Error sincronizando descansos mensuales de sucursal:', error)
+    devError('Error sincronizando descansos mensuales de RRHH:', error)
     return { generados: 0, sincronizados: 0, soportado: false }
   }
 }
@@ -1872,6 +1872,7 @@ type GuardarReglaPuestoInput = {
   periodo_anio?: number
   grupo_base_dias: 'galpon' | 'sucursales' | 'rrhh' | 'lun_sab'
   horas_jornada: number
+  valor_hora_override?: number | null
   tarifa_turno_trabajado: number
   tarifa_turno_especial: number
   habilita_cajero: boolean
@@ -2879,6 +2880,7 @@ export async function guardarReglaPuestoAction(
     }
 
     if (
+      (payload.valor_hora_override != null && payload.valor_hora_override < 0) ||
       payload.tarifa_turno_trabajado < 0 ||
       payload.tarifa_turno_especial < 0 ||
       payload.tarifa_diferencia_cajero < 0
@@ -2893,6 +2895,17 @@ export async function guardarReglaPuestoAction(
       return {
         success: false,
         error: 'Para calculo por turno, la tarifa de turno trabajado debe ser mayor a cero',
+      }
+    }
+
+    if (
+      (payload.tipo_calculo ?? 'hora') === 'hora' &&
+      payload.valor_hora_override != null &&
+      payload.valor_hora_override <= 0
+    ) {
+      return {
+        success: false,
+        error: 'El valor hora editable debe ser mayor a cero o quedar vacio para usar el automatico',
       }
     }
 
@@ -2924,6 +2937,7 @@ export async function guardarReglaPuestoAction(
       categoria_id: categoriaId,
       grupo_base_dias: payload.grupo_base_dias,
       horas_jornada: payload.horas_jornada,
+      valor_hora_override: (payload.tipo_calculo ?? 'hora') === 'hora' ? payload.valor_hora_override ?? null : null,
       tarifa_turno_trabajado: payload.tarifa_turno_trabajado,
       tarifa_turno_especial: payload.tarifa_turno_especial,
       habilita_cajero: payload.habilita_cajero,
@@ -4581,8 +4595,8 @@ export async function obtenerSucursalesActivasAction(): Promise<ApiResponse<Arra
 // ========== AUTO-DESCANSOS ==========
 
 /**
- * Regla vigente RRHH sucursales:
- * - Cada empleado de sucursal tiene 2 descansos mensuales de medio turno tarde.
+ * Regla vigente RRHH descansos mensuales:
+ * - Solo sucursales y tesoreria tienen 2 descansos mensuales de medio turno tarde.
  * - Se generan de forma aleatoria al inicio de mes y pueden re-sincronizarse bajo demanda.
  * - Esos descansos impactan en liquidacion como jornada paga completa (segun regla vigente).
  */
