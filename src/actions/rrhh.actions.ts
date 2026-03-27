@@ -1687,6 +1687,13 @@ type UpsertLiquidacionJornadaInput = {
   observaciones?: string
 }
 
+const RRHH_LIQUIDACION_AUTO_ORIGINS = new Set([
+  'auto_hik',
+  'auto_asistencia',
+  'auto_licencia_descanso',
+  'auto_suspension',
+])
+
 type CalculoLiquidacionAjusteManualInput = {
   horas_adicionales?: number
   turno_especial_unidades?: number
@@ -1887,16 +1894,15 @@ export async function prepararLiquidacionMensualAction(
   anio: number
 ): Promise<ApiResponse<{ liquidacionId: string }>> {
   try {
-    const supabase = await createClient()
-
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) {
+    const adminUserId = await getAuthenticatedAdminUserId()
+    if (!adminUserId) {
       return {
         success: false,
-        error: 'Usuario no autenticado',
+        error: 'No autorizado',
       }
     }
 
+    const supabase = createAdminClient()
     await sincronizarDescansosMensualesSucursal(supabase, {
       anio,
       mes,
@@ -1908,7 +1914,7 @@ export async function prepararLiquidacionMensualAction(
       empleadoId,
       mes,
       anio,
-      createdBy: user.id,
+      createdBy: adminUserId,
     })
 
     if (error) {
@@ -2092,19 +2098,18 @@ export async function recalcularLiquidacionAction(
   liquidacionId: string
 ): Promise<ApiResponse<{ liquidacionId: string }>> {
   try {
-    const supabase = await createClient()
-
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) {
+    const adminUserId = await getAuthenticatedAdminUserId()
+    if (!adminUserId) {
       return {
         success: false,
-        error: 'Usuario no autenticado',
+        error: 'No autorizado',
       }
     }
 
+    const supabase = createAdminClient()
     const { data, error } = await recalcularLiquidacionConDomingoSucursal(supabase, {
       liquidacionId,
-      actorId: user.id,
+      actorId: adminUserId,
     })
 
     if (error) {
@@ -2350,6 +2355,10 @@ export async function upsertLiquidacionJornadaAction(
           : esSucursal
             ? true
             : Boolean(jornadaOriginal?.horas_extra_aprobadas ?? false)
+
+    if (jornadaData.id && jornadaOriginal?.origen && RRHH_LIQUIDACION_AUTO_ORIGINS.has(jornadaOriginal.origen)) {
+      payload.origen = 'manual'
+    }
 
     if (jornadaData.id) {
       const { data, error } = await supabase
