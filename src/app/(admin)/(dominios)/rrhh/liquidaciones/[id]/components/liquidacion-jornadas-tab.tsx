@@ -853,6 +853,7 @@ export function LiquidacionJornadasTab({
               feriados={feriados}
               periodoMes={liquidacion.periodo_mes}
               periodoAnio={liquidacion.periodo_anio}
+              diasBase={liquidacion.dias_base}
               onDiaClick={(dia) => {
                 if (dia.tipo !== 'ausente') return
                 handleAusenteCalendarioClick(dia.fecha, dia.jornada)

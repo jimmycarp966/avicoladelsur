@@ -13,6 +13,7 @@ import {
   applyConfiguredHikMappings,
   loadHikPersonMapConfig,
 } from '@/lib/services/hik-mapping.service'
+import { prepararLiquidacionMensualConDomingoSucursal } from '@/lib/services/rrhh-sucursal-domingos.service'
 
 const ARG_TZ = 'America/Argentina/Buenos_Aires'
 const MIDDAY_HORA_ARG = Number(process.env.HIK_SPLIT_TURNO_HORA || '14')
@@ -770,18 +771,12 @@ async function procesarLiquidacionesPeriodo(
       continue
     }
 
-    const rpcArgs = {
-      p_empleado_id: empleadoId,
-      p_mes: periodo.mes,
-      p_anio: periodo.anio,
-      p_created_by: createdBy,
-    }
-
-    let { error: rpcError } = await adminSupabase.rpc('fn_rrhh_preparar_liquidacion_mensual', rpcArgs)
-    if (rpcError && String(rpcError.message || '').toLowerCase().includes('fn_rrhh_preparar_liquidacion_mensual')) {
-      const legacy = await adminSupabase.rpc('fn_calcular_liquidacion_mensual', rpcArgs)
-      rpcError = legacy.error
-    }
+    const { error: rpcError } = await prepararLiquidacionMensualConDomingoSucursal(adminSupabase, {
+      empleadoId,
+      mes: periodo.mes,
+      anio: periodo.anio,
+      createdBy,
+    })
 
     if (rpcError) {
       summary.errores++

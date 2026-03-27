@@ -10,6 +10,7 @@ type JornadasCalendarioProps = {
   feriados: Array<{ fecha: string; descripcion?: string | null }>
   periodoMes: number
   periodoAnio: number
+  diasBase?: number | null
   onDiaClick?: (dia: DiaCalendario) => void
 }
 
@@ -113,6 +114,7 @@ export function JornadasCalendario({
   feriados,
   periodoMes,
   periodoAnio,
+  diasBase,
   onDiaClick,
 }: JornadasCalendarioProps) {
   const today = getTodayArgentina()
@@ -188,9 +190,18 @@ export function JornadasCalendario({
     [dias],
   )
 
+  const diasAsistidos = (contadores.presente ?? 0) + (contadores.media_falta ?? 0)
+  const diasBaseLabel = Number(diasBase || 0) > 0 ? Number(diasBase) : dias.length
+
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap gap-2 text-xs">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <div className="flex items-center gap-1 rounded border border-slate-200 bg-slate-50 px-2 py-0.5">
+          <span className="text-slate-600">Asistidos</span>
+          <Badge variant="outline" className="border-current/20 bg-white py-0 text-[10px] text-slate-700">
+            {diasAsistidos}/{diasBaseLabel}
+          </Badge>
+        </div>
         {(['presente', 'media_falta', 'descanso', 'suspension', 'ausente'] as DiaCalendario['tipo'][]).map((tipo) => {
           const cfg = TIPO_CONFIG[tipo]
           const count = contadores[tipo] ?? 0

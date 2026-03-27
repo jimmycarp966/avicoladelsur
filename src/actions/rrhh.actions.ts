@@ -15,6 +15,10 @@ import {
 } from '@/lib/utils/rrhh-disciplinario'
 import { buildEmpleadoLegajoFromDni } from '@/lib/utils/empleado-legajo'
 import { devError } from '@/lib/utils/logger'
+import {
+  prepararLiquidacionMensualConDomingoSucursal,
+  recalcularLiquidacionConDomingoSucursal,
+} from '@/lib/services/rrhh-sucursal-domingos.service'
 import type { ApiResponse } from '@/types/api.types'
 import type { Empleado, LiquidacionReglaPeriodo, LiquidacionReglaPuesto } from '@/types/domain.types'
 
@@ -1892,9 +1896,6 @@ export async function prepararLiquidacionMensualAction(
       }
     }
 
-    let data: string | null = null
-    let error: any = null
-
     await sincronizarDescansosMensualesSucursal(supabase, {
       anio,
       mes,
@@ -1902,26 +1903,12 @@ export async function prepararLiquidacionMensualAction(
       seed: `${empleadoId}-${anio}-${mes}`,
     })
 
-    const v2Result = await supabase.rpc('fn_rrhh_preparar_liquidacion_mensual', {
-      p_empleado_id: empleadoId,
-      p_mes: mes,
-      p_anio: anio,
-      p_created_by: user.id,
+    const { data, error } = await prepararLiquidacionMensualConDomingoSucursal(supabase, {
+      empleadoId,
+      mes,
+      anio,
+      createdBy: user.id,
     })
-
-    data = v2Result.data as string | null
-    error = v2Result.error
-
-    if (error && String(error.message || '').toLowerCase().includes('fn_rrhh_preparar_liquidacion_mensual')) {
-      const legacyResult = await supabase.rpc('fn_calcular_liquidacion_mensual', {
-        p_empleado_id: empleadoId,
-        p_mes: mes,
-        p_anio: anio,
-        p_created_by: user.id,
-      })
-      data = legacyResult.data as string | null
-      error = legacyResult.error
-    }
 
     if (error) {
       devError('Error al calcular liquidacion:', error)
@@ -1956,14 +1943,14 @@ async function recalcularLiquidacionesEmpleadoPorPeriodos(
   }
 ) {
   for (const periodo of input.periodos) {
-    const { error } = await db.rpc('fn_rrhh_preparar_liquidacion_mensual', {
-      p_empleado_id: input.empleadoId,
-      p_mes: periodo.mes,
-      p_anio: periodo.anio,
-      p_created_by: input.actorId,
+    const { error } = await prepararLiquidacionMensualConDomingoSucursal(db, {
+      empleadoId: input.empleadoId,
+      mes: periodo.mes,
+      anio: periodo.anio,
+      createdBy: input.actorId,
     })
 
-    if (error && !String(error.message || '').toLowerCase().includes('fn_rrhh_preparar_liquidacion_mensual')) {
+    if (error) {
       devError(
         `Error recalculando liquidacion de ${input.empleadoId} para ${periodo.mes}/${periodo.anio}:`,
         error,
@@ -2114,9 +2101,9 @@ export async function recalcularLiquidacionAction(
       }
     }
 
-    const { data, error } = await supabase.rpc('fn_rrhh_recalcular_liquidacion', {
-      p_liquidacion_id: liquidacionId,
-      p_actor: user.id,
+    const { data, error } = await recalcularLiquidacionConDomingoSucursal(supabase, {
+      liquidacionId,
+      actorId: user.id,
     })
 
     if (error) {
@@ -2251,22 +2238,12 @@ export async function recalcularLiquidacionesPeriodoAction(input: {
         continue
       }
 
-      let { error } = await supabase.rpc('fn_rrhh_preparar_liquidacion_mensual', {
-        p_empleado_id: empleadoId,
-        p_mes: mes,
-        p_anio: anio,
-        p_created_by: adminUserId,
+      const { error } = await prepararLiquidacionMensualConDomingoSucursal(supabase, {
+        empleadoId,
+        mes,
+        anio,
+        createdBy: adminUserId,
       })
-
-      if (error && String(error.message || '').toLowerCase().includes('fn_rrhh_preparar_liquidacion_mensual')) {
-        const legacy = await supabase.rpc('fn_calcular_liquidacion_mensual', {
-          p_empleado_id: empleadoId,
-          p_mes: mes,
-          p_anio: anio,
-          p_created_by: adminUserId,
-        })
-        error = legacy.error
-      }
 
       if (error) {
         errores++
@@ -3049,11 +3026,11 @@ export async function guardarReglaPuestoAction(
           }
 
           for (const empleadoId of empleadosParaRecalculo) {
-            const { error: recalcError } = await supabase.rpc('fn_rrhh_preparar_liquidacion_mensual', {
-              p_empleado_id: empleadoId,
-              p_mes: periodoMes,
-              p_anio: periodoAnio,
-              p_created_by: adminUserId,
+            const { error: recalcError } = await prepararLiquidacionMensualConDomingoSucursal(supabase, {
+              empleadoId,
+              mes: periodoMes,
+              anio: periodoAnio,
+              createdBy: adminUserId,
             })
 
             if (recalcError) {
@@ -4639,20 +4616,20 @@ export async function autoAsignarDescansosAction(
     })
 
     if (syncResult.soportado) {
-      const { error: prepararError } = await supabase.rpc('fn_rrhh_preparar_liquidacion_mensual', {
-        p_empleado_id: liquidacion.empleado_id,
-        p_mes: Number(liquidacion.periodo_mes),
-        p_anio: Number(liquidacion.periodo_anio),
-        p_created_by: adminUserId,
+      const { error: prepararError } = await prepararLiquidacionMensualConDomingoSucursal(supabase, {
+        empleadoId: liquidacion.empleado_id,
+        mes: Number(liquidacion.periodo_mes),
+        anio: Number(liquidacion.periodo_anio),
+        createdBy: adminUserId,
       })
 
       if (prepararError) {
         devError('Error refrescando liquidacion luego de sincronizar descansos:', prepararError)
       }
     } else {
-      const { error: recalcError } = await supabase.rpc('fn_rrhh_recalcular_liquidacion', {
-        p_liquidacion_id: liquidacionId,
-        p_actor: adminUserId,
+      const { error: recalcError } = await recalcularLiquidacionConDomingoSucursal(supabase, {
+        liquidacionId,
+        actorId: adminUserId,
       })
       if (recalcError) {
         devError('Error recalculando liquidacion (fallback descansos):', recalcError)
