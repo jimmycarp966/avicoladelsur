@@ -93,6 +93,26 @@ function buildNombreCompleto(row: DescansoRow['empleado']): string {
   return nombreCompleto || 'Empleado sin nombre'
 }
 
+function formatTurnoLabel(turno: string | null | undefined): string {
+  const normalized = turno?.trim().toLowerCase() || ''
+
+  if (!normalized) return 'Sin definir'
+  if (normalized.includes('manana') || normalized.includes('mañana')) return 'Mañana'
+  if (normalized.includes('tarde')) return 'Tarde'
+  if (normalized.includes('noche')) return 'Noche'
+
+  const cleaned = normalized
+    .replace(/_/g, ' ')
+    .replace(/\bmedio turno\b/g, '')
+    .replace(/\bturno\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  if (!cleaned) return 'Sin definir'
+
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1)
+}
+
 function normalizeDescansoRows(rows: DescansoRow[]): DescansoPdfItem[] {
   return rows.map((row) => {
     const empleado = row.empleado
@@ -102,7 +122,7 @@ function normalizeDescansoRows(rows: DescansoRow[]): DescansoPdfItem[] {
     return {
       sucursal: sucursal?.nombre?.trim() || 'Sin sucursal',
       fecha: row.fecha,
-      turno: row.turno?.trim() ? `Turno: ${row.turno.trim()}` : 'Turno: sin definir',
+      turno: formatTurnoLabel(row.turno),
       legajo: empleado?.legajo?.trim() || '-',
       puesto: categoria?.nombre?.trim() || 'Sin puesto',
       nombreCompleto: buildNombreCompleto(empleado),
@@ -122,6 +142,104 @@ function buildSucursalHeading(sucursal: string, anio: number, mes: number) {
   return `Sucursal ${sucursal} - Descanso mes ${mesNombre}`
 }
 
+function drawPageHeader(doc: InstanceType<typeof PDFDocument>, periodoLabel: string, total: number) {
+  const x = doc.page.margins.left
+  const y = doc.y
+  const width = doc.page.width - doc.page.margins.left - doc.page.margins.right
+
+  doc.roundedRect(x, y, width, 72, 14).fill('#0f172a')
+  doc
+    .fillColor('#f8fafc')
+    .font('Helvetica-Bold')
+    .fontSize(20)
+    .text('Descansos del mes', x + 18, y + 16, { width: width - 36 })
+  doc
+    .fillColor('#cbd5e1')
+    .font('Helvetica')
+    .fontSize(10)
+    .text(`${periodoLabel}  |  ${total} descanso${total === 1 ? '' : 's'} registrados`, x + 18, y + 44, {
+      width: width - 36,
+    })
+
+  doc.y = y + 90
+}
+
+function drawSucursalHeader(
+  doc: InstanceType<typeof PDFDocument>,
+  heading: string,
+  cantidad: number,
+) {
+  const x = doc.page.margins.left
+  const y = doc.y
+  const width = doc.page.width - doc.page.margins.left - doc.page.margins.right
+
+  doc.roundedRect(x, y, width, 34, 10).fill('#e2e8f0')
+  doc
+    .fillColor('#0f172a')
+    .font('Helvetica-Bold')
+    .fontSize(12)
+    .text(heading, x + 12, y + 10, { width: width - 120 })
+  doc
+    .fillColor('#334155')
+    .font('Helvetica')
+    .fontSize(9)
+    .text(`${cantidad} empleado${cantidad === 1 ? '' : 's'}`, x + width - 96, y + 11, {
+      width: 84,
+      align: 'right',
+    })
+
+  doc.y = y + 46
+}
+
+function drawTableHeader(doc: InstanceType<typeof PDFDocument>) {
+  const y = doc.y
+
+  doc
+    .fillColor('#64748b')
+    .font('Helvetica-Bold')
+    .fontSize(8)
+    .text('FECHA', 42, y, { width: 72 })
+  doc.text('TURNO', 118, y, { width: 72 })
+  doc.text('LEGAJO', 194, y, { width: 78 })
+  doc.text('PUESTO', 276, y, { width: 136 })
+  doc.text('EMPLEADO', 416, y, { width: 138 })
+
+  doc
+    .strokeColor('#cbd5e1')
+    .moveTo(doc.page.margins.left, y + 16)
+    .lineTo(doc.page.width - doc.page.margins.right, y + 16)
+    .stroke()
+
+  doc.y = y + 24
+}
+
+function drawDescansoRow(
+  doc: InstanceType<typeof PDFDocument>,
+  descanso: DescansoPdfItem,
+  index: number,
+) {
+  const x = doc.page.margins.left
+  const y = doc.y
+  const width = doc.page.width - doc.page.margins.left - doc.page.margins.right
+  const rowHeight = 24
+
+  if (index % 2 === 0) {
+    doc.roundedRect(x, y - 3, width, rowHeight, 6).fill('#f8fafc')
+  }
+
+  doc
+    .fillColor('#0f172a')
+    .font('Helvetica')
+    .fontSize(10)
+    .text(formatDate(descanso.fecha), 42, y + 3, { width: 72 })
+  doc.text(descanso.turno, 118, y + 3, { width: 72 })
+  doc.text(descanso.legajo, 194, y + 3, { width: 78 })
+  doc.text(descanso.puesto, 276, y + 3, { width: 136 })
+  doc.font('Helvetica-Bold').text(descanso.nombreCompleto, 416, y + 3, { width: 138 })
+
+  doc.y = y + rowHeight
+}
+
 async function buildPdfBuffer(
   items: DescansoPdfItem[],
   periodoLabel: string,
@@ -135,13 +253,11 @@ async function buildPdfBuffer(
     doc.on('data', (chunk) => buffers.push(chunk as Buffer))
     doc.on('end', () => resolve(Buffer.concat(buffers)))
 
-    doc.fontSize(18).fillColor('#0f172a').text('Descansos del mes', { align: 'center' })
-    doc.moveDown(0.25)
-    doc.fontSize(10).fillColor('#475569').text(periodoLabel, { align: 'center' })
-    doc.moveDown(1.2)
+    drawPageHeader(doc, periodoLabel, items.length)
 
     if (items.length === 0) {
       doc
+        .font('Helvetica')
         .fontSize(12)
         .fillColor('#334155')
         .text('No hay descansos registrados para el mes actual.', {
@@ -166,45 +282,23 @@ async function buildPdfBuffer(
         return a.nombreCompleto.localeCompare(b.nombreCompleto, 'es')
       })
 
-      ensureSpace(doc, 72)
+      ensureSpace(doc, 88)
       doc.moveDown(0.2)
-      doc
-        .fontSize(13)
-        .fillColor('#0f172a')
-        .text(buildSucursalHeading(sucursal, anio, mes), doc.page.margins.left, doc.y, {
-          align: 'left',
-        })
-      doc.moveDown(0.15)
-      doc
-        .strokeColor('#cbd5e1')
-        .moveTo(doc.page.margins.left, doc.y)
-        .lineTo(doc.page.width - doc.page.margins.right, doc.y)
-        .stroke()
-      doc.moveDown(0.4)
+      drawSucursalHeader(doc, buildSucursalHeading(sucursal, anio, mes), descansos.length)
+      drawTableHeader(doc)
 
-      doc.fontSize(9).fillColor('#64748b')
-      const headerY = doc.y
-      doc.text('Fecha', 42, headerY, { width: 70 })
-      doc.text('Turno', 114, headerY, { width: 70 })
-      doc.text('Legajo', 186, headerY, { width: 70 })
-      doc.text('Puesto', 258, headerY, { width: 120 })
-      doc.text('Empleado', 382, headerY, { width: 170 })
-      doc.moveDown(0.6)
+      for (const [index, descanso] of descansos.entries()) {
+        ensureSpace(doc, 28)
+        if (doc.y + 28 > doc.page.height - doc.page.margins.bottom) {
+          doc.addPage()
+          drawSucursalHeader(doc, buildSucursalHeading(sucursal, anio, mes), descansos.length)
+          drawTableHeader(doc)
+        }
 
-      for (const descanso of descansos) {
-        ensureSpace(doc, 24)
-        const rowY = doc.y
-
-        doc.fontSize(10).fillColor('#0f172a')
-        doc.text(formatDate(descanso.fecha), 42, rowY, { width: 70 })
-        doc.text(descanso.turno, 114, rowY, { width: 70 })
-        doc.text(descanso.legajo, 186, rowY, { width: 70 })
-        doc.text(descanso.puesto, 258, rowY, { width: 120 })
-        doc.text(descanso.nombreCompleto, 382, rowY, { width: 170 })
-        doc.moveDown(0.55)
+        drawDescansoRow(doc, descanso, index)
       }
 
-      doc.moveDown(0.8)
+      doc.moveDown(1)
     }
 
     doc.end()
