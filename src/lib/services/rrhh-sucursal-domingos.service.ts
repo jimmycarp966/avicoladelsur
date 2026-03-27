@@ -208,7 +208,7 @@ export async function normalizarDomingosSucursalLiquidacion(
   }
 
   const { data: configRows, error: configError } = await db
-    .from('rrhh_configuracion_puestos')
+    .from('rrhh_liquidacion_reglas_puesto')
     .select('puesto_codigo, grupo_base_dias, horas_jornada, tipo_calculo')
     .eq('activo', true)
 
