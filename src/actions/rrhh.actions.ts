@@ -13,6 +13,7 @@ import {
   type DisciplinaEtapa,
   type LegajoDisciplinaMetadata,
 } from '@/lib/utils/rrhh-disciplinario'
+import { buildEmpleadoLegajoFromDni } from '@/lib/utils/empleado-legajo'
 import { devError } from '@/lib/utils/logger'
 import type { ApiResponse } from '@/types/api.types'
 import type { Empleado, LiquidacionReglaPeriodo, LiquidacionReglaPuesto } from '@/types/domain.types'
@@ -43,6 +44,15 @@ const RRHH_LICENCIAS_ALLOWED_INPUT_MIME_TYPES = [
 const RRHH_LICENCIAS_FILE_SIZE_LIMIT = 10 * 1024 * 1024
 const RRHH_DISCIPLINA_ALLOWED_MIME_TYPES = ['application/pdf']
 const RRHH_DISCIPLINA_FILE_SIZE_LIMIT = 5 * 1024 * 1024
+
+function resolveEmpleadoLegajo(legajo?: string, dni?: string): string | undefined {
+  const normalizedLegajo = legajo?.trim()
+  if (normalizedLegajo) {
+    return normalizedLegajo
+  }
+
+  return buildEmpleadoLegajoFromDni(dni)
+}
 
 type CertificadoLicenciaPreparado = {
   file: File
@@ -321,13 +331,18 @@ export async function crearEmpleadoAction(
     }
 
     const supabase = createAdminClient()
+    const resolvedLegajo = resolveEmpleadoLegajo(empleadoData.legajo, empleadoData.dni)
+    const empleadoPayload = {
+      ...empleadoData,
+      legajo: resolvedLegajo,
+    }
 
     // Validar unicidad del legajo si se proporciona
-    if (empleadoData.legajo) {
+    if (resolvedLegajo) {
       const { data: existingEmpleado, error: checkError } = await supabase
         .from('rrhh_empleados')
         .select('id')
-        .eq('legajo', empleadoData.legajo)
+        .eq('legajo', resolvedLegajo)
         .single()
 
       if (existingEmpleado) {
@@ -415,7 +430,7 @@ export async function crearEmpleadoAction(
 
     // Limpiar campos de fecha vacíos (convertir "" a null/undefined)
     const cleanedData: any = {
-      ...empleadoData,
+      ...empleadoPayload,
       activo: empleadoData.activo ?? true,
     }
     
@@ -519,13 +534,18 @@ export async function actualizarEmpleadoAction(
     }
 
     const supabase = createAdminClient()
+    const resolvedLegajo = resolveEmpleadoLegajo(empleadoData.legajo, empleadoData.dni)
+    const empleadoPayload = {
+      ...empleadoData,
+      legajo: resolvedLegajo,
+    }
 
     // Validar unicidad del legajo si se proporciona
-    if (empleadoData.legajo) {
+    if (resolvedLegajo) {
       const { data: existingEmpleado, error: checkError } = await supabase
         .from('rrhh_empleados')
         .select('id')
-        .eq('legajo', empleadoData.legajo)
+        .eq('legajo', resolvedLegajo)
         .neq('id', empleadoId)
         .single()
 
@@ -572,7 +592,7 @@ export async function actualizarEmpleadoAction(
     }
 
     // Limpiar campos de fecha vacíos (convertir "" a null/undefined)
-    const cleanedData: any = { ...empleadoData }
+    const cleanedData: any = { ...empleadoPayload }
     
     // IMPORTANTE: Manejar nombre y apellido correctamente
     // El nombre y apellido del empleado vienen del usuario vinculado (usuario_id)
@@ -819,7 +839,6 @@ export async function crearIncidenciaLegajoAction(payload: {
   titulo: string
   descripcion?: string
   fecha_evento: string
-  suspension_dias?: number
   fecha_inicio_suspension?: string
   turno_inicio?: 'manana' | 'tarde' | 'turno_completo'
   fecha_reintegro?: string
@@ -841,13 +860,13 @@ export async function crearIncidenciaLegajoAction(payload: {
     const titulo = payload.titulo.trim() || buildDisciplinaTitulo(etapa, motivo)
     const descripcion = payload.descripcion?.trim()
     const fechaEvento = new Date(payload.fecha_evento)
-    const suspensionDias =
-      etapa === 'suspension' && payload.suspension_dias
-        ? Number(payload.suspension_dias)
-        : undefined
     const fechaInicioSuspension =
       etapa === 'suspension' ? toIsoDateOnly(payload.fecha_inicio_suspension || payload.fecha_evento) : null
     const fechaReintegro = etapa === 'suspension' ? toIsoDateOnly(payload.fecha_reintegro) : null
+    const suspensionDias =
+      etapa === 'suspension'
+        ? resolveSuspensionDays(fechaInicioSuspension, fechaReintegro)
+        : undefined
 
     if (!titulo) {
       return {
@@ -870,13 +889,6 @@ export async function crearIncidenciaLegajoAction(payload: {
       }
     }
 
-    if (etapa === 'suspension' && (!suspensionDias || Number.isNaN(suspensionDias) || suspensionDias < 1)) {
-      return {
-        success: false,
-        error: 'Debe indicar la cantidad de dias de suspension',
-      }
-    }
-
     if (etapa === 'suspension' && !fechaInicioSuspension) {
       return {
         success: false,
@@ -891,6 +903,13 @@ export async function crearIncidenciaLegajoAction(payload: {
       }
     }
 
+    if (etapa === 'suspension' && !fechaReintegro) {
+      return {
+        success: false,
+        error: 'Debe indicar la fecha de reintegro de la suspension',
+      }
+    }
+
     if (
       etapa === 'suspension' &&
       fechaInicioSuspension &&
@@ -900,6 +919,13 @@ export async function crearIncidenciaLegajoAction(payload: {
       return {
         success: false,
         error: 'La fecha de reintegro no puede ser anterior al inicio de la suspension',
+      }
+    }
+
+    if (etapa === 'suspension' && (!suspensionDias || Number.isNaN(suspensionDias) || suspensionDias < 1)) {
+      return {
+        success: false,
+        error: 'No se pudo calcular la duracion de la suspension',
       }
     }
 
@@ -1455,6 +1481,7 @@ export async function crearAdelantoAction(
     })
 
     revalidatePath('/rrhh/adelantos')
+    revalidatePath(`/rrhh/empleados/${adelantoData.empleado_id}`)
 
     return {
       success: true,
@@ -1527,6 +1554,9 @@ export async function aprobarAdelantoAction(
     }
 
     revalidatePath('/rrhh/adelantos')
+    if (adelantoSnapshot?.empleado_id) {
+      revalidatePath(`/rrhh/empleados/${adelantoSnapshot.empleado_id}`)
+    }
     revalidatePath('/rrhh/liquidaciones')
     if (resultRow.liquidacion_recalculada_id) {
       revalidatePath(`/rrhh/liquidaciones/${resultRow.liquidacion_recalculada_id}`)
@@ -1601,6 +1631,9 @@ export async function rechazarAdelantoAction(adelantoId: string): Promise<ApiRes
     }
 
     revalidatePath('/rrhh/adelantos')
+    if (snapshot?.empleado_id) {
+      revalidatePath(`/rrhh/empleados/${snapshot.empleado_id}`)
+    }
 
     return {
       success: true,
@@ -1675,6 +1708,23 @@ function toIsoDateOnly(value?: string | null): string | null {
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return null
   return parsed.toISOString().slice(0, 10)
+}
+
+function resolveSuspensionDays(
+  fechaInicio?: string | null,
+  fechaReintegro?: string | null,
+): number | undefined {
+  if (fechaInicio && fechaReintegro) {
+    const inicio = new Date(`${fechaInicio}T00:00:00`)
+    const reintegro = new Date(`${fechaReintegro}T00:00:00`)
+
+    if (!Number.isNaN(inicio.getTime()) && !Number.isNaN(reintegro.getTime())) {
+      const diff = Math.round((reintegro.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24))
+      return Math.max(diff, 1)
+    }
+  }
+
+  return undefined
 }
 
 function buildMonthRange(fromIso?: string | null, toIso?: string | null): Array<{ mes: number; anio: number }> {
@@ -3623,6 +3673,7 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
     })
 
     revalidatePath('/rrhh/licencias')
+    revalidatePath(`/rrhh/empleados/${empleado_id}`)
 
     return {
       success: true,
@@ -3706,6 +3757,9 @@ export async function aprobarLicenciaAction(licenciaId: string): Promise<ApiResp
     }
 
     revalidatePath('/rrhh/licencias')
+    if (licenciaSnapshot?.empleado_id) {
+      revalidatePath(`/rrhh/empleados/${licenciaSnapshot.empleado_id}`)
+    }
 
     return {
       success: true,
@@ -3776,6 +3830,9 @@ export async function rechazarLicenciaAction(licenciaId: string): Promise<ApiRes
     }
 
     revalidatePath('/rrhh/licencias')
+    if (licenciaSnapshot?.empleado_id) {
+      revalidatePath(`/rrhh/empleados/${licenciaSnapshot.empleado_id}`)
+    }
 
     return {
       success: true,
@@ -3916,6 +3973,7 @@ export async function guardarDescansosProgramadosAction(input: {
     }
 
     revalidatePath('/rrhh/licencias')
+    revalidatePath(`/rrhh/empleados/${input.empleado_id}`)
     revalidatePath('/rrhh/liquidaciones')
     revalidatePath('/rrhh/liquidaciones/calcular')
 

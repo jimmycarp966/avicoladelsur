@@ -46,12 +46,14 @@ function resolveAmbitoLiquidacion(liquidacion: Liquidacion): 'sucursal' | 'galpo
     liquidacion.sucursal_snapshot_nombre || liquidacion.empleado?.sucursal?.nombre || null
 
   if (snapshot === 'sucursales' && hasSucursalOperativa(liquidacion)) return 'sucursal'
-  if (snapshot === 'rrhh' || snapshot === 'galpon') return 'galpon'
+  if (snapshot === 'rrhh' || snapshot === 'galpon' || snapshot === 'lun_sab') return 'galpon'
   if (hasSucursalOperativa(liquidacion)) return 'sucursal'
 
   const categoriaNombre = liquidacion.empleado?.categoria?.nombre?.toLowerCase() || ''
   if (
-    (categoriaNombre.includes('sucursal') || categoriaNombre.includes('encargad')) &&
+    (categoriaNombre.includes('sucursal') ||
+      categoriaNombre.includes('encargad') ||
+      categoriaNombre.includes('asist')) &&
     !isCasaCentral(sucursalNombre)
   ) {
     return 'sucursal'

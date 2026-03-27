@@ -17,6 +17,10 @@ function normalizeIdentity(v) {
 function digitsOnly(v) {
   return String(v || "").replace(/\D+/g, "");
 }
+function buildPlaceholderLegajo(rawCode, attempt = 0) {
+  const normalized = normalizeIdentity(rawCode) || `HIK${Date.now()}`
+  return attempt <= 0 ? normalized : `${normalized}-${attempt + 1}`
+}
 function normalizeName(v) {
   return String(v || "")
     .normalize("NFD")
@@ -229,9 +233,6 @@ async function main() {
     if (e) { employeeMap.set(hikCode, e); const hd = digitsOnly(hikCode); if (hd) employeeMap.set(hd, e); }
   }
 
-  const legajos = await supabase.from("rrhh_empleados").select("legajo");
-  if (legajos.error) throw new Error(`legajos: ${legajos.error.message}`);
-  let nextLegajo = (legajos.data || []).reduce((max, r) => { const m = String(r.legajo || "").toUpperCase().match(/^EMP(\d+)$/); return m ? Math.max(max, Number(m[1])) : max; }, 0) + 1;
   const learnedMap = parseMap(process.env.HIK_CONNECT_PERSON_MAP || "");
 
   const summary = { from: args.from, to, apply: args.apply, processedDays: 0, rawEvents: 0, mappedRows: 0, unresolvedRows: 0, synced: 0, createdEmployees: 0 };
@@ -263,9 +264,10 @@ async function main() {
         const parts = String(item.name || "").trim().split(/\s+/).filter(Boolean);
         const nombre = parts[0] || "Hik";
         const apellido = parts.slice(1).join(" ") || item.code;
+        let legajoAttempt = 0;
         while (!employee) {
-          const legajo = `EMP${String(nextLegajo).padStart(3, "0")}`;
-          nextLegajo += 1;
+          const legajo = buildPlaceholderLegajo(item.code, legajoAttempt);
+          legajoAttempt += 1;
           const insert = await supabase.from("rrhh_empleados").insert({ legajo, fecha_ingreso: todayAR(), activo: true, nombre, apellido }).select("id,dni,cuil,legajo,nombre,apellido").single();
           if (insert.error) {
             if (insert.error.code === "23505") continue;
@@ -274,7 +276,7 @@ async function main() {
           employee = insert.data;
           summary.createdEmployees += 1;
         }
-        if (mapHasTable) await supabase.from("rrhh_hik_person_map").upsert({ hik_code: item.code, empleado_id: employee.id, source: "auto_backfill", notes: "Placeholder autogenerado" }, { onConflict: "hik_code" });
+        if (mapHasTable) await supabase.from("rrhh_hik_person_map").upsert({ hik_code: item.code, empleado_id: employee.id, source: "auto_backfill", notes: "Placeholder autogenerado con legajo Hik" }, { onConflict: "hik_code" });
       }
       if (!employee) { summary.unresolvedRows += 1; continue; }
       learnedMap.set(item.code, String(employee.legajo || employee.id));

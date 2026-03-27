@@ -567,6 +567,7 @@ export interface Licencia extends BaseEntity {
   presentado_en_termino?: boolean
   certificado_url?: string
   certificado_storage_path?: string
+  certificado_signed_url?: string
   certificado_nombre_archivo?: string
   certificado_mime_type?: string
   certificado_tamano_bytes?: number

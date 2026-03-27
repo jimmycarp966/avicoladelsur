@@ -17,6 +17,7 @@ import { empleadoSchema, type EmpleadoFormData } from '@/lib/schemas/rrhh.schema
 import { actualizarEmpleadoAction, obtenerSucursalesActivasAction, obtenerUsuariosConAuthAction } from '@/actions/rrhh.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 import { createClient } from '@/lib/supabase/client'
+import { buildEmpleadoLegajoFromDni } from '@/lib/utils/empleado-legajo'
 import type { Empleado, Usuario, Sucursal, CategoriaEmpleado } from '@/types/domain.types'
 
 interface EditarEmpleadoFormProps {
@@ -64,6 +65,23 @@ export function EditarEmpleadoForm({ empleado, sucursales: initialSucursales, us
       activo: empleado.activo ?? true,
     },
   })
+  const watchedDni = watch('dni')
+  const watchedLegajo = watch('legajo')
+
+  useEffect(() => {
+    const suggestedLegajo = buildEmpleadoLegajoFromDni(watchedDni)
+    if (!suggestedLegajo) {
+      return
+    }
+
+    if (watchedLegajo?.trim() && watchedLegajo !== suggestedLegajo) {
+      return
+    }
+
+    setValue('legajo', suggestedLegajo, {
+      shouldDirty: Boolean(watchedLegajo),
+    })
+  }, [setValue, watchedDni, watchedLegajo])
 
   // Cargar datos de referencia actualizados
   useEffect(() => {
@@ -248,9 +266,12 @@ export function EditarEmpleadoForm({ empleado, sucursales: initialSucursales, us
                 <Label htmlFor="legajo">Legajo</Label>
                 <Input
                   id="legajo"
-                  placeholder="Ej: EMP001"
+                  placeholder="Ej: 0130123456"
                   {...register('legajo')}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Si el legajo queda vacío, se completa automáticamente como `01 + DNI`.
+                </p>
                 {errors.legajo && (
                   <p className="text-sm text-red-600">{errors.legajo.message}</p>
                 )}

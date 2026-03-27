@@ -266,14 +266,28 @@
     @apply border-border outline-ring/50;
   }
 
-body {
-  @apply text-foreground;
-  background-color: #FAFAFA !important;
-}
+  body {
+    @apply text-foreground;
+    background-color: #FAFAFA !important;
+  }
 
-.safe-area-inset-bottom {
-  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
-}
+  button:not(:disabled):focus-visible,
+  [data-slot="button"]:not(:disabled):focus-visible,
+  [role="button"]:not([aria-disabled="true"]):focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px var(--background),
+      0 0 0 4px rgba(252, 222, 141, 0.95),
+      0 10px 24px rgba(47, 112, 88, 0.22);
+  }
+
+  button:not(:disabled):focus-visible {
+    border-color: rgba(47, 112, 88, 0.55);
+  }
+
+  .safe-area-inset-bottom {
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
 }
 
 /* Estilos personalizados globales */

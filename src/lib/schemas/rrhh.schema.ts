@@ -371,17 +371,6 @@ export const legajoIncidenciaSchema = z.object({
     .refine((val) => !isNaN(Date.parse(val)), {
       message: 'Fecha de incidencia invalida',
     }),
-
-  suspension_dias: z.preprocess(
-    (value) => (value === '' || value === null || value === undefined ? undefined : value),
-    z
-      .coerce
-      .number()
-      .int('Los dias de suspension deben ser un numero entero')
-      .min(1, 'La suspension debe ser de al menos 1 dia')
-      .max(365, 'La suspension no puede superar 365 dias')
-      .optional(),
-  ),
   fecha_inicio_suspension: z
     .string()
     .optional()
@@ -397,14 +386,6 @@ export const legajoIncidenciaSchema = z.object({
     }),
   turno_reintegro: z.enum(['manana', 'tarde', 'turno_completo']).optional(),
 }).superRefine((data, ctx) => {
-  if (data.etapa === 'suspension' && !data.suspension_dias) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['suspension_dias'],
-      message: 'Debe indicar cuantos dias dura la suspension',
-    })
-  }
-
   if (data.etapa === 'suspension' && !data.fecha_inicio_suspension) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -418,6 +399,14 @@ export const legajoIncidenciaSchema = z.object({
       code: z.ZodIssueCode.custom,
       path: ['turno_inicio'],
       message: 'Debe indicar el turno en que inicia la suspension',
+    })
+  }
+
+  if (data.etapa === 'suspension' && !data.fecha_reintegro) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['fecha_reintegro'],
+      message: 'Debe indicar cuando se reintegra el empleado',
     })
   }
 

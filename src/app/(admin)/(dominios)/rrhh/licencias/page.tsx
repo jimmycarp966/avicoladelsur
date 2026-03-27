@@ -1,10 +1,13 @@
 import { Suspense } from 'react'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { createSignedStorageUrlServer } from '@/lib/supabase/storage-server'
 import { LicenciasTableWrapper } from './licencias-table-wrapper'
 import { Button } from '@/components/ui/button'
 import { Calendar, CalendarDays, Plus, CheckCircle, Clock, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import type { Licencia } from '@/types/domain.types'
+
+const RRHH_LICENCIAS_BUCKET = 'rrhh-licencias'
 
 async function getLicencias() {
   const supabase = await createClient()
@@ -35,7 +38,10 @@ async function getLicencias() {
       empleado:rrhh_empleados(
         id,
         legajo,
-        usuario:usuarios(nombre, apellido)
+        dni,
+        nombre,
+        apellido,
+        usuario:usuarios(nombre, apellido, email)
       ),
       aprobado_por:usuarios!rrhh_licencias_aprobado_por_fkey(id, nombre, apellido)
     `)
@@ -48,7 +54,37 @@ async function getLicencias() {
     return { licencias: [], canApprove: false }
   }
 
-  return { licencias: data as Licencia[], canApprove }
+  const licencias = await Promise.all(
+    ((data || []) as Licencia[]).map(async (licencia) => {
+      if (!licencia.certificado_storage_path) {
+        return {
+          ...licencia,
+          certificado_signed_url: licencia.certificado_url || undefined,
+        }
+      }
+
+      try {
+        const certificadoSignedUrl = await createSignedStorageUrlServer(
+          RRHH_LICENCIAS_BUCKET,
+          licencia.certificado_storage_path,
+          60 * 30,
+        )
+
+        return {
+          ...licencia,
+          certificado_signed_url: certificadoSignedUrl || licencia.certificado_url || undefined,
+        }
+      } catch (signedUrlError) {
+        console.error('Error creando URL firmada de licencia:', signedUrlError)
+        return {
+          ...licencia,
+          certificado_signed_url: licencia.certificado_url || undefined,
+        }
+      }
+    }),
+  )
+
+  return { licencias, canApprove }
 }
 
 export const dynamic = 'force-dynamic'

@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
 import { Controller, useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AlertTriangle, ArrowLeft, Loader2, Save } from 'lucide-react'
@@ -33,6 +32,19 @@ function getDefaultFechaEvento(): string {
   return new Date(now.getTime() - timezoneOffset).toISOString().slice(0, 16)
 }
 
+function getSuspensionDurationLabel(fechaInicio?: string, fechaReintegro?: string): string | null {
+  if (!fechaInicio || !fechaReintegro) return null
+
+  const inicio = new Date(`${fechaInicio}T00:00:00`)
+  const reintegro = new Date(`${fechaReintegro}T00:00:00`)
+  if (Number.isNaN(inicio.getTime()) || Number.isNaN(reintegro.getTime())) return null
+  if (reintegro.getTime() < inicio.getTime()) return null
+
+  const diff = Math.round((reintegro.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24))
+  const dias = Math.max(diff, 1)
+  return `${dias} dia${dias !== 1 ? 's' : ''}`
+}
+
 export function NuevaIncidenciaForm({
   empleadoId,
   empleadoNombre,
@@ -56,7 +68,6 @@ export function NuevaIncidenciaForm({
       fecha_evento: getDefaultFechaEvento(),
       titulo: buildDisciplinaTitulo('verbal', ''),
       descripcion: '',
-      suspension_dias: undefined,
       fecha_inicio_suspension: '',
       turno_inicio: undefined,
       fecha_reintegro: '',
@@ -66,21 +77,9 @@ export function NuevaIncidenciaForm({
 
   const etapa = useWatch({ control, name: 'etapa' })
   const motivo = useWatch({ control, name: 'motivo' })
-  const suspensionDias = useWatch({ control, name: 'suspension_dias' })
   const fechaInicioSuspension = useWatch({ control, name: 'fecha_inicio_suspension' })
-
-  useEffect(() => {
-    if (etapa !== 'suspension' || !fechaInicioSuspension || !suspensionDias) return
-
-    const inicio = new Date(`${fechaInicioSuspension}T12:00:00`)
-    if (Number.isNaN(inicio.getTime())) return
-
-    const reintegro = new Date(inicio.getTime() + Number(suspensionDias) * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .slice(0, 10)
-
-    setValue('fecha_reintegro', reintegro, { shouldDirty: true, shouldValidate: true })
-  }, [etapa, fechaInicioSuspension, suspensionDias, setValue])
+  const fechaReintegro = useWatch({ control, name: 'fecha_reintegro' })
+  const suspensionDurationLabel = getSuspensionDurationLabel(fechaInicioSuspension, fechaReintegro)
 
   const onSubmit = async (data: LegajoIncidenciaFormData) => {
     const result = await crearIncidenciaLegajoAction(data)
@@ -193,19 +192,6 @@ export function NuevaIncidenciaForm({
             {etapa === 'suspension' && (
               <div className="grid gap-4 rounded-lg border border-amber-200 bg-amber-50/40 p-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="suspension_dias">Dias de suspension *</Label>
-                  <Input
-                    id="suspension_dias"
-                    type="number"
-                    min={1}
-                    max={365}
-                    placeholder="Ej: 3"
-                    {...register('suspension_dias')}
-                  />
-                  {errors.suspension_dias && <p className="text-sm text-red-600">{errors.suspension_dias.message}</p>}
-                </div>
-
-                <div className="space-y-2">
                   <Label htmlFor="fecha_inicio_suspension">Inicio de suspension *</Label>
                   <Input id="fecha_inicio_suspension" type="date" {...register('fecha_inicio_suspension')} />
                   {errors.fecha_inicio_suspension && (
@@ -235,9 +221,14 @@ export function NuevaIncidenciaForm({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="fecha_reintegro">Reintegro previsto</Label>
+                  <Label htmlFor="fecha_reintegro">Reintegro previsto *</Label>
                   <Input id="fecha_reintegro" type="date" {...register('fecha_reintegro')} />
                   {errors.fecha_reintegro && <p className="text-sm text-red-600">{errors.fecha_reintegro.message}</p>}
+                  {suspensionDurationLabel && (
+                    <p className="text-xs text-muted-foreground">
+                      Duracion calculada automaticamente: {suspensionDurationLabel}.
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2 md:col-span-2">

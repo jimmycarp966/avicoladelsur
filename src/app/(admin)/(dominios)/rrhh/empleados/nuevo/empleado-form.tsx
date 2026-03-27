@@ -17,6 +17,7 @@ import { empleadoSchema, type EmpleadoFormData } from '@/lib/schemas/rrhh.schema
 import { crearEmpleadoAction, obtenerSucursalesActivasAction, obtenerUsuariosConAuthAction } from '@/actions/rrhh.actions'
 import { useNotificationStore } from '@/store/notificationStore'
 import { createClient } from '@/lib/supabase/client'
+import { buildEmpleadoLegajoFromDni } from '@/lib/utils/empleado-legajo'
 import type { Usuario, Sucursal, CategoriaEmpleado } from '@/types/domain.types'
 
 export function NuevoEmpleadoForm() {
@@ -39,6 +40,23 @@ export function NuevoEmpleadoForm() {
       activo: true,
     },
   })
+  const watchedDni = watch('dni')
+  const watchedLegajo = watch('legajo')
+
+  useEffect(() => {
+    const suggestedLegajo = buildEmpleadoLegajoFromDni(watchedDni)
+    if (!suggestedLegajo) {
+      return
+    }
+
+    if (watchedLegajo?.trim() && watchedLegajo !== suggestedLegajo) {
+      return
+    }
+
+    setValue('legajo', suggestedLegajo, {
+      shouldDirty: Boolean(watchedLegajo),
+    })
+  }, [setValue, watchedDni, watchedLegajo])
 
   // Cargar datos de referencia
   useEffect(() => {
@@ -246,9 +264,12 @@ export function NuevoEmpleadoForm() {
                 <Label htmlFor="legajo">Legajo</Label>
                 <Input
                   id="legajo"
-                  placeholder="Ej: EMP001"
+                  placeholder="Ej: 0130123456"
                   {...register('legajo')}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Si cargás el DNI y dejás este campo vacío, se completa como `01 + DNI`.
+                </p>
                 {errors.legajo && (
                   <p className="text-sm text-red-600">{errors.legajo.message}</p>
                 )}

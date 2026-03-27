@@ -18,6 +18,7 @@ import {
 import {
   applyConfiguredHikMappings,
   loadHikPersonMapConfig,
+  normalizeHikNameReference,
 } from '@/lib/services/hik-mapping.service'
 
 interface EmpleadoLookup {
@@ -53,13 +54,7 @@ function digitsOnly(value: string): string {
 }
 
 function normalizePersonName(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^0-9A-Za-z ]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toUpperCase()
+  return normalizeHikNameReference(value)
 }
 
 function readString(record: Record<string, unknown>, key: string): string {
@@ -613,6 +608,7 @@ export async function obtenerHorariosHoyDesdeHikAction(fecha?: string): Promise<
         configuredMap: hikMapConfig.map,
         employeeMap,
         employeeById,
+        employeeByName,
       })
     warnings.push(...hikMapConfig.warnings)
 
@@ -722,6 +718,7 @@ export async function sincronizarMesDesdeHikAction(
       configuredMap: hikMapConfig.map,
       employeeMap,
       employeeById,
+      employeeByName,
     })
     if (unresolvedHikMapCount > 0) {
       devError(

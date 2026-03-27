@@ -155,13 +155,20 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
     return null
   })()
 
-  const focusClienteSearchInput = () => {
-    setClienteDropdownOpen(true)
-  }
+  const focusClienteSearchInput = useCallback((selectText = false) => {
+    window.setTimeout(() => {
+      const input = clienteSearchInputRef.current
+      if (!input) return
+      input.focus()
+      if (selectText) {
+        input.select()
+      }
+    }, 0)
+  }, [])
 
-  const openClienteSelector = () => {
+  const openClienteSelector = useCallback(() => {
     setClienteDropdownOpen(true)
-  }
+  }, [])
 
   const formShortcuts: FormFieldShortcut[] = [
     {
@@ -319,7 +326,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
     if (!clienteDropdownOpen) return
 
     const timeoutId = window.setTimeout(() => {
-      focusClienteSearchInput()
+      focusClienteSearchInput(true)
     }, 0)
 
     return () => clearTimeout(timeoutId)
@@ -1045,6 +1052,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                   onValueChange={(value) => {
                     // Establecer el valor primero
                     setValue('cliente_id', value, { shouldValidate: true, shouldDirty: true })
+                    setClienteDropdownOpen(false)
                     // Limpiar la búsqueda después de un pequeño delay para asegurar que el valor se estableció
                     setTimeout(() => {
                       setClienteSearch('')
@@ -1057,7 +1065,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                   onOpenChange={(open) => {
                     setClienteDropdownOpen(open)
                     if (open) {
-                      focusClienteSearchInput()
+                      focusClienteSearchInput(true)
                     } else {
                       // Limpiar la busqueda cuando se cierra el dropdown
                       setClienteSearch('')
@@ -1131,6 +1139,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                             onClick={(e) => {
                               e.stopPropagation()
                               setClienteSearch('')
+                              focusClienteSearchInput(true)
                             }}
                           >
                             <X className="h-3 w-3" />

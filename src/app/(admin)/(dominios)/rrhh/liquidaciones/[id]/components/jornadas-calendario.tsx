@@ -252,6 +252,12 @@ export function JornadasCalendario({
                   {cfg.icon && <span className={`text-[11px] leading-none ${cfg.text}`}>{cfg.icon}</span>}
                 </div>
 
+                {dia.esDomingo && (
+                  <p className="mt-0.5 inline-flex w-fit rounded border border-rose-200 bg-rose-50 px-1 py-0 text-[9px] leading-tight text-rose-700">
+                    Domingo
+                  </p>
+                )}
+
                 {dia.esFeriado && dia.feriadoLabel && (
                   <p className="text-[9px] text-red-500 leading-tight mt-0.5 truncate">
                     {dia.feriadoLabel}

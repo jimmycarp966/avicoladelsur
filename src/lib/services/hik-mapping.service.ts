@@ -23,6 +23,7 @@ export interface ApplyHikMapParams<T extends { id: string }> {
   configuredMap: Map<string, string>
   employeeMap: Map<string, T>
   employeeById: Map<string, T>
+  employeeByName?: Map<string, T>
 }
 
 export interface ApplyHikMapResult {
@@ -32,6 +33,16 @@ export interface ApplyHikMapResult {
 
 export function normalizeHikIdentity(value: string): string {
   return value.replace(/[^0-9A-Za-z]+/g, '').toUpperCase()
+}
+
+export function normalizeHikNameReference(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^0-9A-Za-z ]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase()
 }
 
 export function hikDigitsOnly(value: string): string {
@@ -161,7 +172,7 @@ export async function loadHikPersonMapConfig(options: HikMapLoadOptions = {}): P
 export function applyConfiguredHikMappings<T extends { id: string }>(
   params: ApplyHikMapParams<T>,
 ): ApplyHikMapResult {
-  const { configuredMap, employeeMap, employeeById } = params
+  const { configuredMap, employeeMap, employeeById, employeeByName } = params
 
   let appliedCount = 0
   let unresolvedCount = 0
@@ -169,11 +180,13 @@ export function applyConfiguredHikMappings<T extends { id: string }>(
   for (const [hikCode, employeeRef] of configuredMap.entries()) {
     const refKey = normalizeHikIdentity(employeeRef)
     const refDigits = hikDigitsOnly(employeeRef)
+    const refName = normalizeHikNameReference(employeeRef)
 
     const resolved =
       employeeById.get(employeeRef) ||
       employeeMap.get(refKey) ||
-      (refDigits ? employeeMap.get(refDigits) : undefined)
+      (refDigits ? employeeMap.get(refDigits) : undefined) ||
+      (employeeByName && refName ? employeeByName.get(refName) : undefined)
 
     if (!resolved) {
       unresolvedCount++
