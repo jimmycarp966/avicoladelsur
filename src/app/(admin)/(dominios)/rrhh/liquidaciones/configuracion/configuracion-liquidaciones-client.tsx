@@ -56,9 +56,27 @@ type ReglaPeriodoEditable = {
   activo: boolean
 }
 
+type CategoriaLiquidacion = {
+  id: string
+  nombre: string
+  sueldo_basico: number
+}
+
 function toNumber(value: string): number {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : 0
+}
+
+function normalizeText(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+}
+
+function roundMoney(value: number): number {
+  return Math.round(value * 100) / 100
 }
 
 function getDaysInMonth(periodoMes: number, periodoAnio: number): number {
@@ -157,7 +175,7 @@ export function ConfiguracionLiquidacionesClient() {
   )
   const [reglasPuesto, setReglasPuesto] = useState<ReglaPuestoEditable[]>([])
   const [nuevaRegla, setNuevaRegla] = useState<ReglaPuestoEditable>(defaultReglaPuesto())
-  const [categorias, setCategorias] = useState<{ id: string; nombre: string }[]>([])
+  const [categorias, setCategorias] = useState<CategoriaLiquidacion[]>([])
 
   const codigosExistentes = useMemo(
     () => new Set(reglasPuesto.map((r) => r.puesto_codigo.toLowerCase())),
@@ -170,6 +188,14 @@ export function ConfiguracionLiquidacionesClient() {
   const categoriasCubiertas = useMemo(
     () => categorias.filter((c) => codigosExistentes.has(c.nombre.toLowerCase())),
     [categorias, codigosExistentes],
+  )
+  const categoriasById = useMemo(
+    () => new Map(categorias.map((categoria) => [categoria.id, categoria])),
+    [categorias],
+  )
+  const categoriasByNombre = useMemo(
+    () => new Map(categorias.map((categoria) => [normalizeText(categoria.nombre), categoria])),
+    [categorias],
   )
 
   const meses = [
@@ -295,6 +321,40 @@ export function ConfiguracionLiquidacionesClient() {
     setReglasPuesto((prev) =>
       prev.map((item, idx) => (idx === index ? { ...item, ...patch, _dirty: true } : item)),
     )
+  }
+
+  const getDiasBase = (grupoBaseDias: GrupoBaseDias): number => {
+    switch (grupoBaseDias) {
+      case 'sucursales':
+        return getDaysInMonth(periodoMes, periodoAnio)
+      case 'rrhh':
+        return reglaPeriodo.dias_base_rrhh
+      case 'lun_sab':
+        return reglaPeriodo.dias_base_lun_sab
+      case 'galpon':
+      default:
+        return reglaPeriodo.dias_base_galpon
+    }
+  }
+
+  const getCategoriaForRegla = (regla: ReglaPuestoEditable): CategoriaLiquidacion | null => {
+    if (regla.categoria_id && categoriasById.has(regla.categoria_id)) {
+      return categoriasById.get(regla.categoria_id) || null
+    }
+
+    return categoriasByNombre.get(normalizeText(regla.puesto_codigo)) || null
+  }
+
+  const getValorHoraCalculado = (regla: ReglaPuestoEditable): number | null => {
+    const categoria = getCategoriaForRegla(regla)
+    const diasBase = getDiasBase(regla.grupo_base_dias)
+    const horasJornada = Number(regla.horas_jornada || 0)
+
+    if (!categoria || diasBase <= 0 || horasJornada <= 0) {
+      return null
+    }
+
+    return roundMoney(Number(categoria.sueldo_basico || 0) / diasBase / horasJornada)
   }
 
   return (
@@ -580,7 +640,7 @@ export function ConfiguracionLiquidacionesClient() {
                     <TableHead>Grupo días</TableHead>
                     <TableHead>Tipo cálculo</TableHead>
                     <TableHead className="text-right">Hs diarias</TableHead>
-                    <TableHead className="text-right">Tarifa turno comp.</TableHead>
+                    <TableHead className="text-right">Valor base mes</TableHead>
                     <TableHead className="text-right">Tarifa especial</TableHead>
                     <TableHead>Cajero</TableHead>
                     <TableHead className="text-right">Tarifa cajero</TableHead>
@@ -592,6 +652,9 @@ export function ConfiguracionLiquidacionesClient() {
                   {reglasPuesto.map((regla, index) => {
                     const rowSavingId = regla.id || ''
                     const isSaving = savingPuestoId === rowSavingId
+                    const valorHoraCalculado = getValorHoraCalculado(regla)
+                    const categoriaRegla = getCategoriaForRegla(regla)
+                    const diasBaseRegla = getDiasBase(regla.grupo_base_dias)
 
                     return (
                       <TableRow key={regla.id || `regla-${index}`}>
@@ -661,18 +724,31 @@ export function ConfiguracionLiquidacionesClient() {
                           />
                         </TableCell>
                         <TableCell className="text-right">
-                          <Input
-                            type="number"
-                            min={0}
-                            step="0.01"
-                            value={regla.tarifa_turno_trabajado}
-                            className="h-8 w-24 text-sm text-right ml-auto"
-                            onChange={(e) =>
-                              updateReglaPuesto(index, {
-                                tarifa_turno_trabajado: Math.max(0, toNumber(e.target.value)),
-                              })
-                            }
-                          />
+                          {regla.tipo_calculo === 'turno' ? (
+                            <Input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              value={regla.tarifa_turno_trabajado}
+                              className="h-8 w-24 text-sm text-right ml-auto"
+                              onChange={(e) =>
+                                updateReglaPuesto(index, {
+                                  tarifa_turno_trabajado: Math.max(0, toNumber(e.target.value)),
+                                })
+                              }
+                            />
+                          ) : (
+                            <div className="text-right space-y-0.5">
+                              <div className="font-medium tabular-nums">
+                                {valorHoraCalculado !== null ? valorHoraCalculado.toFixed(2) : '0.00'}
+                              </div>
+                              <div className="text-[11px] text-muted-foreground">
+                                {categoriaRegla
+                                  ? `Auto: sueldo ${Number(categoriaRegla.sueldo_basico || 0).toFixed(0)} / ${diasBaseRegla} dias`
+                                  : 'Auto segun sueldo de categoria'}
+                              </div>
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell className="text-right">
                           <Input

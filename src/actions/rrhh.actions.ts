@@ -2717,7 +2717,7 @@ export async function eliminarLiquidacionJornadaAction(
 export async function obtenerConfiguracionLiquidacionAction(
   periodoMes: number,
   periodoAnio: number
-): Promise<ApiResponse<{ reglaPeriodo: LiquidacionReglaPeriodo | null; reglasPuesto: LiquidacionReglaPuesto[]; categorias: { id: string; nombre: string }[] }>> {
+): Promise<ApiResponse<{ reglaPeriodo: LiquidacionReglaPeriodo | null; reglasPuesto: LiquidacionReglaPuesto[]; categorias: { id: string; nombre: string; sueldo_basico: number }[] }>> {
   try {
     const adminUserId = await getAuthenticatedAdminUserId()
     if (!adminUserId) {
@@ -2759,7 +2759,7 @@ export async function obtenerConfiguracionLiquidacionAction(
 
     const { data: categorias } = await supabase
       .from('rrhh_categorias')
-      .select('id, nombre')
+      .select('id, nombre, sueldo_basico')
       .eq('activo', true)
       .order('nombre')
 
@@ -2768,7 +2768,7 @@ export async function obtenerConfiguracionLiquidacionAction(
       data: {
         reglaPeriodo: (reglaPeriodo || null) as LiquidacionReglaPeriodo | null,
         reglasPuesto: (reglasPuesto || []) as LiquidacionReglaPuesto[],
-        categorias: (categorias ?? []) as { id: string; nombre: string }[],
+        categorias: (categorias ?? []) as { id: string; nombre: string; sueldo_basico: number }[],
       },
     }
   } catch (error) {
