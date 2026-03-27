@@ -1,5 +1,7 @@
 # RRHH · Actualizaciones Operativas (Febrero 2026)
 
+Nota: este archivo es un snapshot operativo de febrero 2026. La referencia vigente del modulo RRHH es `RRHH_README.md`.
+
 ## Fecha
 - 2026-02-20
 

@@ -1,415 +1,142 @@
-# Flujo Completo: Presupuestos → Pedidos → Rutas Diarias
+# Flujo presupuestos -> pedidos -> rutas
 
-**Última actualización**: Febrero 2026
-**Estado**: ✅ Implementado y Verificado
+Actualizado: 2026-03-27
 
-## 📋 Resumen Ejecutivo
+Este documento describe el flujo operativo vigente entre ventas, almacen y reparto.
 
-Sistema completo de gestión de presupuestos que transforma el proceso operativo desde la creación hasta la entrega, con asignación automática de turnos, fechas y estados, optimización de rutas y trazabilidad completa.
+## 1. Entradas al flujo
 
-## 🔄 Flujo Operativo Completo
+El flujo puede comenzar desde:
 
-### 1. Creación de Presupuestos
+- backoffice de ventas (`/ventas/presupuestos/nuevo`)
+- bot de WhatsApp (`/api/bot`)
+- catalogo publico integrado a WhatsApp (`/catalogo`)
 
-#### Por Bot WhatsApp
-```
-Cliente envía: "POLLO001 5"
-↓
-Bot valida stock → fn_crear_presupuesto_desde_bot()
-↓
-Asignación automática:
-- Turno: según horario de corte
-- Fecha entrega: automática
-- Estado: 'en_almacen'
-↓
-Reserva preventiva de stock (FIFO)
-↓
-Respuesta: "Presupuesto PRES-YYYYMMDD-XXXX creado"
-```
+## 2. Presupuesto
 
-#### Por Vendedor (Web)
-```
-Vendedor → /ventas/presupuestos/nuevo
-↓
-Formulario con:
-- **Selector de clientes** con autoFocus automático (dropdown se abre al cargar)
-- Búsqueda por: nombre, teléfono, zona, código
-- **Selector de productos** buscable (código, nombre)
-- Fecha de entrega: automática (hoy), editable
-- Zona: opcional (se detecta del cliente si existe)
-- Tipo de venta: Reparto o Retira en Casa Central
-↓
-Crear Presupuesto
-↓
-Asignación automática (misma lógica que bot):
-- Turno: según horario de corte
-- Fecha entrega: automática
-- Estado: 'en_almacen'
-↓
-Presupuesto aparece automáticamente en "Presupuestos del Día"
-```
+Rutas y piezas principales:
 
-### 2. Horarios de Corte Automáticos
+- `/ventas/presupuestos`
+- `/ventas/presupuestos/nuevo`
+- `/ventas/presupuestos/[id]`
+- `/ventas/presupuestos/[id]/editar`
+- `/api/ventas/presupuestos/crear`
+- `/api/ventas/presupuestos/listar`
+- `/api/ventas/presupuestos/[id]`
+- `/api/ventas/presupuestos/enviar-almacen`
+- `src/actions/presupuestos.actions.ts`
 
-El sistema asigna turno y fecha automáticamente según la hora de creación:
+Notas:
 
-| Hora de Creación | Turno Asignado | Fecha de Entrega |
-|-----------------|----------------|------------------|
-| Antes de 5:00 AM | Mañana | Mismo día |
-| 5:00 AM - 3:00 PM | Tarde | Mismo día |
-| Después de 3:00 PM | Mañana | Día siguiente |
+- el presupuesto puede nacer desde web o bot
+- el flujo actual convive con procesos automaticos y acciones manuales
+- la transicion a almacen y la conversion a pedido ya no deben documentarse como simples scripts SQL aislados
 
-**Zona horaria**: America/Argentina/Buenos_Aires
+## 3. Almacen y pesaje
 
-### 3. Presupuestos del Día (Almacén)
+Rutas principales:
 
-```
-/almacen/presupuestos-dia
-↓
-Filtros disponibles:
-- Fecha (default: hoy)
-- Zona
-- Turno (mañana/tarde)
-↓
-Vista muestra:
-- Total de presupuestos del día
-- Total de kg estimados
-- Resumen consolidado del día (sin filtros)
-- **Lista de preparación del día** (colapsable):
-  - Consolidado de productos por zona, turno y categoría/rubro
-  - Productos agrupados por categoría (Lácteos, Panificados, Carnes, etc.)
-  - Dentro de cada categoría: **productos pesables (BALANZA) primero**
-  - Ordenados por cantidad descendente dentro de cada grupo
-  - Opción de imprimir lista organizada
-- Lista de presupuestos agrupados por zona/turno:
-  - **Ordenamiento**: Presupuestos con items pesables pendientes primero
-  - Luego los que solo tienen items no pesables
-  - Dentro de cada grupo: por cantidad de pesables pendientes (descendente)
-  - Si siguen iguales: por kg totales (descendente)
-  - Información de cada presupuesto:
-    - Número de presupuesto
-    - Cliente
-    - Zona y turno
-    - Items con badge "BALANZA" si aplica
-    - Botón "Pasar a Pedido" individual
-  - Al expandir "Ver productos": items ordenados con pesables primero
-↓
-Botón "Pasar a Pedidos del Día" (masivo):
-- Convierte todos los presupuestos visibles
-- Muestra confirmación con cantidad
-- Valida que todos tengan turno y zona
-```
+- `/almacen/presupuestos-dia`
+- `/almacen/presupuesto/[id]/pesaje`
+- `/almacen/en-preparacion`
+- `/almacen/pedidos`
+- `/almacen/pedidos/[id]`
 
-### 4. Pesaje de Productos Balanza
+APIs y acciones relevantes:
 
-```
-Presupuesto con productos balanza → /almacen/presupuesto/[id]/pesaje
-↓
-Interfaz de pesaje:
-- Lista de items pesables
-- Campo de peso editable por item
-- Actualización en tiempo real
-↓
-Actualizar peso → actualizarPesoItemAction()
-↓
-Recálculo automático:
-- Precio final = precio unitario × peso final
-- Subtotal final actualizado
-- Total del presupuesto actualizado
-```
+- `/api/almacen/presupuesto/pesaje`
+- `/api/almacen/analizar-peso`
+- `/api/almacen/presupuesto/finalizar`
+- `/api/almacen/presupuesto/convertir-pedido`
+- `src/actions/pesajes.actions.ts`
+- `src/actions/presupuestos-dia.actions.ts`
+- `src/actions/en-preparacion.actions.ts`
 
-### 5. Conversión a Pedidos
+Notas:
 
-#### Conversión Individual
-```
-Presupuesto del Día → Botón "Pasar a Pedido"
-↓
-confirmarPresupuestoAction()
-↓
-Validaciones:
-- Presupuesto debe tener zona asignada
-- Si tiene productos balanza, deben estar pesados
-↓
-fn_convertir_presupuesto_a_pedido()
-↓
-- Asigna turno automáticamente si no existe
-- Crea pedido en estado 'preparando'
-- Descuenta stock físico (FIFO)
-- Actualiza presupuesto a estado 'facturado'
-↓
-Redirige a /almacen/pedidos/[id]
-```
+- existe soporte para productos pesables y analisis de anomalias
+- `POST /api/almacen/analizar-peso` sigue siendo un endpoint legacy y no usa aun el contrato moderno de metadata IA
 
-#### Conversión Masiva
-```
-Presupuestos del Día → Botón "Pasar a Pedidos del Día"
-↓
-Confirmación con cantidad de presupuestos
-↓
-Procesa cada presupuesto:
-- Misma validación que individual
-- Muestra progreso
-- Errores individuales no detienen el proceso
-↓
-Todos los pedidos creados aparecen en /almacen/pedidos
-```
+## 4. Pedido
 
-### 6. Gestión de Pedidos (Almacén)
+Una vez convertido, el flujo sigue en:
 
-```
-/almacen/pedidos
-↓
-Filtros:
-- Fecha (default: hoy)
-- Turno (mañana/tarde/todos)
-↓
-Vista muestra:
-- Lista de pedidos del turno seleccionado
-- Estado: preparando, en_ruta, entregado, cancelado
-- Información de cliente, zona, turno
-↓
-Botones disponibles:
-- "Pasar a Ruta" (individual): Desde tabla o desde página de detalle
-  - Solo visible si estado = 'preparando'
-  - Asigna pedido a ruta planificada existente
-  - Optimiza automáticamente el orden de la ruta
-- "Pasar a Ruta Diaria" (masivo):
-  - Opción Automática: Genera rutas para todos los pedidos del turno
-  - Opción Manual: Selecciona pedidos específicos
-```
+- `/almacen/pedidos`
+- `/almacen/pedidos/[id]`
+- `/api/almacen/presupuesto/convertir-pedido`
+- `/api/pedidos/[id]/pdf`
 
-#### Página de Detalle del Pedido
-```
-/almacen/pedidos/[id]
-↓
-Información completa del pedido
-↓
-Botón "Pasar a Ruta" (si estado = 'preparando'):
-- Asigna el pedido a una ruta planificada
-- Busca ruta por zona/turno/fecha
-- Si no existe, la crea según plan semanal
-- Optimiza automáticamente el orden de clientes
-- Muestra mensaje de éxito o error
-```
+El pedido puede terminar en reparto o en otros subflujos operativos, segun el caso.
 
-### 7. Generación de Rutas Diarias
+## 5. Ruta y reparto
 
-#### Automática
-```
-Pedidos → "Pasar a Ruta Diaria" → Automática
-↓
-generarRutaDiariaAutomatica(fecha, turno)
-↓
-- Obtiene pedidos en estado 'preparando' del turno/fecha
-- Agrupa por zona
-- Crea rutas automáticas por zona
-- Asigna vehículos según capacidad
-- Genera optimización de ruta (Google Maps + fallback)
-↓
-Rutas creadas disponibles en /reparto/rutas
-```
+Rutas principales:
 
-#### Manual
-```
-Pedidos → "Pasar a Ruta Diaria" → Manual
-↓
-Modal de selección:
-- Lista de pedidos disponibles (filtrados por turno)
-- Checkboxes para seleccionar
-- Resumen: total pedidos, peso estimado, zona
-↓
-Validaciones:
-- Todos deben ser del mismo turno
-- Todos deben ser de la misma zona
-↓
-generarRutaDiariaManual(pedidosIds, fecha, zona_id, turno)
-↓
-- Crea ruta con pedidos seleccionados
-- Asigna vehículo según peso total
-- Genera optimización de ruta
-```
+- `/reparto/planificacion`
+- `/reparto/planificacion/semana`
+- `/reparto/planificacion/historial`
+- `/reparto/rutas`
+- `/reparto/rutas/nueva`
+- `/reparto/rutas/[id]`
+- `/reparto/rutas/[id]/optimizar`
+- `/reparto/monitor`
 
-## 🗄️ Estructura de Datos
+PWA del repartidor:
 
-### Tabla `presupuestos`
-```sql
-- id: UUID
-- numero_presupuesto: VARCHAR(50) UNIQUE
-- cliente_id: UUID
-- zona_id: UUID
-- estado: 'pendiente' | 'en_almacen' | 'facturado' | 'anulado'
-- turno: 'mañana' | 'tarde' (asignado automáticamente)
-- fecha_entrega_estimada: DATE (asignada automáticamente)
-- total_estimado: DECIMAL(10,2)
-- total_final: DECIMAL(10,2)
-- observaciones: TEXT
-- usuario_vendedor: UUID
-- usuario_almacen: UUID
-- created_at: TIMESTAMPTZ
-- updated_at: TIMESTAMPTZ
-```
+- `/ruta-diaria`
+- `/ruta/[ruta_id]`
+- `/ruta/[ruta_id]/mapa`
+- `/ruta/[ruta_id]/entrega/[entrega_id]`
+- `/entregas`
 
-### Tabla `presupuesto_items`
-```sql
-- id: UUID
-- presupuesto_id: UUID
-- producto_id: UUID
-- cantidad_solicitada: DECIMAL(10,3)
-- cantidad_reservada: DECIMAL(10,3)
-- precio_unit_est: DECIMAL(10,2)
-- precio_unit_final: DECIMAL(10,2)
-- pesable: BOOLEAN (true si categoría = 'BALANZA')
-- peso_final: DECIMAL(10,3)
-- subtotal_est: DECIMAL(10,2)
-- subtotal_final: DECIMAL(10,2)
-```
+APIs relevantes:
 
-## 🔧 Funciones RPC Principales
+- `/api/reparto/pedidos/[pedidoId]/asignar-ruta`
+- `/api/reparto/rutas-planificadas`
+- `/api/reparto/rutas-activas`
+- `/api/reparto/ubicacion`
+- `/api/reparto/ubicaciones`
+- `/api/reparto/ubicacion-actual`
+- `/api/reparto/entrega`
+- `/api/reparto/devolucion`
+- `/api/reparto/devoluciones`
+- `/api/reparto/alertas`
+- `/api/rutas/generar`
+- `/api/rutas/alternativas`
+- `/api/rutas/optimize-advanced`
 
-### `fn_crear_presupuesto_desde_bot()`
-**Parámetros:**
-- `p_cliente_id`: UUID
-- `p_items`: JSONB (array de {producto_id, cantidad, precio_unitario})
-- `p_observaciones`: TEXT (opcional)
-- `p_zona_id`: UUID (opcional)
-- `p_fecha_entrega_estimada`: DATE (opcional)
+## 6. Orden real del motor de optimizacion
 
-**Lógica:**
-1. Detecta zona del cliente si no se proporciona
-2. Determina turno según horario de corte
-3. Determina fecha de entrega según horario
-4. Crea presupuesto en estado `'en_almacen'`
-5. Procesa items y marca como pesables si categoría = 'BALANZA'
-6. Reserva stock preventivo (FIFO)
+Flujo base de optimizacion:
 
-**Retorna:**
-```json
-{
-  "success": true,
-  "presupuesto_id": "uuid",
-  "numero_presupuesto": "PRES-YYYYMMDD-XXXX",
-  "total_estimado": 1234.56,
-  "turno": "mañana" | "tarde",
-  "fecha_entrega_estimada": "2025-12-01",
-  "reserva_result": {...}
-}
-```
+1. OpenRouteService
+2. Google Directions
+3. optimizador local
 
-### `fn_convertir_presupuesto_a_pedido()`
-**Parámetros:**
-- `p_presupuesto_id`: UUID
-- `p_user_id`: UUID
-- `p_caja_id`: UUID (opcional)
+Flujo avanzado:
 
-**Lógica:**
-1. Valida que presupuesto esté en estado válido
-2. Valida que tenga zona asignada
-3. Asigna turno automáticamente si no existe (misma lógica que creación)
-4. Valida que productos balanza estén pesados
-5. Crea pedido en estado 'preparando'
-6. Descuenta stock físico (FIFO)
-7. Actualiza presupuesto a estado 'facturado'
+1. Google Cloud Optimization API
+2. Google Fleet Routing
+3. flujo base ORS -> Google -> local
 
-## 🎨 Interfaz de Usuario
+No documentar Fleet Routing o Cloud Optimization como obligatorios para operar el sistema base.
 
-### Módulo Ventas
-- **`/ventas/presupuestos`**: Lista completa de presupuestos
-- **`/ventas/presupuestos/nuevo`**: Formulario de creación
-  - Selector de clientes buscable
-  - Selector de productos buscable
-  - Fecha automática (editable)
-- **`/ventas/presupuestos/[id]`**: Detalle del presupuesto
-- **`/ventas/presupuestos/[id]/editar`**: Edición de presupuesto
+## 7. Seguimiento y estados
 
-### Módulo Almacén
-- **`/almacen/presupuestos-dia`**: Presupuestos del día
-  - Filtros: fecha, zona, turno
-  - Conversión masiva e individual
-- **`/almacen/presupuesto/[id]/pesaje`**: Interfaz de pesaje
-- **`/almacen/pedidos`**: Gestión de pedidos
-  - Filtros: fecha, turno
-  - Generación de rutas diarias
-- **`/almacen/pedidos/[id]`**: Detalle del pedido
+El monitor, la PWA y varios endpoints de reparto dependen de:
 
-## 🔍 Características Técnicas
+- asignacion de ruta
+- orden de visita
+- ETAs estimados
+- tracking GPS
+- cierre de ruta
+- cobros y validaciones posteriores
 
-### Asignación Automática de Turno
-- Se aplica tanto al crear presupuesto como al convertir a pedido
-- Basado en hora local de Buenos Aires
-- Horarios de corte: 5:00 AM y 3:00 PM
+El cierre del flujo no termina en reparto: suele continuar en tesoreria con validacion de cobros y movimientos.
 
-### Estado Automático
-- Presupuestos se crean en estado `'en_almacen'`
-- Aparecen automáticamente en "Presupuestos del Día"
-- No requiere acción manual de "enviar a almacén"
+## 8. Documentos relacionados
 
-### Ordenamiento Inteligente en Presupuestos del Día
-- **Lista de preparación**: Productos agrupados por categoría/rubro
-  - Productos pesables (BALANZA) primero dentro de cada categoría
-  - Ordenados por cantidad descendente
-  - Categorías ordenadas alfabéticamente ("Sin categoría" al final)
-- **Presupuestos dentro de cada zona/turno**:
-  - Presupuestos con items pesables pendientes primero
-  - Luego los que solo tienen items no pesables
-  - Dentro de cada grupo: por cantidad de pesables pendientes (descendente)
-  - Si siguen iguales: por kg totales (descendente)
-- **Items dentro de cada presupuesto**: Pesables primero, por cantidad
-
-### Selectores Buscables
-- Implementados con campo de búsqueda dentro del dropdown
-- Filtrado en tiempo real
-- Búsqueda por múltiples campos (código, nombre, teléfono, zona)
-- **Selector de cliente con autoFocus automático** al crear nuevo presupuesto
-
-### Lista de Preparación Colapsable
-- La sección de "Lista de preparación del día" es colapsable/desplegable
-- Permite ocultar/mostrar para mejor organización de la pantalla
-- Mantiene botón de impresión accesible
-
-### Next.js 16 Compatibility
-- Todos los `params` se manejan como Promise con `await`
-- Correcciones aplicadas en todas las páginas dinámicas `[id]`
-
-## 📝 Notas de Implementación
-
-### Migraciones SQL
-- `20251130_asignar_turno_auto_presupuesto.sql`: Asignación automática de turno
-- `20251130_fix_turno_column.sql`: Asegura que columna `turno` existe
-
-### Cambios en Estructura
-- Módulo Pedidos movido de `/ventas/pedidos` a `/almacen/pedidos`
-- Sidebar actualizado para reflejar nueva ubicación
-- Todas las referencias internas actualizadas
-
-### Validaciones
-- Presupuesto debe tener zona antes de convertir a pedido
-- Productos balanza deben estar pesados antes de convertir
-- Pedidos deben tener turno y zona antes de generar ruta
-- Validación de capacidad de vehículo antes de asignar pedidos
-
-## 🧪 Pruebas Recomendadas
-
-1. **Crear presupuesto manual**: Verificar turno y fecha automáticos
-2. **Crear presupuesto por bot**: Verificar misma lógica
-3. **Ver en Presupuestos del Día**: Debe aparecer automáticamente
-4. **Pesaje**: Editar pesos y verificar recálculo
-5. **Conversión individual**: Convertir un presupuesto a pedido
-6. **Conversión masiva**: Convertir múltiples presupuestos
-7. **Generar ruta automática**: Desde módulo de pedidos
-8. **Generar ruta manual**: Seleccionar pedidos específicos
-
-## 📜 Historial de Cambios
-
-### Febrero 2026
-- **Lista de preparación colapsable**: Sección ahora puede colapsarse/desplegarse
-- **Agrupación por categoría**: Productos en lista de preparación agrupados por rubro/categoría
-- **Ordenamiento pesables primero**:
-  - En lista de preparación: pesables primero dentro de cada categoría
-  - En presupuestos: los que tienen items pesables pendientes aparecen primero
-  - En items de cada presupuesto: pesables primero al expandir
-- **autoFocus en cliente**: Al crear nuevo presupuesto, el selector de cliente tiene foco automático
-
-### Noviembre 2025
-- Asignación automática de turno según horarios de corte
-- Presupuestos creados directamente en estado 'en_almacen'
-- Mejoras en interfaz de pesaje
+- `README.md`
+- `ARCHITECTURE.MD`
+- `docs/USUARIO_REPARTIDOR.md`
+- `docs/IA_CAPABILITIES.md`

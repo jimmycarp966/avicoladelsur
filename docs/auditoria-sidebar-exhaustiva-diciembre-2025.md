@@ -1,5 +1,7 @@
 # 🔍 Auditoría Exhaustiva del Sidebar - Diciembre 2025
 
+Nota: este archivo es una auditoria historica de diciembre 2025. El sistema cambio despues de ese relevamiento y hoy la referencia vigente es `README.md` junto con `ARCHITECTURE.MD`.
+
 ## 📊 Resumen Ejecutivo
 
 Se realizó una auditoría completa y exhaustiva del sistema comparando:

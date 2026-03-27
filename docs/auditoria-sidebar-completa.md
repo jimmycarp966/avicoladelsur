@@ -1,5 +1,7 @@
 # 🔍 Auditoría Completa del Sidebar - Diciembre 2025
 
+Nota: este archivo es una auditoria historica de diciembre 2025. El sidebar, las rutas y el modulo RRHH cambiaron despues de ese corte, por lo que no debe usarse como mapa vigente del sistema.
+
 ## ✅ Estado Actual: COMPLETO
 
 ### 📊 Resumen Ejecutivo

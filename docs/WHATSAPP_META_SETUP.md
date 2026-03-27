@@ -1,5 +1,7 @@
 # Guía Completa de Configuración - WhatsApp Business API (Meta)
 
+Nota: esta guia describe el alta especifica en Meta. Para la matriz actual de proveedores, variables activas y comportamiento real del bot, usar como referencia `README.md`, `docs/VERCEL_SETUP.md` y `env.example`.
+
 Esta guía te ayudará a configurar WhatsApp Business API oficial de Meta para habilitar botones interactivos en el bot de Avícola del Sur.
 
 ## 📋 Requisitos Previos

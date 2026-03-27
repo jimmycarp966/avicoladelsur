@@ -1,5 +1,7 @@
 # 🤖 Casos de Uso de Vertex AI para Avícola del Sur ERP
 
+Nota: este documento describe ideas y roadmap historico. Para configuracion vigente y capacidades activas, usar `docs/GOOGLE_CLOUD_SETUP.md` y `docs/IA_CAPABILITIES.md`.
+
 ## 📋 Resumen Ejecutivo
 
 Vertex AI puede transformar tu ERP de reactivo a proactivo, agregando inteligencia artificial en 6 áreas clave: **Bot WhatsApp avanzado**, **Predicción de demanda**, **Análisis de reclamos**, **Recomendaciones personalizadas**, **OCR de documentos** y **Análisis de sentimiento**.

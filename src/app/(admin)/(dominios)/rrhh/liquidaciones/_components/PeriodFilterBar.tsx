@@ -197,7 +197,7 @@ export function PeriodFilterBar({
           <SelectContent>
             <SelectItem value="todos">Todos los ambitos</SelectItem>
             <SelectItem value="sucursal">Sucursal</SelectItem>
-            <SelectItem value="galpon">Galpon</SelectItem>
+            <SelectItem value="galpon">Galpon / Casa Central / RRHH</SelectItem>
           </SelectContent>
         </Select>
 

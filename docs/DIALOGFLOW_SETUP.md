@@ -1,5 +1,7 @@
 # 🤖 Guía de Configuración - Dialogflow
 
+Nota: esta guia es complementaria para configurar Dialogflow. La referencia vigente de integraciones IA y variables del proyecto esta en `docs/GOOGLE_CLOUD_SETUP.md`, `docs/IA_CAPABILITIES.md` y `env.example`.
+
 Esta guía te ayudará a configurar Dialogflow para el bot inteligente de WhatsApp.
 
 ## 📋 Prerrequisitos

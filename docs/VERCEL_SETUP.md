@@ -1,184 +1,146 @@
-# 🚀 Configuración de Variables de Entorno en Vercel
+# Vercel setup
 
-Esta guía te explica cómo configurar las variables de entorno (incluyendo la Google Maps API Key) en Vercel para producción.
+Actualizado: 2026-03-27
 
-## 📋 Pasos para Configurar en Vercel
+Esta guia resume las variables de entorno que hoy afectan un deploy funcional en Vercel.
 
-### Opción 1: Desde el Dashboard de Vercel (Recomendado)
+## 1. Variables minimas
 
-1. **Accede a tu proyecto en Vercel**
-   - Ve a [vercel.com](https://vercel.com)
-   - Inicia sesión
-   - Selecciona tu proyecto "Avicola del Sur" (o el nombre que tenga)
-
-2. **Ve a la configuración del proyecto**
-   - Haz clic en **"Settings"** (Configuración)
-   - En el menú lateral, selecciona **"Environment Variables"** (Variables de Entorno)
-
-3. **Agrega la Google Maps API Key**
-   - Haz clic en **"Add New"** (Agregar Nueva)
-   - **Key**: `GOOGLE_MAPS_API_KEY`
-   - **Value**: `your-google-maps-api-key`
-   - **Environment**: Selecciona todas las opciones:
-     - ✅ Production (Producción)
-     - ✅ Preview (Previsualización)
-     - ✅ Development (Desarrollo)
-   - Haz clic en **"Save"** (Guardar)
-
-4. **Redesplegar la aplicación**
-   - Ve a la pestaña **"Deployments"** (Despliegues)
-   - Haz clic en los tres puntos (⋯) del último despliegue
-   - Selecciona **"Redeploy"** (Redesplegar)
-   - O simplemente haz un nuevo commit y push (Vercel desplegará automáticamente)
-
-### Opción 2: Desde la CLI de Vercel
-
-Si prefieres usar la terminal:
+### Base app / Supabase
 
 ```bash
-# 1. Instalar Vercel CLI (si no lo tienes)
-npm i -g vercel
+NEXT_PUBLIC_APP_URL=https://your-domain.vercel.app
+NEXT_PUBLIC_SITE_URL=https://your-domain.vercel.app
+NEXT_PUBLIC_API_URL=https://your-domain.vercel.app
 
-# 2. Iniciar sesión
-vercel login
-
-# 3. Agregar la variable de entorno
-vercel env add GOOGLE_MAPS_API_KEY
-
-# Cuando se solicite:
-# - Value: your-google-maps-api-key
-# - Environment: Selecciona Production, Preview y Development
-
-# 4. Verificar que se agregó
-vercel env ls
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
-## ✅ Verificar que Funciona
-
-### Método 1: Revisar Logs de Vercel
-
-1. Ve a tu proyecto en Vercel
-2. Selecciona un despliegue reciente
-3. Haz clic en **"Functions"** (Funciones)
-4. Busca logs que mencionen "Google Directions" o "fallback local"
-
-### Método 2: Probar el Endpoint en Producción
+### Cron
 
 ```bash
-# Reemplaza 'tu-dominio.vercel.app' con tu dominio real
-curl -X POST https://tu-dominio.vercel.app/api/integrations/google/directions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "origin": {"lat": -27.1671, "lng": -65.4995},
-    "destination": {"lat": -27.1856, "lng": -65.4923},
-    "waypoints": [{"lat": -27.1758, "lng": -65.4959}],
-    "optimize": true
-  }'
+CRON_SECRET=generate-a-long-random-secret
 ```
 
-Si funciona, deberías recibir una respuesta con `"success": true` y datos de la ruta optimizada.
+## 2. Variables recomendadas segun features
 
-## 🔒 Seguridad en Vercel
+### Mapas y routing
 
-### Buenas Prácticas
+```bash
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your-public-google-maps-key
+GOOGLE_MAPS_API_KEY=your-server-google-maps-key
+GOOGLE_MAPS_FLEET_ROUTING_API_KEY=your-fleet-routing-key
+NEXT_PUBLIC_OPENROUTESERVICE_API_KEY=your-ors-key
+GRAPHHOPPER_API_KEY=your-graphhopper-key
+```
 
-1. **No expongas la API Key en el código**
-   - ✅ Usa variables de entorno (como estás haciendo)
-   - ❌ No la pongas directamente en el código fuente
+### Bot y WhatsApp
 
-2. **Configura restricciones en Google Cloud Console**
-   - Ve a [Google Cloud Console](https://console.cloud.google.com/)
-   - Edita tu API Key
-   - En "Restricciones de aplicación", agrega:
-     - Tu dominio de Vercel: `*.vercel.app`
-     - Tu dominio personalizado (si lo tienes)
+```bash
+WHATSAPP_PROVIDER=auto
+WHATSAPP_ENABLE_BUTTONS=true
 
-3. **Monitorea el uso**
-   - Revisa regularmente en Google Cloud Console
-   - Configura alertas de facturación
+WHATSAPP_META_ACCESS_TOKEN=...
+WHATSAPP_META_PHONE_NUMBER_ID=...
+WHATSAPP_META_APP_ID=...
+WHATSAPP_META_APP_SECRET=...
+WHATSAPP_META_VERIFY_TOKEN=...
+WHATSAPP_META_WEBHOOK_URL=https://your-domain.vercel.app/api/webhooks/whatsapp-meta
 
-## 📝 Variables de Entorno Completas para Vercel
+KAPSO_API_KEY=...
+KAPSO_WHATSAPP_PHONE_NUMBER_ID=...
+KAPSO_WHATSAPP_WEBHOOK_SECRET=...
+KAPSO_WHATSAPP_BASE_URL=https://api.kapso.ai/meta/whatsapp
 
-Asegúrate de tener configuradas todas estas variables en Vercel:
+TWILIO_ACCOUNT_SID=...
+TWILIO_AUTH_TOKEN=...
+TWILIO_WHATSAPP_NUMBER=...
 
-```env
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+BOTPRESS_WEBHOOK_URL=...
+BOTPRESS_API_KEY=...
+BOTPRESS_WEBHOOK_TOKEN=...
+```
 
-# Twilio
-TWILIO_ACCOUNT_SID=your-twilio-account-sid
-TWILIO_AUTH_TOKEN=your-twilio-auth-token
-TWILIO_WHATSAPP_NUMBER=+14155238886
+### Google Cloud / IA
 
-# Google Maps
-GOOGLE_MAPS_API_KEY=your-google-maps-api-key
-GOOGLE_MAPS_FLEET_ROUTING_API_KEY=tu-fleet-routing-api-key
-
-# Google Cloud Configuration
-GOOGLE_CLOUD_PROJECT_ID=tu-project-id
+```bash
+GOOGLE_CLOUD_PROJECT_ID=...
 GOOGLE_CLOUD_REGION=southamerica-east1
-GOOGLE_CLOUD_SERVICE_ACCOUNT_BASE64=tu-service-account-base64
+GOOGLE_CLOUD_SERVICE_ACCOUNT_BASE64=...
 
-# Google Cloud APIs
-GOOGLE_OPTIMIZATION_API_ENABLED=true
-GOOGLE_SPEECH_TO_TEXT_ENABLED=true
-GOOGLE_VERTEX_AI_ENABLED=true
-GOOGLE_AUTOML_ENABLED=true
-
-# Dialogflow
-GOOGLE_DIALOGFLOW_PROJECT_ID=tu-project-id
-GOOGLE_DIALOGFLOW_AGENT_ID=tu-agent-id
-GOOGLE_DIALOGFLOW_LANGUAGE_CODE=es-AR
-
-# Speech-to-Text
-GOOGLE_SPEECH_TO_TEXT_LANGUAGE_CODE=es-AR
-
-# Document AI
-GOOGLE_DOCUMENT_AI_PROJECT_ID=tu-project-id
-GOOGLE_DOCUMENT_AI_LOCATION=us
-GOOGLE_DOCUMENT_AI_PROCESSOR_ID_FACTURAS=tu-processor-id-facturas
-GOOGLE_DOCUMENT_AI_PROCESSOR_ID_REMITOS=tu-processor-id-remitos
-
-# Vertex AI
-GOOGLE_VERTEX_AI_LOCATION=us-central1
-
-# AutoML
-GOOGLE_AUTOML_LOCATION=us-central1
-
-# Gemini API
-GOOGLE_GEMINI_API_KEY=tu-gemini-api-key
-GOOGLE_GEMINI_MODEL=gemini-3-pro-preview
+GOOGLE_GEMINI_API_KEY=...
+GOOGLE_GEMINI_MODEL=gemini-2.5-flash
 GOOGLE_GEMINI_LOCATION=us-central1
 
-# App
-NEXT_PUBLIC_APP_URL=https://tu-dominio.vercel.app
+GOOGLE_VERTEX_AI_ENABLED=true
+GOOGLE_VERTEX_AI_LOCATION=us-central1
+
+GOOGLE_DOCUMENT_AI_PROJECT_ID=...
+GOOGLE_DOCUMENT_AI_LOCATION=us
+GOOGLE_DOCUMENT_AI_PROCESSOR_ID_FACTURAS=...
+GOOGLE_DOCUMENT_AI_PROCESSOR_ID_REMITOS=...
+
+GOOGLE_DIALOGFLOW_PROJECT_ID=...
+GOOGLE_DIALOGFLOW_AGENT_ID=...
+GOOGLE_DIALOGFLOW_LANGUAGE_CODE=es-AR
+
+GOOGLE_SPEECH_TO_TEXT_ENABLED=true
+GOOGLE_SPEECH_TO_TEXT_LANGUAGE_CODE=es-AR
 ```
 
-## 🆘 Solución de Problemas
+### RRHH / Hik-Connect
 
-### La API Key no funciona en producción
+```bash
+HIK_CONNECT_BASE_URL=...
+HIK_CONNECT_API_KEY=...
+HIK_CONNECT_API_SECRET=...
+HIK_CONNECT_TOKEN_PATH=/api/hccgw/platform/v1/token/get
+HIK_CONNECT_EVENTS_PATH=/api/hccgw/acs/v1/event/certificaterecords/search
+HIK_CONNECT_EVENTS_METHOD=POST
+HIK_CONNECT_AUTH_MODE=hcc_token
+HIK_CONNECT_PERSON_MAP=
+HIK_CONNECT_PAGE_SIZE=200
+HIK_CONNECT_MAX_PAGES_HISTORICAL=100
+HIK_ATTENDANCE_DEBOUNCE_MINUTES=1
+```
 
-**Posibles causas:**
-1. No se redesplegó después de agregar la variable
-2. La variable está en el ambiente incorrecto (solo Development, no Production)
-3. Las restricciones de Google están bloqueando el dominio de Vercel
+### WebMCP y toggles
 
-**Solución:**
-1. Verifica que la variable esté en todos los ambientes (Production, Preview, Development)
-2. Redespliega la aplicación
-3. Revisa las restricciones en Google Cloud Console
+```bash
+NEXT_PUBLIC_WEBMCP_ENABLED=false
+RRHH_AUTO_LIQUIDACIONES_UI_FALLBACK=false
+```
 
-### Error: "API key not valid"
+## 3. Como cargar variables
 
-**Solución:**
-- Verifica que copiaste la API Key correctamente (sin espacios)
-- Revisa que esté habilitada "Directions API" en Google Cloud Console
-- Espera unos minutos después de habilitar (puede tardar en propagarse)
+### Dashboard
 
-## 📚 Recursos
+1. Abrir proyecto en Vercel.
+2. Ir a Settings -> Environment Variables.
+3. Cargar las variables por entorno.
+4. Redeploy del ambiente afectado.
 
-- [Documentación de Vercel sobre Variables de Entorno](https://vercel.com/docs/concepts/projects/environment-variables)
-- [Guía de Despliegue en Vercel](https://vercel.com/docs)
+### CLI
 
+```bash
+vercel env add VARIABLE_NAME
+```
+
+## 4. Verificaciones utiles
+
+- UI de mapas: verificar `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`
+- endpoints cron: verificar `CRON_SECRET`
+- webhook Meta: verificar URL y `WHATSAPP_META_VERIFY_TOKEN`
+- bot multi-proveedor: verificar `WHATSAPP_PROVIDER`
+- RRHH horarios: verificar `HIK_CONNECT_*`
+- WebMCP: verificar `NEXT_PUBLIC_WEBMCP_ENABLED`
+
+## 5. Referencias
+
+- `env.example`
+- `README.md`
+- `docs/GOOGLE_CLOUD_SETUP.md`
+- `docs/WHATSAPP_KAPSO_SETUP.md`
+- `docs/WHATSAPP_META_SETUP.md`

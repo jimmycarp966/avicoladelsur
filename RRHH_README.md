@@ -1,263 +1,200 @@
-# 🧑‍💼 Módulo RRHH - Recursos Humanos
+# RRHH
 
-## 📋 Resumen Ejecutivo
+Actualizado: 2026-03-27
 
-Módulo completo de Recursos Humanos implementado para Avícola del Sur ERP, que incluye gestión completa de empleados, asistencia, liquidaciones, evaluaciones y reportes. Implementa todas las reglas específicas solicitadas incluyendo límites de adelantos (30% del sueldo) y penalizaciones por faltas sin aviso.
+## Resumen
 
-## ✨ Características Principales
+RRHH es uno de los modulos mas evolucionados del repo. Ya no se limita a empleados, asistencia y liquidaciones basicas: hoy incluye integracion con Hik-Connect, legajo disciplinario, licencias con adjuntos, adelantos con planes/cuotas, mensajes internos y un flujo de liquidaciones configurable por periodo y puesto.
 
-### 👥 **Gestión de Empleados**
-- ✅ CRUD completo de empleados con datos personales y laborales
-- ✅ Vinculación con usuarios del sistema
-- ✅ Asignación por sucursal y categoría
-- ✅ Legajos únicos y validaciones de DNI/CUIL
-- ✅ Datos bancarios para pagos automáticos
+La ruta raiz `/rrhh` redirige actualmente a `/rrhh/empleados`.
 
-### 📊 **Control de Asistencia**
-- ✅ Registro manual y automático de asistencia
-- ✅ Cálculo automático de retrasos por turno
-- ✅ **Regla crítica**: 1 falta sin aviso = pérdida presentismo + jornal
-- ✅ **Regla de retrasos**: >15 minutos = falta sin aviso
-- ✅ Turnos configurables (mañana/tarde/noche)
+## Superficies activas
 
-### 💰 **Sistema de Liquidaciones**
-- ✅ Cálculo automático mensual por empleado
-- ✅ Incluye horas extras, turnos y producción por kg
-- ✅ Descuentos automáticos de adelantos
-- ✅ Workflow: Borrador → Calculada → Aprobada → Pagada
-- ✅ Detalle desglosado de cada concepto
+| Ruta | Proposito |
+| --- | --- |
+| `/rrhh/empleados` | listado y acceso al legajo |
+| `/rrhh/empleados/nuevo` | alta de empleado |
+| `/rrhh/empleados/[id]` | legajo, eventos, historial y relaciones RRHH |
+| `/rrhh/empleados/[id]/editar` | edicion de empleado |
+| `/rrhh/empleados/[id]/incidencias/nueva` | carga de evento / incidencia |
+| `/rrhh/empleados/[id]/incidencias/[eventoId]/documento` | documento imprimible del evento |
+| `/rrhh/horarios` | lectura y sincronizacion de marcaciones Hik-Connect |
+| `/rrhh/licencias` | licencias y descansos |
+| `/rrhh/licencias/nueva` | carga de licencia o vacaciones |
+| `/rrhh/adelantos` | adelantos y estado operativo |
+| `/rrhh/adelantos/nuevo` | alta de adelanto |
+| `/rrhh/evaluaciones` | evaluaciones |
+| `/rrhh/evaluaciones/nueva` | nueva evaluacion |
+| `/rrhh/mensajes` | mensajeria interna |
+| `/rrhh/novedades` | novedades de RRHH |
+| `/rrhh/novedades/nueva` | alta de novedad |
+| `/rrhh/reportes` | reportes de RRHH |
+| `/rrhh/liquidaciones` | listado de liquidaciones |
+| `/rrhh/liquidaciones/calcular` | calculo y ajustes previos |
+| `/rrhh/liquidaciones/configuracion` | reglas por periodo y por puesto |
+| `/rrhh/liquidaciones/[id]` | planilla, jornadas, cuotas, feriados y workflow |
+| `/rrhh/liquidaciones/[id]/recibo` | recibo imprimible |
+| `/rrhh/liquidaciones/[id]/recibo/simple` | version simplificada del recibo |
 
-### 💸 **Gestión de Adelantos** ✅ **COMPLETAMENTE IMPLEMENTADO**
-- ✅ **Página principal** (`/rrhh/adelantos`) con tabla interactiva y estadísticas
-- ✅ **Formulario de creación** (`/rrhh/adelantos/nuevo`) con validación en tiempo real
-- ✅ **Límite automático del 30% del sueldo básico** validado antes de aprobar
-- ✅ **Adelantos en dinero o productos** con campos dinámicos según tipo
-- ✅ **Workflow de aprobación** con botones de aprobar/rechazar desde la tabla
-- ✅ **Control de porcentajes** por empleado/mes con reinicio automático
-- ✅ **Función RPC** `fn_validar_limite_adelanto()` para validación atómica
-- ✅ **Estadísticas en tiempo real**: Total, aprobados, pendientes, total aprobado
-- ✅ **Distribución por tipo**: Visualización de adelantos en dinero vs productos
-- ✅ **Tabla completa** con columnas: Empleado, Tipo, Monto/Valor, Producto, % Sueldo, Fecha, Estado, Aprobado Por
+## Capacidades reales hoy
 
-### 📋 **Licencias y Descansos**
-- ✅ Tipos: Vacaciones, Enfermedad, Maternidad, Estudio, Otro
-- ✅ Cálculo automático de días hábiles
-- ✅ Workflow de aprobación
-- ✅ Impacto en asistencia automática
+### Empleados y legajo
 
-### 🎯 **Evaluaciones de Desempeño**
-- ✅ Por sucursal y período mensual
-- ✅ 5 criterios: Puntualidad, Rendimiento, Actitud, Responsabilidad, Trabajo en Equipo
-- ✅ Promedio automático calculado
-- ✅ Comentarios cualitativos y objetivos
-- ✅ Sistema de notificaciones integrado
+- datos personales, laborales y de sucursal
+- vinculacion con usuarios del sistema
+- categoria y sueldo basico
+- legajo disciplinario e historial de eventos
+- documentos firmables e imprimibles por incidencia
 
-### 📢 **Novedades RRHH**
-- ✅ Comunicación interna por tipo: General, Sucursal, Categoría
-- ✅ Sistema de prioridades (Urgente, Alta, Normal, Baja)
-- ✅ Fechas de expiración automática
-- ✅ Filtros por destinatarios
+### Horarios y asistencia
 
-### 📈 **Reportes Avanzados**
-- ✅ 6 tipos de reportes: Empleados, Liquidaciones, Adelantos, Evaluaciones, Asistencia, Licencias
-- ✅ Filtros dinámicos por fechas, empleados, estados
-- ✅ Exportación Excel/CSV automática
-- ✅ Endpoint API `/api/rrhh/reportes`
+- consulta diaria de marcaciones Hik-Connect
+- sincronizacion mensual desde Hik-Connect
+- mapeo `employee_no` / persona Hik a empleado RRHH
+- filtros y advertencias de consulta parcial
+- debounce de marcaciones repetidas
+- resguardo para no sobrescribir cargas manuales
 
-## 🏗️ Arquitectura Implementada
+### Licencias
 
-### 📁 **Estructura de Archivos**
-```
-src/
-├── app/(admin)/(dominios)/rrhh/
-│   ├── empleados/           # ✅ CRUD empleados
-│   │   └── nuevo/          # ✅ Formulario creación
-│   ├── asistencia/          # ✅ Control asistencia
-│   │   └── marcar/         # ✅ Formulario marcado
-│   ├── liquidaciones/       # ✅ Cálculo sueldos
-│   │   └── calcular/       # ✅ Calculadora masiva
-│   ├── adelantos/           # ✅ Gestión adelantos
-│   │   ├── nuevo/          # ✅ Formulario creación
-│   │   └── adelantos-table-wrapper.tsx  # ✅ Wrapper acciones
-│   ├── licencias/           # ✅ Licencias y descansos
-│   │   └── nueva/          # ✅ Formulario creación
-│   ├── evaluaciones/        # ✅ Evaluaciones desempeño
-│   │   └── nueva/          # ✅ Formulario creación
-│   ├── novedades/           # ✅ Comunicación interna
-│   │   └── nueva/          # ✅ Formulario creación
-│   └── reportes/            # ✅ Generador reportes
-├── components/tables/
-│   └── AdelantosTable.tsx   # ✅ Tabla interactiva adelantos
-├── actions/rrhh.actions.ts  # ✅ Server Actions completas
-├── lib/
-│   ├── schemas/rrhh.schema.ts # ✅ Validaciones Zod
-│   └── supabase/             # ✅ Funciones RPC
-└── types/domain.types.ts    # ✅ Tipos TypeScript
-```
+- vacaciones
+- enfermedad
+- maternidad
+- estudio
+- otros permisos
 
-### 🗄️ **Base de Datos**
+Flujo operativo actual:
 
-#### **Nuevas Tablas (10)**
-- `sucursales` - Gestión de sucursales
-- `rrhh_categorias` - Categorías de empleados
-- `rrhh_empleados` - Datos completos empleados
-- `rrhh_novedades` - Comunicación interna
-- `rrhh_asistencia` - Control diario asistencia
-- `rrhh_licencias` - Licencias y descansos
-- `rrhh_adelantos` - Adelantos en dinero/productos
-- `rrhh_liquidaciones` - Cálculo sueldos mensual
-- `rrhh_liquidacion_detalles` - Desglose liquidaciones
-- `rrhh_descuentos` - Descuentos adicionales
-- `rrhh_evaluaciones` - Evaluaciones desempeño
+- carga con formulario dedicado
+- certificados y adjuntos
+- revision manual
+- almacenamiento privado
+- impacto posterior sobre asistencia y liquidaciones
 
-#### **Funciones RPC**
-- `fn_calcular_liquidacion_mensual()` - Cálculo automático sueldos
-- `fn_validar_limite_adelanto()` - Control 30% límite
-- `fn_marcar_asistencia()` - Registro con reglas retrasos
+### Adelantos
 
-### 🔐 **Seguridad y Roles**
-- ✅ **RLS completo** por tabla con políticas específicas
-- ✅ **Empleados ven solo su información**
-- ✅ **Admins gestionan todo**
-- ✅ **Validaciones preventivas** en Server Actions
+El modelo actual ya no es solo "adelanto simple".
 
-## 🎯 **Reglas de Negocio Implementadas**
+Incluye:
 
-### **Asistencia Crítica**
-1. **Faltas sin aviso**: Una sola = pérdida presentismo + jornal completo
-2. **Retrasos**: >15 minutos tarde = falta sin aviso
-3. **Turnos**: Mañana (hasta 15:00), Tarde (desde 15:00)
+- adelantos monetarios y en producto
+- validacion de limites
+- aprobacion / rechazo
+- planes de adelanto
+- cuotas asociadas a liquidaciones
+- RLS especifico para accesos administrativos
 
-### **Adelantos Controlados**
-1. **Límite 30%**: Del sueldo básico mensual por empleado
-2. **Validación automática**: Antes de aprobar cualquier adelanto
-3. **Control mensual**: Reinicio automático cada mes
+### Evaluaciones y mensajes
 
-### **Liquidaciones Automáticas**
-1. **Cálculo mensual**: Basado en asistencia real
-2. **Incluye**: Horas extras, producción por kg, adicionales
-3. **Descuentos**: Adelantos y penalizaciones automáticas
+- evaluaciones de desempeno
+- metricas operativas complementarias
+- mensajes internos
+- novedades segmentadas
 
-### **Evaluaciones Estructuradas**
-1. **Por sucursal**: Evaluaciones específicas por ubicación
-2. **5 criterios**: Escala 1-5 con promedio automático
-3. **Notificaciones**: Sistema integrado de avisos
+### Liquidaciones
 
-## 🚀 **Navegación y UI**
+El flujo actual contempla:
 
-### **Menú Principal**
-```
-RRHH
-├── 👥 Empleados
-├── ⏰ Asistencia
-├── 💰 Liquidaciones
-├── 💸 Adelantos
-├── 📅 Licencias
-├── 📊 Evaluaciones
-├── 📢 Novedades
-└── 📋 Reportes
-```
+- calculo por empleado y periodo
+- reglas por periodo
+- reglas por puesto
+- jornadas de liquidacion
+- feriados
+- tramos por puesto
+- cuotas de adelantos vinculadas
+- workflow de calculada -> aprobada -> autorizada/pagada
+- recalcado, detalle y control manual
 
-### **Páginas Implementadas**
-- ✅ **Empleados** (`/rrhh/empleados`): Listado + CRUD completo con estadísticas
-- ✅ **Asistencia** (`/rrhh/asistencia`): Control diario con estadísticas y marcado manual
-- ✅ **Liquidaciones** (`/rrhh/liquidaciones`): Calculadora masiva + detalles con workflow completo
-- ✅ **Adelantos** (`/rrhh/adelantos`): 
-  - Listado completo con tabla interactiva
-  - Estadísticas (total, aprobados, pendientes, total aprobado)
-  - Distribución por tipo (dinero/productos)
-  - Formulario para crear nuevos adelantos (`/rrhh/adelantos/nuevo`)
-  - Aprobación/rechazo desde la tabla
-  - Validación automática del límite del 30% del sueldo básico
-- ✅ **Licencias** (`/rrhh/licencias`): Solicitudes con aprobación y cálculo automático de días
-- ✅ **Evaluaciones** (`/rrhh/evaluaciones`): Formularios por sucursal con 5 criterios
-- ✅ **Novedades** (`/rrhh/novedades`): Comunicación segmentada con prioridades
-- ✅ **Reportes** (`/rrhh/reportes`): Generador con filtros múltiples y exportación
+## Tablas y entidades relevantes
 
-## 📊 **Estadísticas y KPIs**
+La documentacion de RRHH debe mirar primero `supabase/migrations`, porque el runtime ya usa entidades que no siempre aparecen en tipos generados viejos.
 
-### **Dashboard RRHH**
-- 📈 **Empleados activos** por sucursal
-- ⏱️ **Asistencia promedio** diaria
-- 💰 **Total sueldos** pagados por período
-- 📊 **Evaluaciones promedio** por sucursal
-- 🚫 **Faltas sin aviso** del mes
-- 💸 **Adelantos pendientes** de aprobación
+Entidades operativas relevantes hoy:
 
-### **Reportes Disponibles**
-1. **Empleados**: Listado completo con datos laborales
-2. **Liquidaciones**: Sueldos calculados por período
-3. **Adelantos**: Historial con estados de aprobación
-4. **Evaluaciones**: Resultados por empleado/sucursal
-5. **Asistencia**: Control diario con estadísticas
-6. **Licencias**: Historial de permisos y descansos
+- `rrhh_empleados`
+- `rrhh_categorias`
+- `rrhh_asistencia`
+- `rrhh_licencias`
+- `rrhh_adelantos`
+- `rrhh_adelanto_planes`
+- `rrhh_adelanto_cuotas`
+- `rrhh_novedades`
+- `rrhh_evaluaciones`
+- `rrhh_liquidaciones`
+- `rrhh_liquidacion_detalles`
+- `rrhh_liquidacion_jornadas`
+- `rrhh_liquidacion_reglas_periodo`
+- `rrhh_liquidacion_reglas_puesto`
+- `rrhh_liquidacion_tramos_puesto`
+- `rrhh_descansos_mensuales`
+- `rrhh_legajo_eventos`
+- `rrhh_feriados`
 
-## 🔧 **Implementación Técnica**
+## Integraciones
 
-### **Stack Tecnológico**
-- ✅ **Next.js 15** con App Router
-- ✅ **React 19** + TypeScript
-- ✅ **Supabase** (Postgres + Auth + Storage)
-- ✅ **Server Actions** para lógica crítica
-- ✅ **Zod** para validaciones
-- ✅ **Tailwind CSS** + shadcn/ui
+### Hik-Connect
 
-### **Patrones Implementados**
-- ✅ **Server-Side First**: Toda lógica crítica en servidor
-- ✅ **Atomic Operations**: Transacciones para integridad
-- ✅ **RLS Estricto**: Seguridad por fila y rol
-- ✅ **Real-time**: Actualizaciones automáticas
-- ✅ **Error Handling**: Mensajes user-friendly
+Piezas principales:
 
-## 📋 **Checklist de Funcionalidades**
+- `src/app/(admin)/(dominios)/rrhh/horarios`
+- `src/actions/rrhh-horarios.actions.ts`
+- `src/lib/services/rrhh-horarios.service.ts`
+- `scripts/rrhh-hik-backfill.js`
 
-### ✅ **Completado**
-- [x] Gestión completa de empleados
-- [x] Sistema de asistencia con reglas críticas
-- [x] Liquidaciones automáticas mensuales
-- [x] Control de adelantos con límite 30%
-- [x] Licencias y descansos con aprobación
-- [x] Evaluaciones por sucursal con 5 criterios
-- [x] Novedades segmentadas por tipo
-- [x] Reportes exportables (Excel/CSV)
-- [x] Navegación integrada al sistema
-- [x] Base de datos completa con índices
-- [x] Funciones RPC optimizadas
-- [x] Políticas RLS completas
-- [x] UI/UX consistente con el ERP
+Variables relevantes:
 
-### 🚀 **Próximas Mejoras Sugeridas**
-- 📧 **Notificaciones por email** para evaluaciones
-- 📱 **App móvil** para empleados (marcado asistencia)
-- 🤖 **Recordatorios automáticos** de vencimientos
-- 📊 **Dashboard ejecutivo** con KPIs avanzados
-- 🔄 **Integración con sistemas** de nómina externos
+- `HIK_CONNECT_BASE_URL`
+- `HIK_CONNECT_API_KEY`
+- `HIK_CONNECT_API_SECRET`
+- `HIK_CONNECT_TOKEN_PATH`
+- `HIK_CONNECT_EVENTS_PATH`
+- `HIK_CONNECT_EVENTS_METHOD`
+- `HIK_CONNECT_AUTH_MODE`
+- `HIK_CONNECT_PERSON_MAP`
+- `HIK_CONNECT_PAGE_SIZE`
+- `HIK_CONNECT_MAX_PAGES_HISTORICAL`
+- `HIK_ATTENDANCE_DEBOUNCE_MINUTES`
 
-## 🎉 **Estado: COMPLETAMENTE FUNCIONAL**
+### Storage y documentos
 
-El módulo RRHH está **100% implementado y listo para producción**, siguiendo todas las reglas de negocio especificadas y manteniendo la consistencia con la arquitectura del ERP Avícola del Sur.
+Licencias y legajo disciplinario ya usan almacenamiento y URLs firmadas para documentos sensibles.
 
-**¡Listo para gestionar todo el personal de manera eficiente y automatizada!** 🎯
+## Cambios estructurales de marzo 2026
 
-## Actualizaciones operativas 2026-02-20
+Cambios que ya impactan soporte y operacion:
 
-Se documentan ajustes recientes para mejorar consistencia y soporte del modulo RRHH:
+- adelantos atomicos con planes y cuotas
+- unificacion de legajo y descansos mensuales
+- reglas `lun_sab`
+- resolucion de tarifa por turno
+- tramos por puesto
+- extras y suspensiones
+- bloqueo de asistencia futura dentro del mes actual
+- acceso administrativo sobre licencias
+- bucket privado para archivos de licencias
 
-- Fuente unica de empleados en formularios RRHH:
-  - Evaluaciones: `/rrhh/evaluaciones/nueva`
-  - Licencias: `/rrhh/licencias/nueva`
-  - Asistencia: `/rrhh/asistencia/marcar`
-  - Adelantos: `/rrhh/adelantos/nuevo`
-  - Todos consumen `obtenerEmpleadosActivosAction`, igual que `/rrhh/empleados`.
-- Fuente unificada de sucursales activas en evaluaciones con `obtenerSucursalesActivasAction`.
-- Correccion de acceso en detalle de liquidacion (`/rrhh/liquidaciones/[id]`) para evitar 404 falsos por RLS.
-- Nueva seccion de parametros de liquidacion en `/rrhh/liquidaciones/configuracion`:
-  - reglas por periodo (`rrhh_liquidacion_reglas_periodo`)
-  - reglas por puesto (`rrhh_liquidacion_reglas_puesto`)
-- Ajustes manuales al calcular liquidaciones (`/rrhh/liquidaciones/calcular`):
-  - horas adicionales
-  - turnos especiales
-  - observaciones de RRHH
-- Mejora de tabla de liquidaciones para identificar mejor al empleado (nombre -> email -> "Sin nombre").
+## APIs de RRHH
 
-Referencia extendida: ver `docs/RRHH_ACTUALIZACIONES_2026-02.md`.
+Rutas relevantes:
+
+- `/api/rrhh/empleados/activos`
+- `/api/rrhh/asistencia/marcar`
+- `/api/rrhh/adelantos/crear`
+- `/api/rrhh/adelantos/[id]/aprobar`
+- `/api/rrhh/adelantos/[id]/rechazar`
+- `/api/rrhh/liquidaciones/calcular`
+- `/api/rrhh/liquidaciones/[id]/detalle`
+- `/api/rrhh/liquidaciones/[id]/recalcular`
+- `/api/rrhh/liquidaciones/[id]/aprobar`
+- `/api/rrhh/liquidaciones/[id]/autorizar`
+- `/api/rrhh/liquidaciones/[id]/pagar`
+- `/api/rrhh/liquidaciones/[id]/control`
+- `/api/rrhh/reportes`
+- `/api/cron/rrhh/liquidaciones-en-curso`
+- `/api/cron/rrhh/liquidaciones-mensuales`
+
+## Notas de mantenimiento
+
+- si cambia el modelo de liquidaciones, actualizar primero este archivo y luego `README.md`
+- si cambia la integracion Hik, actualizar tambien `env.example`
+- para revisar drift real del modulo, contrastar siempre paginas RRHH + APIs RRHH + migraciones recientes

@@ -1,4 +1,5 @@
 ﻿// Auto-generated Supabase types with tesoreria_cajas fix
+// Reconciled manually because cloud typegen was unavailable during this audit.
 export type Database = {
   public: {
     Tables: {
@@ -266,12 +267,17 @@ export type Database = {
           fecha: string;
           hora_entrada: string | null;
           hora_salida: string | null;
+          hora_entrada_manana: string | null;
+          hora_salida_manana: string | null;
+          hora_entrada_tarde: string | null;
+          hora_salida_tarde: string | null;
           horas_trabajadas: number | null;
           turno: string | null;
           estado: string;
           observaciones: string | null;
           retraso_minutos: number;
           falta_sin_aviso: boolean;
+          origen: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -281,12 +287,17 @@ export type Database = {
           fecha: string;
           hora_entrada?: string | null;
           hora_salida?: string | null;
+          hora_entrada_manana?: string | null;
+          hora_salida_manana?: string | null;
+          hora_entrada_tarde?: string | null;
+          hora_salida_tarde?: string | null;
           horas_trabajadas?: number | null;
           turno?: string | null;
           estado?: string;
           observaciones?: string | null;
           retraso_minutos?: number;
           falta_sin_aviso?: boolean;
+          origen?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -296,12 +307,17 @@ export type Database = {
           fecha?: string;
           hora_entrada?: string | null;
           hora_salida?: string | null;
+          hora_entrada_manana?: string | null;
+          hora_salida_manana?: string | null;
+          hora_entrada_tarde?: string | null;
+          hora_salida_tarde?: string | null;
           horas_trabajadas?: number | null;
           turno?: string | null;
           estado?: string;
           observaciones?: string | null;
           retraso_minutos?: number;
           falta_sin_aviso?: boolean;
+          origen?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -313,6 +329,27 @@ export type Database = {
           tipo: string;
           fecha_inicio: string;
           fecha_fin: string;
+          fecha_sintomas: string | null;
+          diagnostico_reportado: string | null;
+          excepcion_plazo: boolean;
+          motivo_excepcion: string | null;
+          fecha_presentacion_certificado: string | null;
+          fecha_limite_presentacion: string | null;
+          presentado_en_termino: boolean | null;
+          certificado_url: string | null;
+          certificado_storage_path: string | null;
+          certificado_nombre_archivo: string | null;
+          certificado_mime_type: string | null;
+          certificado_tamano_bytes: number | null;
+          estado_revision: string;
+          revision_manual_required: boolean;
+          revisado_por: string | null;
+          fecha_revision: string | null;
+          ia_certificado_valido: boolean | null;
+          ia_confianza: number | null;
+          ia_observaciones: string | null;
+          ia_nombre_detectado: string | null;
+          ia_diagnostico_detectado: string | null;
           dias_total: number;
           aprobado: boolean;
           aprobado_por: string | null;
@@ -327,6 +364,27 @@ export type Database = {
           tipo: string;
           fecha_inicio: string;
           fecha_fin: string;
+          fecha_sintomas?: string | null;
+          diagnostico_reportado?: string | null;
+          excepcion_plazo?: boolean;
+          motivo_excepcion?: string | null;
+          fecha_presentacion_certificado?: string | null;
+          fecha_limite_presentacion?: string | null;
+          presentado_en_termino?: boolean | null;
+          certificado_url?: string | null;
+          certificado_storage_path?: string | null;
+          certificado_nombre_archivo?: string | null;
+          certificado_mime_type?: string | null;
+          certificado_tamano_bytes?: number | null;
+          estado_revision?: string;
+          revision_manual_required?: boolean;
+          revisado_por?: string | null;
+          fecha_revision?: string | null;
+          ia_certificado_valido?: boolean | null;
+          ia_confianza?: number | null;
+          ia_observaciones?: string | null;
+          ia_nombre_detectado?: string | null;
+          ia_diagnostico_detectado?: string | null;
           dias_total: number;
           aprobado?: boolean;
           aprobado_por?: string | null;
@@ -341,6 +399,27 @@ export type Database = {
           tipo?: string;
           fecha_inicio?: string;
           fecha_fin?: string;
+          fecha_sintomas?: string | null;
+          diagnostico_reportado?: string | null;
+          excepcion_plazo?: boolean;
+          motivo_excepcion?: string | null;
+          fecha_presentacion_certificado?: string | null;
+          fecha_limite_presentacion?: string | null;
+          presentado_en_termino?: boolean | null;
+          certificado_url?: string | null;
+          certificado_storage_path?: string | null;
+          certificado_nombre_archivo?: string | null;
+          certificado_mime_type?: string | null;
+          certificado_tamano_bytes?: number | null;
+          estado_revision?: string;
+          revision_manual_required?: boolean;
+          revisado_por?: string | null;
+          fecha_revision?: string | null;
+          ia_certificado_valido?: boolean | null;
+          ia_confianza?: number | null;
+          ia_observaciones?: string | null;
+          ia_nombre_detectado?: string | null;
+          ia_diagnostico_detectado?: string | null;
           dias_total?: number;
           aprobado?: boolean;
           aprobado_por?: string | null;
@@ -364,6 +443,7 @@ export type Database = {
           aprobado_por: string | null;
           fecha_aprobacion: string | null;
           porcentaje_sueldo: number | null;
+          plan_id: string | null;
           observaciones: string | null;
           created_at: string;
           updated_at: string;
@@ -381,6 +461,7 @@ export type Database = {
           aprobado_por?: string | null;
           fecha_aprobacion?: string | null;
           porcentaje_sueldo?: number | null;
+          plan_id?: string | null;
           observaciones?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -398,6 +479,7 @@ export type Database = {
           aprobado_por?: string | null;
           fecha_aprobacion?: string | null;
           porcentaje_sueldo?: number | null;
+          plan_id?: string | null;
           observaciones?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -424,6 +506,7 @@ export type Database = {
           adelantos_total: number;
           total_neto: number;
           puesto_override: string | null;
+          puesto_hs_extra: string | null;
           dias_base: number | null;
           horas_jornada: number | null;
           valor_jornal: number | null;
@@ -435,6 +518,12 @@ export type Database = {
           adelanto_mercaderia_total: number | null;
           adelanto_efectivo_total: number | null;
           descuento_presentismo: number | null;
+          presentismo_teorico: number | null;
+          presentismo_perdido: number | null;
+          presentismo_pagado: number | null;
+          grupo_base_snapshot: string | null;
+          sucursal_snapshot_id: string | null;
+          sucursal_snapshot_nombre: string | null;
           control_30_limite: number | null;
           control_30_anticipos: number | null;
           control_30_superado: boolean | null;
@@ -472,6 +561,7 @@ export type Database = {
           adelantos_total?: number;
           total_neto: number;
           puesto_override?: string | null;
+          puesto_hs_extra?: string | null;
           dias_base?: number | null;
           horas_jornada?: number | null;
           valor_jornal?: number | null;
@@ -483,6 +573,12 @@ export type Database = {
           adelanto_mercaderia_total?: number | null;
           adelanto_efectivo_total?: number | null;
           descuento_presentismo?: number | null;
+          presentismo_teorico?: number | null;
+          presentismo_perdido?: number | null;
+          presentismo_pagado?: number | null;
+          grupo_base_snapshot?: string | null;
+          sucursal_snapshot_id?: string | null;
+          sucursal_snapshot_nombre?: string | null;
           control_30_limite?: number | null;
           control_30_anticipos?: number | null;
           control_30_superado?: boolean | null;
@@ -520,6 +616,7 @@ export type Database = {
           adelantos_total?: number;
           total_neto?: number;
           puesto_override?: string | null;
+          puesto_hs_extra?: string | null;
           dias_base?: number | null;
           horas_jornada?: number | null;
           valor_jornal?: number | null;
@@ -531,6 +628,12 @@ export type Database = {
           adelanto_mercaderia_total?: number | null;
           adelanto_efectivo_total?: number | null;
           descuento_presentismo?: number | null;
+          presentismo_teorico?: number | null;
+          presentismo_perdido?: number | null;
+          presentismo_pagado?: number | null;
+          grupo_base_snapshot?: string | null;
+          sucursal_snapshot_id?: string | null;
+          sucursal_snapshot_nombre?: string | null;
           control_30_limite?: number | null;
           control_30_anticipos?: number | null;
           control_30_superado?: boolean | null;
@@ -547,6 +650,159 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           created_by?: string | null;
+        };
+      };
+      rrhh_liquidacion_reglas_periodo: {
+        Row: {
+          id: string;
+          periodo_mes: number;
+          periodo_anio: number;
+          dias_base_galpon: number;
+          dias_base_sucursales: number;
+          dias_base_rrhh: number;
+          dias_base_lun_sab: number;
+          activo: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          periodo_mes: number;
+          periodo_anio: number;
+          dias_base_galpon?: number;
+          dias_base_sucursales?: number;
+          dias_base_rrhh?: number;
+          dias_base_lun_sab?: number;
+          activo?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          periodo_mes?: number;
+          periodo_anio?: number;
+          dias_base_galpon?: number;
+          dias_base_sucursales?: number;
+          dias_base_rrhh?: number;
+          dias_base_lun_sab?: number;
+          activo?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      rrhh_liquidacion_reglas_puesto: {
+        Row: {
+          id: string;
+          puesto_codigo: string;
+          categoria_id: string | null;
+          grupo_base_dias: string;
+          horas_jornada: number;
+          tarifa_turno_trabajado: number;
+          tarifa_turno_especial: number;
+          habilita_cajero: boolean;
+          tarifa_diferencia_cajero: number;
+          tipo_calculo: string;
+          activo: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          puesto_codigo: string;
+          categoria_id?: string | null;
+          grupo_base_dias?: string;
+          horas_jornada?: number;
+          tarifa_turno_trabajado?: number;
+          tarifa_turno_especial?: number;
+          habilita_cajero?: boolean;
+          tarifa_diferencia_cajero?: number;
+          tipo_calculo?: string;
+          activo?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          puesto_codigo?: string;
+          categoria_id?: string | null;
+          grupo_base_dias?: string;
+          horas_jornada?: number;
+          tarifa_turno_trabajado?: number;
+          tarifa_turno_especial?: number;
+          habilita_cajero?: boolean;
+          tarifa_diferencia_cajero?: number;
+          tipo_calculo?: string;
+          activo?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      rrhh_liquidacion_jornadas: {
+        Row: {
+          id: string;
+          liquidacion_id: string;
+          empleado_id: string;
+          fecha: string;
+          turno: string;
+          tarea: string | null;
+          horas_mensuales: number;
+          horas_adicionales: number;
+          turno_especial_unidades: number;
+          tarifa_hora_base: number;
+          tarifa_hora_extra: number;
+          tarifa_turno_especial: number;
+          monto_mensual: number | null;
+          monto_extra: number | null;
+          monto_turno_especial: number | null;
+          origen: string;
+          observaciones: string | null;
+          horas_extra_aprobadas: boolean;
+          horas_extra_aprobadas_por: string | null;
+          horas_extra_aprobadas_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          liquidacion_id: string;
+          empleado_id: string;
+          fecha: string;
+          turno?: string;
+          tarea?: string | null;
+          horas_mensuales?: number;
+          horas_adicionales?: number;
+          turno_especial_unidades?: number;
+          tarifa_hora_base?: number;
+          tarifa_hora_extra?: number;
+          tarifa_turno_especial?: number;
+          origen?: string;
+          observaciones?: string | null;
+          horas_extra_aprobadas?: boolean;
+          horas_extra_aprobadas_por?: string | null;
+          horas_extra_aprobadas_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          liquidacion_id?: string;
+          empleado_id?: string;
+          fecha?: string;
+          turno?: string;
+          tarea?: string | null;
+          horas_mensuales?: number;
+          horas_adicionales?: number;
+          turno_especial_unidades?: number;
+          tarifa_hora_base?: number;
+          tarifa_hora_extra?: number;
+          tarifa_turno_especial?: number;
+          origen?: string;
+          observaciones?: string | null;
+          horas_extra_aprobadas?: boolean;
+          horas_extra_aprobadas_por?: string | null;
+          horas_extra_aprobadas_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
         };
       };
       rrhh_liquidacion_detalles: {
@@ -578,6 +834,339 @@ export type Database = {
           created_at?: string;
         };
       };
+      rrhh_adelanto_planes: {
+        Row: {
+          id: string;
+          empleado_id: string;
+          tipo: string;
+          monto_total: number;
+          descripcion: string | null;
+          fecha_inicio: string;
+          cantidad_cuotas: number;
+          estado: string;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          empleado_id: string;
+          tipo: string;
+          monto_total: number;
+          descripcion?: string | null;
+          fecha_inicio?: string;
+          cantidad_cuotas?: number;
+          estado?: string;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          empleado_id?: string;
+          tipo?: string;
+          monto_total?: number;
+          descripcion?: string | null;
+          fecha_inicio?: string;
+          cantidad_cuotas?: number;
+          estado?: string;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      rrhh_adelanto_cuotas: {
+        Row: {
+          id: string;
+          plan_id: string;
+          nro_cuota: number;
+          periodo_mes: number;
+          periodo_anio: number;
+          monto_cuota: number;
+          estado: string;
+          liquidacion_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          plan_id: string;
+          nro_cuota: number;
+          periodo_mes: number;
+          periodo_anio: number;
+          monto_cuota: number;
+          estado?: string;
+          liquidacion_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          plan_id?: string;
+          nro_cuota?: number;
+          periodo_mes?: number;
+          periodo_anio?: number;
+          monto_cuota?: number;
+          estado?: string;
+          liquidacion_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      rrhh_liquidacion_runs: {
+        Row: {
+          id: string;
+          periodo_mes: number;
+          periodo_anio: number;
+          fuente: string;
+          estado: string;
+          ventana_fecha: string;
+          iniciado_at: string;
+          finalizado_at: string | null;
+          resumen_json: any;
+          error: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          periodo_mes: number;
+          periodo_anio: number;
+          fuente: string;
+          estado?: string;
+          ventana_fecha?: string;
+          iniciado_at?: string;
+          finalizado_at?: string | null;
+          resumen_json?: any;
+          error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          periodo_mes?: number;
+          periodo_anio?: number;
+          fuente?: string;
+          estado?: string;
+          ventana_fecha?: string;
+          iniciado_at?: string;
+          finalizado_at?: string | null;
+          resumen_json?: any;
+          error?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      rrhh_feriados: {
+        Row: {
+          id: string;
+          fecha: string;
+          descripcion: string;
+          ambito: string;
+          activo: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          fecha: string;
+          descripcion: string;
+          ambito?: string;
+          activo?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          fecha?: string;
+          descripcion?: string;
+          ambito?: string;
+          activo?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      rrhh_legajo_eventos: {
+        Row: {
+          id: string;
+          empleado_id: string;
+          tipo: string;
+          categoria: string;
+          titulo: string;
+          descripcion: string | null;
+          metadata: any;
+          fecha_evento: string;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          empleado_id: string;
+          tipo: string;
+          categoria: string;
+          titulo: string;
+          descripcion?: string | null;
+          metadata?: any;
+          fecha_evento?: string;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          empleado_id?: string;
+          tipo?: string;
+          categoria?: string;
+          titulo?: string;
+          descripcion?: string | null;
+          metadata?: any;
+          fecha_evento?: string;
+          created_by?: string | null;
+          created_at?: string;
+        };
+      };
+      rrhh_descansos_programados: {
+        Row: {
+          id: string;
+          empleado_id: string;
+          dia_semana: number;
+          vigente_desde: string;
+          vigente_hasta: string | null;
+          observaciones: string | null;
+          activo: boolean;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          empleado_id: string;
+          dia_semana: number;
+          vigente_desde?: string;
+          vigente_hasta?: string | null;
+          observaciones?: string | null;
+          activo?: boolean;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          empleado_id?: string;
+          dia_semana?: number;
+          vigente_desde?: string;
+          vigente_hasta?: string | null;
+          observaciones?: string | null;
+          activo?: boolean;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      rrhh_descansos_mensuales: {
+        Row: {
+          id: string;
+          empleado_id: string;
+          periodo_mes: number;
+          periodo_anio: number;
+          fecha: string;
+          turno: string;
+          estado: string;
+          origen: string;
+          observaciones: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          empleado_id: string;
+          periodo_mes: number;
+          periodo_anio: number;
+          fecha: string;
+          turno?: string;
+          estado?: string;
+          origen?: string;
+          observaciones?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          empleado_id?: string;
+          periodo_mes?: number;
+          periodo_anio?: number;
+          fecha?: string;
+          turno?: string;
+          estado?: string;
+          origen?: string;
+          observaciones?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      rrhh_hik_person_map: {
+        Row: {
+          hik_code: string;
+          empleado_id: string;
+          source: string;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          hik_code: string;
+          empleado_id: string;
+          source?: string;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          hik_code?: string;
+          empleado_id?: string;
+          source?: string;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      rrhh_liquidacion_tramos_puesto: {
+        Row: {
+          id: string;
+          liquidacion_id: string;
+          fecha_desde: string;
+          fecha_hasta: string;
+          puesto_codigo: string;
+          orden: number;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          liquidacion_id: string;
+          fecha_desde: string;
+          fecha_hasta: string;
+          puesto_codigo: string;
+          orden?: number;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          liquidacion_id?: string;
+          fecha_desde?: string;
+          fecha_hasta?: string;
+          puesto_codigo?: string;
+          orden?: number;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
       rrhh_descuentos: {
         Row: {
           id: string;
@@ -598,6 +1187,7 @@ export type Database = {
           id?: string;
           empleado_id: string;
           tipo: string;
+          monto: number;
           fecha?: string;
           motivo: string;
           observaciones?: string | null;

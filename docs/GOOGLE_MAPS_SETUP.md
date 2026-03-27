@@ -1,5 +1,7 @@
 # 🗺️ Configuración de Google Maps API Key
 
+Nota: esta guia queda como material complementario para obtener claves en Google Cloud. La configuracion vigente del proyecto, variables requeridas y orden real de fallbacks estan en `docs/GOOGLE_CLOUD_SETUP.md`, `docs/VERCEL_SETUP.md` y `env.example`.
+
 Esta guía te ayudará a obtener y configurar la API Key de Google Maps para habilitar la optimización de rutas con Google Directions API.
 
 ## 📋 Requisitos Previos

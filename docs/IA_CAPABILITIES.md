@@ -1,20 +1,33 @@
-# Capacidades IA - Avicola del Sur ERP
+# IA Capabilities
 
-## Objetivo
-Definir de forma explicita que partes usan IA real, cuales son hibridas y cuales no usan IA.
+Actualizado: 2026-03-27
+
+Este documento define que capacidades usan IA real, cuales son asistidas y cuales siguen siendo endpoints sin inferencia en tiempo real.
+
+La fuente principal de esta matriz es:
+
+- `src/lib/ai/capability-registry.ts`
+- `src/app/api/ia/*`
+- `src/app/api/predictions/*`
+- `src/app/api/reportes/ia/*`
+- `src/app/api/documents/process/route.ts`
 
 ## Estrategias
-- `none`: no ejecuta inferencia de IA.
-- `assisted`: motor base de reglas/estadistica + enriquecimiento IA opcional.
-- `primary`: la funcionalidad principal depende de IA.
+
+- `none`: no ejecuta inferencia
+- `assisted`: mezcla reglas / estadistica / heuristicas con enriquecimiento IA
+- `primary`: la respuesta principal depende de IA
 
 ## Proveedores
-- `gemini`: razonamiento y generacion de texto.
-- `vertex`: prediccion ML en endpoints `predict`.
-- `document_ai`: extraccion estructurada de documentos.
 
-## Contrato API estandar
-Todos los endpoints IA deben devolver:
+- `none`
+- `gemini`
+- `vertex`
+- `document_ai`
+
+## Contrato recomendado
+
+Los endpoints modernos devuelven metadata IA con esta forma:
 
 ```json
 {
@@ -30,22 +43,85 @@ Todos los endpoints IA deben devolver:
 }
 ```
 
+No todos los endpoints legacy ya cumplen este contrato.
+
+## Matriz actual
+
+| Capability | Strategy | Provider | UI principal | Endpoints |
+| --- | --- | --- | --- | --- |
+| `stock_prediction` | `assisted` | `gemini` | `/dashboard`, `/dashboard/predicciones` | `/api/ia/prediccion-stock`, `/api/predictions/stock-coverage` |
+| `customer_risk` | `assisted` | `gemini` | `/dashboard` | `/api/ia/clientes-riesgo`, `/api/predictions/customer-risk` |
+| `expense_classification` | `assisted` | `gemini` | `/tesoreria/gastos` | `/api/tesoreria/clasificar-gasto`, `/api/ia/clasificar-gasto` |
+| `payment_validation` | `assisted` | `gemini` | `/tesoreria/validar-rutas` | `/api/tesoreria/validar-cobro`, `/api/ia/validar-cobro` |
+| `payment_audit` | `none` | `none` | `/tesoreria` | `/api/ia/auditar-cobros` |
+| `reports_chat` | `primary` | `gemini` | `/reportes/ia` | `/api/reportes/ia/generate`, `/api/reportes/ia/chat` |
+| `document_processing` | `primary` | `document_ai` | `/almacen/documentos` | `/api/documents/process` |
+| `weight_anomaly` | `assisted` | `gemini` | `/almacen/presupuesto/[id]/pesaje` | `/api/almacen/analizar-peso` |
+
+## Endpoints relacionados no cubiertos por el registry
+
+Estos endpoints son relevantes para IA o prediccion, aunque hoy no todos esten registrados en `AI_CAPABILITY_REGISTRY`:
+
+| Endpoint | Estado actual |
+| --- | --- |
+| `/api/predictions/demand` | prediccion asistida, con metadata IA |
+| `/api/predictions/alerts` | lectura sin inferencia en tiempo real |
+| `/api/documents/process` | procesamiento primario con Document AI |
+| `/api/almacen/analizar-peso` | endpoint legacy de analisis de pesaje; no usa aun el contrato moderno de metadata |
+| `/api/ia/capabilities` | inventario publico de capacidades registradas |
+
+## Rutas canonicas y legacy
+
+### Canonicas
+
+- `/api/predictions/stock-coverage`
+- `/api/predictions/customer-risk`
+- `/api/predictions/demand`
+- `/api/predictions/alerts`
+- `/api/tesoreria/clasificar-gasto`
+- `/api/tesoreria/validar-cobro`
+- `/api/reportes/ia/generate`
+- `/api/reportes/ia/chat`
+- `/api/documents/process`
+
+### Legacy mantenidas
+
+- `/api/ia/prediccion-stock`
+- `/api/ia/clientes-riesgo`
+- `/api/ia/clasificar-gasto`
+- `/api/ia/validar-cobro`
+- `/api/almacen/analizar-peso`
+
 ## Variables de entorno
-- Canonica: `GOOGLE_GEMINI_API_KEY`
-- Compatibilidad legacy: `GOOGLE_AI_API_KEY`
-- Vertex: `GOOGLE_VERTEX_AI_ENABLED=true` + credenciales GCP
-- Document AI: `GOOGLE_DOCUMENT_AI_*`
 
-## Rutas canonicas nuevas
-- `POST /api/predictions/stock-coverage`
-- `GET /api/predictions/customer-risk`
-- `POST /api/tesoreria/clasificar-gasto`
-- `POST /api/tesoreria/validar-cobro`
+Variables base:
 
-## Rutas legacy mantenidas (deprecadas)
-- `POST /api/ia/prediccion-stock`
-- `GET /api/ia/clientes-riesgo`
-- `POST /api/ia/clasificar-gasto`
-- `POST /api/ia/validar-cobro`
+- `GOOGLE_GEMINI_API_KEY`
+- `GOOGLE_GEMINI_MODEL`
+- `GOOGLE_GEMINI_LOCATION`
+- `GOOGLE_CLOUD_PROJECT_ID`
+- `GOOGLE_CLOUD_REGION`
 
-Estas rutas siguen activas para no romper integraciones, pero deben migrarse a las canonicas.
+Compatibilidad / fallback:
+
+- `GEMINI_API_KEY`
+- `GOOGLE_AI_API_KEY`
+- `GOOGLE_CLOUD_CREDENTIALS`
+- `GOOGLE_CLOUD_CREDENTIALS_BASE64`
+- `GOOGLE_CLOUD_SERVICE_ACCOUNT_BASE64`
+- `GOOGLE_CLOUD_SERVICE_ACCOUNT_PATH`
+
+Integraciones especificas:
+
+- `GOOGLE_VERTEX_AI_ENABLED`
+- `GOOGLE_VERTEX_AI_LOCATION`
+- `GOOGLE_DOCUMENT_AI_PROJECT_ID`
+- `GOOGLE_DOCUMENT_AI_LOCATION`
+- `GOOGLE_DOCUMENT_AI_PROCESSOR_ID_FACTURAS`
+- `GOOGLE_DOCUMENT_AI_PROCESSOR_ID_REMITOS`
+
+## Notas operativas
+
+- definir `GOOGLE_GEMINI_MODEL` explicitamente en ambiente
+- si se agrega una nueva capability, actualizar este archivo y el registry
+- si un endpoint usa IA pero no expone metadata, marcarlo como legacy hasta normalizarlo
