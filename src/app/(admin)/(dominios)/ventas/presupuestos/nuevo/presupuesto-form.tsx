@@ -170,6 +170,17 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
     setClienteDropdownOpen(true)
   }, [])
 
+  const clearClienteSelection = useCallback(() => {
+    setValue('cliente_id', '', { shouldDirty: true, shouldTouch: true })
+    setValue('zona_id', '', { shouldDirty: true })
+    setValue('lista_precio_id', undefined, { shouldDirty: true })
+    setClienteSearch('')
+    window.setTimeout(() => {
+      setClienteDropdownOpen(true)
+      focusClienteSearchInput(true)
+    }, 0)
+  }, [focusClienteSearchInput, setValue])
+
   const formShortcuts: FormFieldShortcut[] = [
     {
       key: 'c',
@@ -1046,6 +1057,20 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                   Cliente *
                   <KeyboardHintCompact shortcut="C" />
                 </Label>
+                {clienteSeleccionado && (
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto px-0 text-xs text-muted-foreground hover:text-foreground"
+                      onClick={clearClienteSelection}
+                    >
+                      <X className="mr-1 h-3.5 w-3.5" />
+                      Cambiar cliente
+                    </Button>
+                  </div>
+                )}
                 <Select
                   open={clienteDropdownOpen}
                   value={watchedCliente || ''}
