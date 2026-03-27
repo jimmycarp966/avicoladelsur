@@ -58,6 +58,8 @@ function clasificarDia(dia: DiaCalendario): DiaCalendario['tipo'] {
   const turno = jornada.turno?.toLowerCase() ?? ''
   const esMedioTurno = turno.startsWith('medio_turno') || hs === 0.5
 
+  if ((dia.esDomingo || dia.esFeriado) && hs > 0) return 'presente'
+
   if (esMedioTurno) return 'media_falta'
   if (hs >= 4) return 'presente'
   if (hs > 0) return 'media_falta'
