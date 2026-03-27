@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server'
+import { format } from 'date-fns'
+import { es } from 'date-fns/locale'
 import PDFDocument from 'pdfkit'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { formatDate, getTodayArgentina } from '@/lib/utils'
@@ -100,7 +102,7 @@ function normalizeDescansoRows(rows: DescansoRow[]): DescansoPdfItem[] {
     return {
       sucursal: sucursal?.nombre?.trim() || 'Sin sucursal',
       fecha: row.fecha,
-      turno: row.turno?.trim() || 'Sin turno',
+      turno: row.turno?.trim() ? `Turno: ${row.turno.trim()}` : 'Turno: sin definir',
       legajo: empleado?.legajo?.trim() || '-',
       puesto: categoria?.nombre?.trim() || 'Sin puesto',
       nombreCompleto: buildNombreCompleto(empleado),
@@ -115,7 +117,17 @@ function ensureSpace(doc: InstanceType<typeof PDFDocument>, neededHeight: number
   }
 }
 
-async function buildPdfBuffer(items: DescansoPdfItem[], periodoLabel: string): Promise<Buffer> {
+function buildSucursalHeading(sucursal: string, anio: number, mes: number) {
+  const mesNombre = format(new Date(anio, mes - 1, 1), 'MMMM', { locale: es })
+  return `Sucursal ${sucursal} - Descanso mes ${mesNombre}`
+}
+
+async function buildPdfBuffer(
+  items: DescansoPdfItem[],
+  periodoLabel: string,
+  anio: number,
+  mes: number,
+): Promise<Buffer> {
   const doc = new PDFDocument({ margin: 42, size: 'A4' })
   const buffers: Buffer[] = []
 
@@ -156,7 +168,12 @@ async function buildPdfBuffer(items: DescansoPdfItem[], periodoLabel: string): P
 
       ensureSpace(doc, 72)
       doc.moveDown(0.2)
-      doc.fontSize(13).fillColor('#0f172a').text(sucursal)
+      doc
+        .fontSize(13)
+        .fillColor('#0f172a')
+        .text(buildSucursalHeading(sucursal, anio, mes), doc.page.margins.left, doc.y, {
+          align: 'left',
+        })
       doc.moveDown(0.15)
       doc
         .strokeColor('#cbd5e1')
@@ -225,7 +242,7 @@ export async function GET() {
 
     const descansos = normalizeDescansoRows((data || []) as DescansoRow[])
     const periodoLabel = `Mes actual: ${String(mes).padStart(2, '0')}/${anio}`
-    const pdfBuffer = await buildPdfBuffer(descansos, periodoLabel)
+    const pdfBuffer = await buildPdfBuffer(descansos, periodoLabel, anio, mes)
     const filename = `descansos-${anio}-${String(mes).padStart(2, '0')}.pdf`
 
     return new NextResponse(new Uint8Array(pdfBuffer), {
