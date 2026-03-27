@@ -192,7 +192,8 @@ export function JornadasCalendario({
     [dias],
   )
 
-  const diasAsistidos = (contadores.presente ?? 0) + (contadores.media_falta ?? 0)
+  const diasAsistidos =
+    (contadores.presente ?? 0) + (contadores.media_falta ?? 0) + (contadores.descanso ?? 0)
   const diasBaseLabel = Number(diasBase || 0) > 0 ? Number(diasBase) : dias.length
 
   return (
