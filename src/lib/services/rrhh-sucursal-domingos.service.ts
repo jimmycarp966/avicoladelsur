@@ -15,6 +15,7 @@ type RecalcularLiquidacionArgs = {
 type SundayJornadaRow = {
   id: string
   fecha: string
+  tarea: string | null
   origen: string
   horas_mensuales: number | null
   horas_adicionales: number | null
@@ -23,6 +24,49 @@ type SundayJornadaRow = {
   tarifa_hora_extra: number | null
   monto_mensual: number | null
   monto_extra: number | null
+}
+
+type LiquidacionBaseRow = {
+  id: string
+  empleado_id: string
+  grupo_base_snapshot: string | null
+  puesto_override: string | null
+  periodo_mes: number | null
+  periodo_anio: number | null
+  sueldo_basico: number | null
+  horas_jornada: number | null
+  valor_jornal: number | null
+  total_sin_descuentos: number | null
+  total_bruto: number | null
+  total_neto: number | null
+  control_30_anticipos: number | null
+}
+
+type ReglaPeriodoRow = {
+  dias_base_galpon: number | null
+  dias_base_sucursales: number | null
+  dias_base_rrhh: number | null
+  dias_base_lun_sab: number | null
+}
+
+type PuestoConfigRow = {
+  puesto_codigo: string
+  grupo_base_dias: string | null
+  horas_jornada: number | null
+  tipo_calculo: string | null
+}
+
+type TramoPuestoRow = {
+  fecha_desde: string
+  fecha_hasta: string
+  puesto_codigo: string
+}
+
+type ReglaBaseResuelta = {
+  grupoBaseDias: string
+  horasJornada: number
+  tipoCalculo: 'hora' | 'turno'
+  valorHoraBase: number
 }
 
 function round2(value: number) {
@@ -34,9 +78,72 @@ function isSunday(fecha?: string | null) {
   return /^\d{4}-\d{2}-\d{2}$/.test(iso) && new Date(`${iso}T00:00:00`).getDay() === 0
 }
 
+function normalizeCode(value?: string | null) {
+  return String(value || '').trim().toLowerCase()
+}
+
 function isManualizableOrigen(origen?: string | null) {
   const value = String(origen || '').trim().toLowerCase()
   return value === 'manual' || value === 'auto_hik' || value === 'auto_asistencia'
+}
+
+function getDiasBaseForGrupo(
+  grupoBaseDias: string,
+  reglaPeriodo: ReglaPeriodoRow | null,
+  diasEnMes: number,
+) {
+  switch (grupoBaseDias) {
+    case 'sucursales':
+      return diasEnMes
+    case 'rrhh':
+      return Number(reglaPeriodo?.dias_base_rrhh || 22)
+    case 'lun_sab':
+      return Number(reglaPeriodo?.dias_base_lun_sab || 26)
+    case 'galpon':
+    default:
+      return Number(reglaPeriodo?.dias_base_galpon || 27)
+  }
+}
+
+function resolveBaseRuleForDate(options: {
+  fecha: string
+  tarea?: string | null
+  liquidacion: LiquidacionBaseRow
+  reglaPeriodo: ReglaPeriodoRow | null
+  defaultRule: Omit<ReglaBaseResuelta, 'valorHoraBase'>
+  configMap: Map<string, PuestoConfigRow>
+  tramos: TramoPuestoRow[]
+}): ReglaBaseResuelta {
+  const normalizedTask = normalizeCode(options.tarea)
+  const tramo = options.tramos.find(
+    (item) => options.fecha >= item.fecha_desde.slice(0, 10) && options.fecha <= item.fecha_hasta.slice(0, 10),
+  )
+
+  const config =
+    (tramo?.puesto_codigo ? options.configMap.get(normalizeCode(tramo.puesto_codigo)) : undefined) ||
+    (normalizedTask ? options.configMap.get(normalizedTask) : undefined)
+
+  const grupoBaseDias = String(config?.grupo_base_dias || options.defaultRule.grupoBaseDias || 'galpon')
+  const horasJornada = Math.max(Number(config?.horas_jornada || options.defaultRule.horasJornada || 9), 1)
+  const tipoCalculo = String(config?.tipo_calculo || options.defaultRule.tipoCalculo || 'hora') === 'turno'
+    ? 'turno'
+    : 'hora'
+  const diasEnMes = new Date(
+    Number(options.liquidacion.periodo_anio || 0),
+    Number(options.liquidacion.periodo_mes || 0),
+    0,
+  ).getDate()
+  const diasBase = Math.max(getDiasBaseForGrupo(grupoBaseDias, options.reglaPeriodo, diasEnMes), 1)
+  const sueldoBasico = Number(options.liquidacion.sueldo_basico || 0)
+  const valorJornal = diasBase > 0 ? round2(sueldoBasico / diasBase) : 0
+  const valorHoraBase = horasJornada > 0 ? round2(valorJornal / horasJornada) : 0
+
+  return {
+    grupoBaseDias,
+    horasJornada,
+    tipoCalculo,
+    valorHoraBase,
+  }
 }
 
 export async function normalizarDomingosSucursalLiquidacion(
@@ -46,12 +153,14 @@ export async function normalizarDomingosSucursalLiquidacion(
   const { data: liquidacion, error: liquidacionError } = await db
     .from('rrhh_liquidaciones')
     .select(
-      'id, empleado_id, grupo_base_snapshot, valor_jornal, total_sin_descuentos, total_bruto, total_neto, control_30_anticipos, turnos_trabajados',
+      'id, empleado_id, grupo_base_snapshot, puesto_override, periodo_mes, periodo_anio, sueldo_basico, horas_jornada, valor_jornal, total_sin_descuentos, total_bruto, total_neto, control_30_anticipos',
     )
     .eq('id', liquidacionId)
     .maybeSingle()
 
-  if (liquidacionError || !liquidacion?.id) {
+  const liquidacionBase = liquidacion as LiquidacionBaseRow | null
+
+  if (liquidacionError || !liquidacionBase?.id) {
     return {
       success: false,
       adjustedRows: 0,
@@ -59,19 +168,90 @@ export async function normalizarDomingosSucursalLiquidacion(
     }
   }
 
-  if (liquidacion.grupo_base_snapshot !== 'sucursales') {
+  const diasEnMes = new Date(
+    Number(liquidacionBase.periodo_anio || 0),
+    Number(liquidacionBase.periodo_mes || 0),
+    0,
+  ).getDate()
+  if (diasEnMes <= 0) {
     return { success: true, adjustedRows: 0 }
   }
 
-  const valorJornal = Number(liquidacion.valor_jornal || 0)
-  if (valorJornal <= 0) {
-    return { success: true, adjustedRows: 0 }
+  const { data: reglaPeriodoData, error: reglaPeriodoError } = await db
+    .from('rrhh_liquidacion_reglas_periodo')
+    .select('dias_base_galpon, dias_base_sucursales, dias_base_rrhh, dias_base_lun_sab')
+    .eq('periodo_mes', liquidacionBase.periodo_mes)
+    .eq('periodo_anio', liquidacionBase.periodo_anio)
+    .eq('activo', true)
+    .maybeSingle()
+
+  if (reglaPeriodoError) {
+    return {
+      success: false,
+      adjustedRows: 0,
+      error: reglaPeriodoError.message,
+    }
+  }
+
+  const { data: empleadoData, error: empleadoError } = await db
+    .from('rrhh_empleados')
+    .select('categoria:rrhh_categorias(nombre)')
+    .eq('id', liquidacionBase.empleado_id)
+    .maybeSingle()
+
+  if (empleadoError) {
+    return {
+      success: false,
+      adjustedRows: 0,
+      error: empleadoError.message,
+    }
+  }
+
+  const { data: configRows, error: configError } = await db
+    .from('rrhh_configuracion_puestos')
+    .select('puesto_codigo, grupo_base_dias, horas_jornada, tipo_calculo')
+    .eq('activo', true)
+
+  if (configError) {
+    return {
+      success: false,
+      adjustedRows: 0,
+      error: configError.message,
+    }
+  }
+
+  const configMap = new Map<string, PuestoConfigRow>(
+    ((configRows || []) as PuestoConfigRow[]).map((row) => [normalizeCode(row.puesto_codigo), row]),
+  )
+
+  const defaultConfig =
+    configMap.get(normalizeCode(liquidacionBase.puesto_override)) ||
+    configMap.get(normalizeCode((empleadoData as { categoria?: { nombre?: string | null } | null } | null)?.categoria?.nombre))
+
+  const defaultRuleBase: Omit<ReglaBaseResuelta, 'valorHoraBase'> = {
+    grupoBaseDias: String(defaultConfig?.grupo_base_dias || liquidacionBase.grupo_base_snapshot || 'galpon'),
+    horasJornada: Math.max(Number(defaultConfig?.horas_jornada || liquidacionBase.horas_jornada || 9), 1),
+    tipoCalculo: String(defaultConfig?.tipo_calculo || 'hora') === 'turno' ? 'turno' : 'hora',
+  }
+
+  const { data: tramoRows, error: tramoError } = await db
+    .from('rrhh_liquidacion_tramos_puesto')
+    .select('fecha_desde, fecha_hasta, puesto_codigo')
+    .eq('liquidacion_id', liquidacionId)
+    .order('fecha_desde', { ascending: true })
+
+  if (tramoError) {
+    return {
+      success: false,
+      adjustedRows: 0,
+      error: tramoError.message,
+    }
   }
 
   const { data: jornadas, error: jornadasError } = await db
     .from('rrhh_liquidacion_jornadas')
     .select(
-      'id, fecha, origen, horas_mensuales, horas_adicionales, turno_especial_unidades, tarifa_hora_base, tarifa_hora_extra, monto_mensual, monto_extra',
+      'id, fecha, tarea, origen, horas_mensuales, horas_adicionales, turno_especial_unidades, tarifa_hora_base, tarifa_hora_extra, monto_mensual, monto_extra',
     )
     .eq('liquidacion_id', liquidacionId)
 
@@ -83,19 +263,39 @@ export async function normalizarDomingosSucursalLiquidacion(
     }
   }
 
-  const sundayRows = ((jornadas || []) as SundayJornadaRow[]).filter(
-    (row) => isSunday(row.fecha) && isManualizableOrigen(row.origen),
+  const fechasJornadas = Array.from(
+    new Set(((jornadas || []) as SundayJornadaRow[]).map((row) => String(row.fecha).slice(0, 10)).filter(Boolean)),
   )
 
-  if (sundayRows.length === 0) {
+  const { data: feriadosRows, error: feriadosError } = await db
+    .from('rrhh_feriados')
+    .select('fecha')
+    .in('fecha', fechasJornadas)
+    .eq('activo', true)
+
+  if (feriadosError) {
+    return {
+      success: false,
+      adjustedRows: 0,
+      error: feriadosError.message,
+    }
+  }
+
+  const feriadosSet = new Set((feriadosRows || []).map((row: { fecha: string }) => String(row.fecha).slice(0, 10)))
+
+  const specialRows = ((jornadas || []) as SundayJornadaRow[]).filter(
+    (row) => (isSunday(row.fecha) || feriadosSet.has(String(row.fecha).slice(0, 10))) && isManualizableOrigen(row.origen),
+  )
+
+  if (specialRows.length === 0) {
     return { success: true, adjustedRows: 0 }
   }
 
-  const sundayDates = Array.from(new Set(sundayRows.map((row) => String(row.fecha).slice(0, 10))))
+  const sundayDates = Array.from(new Set(specialRows.map((row) => String(row.fecha).slice(0, 10))))
   const { data: asistenciaRows, error: asistenciaError } = await db
     .from('rrhh_asistencia')
     .select('fecha, horas_trabajadas')
-    .eq('empleado_id', liquidacion.empleado_id)
+    .eq('empleado_id', liquidacionBase.empleado_id)
     .in('fecha', sundayDates)
 
   if (asistenciaError) {
@@ -113,11 +313,10 @@ export async function normalizarDomingosSucursalLiquidacion(
     ]),
   )
 
-  const tarifaDomingo = round2(valorJornal / 4)
   let adjustedRows = 0
   let deltaMontoMensual = 0
 
-  for (const row of sundayRows) {
+  for (const row of specialRows) {
     const fecha = String(row.fecha).slice(0, 10)
     const horasAsistencia = Number(asistenciaMap.get(fecha) || 0)
     const horasRegistradas =
@@ -127,13 +326,28 @@ export async function normalizarDomingosSucursalLiquidacion(
       continue
     }
 
-    const horasMensuales = 4
+    const reglaBase = resolveBaseRuleForDate({
+      fecha,
+      tarea: row.tarea,
+      liquidacion: liquidacionBase,
+      reglaPeriodo: (reglaPeriodoData as ReglaPeriodoRow | null) || null,
+      defaultRule: defaultRuleBase,
+      configMap,
+      tramos: (tramoRows || []) as TramoPuestoRow[],
+    })
+
+    if (reglaBase.tipoCalculo === 'turno' || reglaBase.valorHoraBase <= 0) {
+      continue
+    }
+
+    const horasMensuales = reglaBase.horasJornada
     const horasAdicionales = round2(Math.max(horasAsistencia - 4, 0))
-    const montoMensual = round2(valorJornal)
+    const tarifaHoraBase = reglaBase.valorHoraBase
+    const montoMensual = round2(horasMensuales * tarifaHoraBase)
     const montoMensualActual = round2(Number(row.monto_mensual || 0))
     const requiereCambio =
       round2(Number(row.horas_mensuales || 0)) !== horasMensuales ||
-      round2(Number(row.tarifa_hora_base || 0)) !== tarifaDomingo ||
+      round2(Number(row.tarifa_hora_base || 0)) !== tarifaHoraBase ||
       montoMensualActual !== montoMensual ||
       round2(Number(row.horas_adicionales || 0)) !== horasAdicionales
 
@@ -146,7 +360,7 @@ export async function normalizarDomingosSucursalLiquidacion(
       .update({
         horas_mensuales: horasMensuales,
         horas_adicionales: horasAdicionales,
-        tarifa_hora_base: tarifaDomingo,
+        tarifa_hora_base: tarifaHoraBase,
         updated_at: new Date().toISOString(),
       })
       .eq('id', row.id)
