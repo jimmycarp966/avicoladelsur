@@ -257,7 +257,11 @@ export function LiquidacionControlTab({
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               <InfoItem label="Sueldo basico" value={formatMoney(liquidacion.sueldo_basico)} />
               <InfoItem label="Valor jornal" value={formatMoney(liquidacion.valor_jornal)} />
-              <InfoItem label="Valor hora" value={formatMoney(liquidacion.valor_hora)} />
+              <InfoItem
+                label="Valor hora"
+                value={formatMoney(liquidacion.valor_hora)}
+                tooltip={`Auto: sueldo ${Number(liquidacion.sueldo_basico || 0).toFixed(0)} / ${Number(liquidacion.dias_base || 0)} dias = ${Number(liquidacion.valor_jornal || 0).toFixed(2)}`}
+              />
               <InfoItem label="Dias base" value={String(liquidacion.dias_base ?? '-')} />
               <InfoItem label="Horas diarias" value={String(liquidacion.horas_jornada ?? '-')} />
               <InfoItem label="Puesto resuelto" value={liquidacion.puesto_override || 'Por defecto'} />
@@ -544,11 +548,19 @@ export function LiquidacionControlTab({
   )
 }
 
-function InfoItem({ label, value }: { label: string; value: string }) {
+function InfoItem({ label, value, tooltip }: { label: string; value: string; tooltip?: string }) {
   return (
     <div className="rounded-md border bg-slate-50 p-2.5">
-      <p className="text-[11px] text-muted-foreground">{label}</p>
-      <p className="font-medium text-sm tabular-nums mt-0.5">{value}</p>
+      {tooltip ? (
+        <FieldWithTooltip label={label} tooltip={tooltip}>
+          <p className="font-medium text-sm tabular-nums mt-0.5">{value}</p>
+        </FieldWithTooltip>
+      ) : (
+        <>
+          <p className="text-[11px] text-muted-foreground">{label}</p>
+          <p className="font-medium text-sm tabular-nums mt-0.5">{value}</p>
+        </>
+      )}
     </div>
   )
 }

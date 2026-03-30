@@ -199,9 +199,9 @@ export function JornadasCalendario({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2 text-xs">
-        <div className="flex items-center gap-1 rounded border border-slate-200 bg-slate-50 px-2 py-0.5">
-          <span className="text-slate-600">Asistidos</span>
-          <Badge variant="outline" className="border-current/20 bg-white py-0 text-[10px] text-slate-700">
+        <div className="flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 shadow-sm">
+          <span className="font-medium text-emerald-800">Asistidos</span>
+          <Badge variant="outline" className="border-emerald-200 bg-white py-0 text-[10px] font-semibold text-emerald-800">
             {diasAsistidos}/{diasBaseLabel}
           </Badge>
         </div>

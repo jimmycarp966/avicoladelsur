@@ -88,20 +88,6 @@ export function LicenciasTable({ licencias, onView, onApprove, onReject }: Licen
     )
   }
 
-  const getIABadge = (licencia: Licencia) => {
-    if (licencia.tipo === 'vacaciones') {
-      return <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">No aplica</Badge>
-    }
-
-    if (licencia.ia_certificado_valido === true) {
-      return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">IA valida</Badge>
-    }
-    if (licencia.ia_certificado_valido === false) {
-      return <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100">IA observar</Badge>
-    }
-    return <Badge variant="outline">Sin IA</Badge>
-  }
-
   const columns: ColumnDef<Licencia>[] = [
     {
       id: 'empleado',
@@ -171,11 +157,6 @@ export function LicenciasTable({ licencias, onView, onApprove, onReject }: Licen
       id: 'certificado',
       header: 'Certificado',
       cell: ({ row }) => getCertificadoBadge(row.original),
-    },
-    {
-      id: 'auditoria_ia',
-      header: 'Auditoria IA',
-      cell: ({ row }) => getIABadge(row.original),
     },
     {
       id: 'revision_rrhh',

@@ -1043,7 +1043,7 @@ export function LiquidacionJornadasTab({
                         )}
                       </TableCell>
                       <TableCell className="text-right text-sm tabular-nums">
-                        {row.horas_mensuales ?? 0}
+                        {esDiaCompletoEspecial ? 9 : row.horas_mensuales ?? 0}
                       </TableCell>
                       <TableCell className="text-right text-sm tabular-nums">
                         {row.horas_adicionales ?? 0}

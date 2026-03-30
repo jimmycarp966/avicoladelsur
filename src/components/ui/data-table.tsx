@@ -261,7 +261,7 @@ export function DataTable<TData, TValue>({
   return (
     <div className="w-full">
       {/* Search and filters */}
-      <div className="flex flex-col gap-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="sticky top-20 z-20 mb-4 flex flex-col gap-4 rounded-2xl border border-border/70 bg-background/90 px-4 py-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/75 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex w-full items-center space-x-2 sm:w-auto">
           {searchKey && (
             <div className="relative flex-1 sm:flex-initial">
@@ -305,7 +305,7 @@ export function DataTable<TData, TValue>({
       </div>
 
       {/* Table - Responsive */}
-      <div className="rounded-md border overflow-hidden">
+      <div className="overflow-hidden rounded-xl border border-border/80 bg-background shadow-sm">
         {/* Vista móvil - Cards (sin scroll horizontal) */}
         <div className="lg:hidden">
           {table.getRowModel().rows?.length ? (

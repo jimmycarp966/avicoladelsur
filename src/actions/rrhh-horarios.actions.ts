@@ -35,6 +35,23 @@ interface EmpleadoLookup {
 }
 
 type TurnoAsistencia = 'turno_completo' | 'medio_turno_manana' | 'medio_turno_tarde' | 'general'
+type EstadoHorarioConsolidado = 'presente' | 'ausente' | 'vacaciones' | 'enfermedad'
+
+interface AsistenciaLookup {
+  empleado_id: string
+  estado: 'presente' | 'ausente' | 'tarde' | 'licencia'
+  retraso_minutos?: number | null
+  hora_entrada?: string | null
+  hora_salida?: string | null
+}
+
+interface LicenciaLookup {
+  empleado_id: string
+  tipo: 'vacaciones' | 'enfermedad' | 'maternidad' | 'estudio' | 'otro' | 'descanso_programado'
+  observaciones?: string | null
+  fecha_inicio: string
+  fecha_fin: string
+}
 
 function getTodayArgentina(): string {
   return new Intl.DateTimeFormat('en-CA', {
@@ -220,6 +237,174 @@ function findEmployeeByPartialName(
   return bestMatch
 }
 
+function formatEmpleadoNombre(empleado?: EmpleadoLookup | null): string {
+  return `${empleado?.usuario?.nombre || empleado?.nombre || ''} ${empleado?.usuario?.apellido || empleado?.apellido || ''}`.trim()
+}
+
+function normalizeHourFromAsistencia(value?: string | null): string | undefined {
+  if (!value) return undefined
+  const trimmed = value.trim()
+  if (!trimmed) return undefined
+  if (/^\d{2}:\d{2}$/.test(trimmed)) return trimmed
+
+  const parsed = new Date(trimmed)
+  if (Number.isNaN(parsed.getTime())) return undefined
+  return timestampToLocalHour(parsed.toISOString())
+}
+
+function hasAnyMarcacion(row?: HorariosHoyData['registros'][number], asistencia?: AsistenciaLookup): boolean {
+  return Boolean(
+    row?.hora_entrada ||
+    row?.hora_salida ||
+    row?.hora_entrada_manana ||
+    row?.hora_salida_manana ||
+    row?.hora_entrada_tarde ||
+    row?.hora_salida_tarde ||
+    asistencia?.hora_entrada ||
+    asistencia?.hora_salida ||
+    (asistencia?.estado && asistencia.estado !== 'ausente' && asistencia.estado !== 'licencia'),
+  )
+}
+
+function pickRelevantLicencia(licencias: LicenciaLookup[]): LicenciaLookup | null {
+  if (licencias.length === 0) return null
+
+  return [...licencias].sort((a, b) => {
+    const priority = (tipo: LicenciaLookup['tipo']) => {
+      if (tipo === 'vacaciones') return 0
+      if (tipo === 'enfermedad') return 1
+      return 2
+    }
+
+    return priority(a.tipo) - priority(b.tipo)
+  })[0]
+}
+
+function buildEstadoHorario(
+  licencia: LicenciaLookup | null,
+  row?: HorariosHoyData['registros'][number],
+  asistencia?: AsistenciaLookup,
+): {
+  estado: EstadoHorarioConsolidado
+  detalle?: string
+  licenciaTipo?: LicenciaLookup['tipo'] | null
+} {
+  if (licencia?.tipo === 'vacaciones') {
+    return {
+      estado: 'vacaciones',
+      detalle: 'Licencia aprobada vigente.',
+      licenciaTipo: licencia.tipo,
+    }
+  }
+
+  if (licencia?.tipo === 'enfermedad') {
+    return {
+      estado: 'enfermedad',
+      detalle: 'Licencia aprobada vigente.',
+      licenciaTipo: licencia.tipo,
+    }
+  }
+
+  const presente = hasAnyMarcacion(row, asistencia)
+  if (presente) {
+    if ((asistencia?.retraso_minutos || 0) > 0) {
+      return {
+        estado: 'presente',
+        detalle: `Ingreso con ${asistencia?.retraso_minutos} min de demora.`,
+        licenciaTipo: licencia?.tipo || null,
+      }
+    }
+
+    return {
+      estado: 'presente',
+      detalle: licencia ? `Con licencia aprobada: ${licencia.tipo.replaceAll('_', ' ')}.` : undefined,
+      licenciaTipo: licencia?.tipo || null,
+    }
+  }
+
+  return {
+    estado: 'ausente',
+    detalle: licencia ? `Sin marcacion. Licencia aprobada: ${licencia.tipo.replaceAll('_', ' ')}.` : 'Sin marcacion registrada en el dia.',
+    licenciaTipo: licencia?.tipo || null,
+  }
+}
+
+function buildRosterRows(
+  empleados: EmpleadoLookup[],
+  hikRows: HorariosHoyData['registros'],
+  asistencias: AsistenciaLookup[],
+  licencias: LicenciaLookup[],
+): HorariosHoyData['registros'] {
+  const hikByEmpleadoId = new Map(
+    hikRows.filter((row) => row.empleado_id).map((row) => [row.empleado_id!, row]),
+  )
+  const asistenciaByEmpleadoId = new Map(asistencias.map((asistencia) => [asistencia.empleado_id, asistencia]))
+  const licenciasByEmpleadoId = new Map<string, LicenciaLookup[]>()
+
+  for (const licencia of licencias) {
+    const current = licenciasByEmpleadoId.get(licencia.empleado_id) || []
+    current.push(licencia)
+    licenciasByEmpleadoId.set(licencia.empleado_id, current)
+  }
+
+  const rosterRows = empleados.map((empleado) => {
+    const hikRow = hikByEmpleadoId.get(empleado.id)
+    const asistencia = asistenciaByEmpleadoId.get(empleado.id)
+    const licencia = pickRelevantLicencia(licenciasByEmpleadoId.get(empleado.id) || [])
+    const estado = buildEstadoHorario(licencia, hikRow, asistencia)
+
+    const horaEntrada = hikRow?.hora_entrada || normalizeHourFromAsistencia(asistencia?.hora_entrada)
+    const horaSalida = hikRow?.hora_salida || normalizeHourFromAsistencia(asistencia?.hora_salida)
+
+    return {
+      employee_no: hikRow?.employee_no || empleado.legajo || empleado.dni || empleado.id,
+      empleado_id: empleado.id,
+      dni: empleado.dni || empleado.cuil || empleado.legajo || empleado.id,
+      empleado_nombre: formatEmpleadoNombre(empleado),
+      hora_entrada_manana: hikRow?.hora_entrada_manana,
+      hora_salida_manana: hikRow?.hora_salida_manana,
+      hora_entrada_tarde: hikRow?.hora_entrada_tarde,
+      hora_salida_tarde: hikRow?.hora_salida_tarde,
+      hora_entrada: horaEntrada,
+      hora_salida: horaSalida,
+      mapeado: true,
+      tiene_marcacion: hasAnyMarcacion(hikRow, asistencia),
+      estado_consolidado: estado.estado,
+      estado_detalle: estado.detalle,
+      licencia_tipo: estado.licenciaTipo || null,
+      licencia_activa: Boolean(licencia),
+      sincronizado_asistencia: Boolean(asistencia),
+      origen: 'hik_connect' as const,
+    }
+  })
+
+  const unmappedRows = hikRows
+    .filter((row) => !row.empleado_id)
+    .map((row) => ({
+      ...row,
+      tiene_marcacion: true,
+      estado_consolidado: 'presente' as const,
+      estado_detalle: 'Marcacion detectada sin vinculo con un empleado activo.',
+      licencia_tipo: null,
+      licencia_activa: false,
+      sincronizado_asistencia: false,
+    }))
+
+  return [...rosterRows, ...unmappedRows].sort((a, b) => {
+    if (a.mapeado !== b.mapeado) return a.mapeado ? -1 : 1
+
+    const priority = (estado?: EstadoHorarioConsolidado) => {
+      if (estado === 'ausente') return 0
+      if (estado === 'enfermedad' || estado === 'vacaciones') return 1
+      return 2
+    }
+
+    const byEstado = priority(a.estado_consolidado) - priority(b.estado_consolidado)
+    if (byEstado !== 0) return byEstado
+    return (a.empleado_nombre || '').localeCompare(b.empleado_nombre || '', 'es')
+  })
+}
+
 function buildDailyRows(
   events: HorarioEventoNormalizado[],
   employeeMap: Map<string, EmpleadoLookup>,
@@ -285,6 +470,8 @@ function buildDailyRows(
       hora_entrada: first ? timestampToLocalHour(first.toISOString()) : undefined,
       hora_salida: hasDistinctOut ? timestampToLocalHour(last.toISOString()) : undefined,
       mapeado: !!empleado,
+      tiene_marcacion: true,
+      estado_consolidado: 'presente',
       origen: 'hik_connect',
     })
   }
@@ -553,55 +740,52 @@ export async function obtenerHorariosHoyDesdeHikAction(fecha?: string): Promise<
 
     const { normalized: normalizedToday, warnings } = normalizeHikAttendanceEvents(rawEventsForDate)
 
-    const uniqueIdentityKeys = [...new Set(normalizedToday.map((item) => normalizeIdentity(item.employee_no)).filter(Boolean))]
-
+    const adminSupabase = createAdminClient()
     const employeeMap = new Map<string, EmpleadoLookup>()
     const employeeById = new Map<string, EmpleadoLookup>()
     const employeeByName = new Map<string, EmpleadoLookup>()
-    if (uniqueIdentityKeys.length > 0) {
-      const { data: empleados, error } = await supabase
-        .from('rrhh_empleados')
-        .select('id, dni, cuil, legajo, nombre, apellido, usuario:usuarios(nombre, apellido)')
-        .eq('activo', true)
+    const { data: empleados, error: empleadosError } = await supabase
+      .from('rrhh_empleados')
+      .select('id, dni, cuil, legajo, nombre, apellido, usuario:usuarios(nombre, apellido)')
+      .eq('activo', true)
 
-      if (error) {
-        devError('Error consultando empleados para mapeo de horarios:', error)
-      } else {
-        ; (empleados || []).forEach((empleado) => {
-          const typed = empleado as EmpleadoLookup
-          employeeById.set(typed.id, typed)
+    if (empleadosError) {
+      devError('Error consultando empleados para mapeo de horarios:', empleadosError)
+    } else {
+      ; (empleados || []).forEach((empleado) => {
+        const typed = empleado as EmpleadoLookup
+        employeeById.set(typed.id, typed)
 
-          const fullName = `${typed.nombre || ''} ${typed.apellido || ''}`.trim()
-          if (fullName) {
-            const fullNameKey = normalizePersonName(fullName)
-            employeeByName.set(fullNameKey, typed)
+        const fullName = `${typed.nombre || ''} ${typed.apellido || ''}`.trim()
+        if (fullName) {
+          const fullNameKey = normalizePersonName(fullName)
+          employeeByName.set(fullNameKey, typed)
 
-            const reverseName = `${typed.apellido || ''} ${typed.nombre || ''}`.trim()
-            if (reverseName) {
-              employeeByName.set(normalizePersonName(reverseName), typed)
-            }
+          const reverseName = `${typed.apellido || ''} ${typed.nombre || ''}`.trim()
+          if (reverseName) {
+            employeeByName.set(normalizePersonName(reverseName), typed)
           }
+        }
 
-          const keys = [
-            typed.dni ? normalizeIdentity(typed.dni) : '',
-            typed.cuil ? normalizeIdentity(typed.cuil) : '',
-            typed.legajo ? normalizeIdentity(typed.legajo) : '',
-            typed.id ? normalizeIdentity(typed.id) : '',
-          ].filter(Boolean)
+        const keys = [
+          typed.dni ? normalizeIdentity(typed.dni) : '',
+          typed.cuil ? normalizeIdentity(typed.cuil) : '',
+          typed.legajo ? normalizeIdentity(typed.legajo) : '',
+          typed.id ? normalizeIdentity(typed.id) : '',
+        ].filter(Boolean)
 
-          for (const key of keys) {
-            employeeMap.set(key, typed)
-            const keyDigits = digitsOnly(key)
-            if (keyDigits) {
-              employeeMap.set(keyDigits, typed)
-            }
+        for (const key of keys) {
+          employeeMap.set(key, typed)
+          const keyDigits = digitsOnly(key)
+          if (keyDigits) {
+            employeeMap.set(keyDigits, typed)
           }
-        })
-      }
+        }
+      })
     }
 
     const hikMapConfig = await loadHikPersonMapConfig({
-      adminSupabase: createAdminClient(),
+      adminSupabase,
     })
     const { appliedCount: appliedHikMapCount, unresolvedCount: unresolvedHikMapCount } =
       applyConfiguredHikMappings({
@@ -612,8 +796,8 @@ export async function obtenerHorariosHoyDesdeHikAction(fecha?: string): Promise<
       })
     warnings.push(...hikMapConfig.warnings)
 
-    const registros = buildDailyRows(normalizedToday, employeeMap, employeeByName)
-    const mappedCount = registros.filter((row) => row.mapeado).length
+    const hikRegistros = buildDailyRows(normalizedToday, employeeMap, employeeByName)
+    const mappedCount = hikRegistros.filter((row) => row.mapeado).length
 
     if (hikMapConfig.map.size > 0 && unresolvedHikMapCount > 0) {
       warnings.push(
@@ -621,7 +805,7 @@ export async function obtenerHorariosHoyDesdeHikAction(fecha?: string): Promise<
       )
     }
 
-    if (registros.length > 0 && mappedCount === 0) {
+    if (hikRegistros.length > 0 && mappedCount === 0) {
       warnings.push(
         'No se pudo mapear ninguna marcacion a RRHH. Revise DNI/CUIL/legajo o configure rrhh_hik_person_map/HIK_CONNECT_PERSON_MAP.',
       )
@@ -630,10 +814,37 @@ export async function obtenerHorariosHoyDesdeHikAction(fecha?: string): Promise<
     // Sincronizar marcaciones mapeadas con rrhh_asistencia
     let sincronizados = 0
     if (mappedCount > 0) {
-      const syncResult = await sincronizarAsistenciaDesdeHik(registros, range.date)
+      const syncResult = await sincronizarAsistenciaDesdeHik(hikRegistros, range.date)
       sincronizados = syncResult.sincronizados
       warnings.push(...syncResult.warnings)
     }
+
+    const activeEmpleadoIds = [...employeeById.keys()]
+    const [{ data: asistencias }, { data: licenciasActivas }] = await Promise.all([
+      activeEmpleadoIds.length > 0
+        ? adminSupabase
+          .from('rrhh_asistencia')
+          .select('empleado_id, estado, retraso_minutos, hora_entrada, hora_salida')
+          .in('empleado_id', activeEmpleadoIds)
+          .eq('fecha', range.date)
+        : Promise.resolve({ data: [], error: null }),
+      activeEmpleadoIds.length > 0
+        ? adminSupabase
+          .from('rrhh_licencias')
+          .select('empleado_id, tipo, observaciones, fecha_inicio, fecha_fin')
+          .in('empleado_id', activeEmpleadoIds)
+          .eq('aprobado', true)
+          .lte('fecha_inicio', range.date)
+          .gte('fecha_fin', range.date)
+        : Promise.resolve({ data: [], error: null }),
+    ])
+
+    const registros = buildRosterRows(
+      Array.from(employeeById.values()),
+      hikRegistros,
+      (asistencias || []) as AsistenciaLookup[],
+      (licenciasActivas || []) as LicenciaLookup[],
+    )
 
     return {
       success: true,

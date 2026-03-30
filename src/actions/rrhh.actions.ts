@@ -2,8 +2,6 @@
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
-import { getGeminiModel } from '@/lib/ai/runtime'
-import { GEMINI_MODEL_FLASH } from '@/lib/constants/gemini-models'
 import {
   RRHH_DISCIPLINA_BUCKET,
   generarDocumentoIncidenciaDisciplinaria,
@@ -3320,125 +3318,6 @@ export async function marcarLiquidacionPagadaAction(liquidacionId: string): Prom
 
 // ========== LICENCIAS ==========
 
-type AuditoriaCertificadoIA = {
-  valido: boolean
-  confianza: number
-  observaciones: string
-  nombreDetectado?: string
-  diagnosticoDetectado?: string
-}
-
-function normalizarTexto(value?: string | null) {
-  return (value || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
-function coincideNombre(esperado: string, detectado: string) {
-  const esperadoNorm = normalizarTexto(esperado)
-  const detectadoNorm = normalizarTexto(detectado)
-
-  if (!esperadoNorm || !detectadoNorm) return false
-  if (esperadoNorm.includes(detectadoNorm) || detectadoNorm.includes(esperadoNorm)) return true
-
-  const tokens = esperadoNorm.split(' ').filter((token) => token.length > 2)
-  return tokens.length > 0 && tokens.every((token) => detectadoNorm.includes(token))
-}
-
-function coincideDiagnostico(reportado?: string, detectado?: string) {
-  const reportadoNorm = normalizarTexto(reportado)
-  const detectadoNorm = normalizarTexto(detectado)
-
-  if (!reportadoNorm) return true
-  if (!detectadoNorm) return false
-  return reportadoNorm.includes(detectadoNorm) || detectadoNorm.includes(reportadoNorm)
-}
-
-async function auditarCertificadoConIA(
-  file: File,
-  contexto: { nombreEmpleado: string; diagnosticoReportado?: string }
-): Promise<AuditoriaCertificadoIA> {
-  const fallback: AuditoriaCertificadoIA = {
-    valido: false,
-    confianza: 0,
-    observaciones: 'No se pudo validar automaticamente. Requiere revision manual.',
-  }
-
-  if (!file.type.startsWith('image/')) {
-    return {
-      ...fallback,
-      observaciones: 'Solo se admiten imagenes para auditoria IA del certificado.',
-    }
-  }
-
-  const model = getGeminiModel(GEMINI_MODEL_FLASH, {
-    responseMimeType: 'application/json',
-    temperature: 0.1,
-  })
-
-  if (!model) {
-    return {
-      ...fallback,
-      observaciones: 'IA no configurada. Queda pendiente de revision manual por administrador.',
-    }
-  }
-
-  try {
-    const buffer = await file.arrayBuffer()
-    const base64Data = Buffer.from(buffer).toString('base64')
-
-    const prompt = `
-Analiza esta imagen de certificado medico laboral y responde SOLO JSON valido:
-{
-  "es_certificado_medico": true/false,
-  "nombre_paciente": "texto o null",
-  "diagnostico": "texto o null",
-  "fecha_emision": "YYYY-MM-DD o null",
-  "confianza": 0-100,
-  "observaciones": "hallazgos cortos"
-}
-`
-
-    const result = await model.generateContent([
-      prompt,
-      { inlineData: { data: base64Data, mimeType: file.type } },
-    ])
-
-    const response = await result.response
-    const text = response.text()
-    const jsonMatch = text.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) return fallback
-
-    const parsed = JSON.parse(jsonMatch[0]) as {
-      es_certificado_medico?: boolean
-      nombre_paciente?: string | null
-      diagnostico?: string | null
-      confianza?: number
-      observaciones?: string
-    }
-
-    const nombreDetectado = parsed.nombre_paciente || ''
-    const diagnosticoDetectado = parsed.diagnostico || ''
-    const nombreOk = coincideNombre(contexto.nombreEmpleado, nombreDetectado)
-    const diagnosticoOk = coincideDiagnostico(contexto.diagnosticoReportado, diagnosticoDetectado)
-    const esCertificado = !!parsed.es_certificado_medico
-
-    return {
-      valido: esCertificado && nombreOk && diagnosticoOk,
-      confianza: Number(parsed.confianza || 0),
-      observaciones: parsed.observaciones || 'Analisis IA completado.',
-      nombreDetectado,
-      diagnosticoDetectado,
-    }
-  } catch (error) {
-    devError('Error en auditarCertificadoConIA:', error)
-    return fallback
-  }
-}
-
 export async function crearLicenciaAction(formData: FormData): Promise<ApiResponse<{ licenciaId: string }>> {
   try {
     const { db, user, isAdmin } = await getDbForCurrentUser()
@@ -3548,16 +3427,11 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
       return { success: false, error: 'Empleado no encontrado' }
     }
 
-    const nombreEmpleado =
-      `${(empleado as any).usuario?.nombre || (empleado as any).nombre || ''} ${(empleado as any).usuario?.apellido || (empleado as any).apellido || ''}`.trim() ||
-      'Empleado'
-
     const certificadoUrl: string | null = null
     let storagePath: string | null = null
     let certificadoNombreArchivo: string | null = null
     let certificadoMimeType: string | null = null
     let certificadoTamanoBytes: number | null = null
-    let auditoriaIA: AuditoriaCertificadoIA | null = null
 
     if (!esVacaciones && certificadoPreparado) {
       const bucketReady = await ensureRrhhLicenciasBucket(db)
@@ -3602,11 +3476,6 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
       certificadoNombreArchivo = certificadoPreparado.originalName
       certificadoMimeType = certificadoPreparado.mimeType
       certificadoTamanoBytes = certificadoPreparado.sizeBytes
-
-      auditoriaIA = await auditarCertificadoConIA(certificadoPreparado.file, {
-        nombreEmpleado,
-        diagnosticoReportado: diagnostico_reportado,
-      })
     }
 
     const diasTotal = Math.ceil((fechaFin.getTime() - fechaInicio.getTime()) / (1000 * 60 * 60 * 24)) + 1
@@ -3632,11 +3501,11 @@ export async function crearLicenciaAction(formData: FormData): Promise<ApiRespon
         certificado_tamano_bytes: certificadoTamanoBytes,
         estado_revision: 'pendiente',
         revision_manual_required: true,
-        ia_certificado_valido: auditoriaIA?.valido ?? null,
-        ia_confianza: auditoriaIA?.confianza ?? null,
-        ia_observaciones: auditoriaIA?.observaciones ?? null,
-        ia_nombre_detectado: auditoriaIA?.nombreDetectado || null,
-        ia_diagnostico_detectado: auditoriaIA?.diagnosticoDetectado || null,
+        ia_certificado_valido: null,
+        ia_confianza: null,
+        ia_observaciones: null,
+        ia_nombre_detectado: null,
+        ia_diagnostico_detectado: null,
         observaciones,
         dias_total: diasTotal,
         aprobado: false,

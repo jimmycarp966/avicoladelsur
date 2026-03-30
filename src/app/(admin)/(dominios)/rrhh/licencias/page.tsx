@@ -232,7 +232,7 @@ export default async function LicenciasPage() {
           <div>
             <h3 className="font-semibold text-blue-900">Sistema de Licencias</h3>
             <ul className="mt-2 space-y-2 text-sm text-blue-700">
-              <li>Vacaciones se cargan sin certificado ni auditoria IA.</li>
+              <li>Vacaciones se cargan sin certificado.</li>
               <li>Las licencias medicas exigen certificado en imagen y control de presentacion dentro de 24 horas.</li>
               <li>Si el plazo ya vencio, la carga requiere excepcion justificada.</li>
               <li>Todas las solicitudes quedan visibles para revision manual del administrador.</li>

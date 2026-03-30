@@ -18,7 +18,6 @@ import {
   ArrowLeft,
   Loader2,
   Save,
-  ShieldCheck,
   Upload,
   AlertCircle,
 } from 'lucide-react'
@@ -205,7 +204,7 @@ export function NuevaLicenciaForm({ defaultTipo }: NuevaLicenciaFormProps) {
                 <li>El certificado puede adjuntarse como `JPG`, `PNG`, `WEBP`, `HEIC` o `HEIF`.</li>
                 <li>El plazo de presentacion es de 24 horas desde la fecha declarada; si no se informa, se toma la fecha de inicio.</li>
                 <li>Si el plazo vencio, solo se puede continuar marcando excepcion y explicando el motivo.</li>
-                <li>La IA audita el certificado y el administrador mantiene la revision manual antes de resolverlo.</li>
+                <li>El certificado queda disponible para revision manual del administrador antes de resolverlo.</li>
               </ul>
             )}
           </CardContent>
@@ -404,14 +403,14 @@ export function NuevaLicenciaForm({ defaultTipo }: NuevaLicenciaFormProps) {
               {esVacaciones ? (
                 <CalendarDays className="w-5 h-5 text-emerald-600" />
               ) : (
-                <ShieldCheck className="w-5 h-5 text-purple-600" />
+                <Upload className="w-5 h-5 text-purple-600" />
               )}
-              {esVacaciones ? 'Observaciones de la solicitud' : 'Certificado y Auditoria IA'}
+              {esVacaciones ? 'Observaciones de la solicitud' : 'Certificado adjunto y observaciones'}
             </CardTitle>
             <CardDescription>
               {esVacaciones
                 ? 'Usá este espacio para aclarar cobertura, viaje, fechas especiales o cualquier nota interna.'
-                : 'Sin certificado no se valida. La IA analiza la imagen y el administrador revisa manualmente el caso pendiente.'}
+                : 'Sin certificado no se valida. El adjunto queda disponible para revision manual del administrador.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -479,7 +478,7 @@ export function NuevaLicenciaForm({ defaultTipo }: NuevaLicenciaFormProps) {
               <p className={`mt-1 text-sm ${esVacaciones ? 'text-emerald-800' : 'text-yellow-800'}`}>
                 {esVacaciones
                   ? '1) Se guardan fechas y observaciones. 2) El administrador revisa la solicitud y mantiene el seguimiento hasta resolverla.'
-                  : '1) Se valida la carga del certificado. 2) La IA audita nombre y diagnostico de la imagen. 3) El administrador realiza la revision manual y mantiene el estado pendiente hasta resolverlo.'}
+                  : '1) Se valida la carga del certificado. 2) El administrador revisa manualmente la documentacion y mantiene el estado pendiente hasta resolverlo.'}
               </p>
             </div>
           </div>

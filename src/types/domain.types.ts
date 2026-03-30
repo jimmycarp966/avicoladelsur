@@ -918,6 +918,12 @@ export interface HorarioDiarioEmpleado {
   hora_entrada?: string
   hora_salida?: string
   mapeado: boolean
+  tiene_marcacion?: boolean
+  estado_consolidado?: 'presente' | 'ausente' | 'vacaciones' | 'enfermedad'
+  estado_detalle?: string
+  licencia_tipo?: Licencia['tipo'] | null
+  licencia_activa?: boolean
+  sincronizado_asistencia?: boolean
   origen: 'hik_connect'
 }
 

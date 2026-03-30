@@ -170,16 +170,38 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
     setClienteDropdownOpen(true)
   }, [])
 
+  const resetClienteDependencias = useCallback(() => {
+    setValue('zona_id', '', { shouldDirty: true, shouldTouch: true })
+    setValue('lista_precio_id', undefined, { shouldDirty: true, shouldTouch: true })
+    setListasPorProducto({})
+    ultimasListasRef.current = {}
+    ultimaListaGlobalRef.current = undefined
+    productosProcesadosRef.current.clear()
+    preciosModificadosManualmenteRef.current.clear()
+  }, [setValue])
+
+  const seleccionarCliente = useCallback((clienteId: string) => {
+    resetClienteDependencias()
+    setValue('cliente_id', clienteId, { shouldValidate: true, shouldDirty: true, shouldTouch: true })
+    setClienteDropdownOpen(false)
+    setClienteSearch('')
+    window.setTimeout(() => {
+      const fechaInput = document.getElementById('fecha_entrega_estimada')
+      if (fechaInput) {
+        fechaInput.focus()
+      }
+    }, 100)
+  }, [resetClienteDependencias, setValue])
+
   const clearClienteSelection = useCallback(() => {
-    setValue('cliente_id', '', { shouldDirty: true, shouldTouch: true })
-    setValue('zona_id', '', { shouldDirty: true })
-    setValue('lista_precio_id', undefined, { shouldDirty: true })
+    resetClienteDependencias()
+    setValue('cliente_id', '', { shouldDirty: true, shouldTouch: true, shouldValidate: true })
     setClienteSearch('')
     window.setTimeout(() => {
       setClienteDropdownOpen(true)
       focusClienteSearchInput(true)
     }, 0)
-  }, [focusClienteSearchInput, setValue])
+  }, [focusClienteSearchInput, resetClienteDependencias, setValue])
 
   const formShortcuts: FormFieldShortcut[] = [
     {
@@ -1074,19 +1096,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                 <Select
                   open={clienteDropdownOpen}
                   value={watchedCliente || ''}
-                  onValueChange={(value) => {
-                    // Establecer el valor primero
-                    setValue('cliente_id', value, { shouldValidate: true, shouldDirty: true })
-                    setClienteDropdownOpen(false)
-                    // Limpiar la búsqueda después de un pequeño delay para asegurar que el valor se estableció
-                    setTimeout(() => {
-                      setClienteSearch('')
-                      const fechaInput = document.getElementById('fecha_entrega_estimada')
-                      if (fechaInput) {
-                        fechaInput.focus()
-                      }
-                    }, 100)
-                  }}
+                  onValueChange={seleccionarCliente}
                   onOpenChange={(open) => {
                     setClienteDropdownOpen(open)
                     if (open) {
@@ -1128,15 +1138,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                               e.preventDefault()
                               // Seleccionar el primer resultado
                               const primerCliente = listaFinal[0]
-                              setValue('cliente_id', primerCliente.id, { shouldValidate: true, shouldDirty: true })
-                              setClienteSearch('')
-                              setClienteDropdownOpen(false)
-                              setTimeout(() => {
-                                const fechaInput = document.getElementById('fecha_entrega_estimada')
-                                if (fechaInput) {
-                                  fechaInput.focus()
-                                }
-                              }, 100)
+                              seleccionarCliente(primerCliente.id)
                             } else if (e.key === 'Tab' && !e.shiftKey) {
                               // Si hay un cliente seleccionado, cerrar dropdown y avanzar
                               if (watchedCliente) {
@@ -1155,7 +1157,7 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                           autoComplete="off"
                           autoFocus={clienteDropdownOpen && !watchedCliente}
                         />
-                        {clienteSearch && (
+                        {(clienteSearch || watchedCliente) && (
                           <Button
                             type="button"
                             variant="ghost"
@@ -1163,8 +1165,13 @@ export function PresupuestoForm({ clientes, productos, zonas, tipoVentaInicial }
                             className="absolute right-1 top-1 h-6 w-6 p-0"
                             onClick={(e) => {
                               e.stopPropagation()
-                              setClienteSearch('')
-                              focusClienteSearchInput(true)
+                              if (clienteSearch) {
+                                setClienteSearch('')
+                                focusClienteSearchInput(true)
+                                return
+                              }
+
+                              clearClienteSelection()
                             }}
                           >
                             <X className="h-3 w-3" />

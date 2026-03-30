@@ -91,8 +91,8 @@ export function LicenciasTableWrapper({ licencias, canApprove }: LicenciasTableW
       />
 
       <Dialog open={Boolean(licenciaSeleccionada)} onOpenChange={(open) => !open && setSelectedLicencia(null)}>
-        <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[95vh] w-[calc(100vw-1.5rem)] max-w-5xl flex-col overflow-hidden p-0 sm:w-full">
+          <DialogHeader className="border-b px-4 py-4 sm:px-6">
             <DialogTitle>Detalle de licencia</DialogTitle>
             <DialogDescription>
               Revisa la información y el certificado antes de aprobar o rechazar la solicitud.
@@ -100,7 +100,8 @@ export function LicenciasTableWrapper({ licencias, canApprove }: LicenciasTableW
           </DialogHeader>
 
           {licenciaSeleccionada && (
-            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+              <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
               <div className="space-y-4">
                 <div className="grid gap-4 rounded-lg border bg-slate-50/60 p-4 sm:grid-cols-2">
                   <div>
@@ -149,17 +150,8 @@ export function LicenciasTableWrapper({ licencias, canApprove }: LicenciasTableW
                   </div>
                 )}
 
-                {licenciaSeleccionada.ia_observaciones && (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-                    <p className="text-xs font-medium uppercase tracking-wide text-amber-900">Auditoria IA</p>
-                    <p className="mt-2 text-sm text-amber-900 whitespace-pre-wrap">
-                      {licenciaSeleccionada.ia_observaciones}
-                    </p>
-                  </div>
-                )}
-
                 <div className="rounded-lg border p-4">
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                         Certificado adjunto
@@ -186,14 +178,14 @@ export function LicenciasTableWrapper({ licencias, canApprove }: LicenciasTableW
                       <iframe
                         src={certificadoUrl}
                         title={`Certificado de ${empleadoNombre}`}
-                        className="h-[60vh] w-full bg-white"
+                        className="h-[52vh] min-h-[320px] w-full bg-white sm:h-[60vh]"
                       />
                     </div>
                   )}
                 </div>
               </div>
 
-              <div className="space-y-4 rounded-lg border p-4">
+              <div className="space-y-4 rounded-lg border p-4 lg:sticky lg:top-0">
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Estado actual</p>
                   <div className="mt-2">{renderRevisionBadge()}</div>
@@ -203,38 +195,23 @@ export function LicenciasTableWrapper({ licencias, canApprove }: LicenciasTableW
                   {licenciaSeleccionada.fecha_limite_presentacion && (
                     <p>Limite de presentacion: {formatDate(licenciaSeleccionada.fecha_limite_presentacion)}</p>
                   )}
-                  {licenciaSeleccionada.ia_certificado_valido !== undefined &&
-                    licenciaSeleccionada.ia_certificado_valido !== null && (
-                      <p>
-                        Validacion IA:{' '}
-                        <span className="font-medium text-foreground">
-                          {licenciaSeleccionada.ia_certificado_valido ? 'Valida' : 'Observar'}
-                        </span>
-                      </p>
-                    )}
-                  {typeof licenciaSeleccionada.ia_confianza === 'number' && (
-                    <p>
-                      Confianza IA:{' '}
-                      <span className="font-medium text-foreground">
-                        {Math.round(licenciaSeleccionada.ia_confianza * 100)}%
-                      </span>
-                    </p>
-                  )}
+                  <p>La resolucion de esta licencia es completamente manual.</p>
                 </div>
               </div>
             </div>
+            </div>
           )}
 
-          <DialogFooter className="gap-2 sm:justify-between">
+          <DialogFooter className="border-t bg-background px-4 py-4 sm:justify-between sm:px-6">
             <Button type="button" variant="outline" onClick={() => setSelectedLicencia(null)}>
               Cerrar
             </Button>
             {licenciaSeleccionada && canApprove && !licenciaSeleccionada.aprobado && (
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={() => void handleReject(licenciaSeleccionada)}>
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => void handleReject(licenciaSeleccionada)}>
                   Rechazar
                 </Button>
-                <Button type="button" onClick={() => void handleApprove(licenciaSeleccionada)}>
+                <Button type="button" className="w-full sm:w-auto" onClick={() => void handleApprove(licenciaSeleccionada)}>
                   Aprobar
                 </Button>
               </div>

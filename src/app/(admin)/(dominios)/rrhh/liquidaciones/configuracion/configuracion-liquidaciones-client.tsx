@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useNotificationStore } from '@/store/notificationStore'
 import type { LiquidacionReglaPuesto } from '@/types/domain.types'
 
@@ -653,7 +654,23 @@ export function ConfiguracionLiquidacionesClient() {
                     <TableHead>Grupo días</TableHead>
                     <TableHead>Tipo cálculo</TableHead>
                     <TableHead className="text-right">Hs diarias</TableHead>
-                    <TableHead className="text-right">Valor hora / turno</TableHead>
+                    <TableHead className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <span>Valor hora / turno</span>
+                        <TooltipProvider delayDuration={150}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button type="button" className="text-muted-foreground transition-colors hover:text-foreground">
+                                <Info className="h-3.5 w-3.5" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-[260px] text-xs">
+                              Auto: sueldo basico / dias base del grupo = valor jornal.
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    </TableHead>
                     <TableHead className="text-right">Tarifa especial</TableHead>
                     <TableHead>Cajero</TableHead>
                     <TableHead className="text-right">Tarifa cajero</TableHead>
@@ -768,9 +785,23 @@ export function ConfiguracionLiquidacionesClient() {
                               <div className="text-[11px] text-muted-foreground">
                                 {regla.valor_hora_override != null
                                   ? 'Manual. Guardar para recalcular el periodo.'
-                                  : categoriaRegla
-                                    ? `Auto: sueldo ${Number(categoriaRegla.sueldo_basico || 0).toFixed(0)} / ${diasBaseRegla} dias = ${(valorHoraCalculado ?? 0).toFixed(2)}`
-                                    : 'Vacio = usa el valor automatico de la categoria'}
+                                  : categoriaRegla ? (
+                                    <span className="inline-flex items-center gap-1">
+                                      <span>{`Auto: sueldo ${Number(categoriaRegla.sueldo_basico || 0).toFixed(0)} / ${diasBaseRegla} dias = ${(valorHoraCalculado ?? 0).toFixed(2)}`}</span>
+                                      <TooltipProvider delayDuration={150}>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <button type="button" className="text-muted-foreground transition-colors hover:text-foreground">
+                                              <Info className="h-3.5 w-3.5" />
+                                            </button>
+                                          </TooltipTrigger>
+                                          <TooltipContent className="max-w-[280px] text-xs">
+                                            {`Auto: sueldo ${Number(categoriaRegla.sueldo_basico || 0).toFixed(0)} / ${diasBaseRegla} dias = ${(valorHoraCalculado ?? 0).toFixed(2)}`}
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
+                                    </span>
+                                  ) : 'Vacio = usa el valor automatico de la categoria'}
                               </div>
                             </div>
                           )}
